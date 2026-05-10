@@ -15,6 +15,10 @@ struct SupersetCard: View {
     let onDismissRest: () -> Void
     var restTimerGeneration: Int = 0
 
+    /// Weight text from the currently editing set, captured so the inline
+    /// ExerciseTimerView can submit it on Done. Mirrors ActiveExerciseCard.
+    @State private var currentWeightText: String = ""
+
     private var allSetsCompleted: Bool {
         children.allSatisfy { child in
             child.exercise.sets.allSatisfy { $0.status == .completed || $0.status == .skipped }
@@ -163,8 +167,24 @@ struct SupersetCard: View {
                         onSave: { weight, reps, time in
                             onSaveSet(item.exerciseIndex, item.setIndex, weight, reps, time)
                         },
-                        onUnlog: { onUnlogSet(item.exerciseIndex, item.setIndex) }
+                        onUnlog: { onUnlogSet(item.exerciseIndex, item.setIndex) },
+                        onWeightChanged: isCurrent ? { newWeight in
+                            currentWeightText = newWeight
+                        } : nil
                     )
+
+                    // Timed-exercise timer — pinned directly under the active
+                    // set, identical to ActiveExerciseCard. Without this block
+                    // a timed set inside a superset has no countdown UI and
+                    // can't be re-timed after being skipped + unlogged.
+                    if isCurrent,
+                       let targetTime = item.set.entries.first?.target?.time, targetTime > 0 {
+                        ExerciseTimerView(targetSeconds: targetTime) { elapsedSeconds in
+                            let weight = Double(currentWeightText)
+                            onCompleteSet(item.exerciseIndex, item.setIndex, weight, nil, elapsedSeconds)
+                        }
+                        .id(item.set.id)
+                    }
 
                     // Rest timer after last completed set
                     if let lastId = lastCompletedSetId, item.set.id == lastId,

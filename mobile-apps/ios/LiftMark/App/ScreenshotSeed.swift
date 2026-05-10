@@ -507,10 +507,18 @@ enum ScreenshotSeed {
 
     ## Core
 
-    ### Plank
-    - 60s @rest: 45s
-    - 45s @rest: 45s
-    - 30s
+    ### Superset: Plank & Dead Bug
+    #### Plank
+    Beat last week's 65s — aim for 70s if it feels solid.
+    - 60s @rest: 20s
+    - 60s @rest: 20s
+    - 45s
+
+    #### Dead Bug
+    Slow and controlled, lower back pressed into floor.
+    - x 10 @perside
+    - x 10 @perside
+    - x 10 @perside
 
     ### Hollow Hold
     - 30s @rest: 30s

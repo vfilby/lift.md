@@ -120,17 +120,50 @@ struct ActiveWorkoutFooter: View {
     }
 }
 
-/// Progress bar showing completed sets count.
+/// Progress bar showing completed and skipped sets.
+///
+/// Two-tone fill: blue for logged sets, orange (`LiftMarkTheme.warning`) for
+/// skipped sets, and the remaining track in grey. A single-tone bar made an
+/// all-but-finished workout look like the user had missed several sets — the
+/// orange segment makes the "done, just not logged" share legible at a glance.
 struct ActiveWorkoutProgressBar: View {
-    let progress: Double
     let completedSets: Int
+    let skippedSets: Int
     let totalSets: Int
+
+    private var completedFraction: Double {
+        totalSets > 0 ? Double(completedSets) / Double(totalSets) : 0
+    }
+
+    private var skippedFraction: Double {
+        totalSets > 0 ? Double(skippedSets) / Double(totalSets) : 0
+    }
+
+    private var doneSets: Int { completedSets + skippedSets }
+
+    private var completedColor: Color {
+        doneSets >= totalSets && skippedSets == 0 ? LiftMarkTheme.success : LiftMarkTheme.primary
+    }
 
     var body: some View {
         VStack(spacing: 4) {
-            ProgressView(value: progress)
-                .tint(progress >= 1.0 ? LiftMarkTheme.success : LiftMarkTheme.primary)
-            Text("\(completedSets) / \(totalSets) sets completed")
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(LiftMarkTheme.tertiaryLabel.opacity(0.25))
+                    HStack(spacing: 0) {
+                        Capsule()
+                            .fill(completedColor)
+                            .frame(width: geo.size.width * completedFraction)
+                        Rectangle()
+                            .fill(LiftMarkTheme.warning)
+                            .frame(width: geo.size.width * skippedFraction)
+                    }
+                    .clipShape(Capsule())
+                }
+            }
+            .frame(height: 4)
+            Text("\(doneSets) / \(totalSets) sets done")
                 .font(.caption)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
         }
@@ -139,6 +172,8 @@ struct ActiveWorkoutProgressBar: View {
         .accessibilityIdentifier("active-workout-progress")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Workout progress")
-        .accessibilityValue("\(completedSets) of \(totalSets) sets completed")
+        .accessibilityValue(skippedSets > 0
+            ? "\(completedSets) logged, \(skippedSets) skipped of \(totalSets) sets"
+            : "\(completedSets) of \(totalSets) sets completed")
     }
 }

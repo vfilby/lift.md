@@ -12,6 +12,12 @@ enum ActiveWorkoutViewModel {
         } ?? 0
     }
 
+    static func skippedSets(in session: WorkoutSession?) -> Int {
+        session?.exercises.reduce(0) { sum, ex in
+            sum + ex.sets.filter { $0.status == .skipped }.count
+        } ?? 0
+    }
+
     static func totalSets(in session: WorkoutSession?) -> Int {
         session?.exercises.reduce(0) { $0 + $1.sets.count } ?? 0
     }

@@ -34,6 +34,39 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(ActiveWorkoutViewModel.completedSets(in: session), 0)
     }
 
+    // MARK: - Progress: skippedSets
+
+    func testSkippedSetsCountsOnlySkipped() {
+        let session = makeSession(exercises: [
+            makeExercise(sets: [
+                makeSet(status: .completed),
+                makeSet(status: .skipped),
+                makeSet(status: .pending),
+                makeSet(status: .skipped)
+            ])
+        ])
+        XCTAssertEqual(ActiveWorkoutViewModel.skippedSets(in: session), 2)
+    }
+
+    func testSkippedSetsAcrossMultipleExercises() {
+        let session = makeSession(exercises: [
+            makeExercise(sets: [makeSet(status: .skipped), makeSet(status: .skipped)]),
+            makeExercise(sets: [makeSet(status: .completed), makeSet(status: .skipped)])
+        ])
+        XCTAssertEqual(ActiveWorkoutViewModel.skippedSets(in: session), 3)
+    }
+
+    func testSkippedSetsReturnsZeroForNilSession() {
+        XCTAssertEqual(ActiveWorkoutViewModel.skippedSets(in: nil), 0)
+    }
+
+    func testSkippedSetsReturnsZeroWhenNoSkippedSets() {
+        let session = makeSession(exercises: [
+            makeExercise(sets: [makeSet(status: .completed), makeSet(status: .pending)])
+        ])
+        XCTAssertEqual(ActiveWorkoutViewModel.skippedSets(in: session), 0)
+    }
+
     // MARK: - Progress: totalSets
 
     func testTotalSetsCountsAllSets() {

@@ -23,6 +23,7 @@ struct ActiveWorkoutView: View {
     private var session: WorkoutSession? { sessionStore.activeSession }
 
     private var completedSets: Int { ActiveWorkoutViewModel.completedSets(in: session) }
+    private var skippedSets: Int { ActiveWorkoutViewModel.skippedSets(in: session) }
     private var totalSets: Int { ActiveWorkoutViewModel.totalSets(in: session) }
     private var progress: Double { ActiveWorkoutViewModel.progress(in: session) }
     private var isSkipHeavy: Bool { ActiveWorkoutViewModel.isSkipHeavy(in: session) }
@@ -186,8 +187,8 @@ struct ActiveWorkoutView: View {
 
     private var progressBar: some View {
         ActiveWorkoutProgressBar(
-            progress: progress,
             completedSets: completedSets,
+            skippedSets: skippedSets,
             totalSets: totalSets
         )
     }

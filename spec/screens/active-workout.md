@@ -8,7 +8,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 
 ## Layout
 - **Header**: Custom header with Pause button (left), workout name (center), Notes button + Finish button (right). The Notes button is persistently reachable at all times during the session — the user should never lose a thought because they can't find the field. Add Exercise is intentionally NOT in the header; it lives in the bottom action bar so the top cluster stays readable on iPhone (GH #98).
-- **Progress bar**: Below header showing completed/total sets
+- **Progress bar**: Below header. Two-tone fill — blue (`LiftMarkTheme.primary`) for the completed proportion, orange (`LiftMarkTheme.warning`) for the skipped proportion, and grey for the remainder. The label reads `"<completed + skipped> / <total> sets done"` so a session in which most pending sets were intentionally skipped does not visually read as "you missed something." When `skipped == 0` and `completed == total`, the completed segment uses `LiftMarkTheme.success` for the full-success affordance.
 - **Body**: ScrollView of exercise sections, each containing SetRow components
 - **Bottom action bar** (`active-workout-footer`): Pinned to the bottom safe-area inset. Houses the primary **Add Exercise** button (filled, `active-workout-add-exercise-button`) and a secondary **End Workout** button (bordered, `active-workout-footer-finish-button`). The bottom End-Workout button exists in addition to the top-bar Finish so the user does not have to reach the top-right corner on large iPhones (GH #99). Both buttons trigger the same finish confirmation flow. The bottom button is deliberately labelled "End Workout" rather than "Finish" so text-based UI test matchers (which target `Finish` / `Finish Anyway` / `Log Anyway` in the confirm alert) cannot accidentally match the bottom button when the alert is what should be hit.
 - **Modals**: EditExerciseModal, AddExerciseModal (overlaid)
@@ -81,6 +81,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 ### Exercise Timer (timed sets)
 - ExerciseTimer component appears **inline directly below the current set row** (not at the bottom of the exercise card). This keeps the timer visually associated with the active set when multiple timed sets exist.
 - ExerciseTimer component appears for sets with `targetTime`
+- This applies equally to timed sets inside a superset: when the current pending set in the interleaved superset list has a `targetTime`, the same `ExerciseTimerView` renders directly below that set row. Re-pending a previously skipped timed set (via "Clear Log" in the edit menu) restores the timer.
 - **Tap Start** → begins counting up toward target
 - **Tap Pause** → pauses timer; elapsed time is frozen
 - **Tap timer display** → toggles between count-up and count-down display modes:
