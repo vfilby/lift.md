@@ -1671,7 +1671,7 @@
 			repositoryURL = "https://github.com/jpsim/Yams.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.1.0;
+				minimumVersion = 6.2.1;
 			};
 		};
 		C21050608BE79B97D9DAA152 /* XCRemoteSwiftPackageReference "swift-log" */ = {
