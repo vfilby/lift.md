@@ -13,7 +13,7 @@
   },
   {
     "canonical": "Deadlift",
-    "aliases": ["conventional deadlift", "barbell deadlift", "bb deadlift"],
+    "aliases": ["dl", "deads", "conventional deadlift", "barbell deadlift", "bb deadlift"],
     "muscleGroups": ["hamstrings", "glutes", "back", "core"],
     "category": "compound"
   },
@@ -31,7 +31,7 @@
   },
   {
     "canonical": "Bench Press",
-    "aliases": ["barbell bench press", "flat bench press", "flat bench", "barbell bench", "bb bench press", "bb bench"],
+    "aliases": ["bench", "barbell bench press", "flat bench press", "flat bench", "barbell bench", "bb bench press", "bb bench"],
     "muscleGroups": ["chest", "triceps", "shoulders"],
     "category": "compound"
   },

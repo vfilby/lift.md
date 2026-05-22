@@ -1949,3 +1949,91 @@ describe('Mixed Section Levels Warning', () => {
     expect(mixedWarnings).toHaveLength(1);
   });
 });
+
+// MARK: - Exercise Name Suggestions
+
+describe('Exercise Name Suggestions', () => {
+  it('emits EXERCISE_ALIAS_SUGGESTION when shorthand alias is used', () => {
+    const markdown = `# Push Day
+## Bench
+- 135 x 5`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    const aliasWarnings = result.warnings.filter((w) => w.includes('alias for "Bench Press"'));
+    expect(aliasWarnings).toHaveLength(1);
+    expect(aliasWarnings[0]).toContain('"Bench"');
+    expect(aliasWarnings[0]).toContain('barbell math');
+  });
+
+  it('does not warn when canonical name is used', () => {
+    const markdown = `# Push Day
+## Bench Press
+- 135 x 5`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    const aliasWarnings = result.warnings.filter((w) => w.includes('alias for'));
+    expect(aliasWarnings).toHaveLength(0);
+  });
+
+  it('emits EXERCISE_NAME_SUGGESTION for likely typo', () => {
+    const markdown = `# Workout
+## Bnch Prss
+- 135 x 5`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    const fuzzyWarnings = result.warnings.filter((w) => w.includes('did you mean'));
+    expect(fuzzyWarnings.length).toBeGreaterThan(0);
+    expect(fuzzyWarnings[0]).toContain('"Bnch Prss"');
+  });
+
+  it('does not warn for genuinely unknown exercise names', () => {
+    const markdown = `# Workout
+## Cossack Pistol Squat with Kettlebell
+- 24 x 6`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    const exerciseWarnings = result.warnings.filter(
+      (w) => w.includes('alias for') || w.includes('did you mean')
+    );
+    expect(exerciseWarnings).toHaveLength(0);
+  });
+
+  it('does not fuzzy-match very short unknown names', () => {
+    const markdown = `# Workout
+## Foo
+- 10 x 5`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    const fuzzyWarnings = result.warnings.filter((w) => w.includes('did you mean'));
+    expect(fuzzyWarnings).toHaveLength(0);
+  });
+
+  it('resolves "OHP" to "Overhead Press"', () => {
+    const markdown = `# Workout
+## OHP
+- 95 x 5`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    const aliasWarnings = result.warnings.filter((w) => w.includes('alias for "Overhead Press"'));
+    expect(aliasWarnings).toHaveLength(1);
+  });
+
+  it('reports the line number of the exercise header', () => {
+    const markdown = `# Workout
+
+## Bench
+- 135 x 5`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    const aliasWarnings = result.warnings.filter((w) => w.includes('alias for'));
+    expect(aliasWarnings).toHaveLength(1);
+    expect(aliasWarnings[0]).toMatch(/^Line 3:/);
+  });
+});

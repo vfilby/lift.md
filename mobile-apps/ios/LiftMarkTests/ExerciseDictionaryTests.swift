@@ -33,6 +33,18 @@ final class ExerciseDictionaryTests: XCTestCase {
         XCTAssertEqual(ExerciseDictionary.getCanonicalName("rdl"), "Romanian Deadlift")
     }
 
+    // GH #124 — `Bench` was a phantom alias: barbell math silently failed to engage.
+    func testGetCanonicalName_benchShorthand() {
+        XCTAssertEqual(ExerciseDictionary.getCanonicalName("Bench"), "Bench Press")
+        XCTAssertEqual(ExerciseDictionary.getCanonicalName("bench"), "Bench Press")
+    }
+
+    func testGetCanonicalName_deadliftShorthand() {
+        XCTAssertEqual(ExerciseDictionary.getCanonicalName("dl"), "Deadlift")
+        XCTAssertEqual(ExerciseDictionary.getCanonicalName("DL"), "Deadlift")
+        XCTAssertEqual(ExerciseDictionary.getCanonicalName("deads"), "Deadlift")
+    }
+
     // MARK: - isSameExercise
 
     func testIsSameExercise_sameCanonical() {

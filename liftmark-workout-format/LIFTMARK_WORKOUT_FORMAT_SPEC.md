@@ -146,6 +146,19 @@ Note: The workout is "Week 1 - Day 1: Push" (the first header with exercises). H
 - `@type: [equipment]` - Freeform equipment type (e.g., `barbell`, `dumbbell`, `cable`, `resistance band`, `kettlebell`) - completely optional
 - **Freeform notes**: Any text after the exercise header (before first set) is treated as exercise notes
 
+### Exercise Name Resolution
+
+Exercise names are permissive — any string is a valid exercise. However, downstream features (barbell math, history matching, muscle-group tagging) key on **canonical names** drawn from a bundled exercise dictionary.
+
+The validator and the app share a curated alias table (`spec/data/exercise-dictionary.json`). When a written name matches a known alias (case-insensitive), it resolves to the canonical form. Example: `Bench` → `Bench Press`, `RDL` → `Romanian Deadlift`, `OHP` → `Overhead Press`.
+
+To help users discover the canonical form, the validator emits two non-blocking warnings:
+
+- **`EXERCISE_ALIAS_SUGGESTION`** — fires when an exact alias is used in place of the canonical name. The set still parses normally; the warning suggests renaming so identity-keyed features engage reliably.
+- **`EXERCISE_NAME_SUGGESTION`** — fires when a name doesn't match any alias but fuzzy-matches a canonical name (typo recovery). Suggests a "did you mean?" candidate.
+
+Names that match neither path are passed through unchanged and receive no warning.
+
 ### Examples
 
 **Simple exercise:**
@@ -766,6 +779,8 @@ Short sprints with full recovery.
 - ⚠️ Very short rest (<10s, might be typo)
 - ⚠️ Very long rest (>10m, might be typo)
 - ⚠️ Mixed section levels — exercises and sections (groups with nested headers) at the same heading level. This is valid but may indicate structural issues (e.g., `## Warmup` as a section alongside `## Bench Press` as a standalone exercise).
+- ⚠️ `EXERCISE_ALIAS_SUGGESTION` — alias used in place of canonical name (e.g., `Bench` → `Bench Press`)
+- ⚠️ `EXERCISE_NAME_SUGGESTION` — fuzzy "did you mean?" hint for likely typos near a canonical name
 
 ### Error Examples
 
@@ -2269,6 +2284,9 @@ No actual child exercises here, just notes.
 - Added Example 9 (distance-based conditioning workout)
 - Added test cases TC-V31 through TC-V34 (valid) and TC-E31 through TC-E34 (invalid)
 
+### Version 1.4 (2026-05-22)
+- **Exercise name resolution via alias table** — `spec/data/exercise-dictionary.json` is now consulted by the validator. Two new non-blocking warnings: `EXERCISE_ALIAS_SUGGESTION` (alias used; suggests canonical) and `EXERCISE_NAME_SUGGESTION` (fuzzy "did you mean?"). Names that match neither path pass through silently.
+
 ### Version 1.3 (2026-05-22)
 - **Clarified `@amrap` is not a modifier** — AMRAP is expressed via the rep value (`x AMRAP`). The parser now emits a `DEPRECATED_AMRAP` warning when `@amrap` appears as a set-line flag.
 - **Sharpened `@perside` guidance** — primary use case is timed per-side sets (`30s @perside`); rep-based sets should prefer auto-detected trailing prose ("per side", "each leg").
@@ -2320,5 +2338,5 @@ Based on user feedback, the following design decisions were implemented:
 
 ---
 
-**Document Version:** 1.3
+**Document Version:** 1.4
 **Last Updated:** 2026-05-22

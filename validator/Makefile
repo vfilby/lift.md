@@ -1,4 +1,4 @@
-.PHONY: test build deploy diff destroy typecheck install install-cdk bundle
+.PHONY: test build deploy diff destroy typecheck install install-cdk bundle sync-dict
 
 # Wrap AWS-calling commands in aws-vault-op, which pulls the file-backend
 # passphrase and MFA TOTP from 1Password before invoking aws-vault. Falls back
@@ -32,14 +32,19 @@ test-watch:
 typecheck:
 	npx tsc --noEmit
 
+# ── Sync exercise dictionary from spec/ canonical source ──
+sync-dict:
+	cp ../spec/data/exercise-dictionary.json src/data/exercise-dictionary.json
+
 # ── Bundle Lambda code ──
-bundle:
+bundle: sync-dict
 	npx esbuild src/handler.ts \
 		--bundle \
 		--platform=node \
 		--target=node22 \
 		--outfile=dist/handler.js \
-		--format=cjs
+		--format=cjs \
+		--loader:.json=json
 
 # ── CDK commands ──
 # Both stacks deploy together: LmwfEdgeStack (us-east-1 cert) and

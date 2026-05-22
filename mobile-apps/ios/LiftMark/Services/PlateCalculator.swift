@@ -37,13 +37,18 @@ enum PlateCalculator {
     // MARK: - Public API
 
     /// Determines if an exercise uses a barbell and should show the plate calculator.
+    ///
+    /// Resolves shorthand to canonical names via `ExerciseDictionary` first
+    /// (e.g. "Bench" → "Bench Press") so identity-keyed features don't depend
+    /// on the user typing the canonical name verbatim. See GH #124.
     static func isBarbellExercise(exerciseName: String, equipmentType: String? = nil) -> Bool {
         // 1. Equipment type contains "barbell"
         if let equipmentType, equipmentType.localizedCaseInsensitiveContains("barbell") {
             return true
         }
 
-        let lowerName = exerciseName.lowercased()
+        let canonicalName = ExerciseDictionary.getCanonicalName(exerciseName)
+        let lowerName = canonicalName.lowercased()
 
         // 2. Name explicitly mentions barbell
         if lowerName.contains("barbell") {

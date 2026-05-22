@@ -42,6 +42,16 @@ struct PlateCalculatorTests {
             #expect(PlateCalculator.isBarbellExercise(exerciseName: "bench press") == true)
             #expect(PlateCalculator.isBarbellExercise(exerciseName: "BaRbElL rOw") == true)
         }
+
+        // GH #124 — shorthand exercise names must resolve via ExerciseDictionary.
+        @Test("resolves shorthand aliases to canonical via ExerciseDictionary")
+        func aliasResolution() {
+            #expect(PlateCalculator.isBarbellExercise(exerciseName: "Bench") == true)
+            #expect(PlateCalculator.isBarbellExercise(exerciseName: "bench") == true)
+            #expect(PlateCalculator.isBarbellExercise(exerciseName: "OHP") == true)
+            #expect(PlateCalculator.isBarbellExercise(exerciseName: "ohp") == true)
+            #expect(PlateCalculator.isBarbellExercise(exerciseName: "DL") == true)
+        }
     }
 
     // MARK: - calculatePlates (lbs)

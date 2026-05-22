@@ -15,6 +15,7 @@ import type {
   GroupType,
   ExerciseBlockResult,
 } from './types.js';
+import { resolveAlias, fuzzyMatch } from './exercise-suggestions.js';
 
 export type { ParseResult, WorkoutPlan, PlannedExercise, PlannedSet, WeightUnit, DistanceUnit, GroupType } from './types.js';
 
@@ -506,6 +507,8 @@ function parseExerciseBlock(
     });
   }
 
+  emitExerciseNameSuggestion(context, exerciseName, headerLine.lineNumber);
+
   const exercise: PlannedExercise = {
     id: exerciseId,
     workoutPlanId,
@@ -520,6 +523,33 @@ function parseExerciseBlock(
   };
 
   return { type: 'single', exercise };
+}
+
+function emitExerciseNameSuggestion(
+  context: ParseContext,
+  exerciseName: string,
+  lineNumber: number
+): void {
+  const alias = resolveAlias(exerciseName);
+  if (alias) {
+    if (!alias.inputIsCanonical) {
+      context.warnings.push({
+        line: lineNumber,
+        message: `"${exerciseName}" is a known alias for "${alias.canonical}". Use the canonical name to ensure features like barbell math engage reliably.`,
+        code: 'EXERCISE_ALIAS_SUGGESTION',
+      });
+    }
+    return;
+  }
+
+  const fuzzy = fuzzyMatch(exerciseName);
+  if (fuzzy) {
+    context.warnings.push({
+      line: lineNumber,
+      message: `"${exerciseName}" looks like "${fuzzy.suggestion}" — did you mean that?`,
+      code: 'EXERCISE_NAME_SUGGESTION',
+    });
+  }
 }
 
 function checkForNestedHeaders(context: ParseContext, headerIndex: number, headerLevel: number): boolean {
