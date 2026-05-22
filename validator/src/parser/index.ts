@@ -1092,6 +1092,16 @@ function parseModifiersAndTrailingText(
       if (trailing.length > 0) trailingTextParts.push(trailing);
       continue;
     }
+    if (lowerTrimmed.startsWith('amrap')) {
+      const trailing = trimmed.slice('amrap'.length).trim();
+      if (trailing.length > 0) trailingTextParts.push(trailing);
+      context.warnings.push({
+        line: lineNumber,
+        message: `@amrap is not a modifier — express AMRAP via the rep value instead (e.g., "135 x AMRAP")`,
+        code: 'DEPRECATED_AMRAP',
+      });
+      continue;
+    }
 
     // Try to parse as key: value modifier
     const modifierMatch = trimmed.match(/^(\w+):\s*(.+)$/);

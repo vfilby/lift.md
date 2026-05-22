@@ -419,6 +419,16 @@ extension MarkdownParser {
                 if !trailing.isEmpty { trailingTextParts.append(trailing) }
                 continue
             }
+            if lowerTrimmed.hasPrefix("amrap") {
+                let trailing = String(trimmed.dropFirst("amrap".count)).trimmingCharacters(in: .whitespaces)
+                if !trailing.isEmpty { trailingTextParts.append(trailing) }
+                context.warnings.append(ParseWarning(
+                    line: lineNumber,
+                    message: "@amrap is not a modifier — express AMRAP via the rep value instead (e.g., \"135 x AMRAP\")",
+                    code: "DEPRECATED_AMRAP"
+                ))
+                continue
+            }
 
             // Try to parse as key: value modifier
             guard let match = trimmed.wholeMatch(of: modifierPattern) else {

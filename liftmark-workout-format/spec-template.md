@@ -199,7 +199,7 @@ Modifiers provide functional metadata that affects how the app behaves. They use
 |----------|--------|-------------|---------|
 | `@rest` | Number + `s`/`m` | Rest timer after set (triggers countdown in app) | `@rest: 180s` or `@rest: 3m` |
 | `@dropset` | flag | Drop set indicator (changes UI tracking) | `@dropset` |
-| `@perside` | flag | Per-side indicator (shows dual sequential timers for timed sets) | `@perside` |
+| `@perside` | flag | Per-side indicator — primarily for **timed** per-side sets where the rep value alone (e.g., `30s`) carries no side cue. For rep-based sets, prefer trailing prose like `per side` or `each leg`, which is auto-detected. | `30s @perside` |
 
 ### Examples
 
@@ -245,6 +245,17 @@ Pull heel to glutes, keep knees together
 - 135 lbs x AMRAP
 - bw x AMRAP
 ```
+
+### `@amrap` is not a modifier
+
+`@amrap` is **not** a recognized modifier — there is no set-line flag for AMRAP. Express AMRAP through the rep value instead:
+
+```markdown
+- 135 lbs x AMRAP
+- bw x AMRAP
+```
+
+If `@amrap` appears on a set line it is treated as a deprecated modifier and the parser emits a `DEPRECATED_AMRAP` warning pointing to the rep-value form. The set still parses; the flag has no effect.
 
 ### Descriptive Information (Use Freeform Notes)
 
@@ -826,6 +837,10 @@ All test cases below are validated against the LMWF parser at spec generation ti
 ---
 
 ## Changelog
+
+### Version 1.3 (2026-05-22)
+- **Clarified `@amrap` is not a modifier** — AMRAP is expressed via the rep value (`x AMRAP`). The parser now emits a `DEPRECATED_AMRAP` warning when `@amrap` appears as a set-line flag.
+- **Sharpened `@perside` guidance** — primary use case is timed per-side sets (`30s @perside`); rep-based sets should prefer auto-detected trailing prose ("per side", "each leg").
 
 ### Version 1.1 (2026-01-16)
 - **Simplified to one workout per file** - removed multi-workout support for cleaner mental model

@@ -165,7 +165,8 @@ enum WorkoutGenerationService {
         ```
 
         Use nested headers (`###` under a `## Superset:` parent) for supersets/circuits.
-        Functional modifiers: `@rest: 120s`, `@dropset`, `@per-side`, `@amrap`.
+        Functional modifiers: `@rest: 120s`, `@dropset`, `@perside` (primarily for timed per-side sets, e.g. `30s @perside`).
+        For AMRAP, use the rep value (`- 135 x AMRAP` or `- bw x AMRAP`) — there is no `@amrap` modifier.
         """
     }
 

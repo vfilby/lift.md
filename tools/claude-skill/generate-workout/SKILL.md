@@ -48,7 +48,8 @@ Exercise-level note — target ranges, cues, substitutions.
 
 ### Modifiers
 
-- **Functional (use when needed):** `@rest: <duration>`, `@dropset`, `@perside`, `@amrap`. These trigger app behavior (timers, drop-set recording, etc.).
+- **Functional (use when needed):** `@rest: <duration>`, `@dropset`, `@perside`. These trigger app behavior (timers, drop-set recording, per-side timer for timed sets). `@perside` is primarily for timed per-side sets like `- 30s @perside`; for rep-based sets, prefer trailing prose ("per side", "each leg") which is auto-detected.
+- **AMRAP is not a modifier.** Express AMRAP via the rep value (`- 135 x AMRAP` or `- bw x AMRAP`). The validator emits a `DEPRECATED_AMRAP` warning if `@amrap` is used as a flag.
 - **Deprecated (do not use — validator emits a warning):** `@rpe`, `@tempo`. Express RPE, tempo, and all descriptive targets as trailing freeform text on the set line (e.g. `- 225 x 5 @rest: 180s Aim for RPE 8, controlled eccentric`).
 
 ## Workflow

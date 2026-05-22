@@ -104,6 +104,35 @@ final class MarkdownParserTests: XCTestCase {
         XCTAssertTrue(result.warnings.contains(where: { $0.contains("@tempo is deprecated") }))
     }
 
+    func testAmrapFlagModifierEmitsDeprecationWarning() {
+        let markdown = """
+        # Workout
+        ## Pull-ups
+        - bw x 10 @amrap
+        """
+        let result = MarkdownParser.parseWorkout(markdown)
+
+        XCTAssertTrue(result.success)
+        // @amrap as a flag does NOT set isAmrap — only the rep value `AMRAP` does.
+        XCTAssertFalse(result.data?.exercises[0].sets[0].isAmrap ?? true)
+        let amrapWarnings = result.warnings.filter { $0.contains("@amrap is not a modifier") }
+        XCTAssertEqual(amrapWarnings.count, 1)
+        XCTAssertTrue(amrapWarnings[0].contains("135 x AMRAP"))
+    }
+
+    func testAmrapRepValueParsesWithoutDeprecationWarning() {
+        let markdown = """
+        # Workout
+        ## Pull-ups
+        - bw x AMRAP
+        """
+        let result = MarkdownParser.parseWorkout(markdown)
+
+        XCTAssertTrue(result.success)
+        XCTAssertTrue(result.data?.exercises[0].sets[0].isAmrap ?? false)
+        XCTAssertFalse(result.warnings.contains(where: { $0.contains("@amrap") }))
+    }
+
     // MARK: - Bodyweight Exercises
 
     func testParsesBodyweightExercises() {

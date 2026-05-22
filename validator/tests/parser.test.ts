@@ -143,6 +143,31 @@ describe('Deprecated Modifier Warnings', () => {
     expect(result.warnings.some((w) => w.includes('@rpe is deprecated'))).toBe(true);
     expect(result.warnings.some((w) => w.includes('@tempo is deprecated'))).toBe(true);
   });
+
+  it('emits deprecation warning for @amrap (not a modifier — use rep value)', () => {
+    const markdown = `# Workout
+## Pull-ups
+- bw x 10 @amrap`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    // @amrap as a flag does NOT set isAmrap — only the rep value `AMRAP` does.
+    expect(result.data?.exercises[0].sets[0].isAmrap).toBeFalsy();
+    const amrapWarnings = result.warnings.filter((w) => w.includes('@amrap is not a modifier'));
+    expect(amrapWarnings).toHaveLength(1);
+    expect(amrapWarnings[0]).toContain('135 x AMRAP');
+  });
+
+  it('rep-value AMRAP still parses without warning', () => {
+    const markdown = `# Workout
+## Pull-ups
+- bw x AMRAP`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    expect(result.data?.exercises[0].sets[0].isAmrap).toBe(true);
+    expect(result.warnings.some((w) => w.includes('@amrap'))).toBe(false);
+  });
 });
 
 // MARK: - Bodyweight Exercises
