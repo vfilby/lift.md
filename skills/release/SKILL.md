@@ -30,6 +30,14 @@ make test-ui
 
 If any test fails, **stop and report** the failure output. Do not proceed to release.
 
+### 2.5 Check CloudKit Schema Drift
+
+```bash
+python tools/check_ckrecord_drift.py
+```
+
+If the script exits non-zero, new `record["..."]` fields have been added to `CKRecordMapper.swift` since the last `deploy/*` tag. **Stop and report.** Promote the CloudKit Production schema via CloudKit Dashboard (container `iCloud.com.eff3.liftmark.v2`) before releasing, or saves against the affected record types will fail in production with CKError 12 / 2006.
+
 ### 3. Push to Remote
 
 Ensure main is pushed. `make release-alpha` does NOT push commits — it triggers a GitHub Actions workflow against whatever is on remote main.

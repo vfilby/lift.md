@@ -74,6 +74,18 @@ make release-alpha
 
 Always push commits to main before releasing — `make release-alpha` creates a GitHub release tag that triggers a TestFlight build, but does NOT push commits.
 
+### CloudKit schema gate
+
+If a release touches `mobile-apps/ios/LiftMark/Services/CKRecordMapper.swift` (or `CKRecordMapper+SetMeasurement.swift`), the CloudKit Production schema must be promoted via CloudKit Dashboard BEFORE the build reaches devices, or every save against the affected record type fails with CKError 12 / 2006 and the data silently never reaches iCloud.
+
+Pre-flight check:
+
+```bash
+python tools/check_ckrecord_drift.py
+```
+
+Exits non-zero if any new `record["..."]` field has been added since the last `deploy/*` tag. When it fires, update `mobile-apps/ios/cloudkit-schema.ckdb`, import it via CloudKit Dashboard, and "Deploy Schema Changes" to Production before releasing.
+
 ## Architecture
 
 Native Swift iOS fitness tracking app.
