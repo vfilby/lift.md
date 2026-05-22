@@ -18,6 +18,7 @@ final class CrashReporter: @unchecked Sendable {
     /// Keys permitted on sync-class error events. Anything else is dropped.
     private static let syncMetadataAllowlist: Set<String> = [
         "recordType",
+        "recordFields",
         "errorCode",
         "errorDomain",
         "zoneName",

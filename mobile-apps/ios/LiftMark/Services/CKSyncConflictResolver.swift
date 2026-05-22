@@ -101,15 +101,19 @@ final class CKSyncConflictResolver: @unchecked Sendable {
             case .partialFailure:
                 handlePartialFailure(recordName: recordName, recordType: recordType, error: error)
 
-            case .serverRejectedRequest:
-                // CK 2006 — typically schema drift (a field on the local record
-                // doesn't exist on the deployed CloudKit container schema, or has
-                // the wrong type). Capture the field names so we can identify
-                // which schema element is missing without needing to repro.
+            case .invalidArguments, .serverRejectedRequest:
+                // CKError 12 (invalidArguments) and 2006 (serverRejectedRequest) both
+                // indicate the local record doesn't match the deployed CloudKit container
+                // schema — typically a field present locally but not in Production, or
+                // a type mismatch. Capture the field names so we can identify which
+                // schema element is missing without needing to repro.
                 let fields = record.allKeys().sorted().joined(separator: ",")
                 Logger.shared.error(
                     .sync,
-                    "[sync-engine] Server rejected \(recordType)/\(recordName) (CKError 2006) — likely schema drift. Fields sent: [\(fields)]"
+                    "[sync-engine] Server rejected \(recordType)/\(recordName) "
+                        + "(CKError \(error.code.rawValue) "
+                        + "(\(Self.errorCodeName(error.code)))) "
+                        + "— likely schema drift. Fields sent: [\(fields)]"
                 )
                 let metadata: [String: String] = [
                     "recordType": recordType,
@@ -119,7 +123,7 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                     "tag": "schema-drift-suspected"
                 ]
                 Self.captureOncePerBuild(
-                    key: "ck-reject-\(recordType)-\(fields)",
+                    key: "ck-reject-\(error.code.rawValue)-\(recordType)",
                     error: error,
                     breadcrumb: "sync.schemaDrift.repeat",
                     metadata: metadata
@@ -141,7 +145,7 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                     "errorDomain": CKErrorDomain
                 ]
                 Self.captureOncePerBuild(
-                    key: "ck-fail-\(error.code.rawValue)-\(recordType)-\(fields)",
+                    key: "ck-fail-\(error.code.rawValue)-\(recordType)",
                     error: error,
                     breadcrumb: "sync.saveFailed.repeat",
                     metadata: metadata
