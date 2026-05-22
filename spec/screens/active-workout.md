@@ -69,6 +69,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 
 ### Rest Timer
 - After set completion with rest seconds: rest timer or suggestion appears inline after the completed set
+- **Single visible instance**: At most one rest timer is rendered at a time, regardless of how many exercises have pending sets. The timer is scoped to the specific set whose completion started it (the *triggering set*), identified by `RestTimerState.triggeringSetId`. When the user completes sets out of order — leaving multiple exercise cards with pending sets — the timer appears only on the card that owns the triggering set, immediately below that set row. Other in-progress cards must not echo the same timer.
 - **Tap "Start"** → starts countdown timer with audio ticks at 5/4/3/2/1s and completion tone at 0 (when Countdown Sounds setting is enabled). Audio ticks must fire at whole-second boundaries — the timer display tick must be aligned to second boundaries (not offset by the fractional time at which the timer was started).
 - **Tap "Skip"** → dismisses rest suggestion
 - **Tap "Stop"** → stops running timer (including overrun)

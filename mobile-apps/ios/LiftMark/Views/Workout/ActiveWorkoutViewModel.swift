@@ -263,4 +263,22 @@ enum ActiveWorkoutViewModel {
 
         return true
     }
+
+    // MARK: - Rest Timer Scoping
+
+    /// Whether a card composed of the given exercises owns the active rest
+    /// timer — i.e. one of its sets is the timer's triggering set. Only the
+    /// owning card should render the inline timer view; this prevents the
+    /// "timer echoed on every in-progress card" bug when the user completes
+    /// sets out of order (#123).
+    ///
+    /// Returns false when `restTimer` is nil or no exercise contains the
+    /// triggering set. Passing the children of a superset (their full
+    /// exercise list) is supported via a single call.
+    static func ownsRestTimer(exercises: [SessionExercise], restTimer: RestTimerState?) -> Bool {
+        guard let triggeringSetId = restTimer?.triggeringSetId else { return false }
+        return exercises.contains { ex in
+            ex.sets.contains { $0.id == triggeringSetId }
+        }
+    }
 }

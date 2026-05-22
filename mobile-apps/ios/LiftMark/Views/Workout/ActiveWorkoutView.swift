@@ -209,14 +209,20 @@ struct ActiveWorkoutView: View {
                                     collapsedExercises: collapsedExercises,
                                     lastInteractedExerciseId: lastInteractedExerciseId,
                                     allExercises: session?.exercises)
-                                let isActiveExercise = exercise.sets.contains { $0.status == .pending }
+                                // The rest timer renders only on the card that
+                                // owns the triggering set. When sets are
+                                // completed out of order, multiple cards have
+                                // pending sets — without this scoping every
+                                // card would echo the same timer (#123).
+                                let ownsRestTimer = ActiveWorkoutViewModel.ownsRestTimer(
+                                    exercises: [exercise], restTimer: activeRestTimer)
                                 ActiveExerciseCard(
                                     exercise: exercise,
                                     exerciseIndex: exerciseIndex,
                                     displayNumber: displayNumber,
                                     settings: settingsStore.settings,
                                     isCollapsed: collapsed,
-                                    activeRestTimer: isActiveExercise ? activeRestTimer : nil,
+                                    activeRestTimer: ownsRestTimer ? activeRestTimer : nil,
                                     onToggleCollapse: {
                                         toggleCollapse(exerciseId: exercise.id, currentlyCollapsed: collapsed)
                                     },
@@ -256,13 +262,15 @@ struct ActiveWorkoutView: View {
                                     collapsedExercises: collapsedExercises,
                                     lastInteractedExerciseId: lastInteractedExerciseId,
                                     allExercises: session?.exercises)
-                                let isActive = children.contains { $0.exercise.sets.contains { $0.status == .pending } }
+                                let ownsRestTimer = ActiveWorkoutViewModel.ownsRestTimer(
+                                    exercises: children.map { $0.exercise },
+                                    restTimer: activeRestTimer)
                                 SupersetCard(
                                     parentExercise: parentExercise,
                                     children: children,
                                     settings: settingsStore.settings,
                                     isCollapsed: collapsed,
-                                    activeRestTimer: isActive ? activeRestTimer : nil,
+                                    activeRestTimer: ownsRestTimer ? activeRestTimer : nil,
                                     onToggleCollapse: {
                                         toggleCollapse(exerciseId: parentExercise.id, currentlyCollapsed: collapsed)
                                     },
@@ -388,7 +396,7 @@ struct ActiveWorkoutView: View {
         // Trigger rest timer if applicable
         if let rest = set.restSeconds, rest > 0,
            settingsStore.settings?.autoStartRestTimer == true {
-            activeRestTimer = RestTimerState(seconds: rest)
+            activeRestTimer = RestTimerState(seconds: rest, triggeringSetId: set.id)
             restTimerGeneration += 1
             let updatedSession = sessionStore.activeSession
             let nextExercise = updatedSession?.exercises.first { ex in ex.sets.contains { $0.status == .pending } }
@@ -414,7 +422,7 @@ struct ActiveWorkoutView: View {
         // Trigger rest timer if applicable
         if let rest = set.restSeconds, rest > 0,
            settingsStore.settings?.autoStartRestTimer == true {
-            activeRestTimer = RestTimerState(seconds: rest)
+            activeRestTimer = RestTimerState(seconds: rest, triggeringSetId: set.id)
             restTimerGeneration += 1
             let updatedSession = sessionStore.activeSession
             let nextExercise = updatedSession?.exercises.first { ex in ex.sets.contains { $0.status == .pending } }

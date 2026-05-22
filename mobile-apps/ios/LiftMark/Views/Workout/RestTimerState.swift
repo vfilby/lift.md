@@ -1,11 +1,19 @@
 import Foundation
 
 /// Identity/configuration for an active rest timer instance.
-/// Holds the total countdown duration in seconds. The actual runtime state
-/// (remaining/overrun/display) is derived from a `startDate` + current `Date()`
-/// via `RestTimerTick.compute(...)`.
+/// Holds the total countdown duration and the id of the set whose completion
+/// triggered the timer. The actual runtime state (remaining/overrun/display)
+/// is derived from a `startDate` + current `Date()` via
+/// `RestTimerTick.compute(...)`.
+///
+/// `triggeringSetId` scopes the inline timer to a single set so that when the
+/// user completes sets out of order — leaving multiple exercises with pending
+/// sets — the timer renders only on the card that owns the triggering set,
+/// directly below that set row. See `spec/screens/active-workout.md`
+/// → "Rest Timer / Single visible instance".
 struct RestTimerState {
     let seconds: Int
+    let triggeringSetId: String
 }
 
 /// Pure, testable state machine for the rest timer display.

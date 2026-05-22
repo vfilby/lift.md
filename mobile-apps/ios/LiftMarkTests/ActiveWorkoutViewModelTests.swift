@@ -774,4 +774,82 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(parsed?.sets[0].rest, 120)
         XCTAssertEqual(parsed?.sets[1].rest, 180)
     }
+
+    // MARK: - Rest Timer Scoping (#123)
+    //
+    // When a user completes sets out of order, multiple exercises hold pending
+    // sets simultaneously. The rest timer must only render on the card whose
+    // set actually triggered it. These tests guard that scoping.
+
+    private func makeSetWithId(_ id: String, status: SetStatus = .pending) -> SessionSet {
+        SessionSet(id: id, sessionExerciseId: "e1", orderIndex: 0, status: status)
+    }
+
+    func testOwnsRestTimerReturnsFalseWhenTimerNil() {
+        let exercise = makeExercise(sets: [makeSetWithId("s1", status: .completed)])
+        XCTAssertFalse(ActiveWorkoutViewModel.ownsRestTimer(
+            exercises: [exercise], restTimer: nil))
+    }
+
+    func testOwnsRestTimerTrueWhenExerciseContainsTriggeringSet() {
+        let exercise = makeExercise(sets: [
+            makeSetWithId("s1", status: .completed),
+            makeSetWithId("s2", status: .pending)
+        ])
+        let timer = RestTimerState(seconds: 60, triggeringSetId: "s1")
+        XCTAssertTrue(ActiveWorkoutViewModel.ownsRestTimer(
+            exercises: [exercise], restTimer: timer))
+    }
+
+    func testOwnsRestTimerFalseWhenTriggeringSetBelongsToAnotherExercise() {
+        // Exercise A has a pending set (in-progress) but DID NOT trigger the
+        // timer. Exercise B owns the timer. A's card must not render the
+        // timer just because it is "active". This is the #123 regression.
+        let exerciseA = makeExercise(
+            id: "ex-a",
+            sets: [
+                makeSetWithId("a1", status: .completed),
+                makeSetWithId("a2", status: .pending)
+            ])
+        let timerOwnedByExerciseB = RestTimerState(seconds: 60, triggeringSetId: "b1")
+        XCTAssertFalse(ActiveWorkoutViewModel.ownsRestTimer(
+            exercises: [exerciseA], restTimer: timerOwnedByExerciseB))
+    }
+
+    func testOwnsRestTimerHandlesSupersetChildren() {
+        // Superset cards pass the full list of children's exercises.
+        let childA = makeExercise(id: "child-a", sets: [makeSetWithId("a1", status: .pending)])
+        let childB = makeExercise(id: "child-b", sets: [makeSetWithId("b1", status: .completed)])
+        let timer = RestTimerState(seconds: 90, triggeringSetId: "b1")
+        XCTAssertTrue(ActiveWorkoutViewModel.ownsRestTimer(
+            exercises: [childA, childB], restTimer: timer))
+    }
+
+    func testOwnsRestTimerOnlyOneCardOwnsAcrossOutOfOrderCompletion() {
+        // Simulates the bug repro: two exercises, both with at least one
+        // completed set and one pending set. Exactly one card may own the
+        // timer.
+        let cableTriExtension = makeExercise(
+            id: "cable-tri",
+            sets: [
+                makeSetWithId("cable-s1", status: .completed),
+                makeSetWithId("cable-s2", status: .pending)
+            ])
+        let dbCurls = makeExercise(
+            id: "db-curls",
+            sets: [
+                makeSetWithId("db-s1", status: .completed),
+                makeSetWithId("db-s2", status: .pending)
+            ])
+        // The user just completed cable-s1 — that's the triggering set.
+        let timer = RestTimerState(seconds: 55, triggeringSetId: "cable-s1")
+
+        let cableOwns = ActiveWorkoutViewModel.ownsRestTimer(
+            exercises: [cableTriExtension], restTimer: timer)
+        let curlsOwns = ActiveWorkoutViewModel.ownsRestTimer(
+            exercises: [dbCurls], restTimer: timer)
+
+        XCTAssertTrue(cableOwns)
+        XCTAssertFalse(curlsOwns, "DB Curls card must not echo the timer started by Cable Tri Extension (#123)")
+    }
 }

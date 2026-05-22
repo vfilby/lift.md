@@ -79,14 +79,13 @@ struct ActiveExerciseCard: View {
         return exercise.sets[idx].id
     }
 
-    /// Index of the last completed/skipped set (for placing rest timer after it)
-    private var lastCompletedSetIndex: Int? {
-        for i in stride(from: exercise.sets.count - 1, through: 0, by: -1) {
-            if exercise.sets[i].status == .completed || exercise.sets[i].status == .skipped {
-                return i
-            }
-        }
-        return nil
+    /// Index of the set whose completion triggered the active rest timer.
+    /// The timer renders directly below this set so it's visually anchored to
+    /// the action that started it — even when the user has completed other
+    /// sets out of order since (#123).
+    private var restTimerSetIndex: Int? {
+        guard let triggeringSetId = activeRestTimer?.triggeringSetId else { return nil }
+        return exercise.sets.firstIndex { $0.id == triggeringSetId }
     }
 
     var body: some View {
@@ -192,8 +191,9 @@ struct ActiveExerciseCard: View {
                         .id(setId)
                     }
 
-                    // Inline rest timer — placed after the last completed set
-                    if let lastIdx = lastCompletedSetIndex, setIndex == lastIdx,
+                    // Inline rest timer — placed directly under the set that
+                    // triggered it (see restTimerSetIndex above).
+                    if let triggerIdx = restTimerSetIndex, setIndex == triggerIdx,
                        let restState = activeRestTimer {
                         RestTimerView(totalSeconds: restState.seconds) {
                             onDismissRest()

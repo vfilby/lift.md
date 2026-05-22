@@ -61,15 +61,17 @@ struct SupersetCard: View {
         return result
     }
 
-    /// The last completed/skipped set across all children
-    private var lastCompletedSetId: String? {
-        let allSets = interleavedSets
-        for item in allSets.reversed() {
-            if item.set.status == .completed || item.set.status == .skipped {
-                return item.set.id
-            }
+    /// The id of the set whose completion triggered the active rest timer,
+    /// when that set belongs to one of this superset's children. The rest
+    /// timer renders directly below that set so it stays anchored to the
+    /// action that started it — even when the user has completed other sets
+    /// out of order since (#123).
+    private var restTimerSetId: String? {
+        guard let triggeringSetId = activeRestTimer?.triggeringSetId else { return nil }
+        let owns = children.contains { child in
+            child.exercise.sets.contains { $0.id == triggeringSetId }
         }
-        return nil
+        return owns ? triggeringSetId : nil
     }
 
     var body: some View {
@@ -186,8 +188,9 @@ struct SupersetCard: View {
                         .id(item.set.id)
                     }
 
-                    // Rest timer after last completed set
-                    if let lastId = lastCompletedSetId, item.set.id == lastId,
+                    // Rest timer rendered directly below the set that
+                    // triggered it (see restTimerSetId above).
+                    if let triggerId = restTimerSetId, item.set.id == triggerId,
                        let restState = activeRestTimer {
                         RestTimerView(totalSeconds: restState.seconds) {
                             onDismissRest()
