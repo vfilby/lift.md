@@ -241,11 +241,12 @@ Positive-path events:
 | Event                                      | When                                                          | Payload                                                              |
 |--------------------------------------------|---------------------------------------------------------------|----------------------------------------------------------------------|
 | `migrator_bridge_attempted`                | Entry to bridge, after pre-flight passes                      | `fromVersion`, `dbSizeBytes`                                          |
-| `migrator_bridge_backup_succeeded`         | After §2.4 verification passes                                | `backupSizeBytes`, `durationMs`                                       |
 | `migrator_bridge_succeeded`                | After transaction commit, before returning                    | `fromVersion`, `toIdentifier`, `bridgedIdentifierCount`, `durationMs` |
 | `migrator_bridge_build_number_changed`     | See §3.g                                                      | `buildNumber`, previous `lastSuccessBuildNumber`, `direction`         |
 
-> `migrator_bridge_skipped_fresh_install` and `migrator_bridge_skipped_already_done` were previously emitted as Sentry events but were demoted to breadcrumbs (§5.2) because they fire on every launch for every already-bridged user, which generated high-volume info-level noise in Sentry. See §5.3.1 for the revised cleanup-trigger approach.
+> `migrator_bridge_skipped_fresh_install` and `migrator_bridge_skipped_already_done` were previously emitted as Sentry events but were demoted to breadcrumbs because they fire on every launch for every already-bridged user, which generated high-volume info-level noise in Sentry. See §5.3.1 for the revised cleanup-trigger approach.
+
+> `migrator_bridge_backup_succeeded` was previously emitted as an event but was demoted to a breadcrumb — backup completion is informational, doesn't need to count against the Sentry event cap, and the end-of-bridge `migrator_bridge_succeeded` event already records the overall outcome. Asserted by `MigratorBridgeTests.testBridge_emitsExpectedEventSequence`.
 
 Failure events (one per §3 row):
 
@@ -265,6 +266,7 @@ Breadcrumbs (not events):
 
 - `bridge.preflight.begin` / `bridge.preflight.end`
 - `bridge.backup.begin` / `bridge.backup.end`
+- `migrator_bridge_backup_succeeded` (payload: `backupSizeBytes`, `backupPath`, `durationMs`)
 - `bridge.write.begin` / `bridge.write.end`
 - `bridge.resumed_after_kill` (§3.h)
 - `migrator_bridge_skipped_fresh_install`
