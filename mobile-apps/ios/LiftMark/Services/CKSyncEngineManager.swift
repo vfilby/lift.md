@@ -177,7 +177,7 @@ final class CKSyncEngineManager: @unchecked Sendable {
 
     /// One-time recovery key. Bump the value to force a full re-upload on next launch.
     private static let fullUploadVersion = "sync.fullUploadVersion"
-    private static let currentFullUploadVersion = 3 // Bump to force re-upload
+    private static let currentFullUploadVersion = 4 // Bump to force re-upload
 
     /// Check if a forced full re-upload is needed (schema fix recovery).
     func scheduleFullUploadIfNeeded() {
