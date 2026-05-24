@@ -164,6 +164,12 @@ export class LmwfValidatorStack extends cdk.Stack {
         NODE_ENV: 'production',
         LMWF_ENV: env.name,
         STRIPE_MODE: env.stripeMode,
+        // Deploy metadata surfaced via /version endpoint and the
+        // X-Validator-Version response header. See
+        // spec/services/lmwf-validator.md → Version.
+        BUILD_COMMIT: this.node.tryGetContext('buildCommit') ?? 'unknown',
+        BUILD_TIMESTAMP:
+          this.node.tryGetContext('buildTimestamp') ?? 'unknown',
         ...tableEnv,
         // JWT secret resolved at deploy time from Secrets Manager.
         JWT_SECRET: cdk.SecretValue.secretsManager(jwtSigningSecret.secretArn).unsafeUnwrap(),

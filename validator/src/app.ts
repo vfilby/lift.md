@@ -65,7 +65,24 @@ app.route('/v1/auth', authRouter);
 app.route('/v1/tokens', tokensRouter);
 app.route('/v1/workouts', workoutsRouter);
 
+// Deploy metadata. Set at deploy time via CDK context → Lambda env. Read
+// per-request rather than at module load so tests can set/clear env vars
+// without import-order coupling. See spec/services/lmwf-validator.md → Version.
+const buildCommit = () => process.env.BUILD_COMMIT ?? 'unknown';
+const buildTimestamp = () => process.env.BUILD_TIMESTAMP ?? 'unknown';
+const buildEnv = () => process.env.LMWF_ENV ?? 'unknown';
+
+app.get('/version', (c) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({
+    commit: buildCommit(),
+    builtAt: buildTimestamp(),
+    env: buildEnv(),
+  });
+});
+
 app.post('/validate', async (c) => {
+  c.header('X-Validator-Version', buildCommit());
   const requestId = c.var.requestId;
   const startTime = c.var.startTime;
 

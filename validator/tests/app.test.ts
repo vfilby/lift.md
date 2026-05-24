@@ -1,10 +1,75 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { app } from '../src/app.js';
 
 // These tests hit the Hono app directly (no Lambda adapter), proving the
 // same code runs unchanged in local dev mode via @hono/node-server.
 
+describe('Hono app — /version', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    savedEnv.BUILD_COMMIT = process.env.BUILD_COMMIT;
+    savedEnv.BUILD_TIMESTAMP = process.env.BUILD_TIMESTAMP;
+    savedEnv.LMWF_ENV = process.env.LMWF_ENV;
+    process.env.BUILD_COMMIT = 'test-commit-abc123';
+    process.env.BUILD_TIMESTAMP = '2026-05-24T13:37:00Z';
+    process.env.LMWF_ENV = 'test';
+  });
+  afterEach(() => {
+    process.env.BUILD_COMMIT = savedEnv.BUILD_COMMIT;
+    process.env.BUILD_TIMESTAMP = savedEnv.BUILD_TIMESTAMP;
+    process.env.LMWF_ENV = savedEnv.LMWF_ENV;
+  });
+
+  it('returns commit, builtAt, env from process.env', async () => {
+    const res = await app.request('/version', { method: 'GET' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    const body = (await res.json()) as {
+      commit: string;
+      builtAt: string;
+      env: string;
+    };
+    expect(body).toEqual({
+      commit: 'test-commit-abc123',
+      builtAt: '2026-05-24T13:37:00Z',
+      env: 'test',
+    });
+  });
+
+  it('defaults to "unknown" when env vars are unset', async () => {
+    delete process.env.BUILD_COMMIT;
+    delete process.env.BUILD_TIMESTAMP;
+    delete process.env.LMWF_ENV;
+    const res = await app.request('/version', { method: 'GET' });
+    const body = (await res.json()) as {
+      commit: string;
+      builtAt: string;
+      env: string;
+    };
+    expect(body).toEqual({
+      commit: 'unknown',
+      builtAt: 'unknown',
+      env: 'unknown',
+    });
+  });
+});
+
 describe('Hono app — /validate', () => {
+  it('attaches X-Validator-Version header from BUILD_COMMIT', async () => {
+    const saved = process.env.BUILD_COMMIT;
+    process.env.BUILD_COMMIT = 'header-commit-xyz';
+    try {
+      const res = await app.request('/validate', {
+        method: 'POST',
+        headers: { 'content-type': 'text/markdown' },
+        body: '# Workout\n## Squat\n- 135 x 5',
+      });
+      expect(res.headers.get('x-validator-version')).toBe('header-commit-xyz');
+    } finally {
+      process.env.BUILD_COMMIT = saved;
+    }
+  });
+
   it('returns 200 for a valid workout (JSON body)', async () => {
     const markdown = `# Test Workout
 @units: lbs

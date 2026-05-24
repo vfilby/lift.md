@@ -87,13 +87,22 @@ diff-prod: bundle
 	cd cdk && npx cdk diff --profile liftmark-prod --strict \
 	    LmwfProdEdgeStack LmwfProdValidatorStack
 
+# Deploy metadata: commit SHA + ISO 8601 UTC timestamp, surfaced via the
+# /version endpoint and X-Validator-Version response header.
+BUILD_COMMIT    := $(shell git rev-parse HEAD)
+BUILD_TIMESTAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
 deploy-beta: bundle
 	cd cdk && npx cdk deploy --profile liftmark-beta --require-approval never \
+	    --context buildCommit=$(BUILD_COMMIT) \
+	    --context buildTimestamp=$(BUILD_TIMESTAMP) \
 	    --outputs-file outputs-beta.json \
 	    LmwfBetaEdgeStack LmwfBetaValidatorStack
 
 deploy-prod: bundle
 	cd cdk && npx cdk deploy --profile liftmark-prod --require-approval any-change \
+	    --context buildCommit=$(BUILD_COMMIT) \
+	    --context buildTimestamp=$(BUILD_TIMESTAMP) \
 	    --outputs-file outputs-prod.json \
 	    LmwfProdEdgeStack LmwfProdValidatorStack
 

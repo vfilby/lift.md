@@ -1,25 +1,55 @@
 #!/usr/bin/env bash
-# Post-deploy smoke test: validate every LMWF example fixture against a live
-# validator and assert success vs. expected outcome.
+# Post-deploy smoke test: assert /version reports the expected commit (if
+# provided), then validate every LMWF example fixture against the live
+# /validate endpoint and assert success vs. expected outcome.
 #
 # Usage:
-#   scripts/smoke-test-live.sh <base_url>
+#   scripts/smoke-test-live.sh <base_url> [expected_commit]
 #
 # Examples:
 #   scripts/smoke-test-live.sh https://beta.liftmark.app
-#   scripts/smoke-test-live.sh https://workoutformat.liftmark.app
+#   scripts/smoke-test-live.sh https://beta.liftmark.app $(git rev-parse HEAD)
 #
-# Exits non-zero if any fixture returns an unexpected success/failure result.
+# Exits non-zero if:
+#   - expected_commit was supplied and /version reports a different commit
+#   - any fixture returns an unexpected success/failure result
 
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "usage: $0 <base_url>" >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  echo "usage: $0 <base_url> [expected_commit]" >&2
   exit 64
 fi
 
 BASE_URL="${1%/}"
 ENDPOINT="$BASE_URL/validate"
+EXPECTED_COMMIT="${2:-}"
+
+echo "==> GET $BASE_URL/version"
+set +e
+version_body=$(curl -fsS --max-time 30 --retry 3 --retry-delay 1 --retry-all-errors \
+  "$BASE_URL/version" 2>/tmp/smoke.version.err)
+curl_rc=$?
+set -e
+if [ "$curl_rc" -ne 0 ]; then
+  echo "FAIL: GET $BASE_URL/version (curl exit=$curl_rc): $(tr -d '\n' < /tmp/smoke.version.err | head -c 200)" >&2
+  exit 2
+fi
+echo "    $version_body"
+live_commit=$(printf '%s' "$version_body" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit","unknown"))' 2>/dev/null || echo "unparseable")
+if [ "$live_commit" = "unparseable" ]; then
+  echo "FAIL: /version returned a non-JSON body" >&2
+  exit 2
+fi
+if [ -n "$EXPECTED_COMMIT" ]; then
+  if [ "$live_commit" != "$EXPECTED_COMMIT" ]; then
+    echo "FAIL: /version reports commit=$live_commit, expected $EXPECTED_COMMIT" >&2
+    echo "      (deploy may not have landed yet, or the wrong code is live)" >&2
+    exit 2
+  fi
+  echo "    ✓ /version commit matches expected ($EXPECTED_COMMIT)"
+fi
+echo
 
 # Resolve repo root from this script's location so the script is callable
 # from any cwd (Concourse worker, local make target, ad-hoc).

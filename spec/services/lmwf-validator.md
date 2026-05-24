@@ -3,6 +3,10 @@
 ## Purpose
 HTTP validation service for the LiftMark Workout Format (LMWF). Accepts markdown text and returns structured validation results. Deployed as an AWS Lambda behind API Gateway.
 
+## Endpoints
+- `POST /validate` — see [Request](#request) / [Response](#response)
+- `GET /version` — see [Version](#version)
+
 ## Endpoint
 `POST /validate`
 
@@ -94,6 +98,34 @@ Possible `errors[0]` values:
 ### Payload Too Large (413)
 Same shape as `Bad Request (400)`. Triggered when input exceeds 1MB, 50,000 lines,
 500 exercises, or 10,000 total sets.
+
+### Response Headers
+Every `/validate` response carries `X-Validator-Version: <commit-sha>` identifying
+the deployed Lambda code. Useful for confirming which build a client is hitting
+without an extra round trip to `/version`.
+
+## Version
+`GET /version`
+
+Returns deploy metadata. Used by smoke tests to assert a deploy actually landed
+and by humans/clients to confirm which build is live.
+
+```json
+{
+  "commit": "520e85003a2b…",
+  "builtAt": "2026-05-24T13:37:00Z",
+  "env": "beta"
+}
+```
+
+- `commit` — full git SHA of the deploy source (40 chars), or `"unknown"` if the
+  Lambda was deployed without a `buildCommit` CDK context value.
+- `builtAt` — ISO 8601 UTC timestamp of when CDK packaged the deploy.
+- `env` — `"beta"` or `"prod"`.
+
+Always served with `Cache-Control: no-store` to bypass any CloudFront caching.
+Returns 200 even when `commit` is `"unknown"`; staleness is something callers
+detect by comparing values, not an error condition.
 
 ## Error/Warning Codes
 Matches the iOS parser error and warning codes exactly:
