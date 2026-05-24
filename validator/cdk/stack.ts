@@ -227,6 +227,12 @@ export class LmwfValidatorStack extends cdk.Stack {
       integration: validatorIntegration,
     });
 
+    httpApi.addRoutes({
+      path: '/version',
+      methods: [apigw.HttpMethod.GET],
+      integration: validatorIntegration,
+    });
+
     // All new auth/PAT/workout routes — Hono routes inside Lambda.
     httpApi.addRoutes({
       path: '/v1/{proxy+}',
