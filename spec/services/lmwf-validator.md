@@ -70,11 +70,30 @@ Accepts either JSON or raw markdown:
 ```
 
 ### Bad Request (400)
+Returned when the request is structurally malformed (missing body, invalid JSON,
+non-string markdown field, or empty/whitespace-only markdown). Uses the same
+response shape as `Validation Failure (200)` so callers can rely on a single
+parse path. The `errors` array holds the bad-request reason as plain text;
+`success` is always `false` and `summary` is always `null`.
+
 ```json
 {
-  "error": "Missing or empty markdown content"
+  "success": false,
+  "summary": null,
+  "errors": ["Missing or empty markdown field"],
+  "warnings": []
 }
 ```
+
+Possible `errors[0]` values:
+- `"Missing request body"` — JSON content-type with no body at all
+- `"Invalid JSON body"` — JSON content-type with malformed JSON
+- `"markdown field must be a string"` — JSON body where `markdown` is the wrong type
+- `"Missing or empty markdown field"` — markdown is missing, empty, or whitespace-only
+
+### Payload Too Large (413)
+Same shape as `Bad Request (400)`. Triggered when input exceeds 1MB, 50,000 lines,
+500 exercises, or 10,000 total sets.
 
 ## Error/Warning Codes
 Matches the iOS parser error and warning codes exactly:

@@ -69,6 +69,23 @@ app.post('/validate', async (c) => {
   const requestId = c.var.requestId;
   const startTime = c.var.startTime;
 
+  // All bad-request paths share the same ValidateResponse shape so callers
+  // have a single parse path. See spec/services/lmwf-validator.md.
+  const badRequest = (message: string) => {
+    log({
+      level: 'warn',
+      requestId,
+      event: 'request_error',
+      status: 400,
+      error: message,
+      durationMs: Date.now() - startTime,
+    });
+    return c.json<ValidateResponse>(
+      { success: false, summary: null, errors: [message], warnings: [] },
+      400,
+    );
+  };
+
   const contentType =
     c.req.header('content-type') ?? c.req.header('Content-Type') ?? '';
 
@@ -85,56 +102,24 @@ app.post('/validate', async (c) => {
     }
 
     if (!bodyStr) {
-      log({
-        level: 'warn',
-        requestId,
-        event: 'request_error',
-        status: 400,
-        error: 'Missing request body',
-        durationMs: Date.now() - startTime,
-      });
-      return c.json({ error: 'Missing request body' }, 400);
+      return badRequest('Missing request body');
     }
 
     let parsed: ValidateRequest;
     try {
       parsed = JSON.parse(bodyStr) as ValidateRequest;
     } catch {
-      log({
-        level: 'warn',
-        requestId,
-        event: 'request_error',
-        status: 400,
-        error: 'Invalid JSON body',
-        durationMs: Date.now() - startTime,
-      });
-      return c.json({ error: 'Invalid JSON body' }, 400);
+      return badRequest('Invalid JSON body');
     }
 
     if (typeof parsed.markdown !== 'string') {
-      log({
-        level: 'warn',
-        requestId,
-        event: 'request_error',
-        status: 400,
-        error: 'markdown field must be a string',
-        durationMs: Date.now() - startTime,
-      });
-      return c.json({ error: 'markdown field must be a string' }, 400);
+      return badRequest('markdown field must be a string');
     }
     markdown = parsed.markdown;
   }
 
   if (!markdown || markdown.trim().length === 0) {
-    log({
-      level: 'warn',
-      requestId,
-      event: 'request_error',
-      status: 400,
-      error: 'Missing or empty markdown field',
-      durationMs: Date.now() - startTime,
-    });
-    return c.json({ error: 'Missing or empty markdown field' }, 400);
+    return badRequest('Missing or empty markdown field');
   }
 
   const inputBytes = Buffer.byteLength(markdown, 'utf-8');

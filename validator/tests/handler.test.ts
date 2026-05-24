@@ -181,12 +181,15 @@ describe('Lambda Handler', () => {
     expect(body.summary.exercises[0].setCount).toBe(0);
   });
 
-  it('returns 400 when markdown field is not a string', async () => {
+  it('returns 400 in ValidateResponse shape when markdown field is not a string', async () => {
     const event = makeEvent({ body: JSON.stringify({ markdown: 42 }) });
     const result = await handler(event);
     expect(result).toHaveProperty('statusCode', 400);
     const body = parseBody(result as { body: string });
-    expect(body.error).toBe('markdown field must be a string');
+    expect(body.success).toBe(false);
+    expect(body.summary).toBeNull();
+    expect(body.errors).toEqual(['markdown field must be a string']);
+    expect(body.warnings).toEqual([]);
   });
 
   it('returns 413 with consistent response format for oversized input', async () => {
