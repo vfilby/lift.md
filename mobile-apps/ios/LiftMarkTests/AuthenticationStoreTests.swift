@@ -114,7 +114,9 @@ final class AuthenticationStoreTests: XCTestCase {
             "exp": Date().timeIntervalSince1970 + expSecondsFromNow,
         ]
         func b64(_ obj: [String: Any]) -> String {
-            let data = try! JSONSerialization.data(withJSONObject: obj)
+            guard let data = try? JSONSerialization.data(withJSONObject: obj) else {
+                return ""
+            }
             return data.base64EncodedString()
                 .replacingOccurrences(of: "+", with: "-")
                 .replacingOccurrences(of: "/", with: "_")
