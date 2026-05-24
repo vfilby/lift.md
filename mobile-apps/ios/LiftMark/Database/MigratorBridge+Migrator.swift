@@ -647,6 +647,22 @@ extension MigratorBridge {
                 """)
         }
 
+        m.registerMigration("v16_workout_inbox") { db in
+            try db.execute(sql: """
+                CREATE TABLE workout_inbox (
+                    inbox_id              TEXT PRIMARY KEY NOT NULL,
+                    fetched_at            TEXT NOT NULL,
+                    created_at_server     TEXT NOT NULL,
+                    source_token_id       TEXT,
+                    lmwf_text             TEXT NOT NULL,
+                    workout_json          TEXT NOT NULL,
+                    summary_name          TEXT NOT NULL,
+                    summary_exercise_count INTEGER NOT NULL DEFAULT 0,
+                    summary_set_count     INTEGER NOT NULL DEFAULT 0
+                )
+                """)
+        }
+
         return m
     }
 

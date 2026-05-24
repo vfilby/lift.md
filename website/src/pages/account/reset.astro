@@ -1,0 +1,87 @@
+---
+import AccountLayout from '../../layouts/AccountLayout.astro';
+---
+
+<AccountLayout title="Reset password" description="Set a new password for your LiftMark account.">
+  <div class="auth-page">
+    <h1>Reset password</h1>
+
+    <div id="no-token" class="inline-msg err" hidden>
+      Invalid reset link — no token provided.
+      <p style="margin:0.5rem 0 0">
+        <a href="/account/forgot">Request a new reset link</a>.
+      </p>
+    </div>
+
+    <form id="reset-form" class="account-form" novalidate hidden>
+      <div>
+        <label for="password">New password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" required />
+        <div class="field-hint">At least 12 characters.</div>
+      </div>
+      <div>
+        <label for="password_confirm">Confirm password</label>
+        <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="12" required />
+      </div>
+      <div>
+        <button type="submit" class="btn" id="submit-btn">Update password</button>
+      </div>
+      <div id="reset-msg"></div>
+    </form>
+  </div>
+
+  <script>
+    import { api, escapeHtml } from '../../scripts/api.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const form = document.getElementById('reset-form');
+    const noToken = document.getElementById('no-token');
+    const msg = document.getElementById('reset-msg');
+    const submitBtn = document.getElementById('submit-btn');
+
+    if (!token) {
+      noToken.hidden = false;
+    } else {
+      form.hidden = false;
+    }
+
+    function showMsg(kind, html) {
+      msg.innerHTML = '<div class="inline-msg ' + kind + '">' + html + '</div>';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.innerHTML = '';
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('password_confirm').value;
+      if (password.length < 12) {
+        showMsg('err', 'Password must be at least 12 characters.');
+        return;
+      }
+      if (password !== confirm) {
+        showMsg('err', 'Passwords do not match.');
+        return;
+      }
+      submitBtn.disabled = true;
+      try {
+        const { status, body } = await api('/v1/auth/password/reset', {
+          method: 'POST',
+          auth: false,
+          body: { token, new_password: password },
+        });
+        if (status === 200) {
+          form.hidden = true;
+          msg.innerHTML =
+            '<div class="inline-msg ok">Password updated. <a href="/account/login">Sign in</a>.</div>';
+          return;
+        }
+        showMsg('err', escapeHtml((body && body.error) || ('Reset failed (HTTP ' + status + ')')));
+      } catch (err) {
+        showMsg('err', 'Network error: ' + escapeHtml(err.message || String(err)));
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</AccountLayout>

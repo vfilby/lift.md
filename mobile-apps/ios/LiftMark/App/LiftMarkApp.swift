@@ -8,6 +8,9 @@ struct LiftMarkApp: App {
     @State private var settingsStore = SettingsStore()
     @State private var gymStore = GymStore()
     @State private var equipmentStore = EquipmentStore()
+    @State private var authStore: AuthenticationStore
+    @State private var inboxPoller: InboxPollerService
+    @State private var featureFlags: FeatureFlagsStore
     @State private var pendingImportContent: String? = Self.importContentFromLaunchArgs()
 
     init() {
@@ -15,6 +18,23 @@ struct LiftMarkApp: App {
         // Must precede Logger.shared access so the one-shot LoggingSystem.bootstrap
         // happens here rather than from whichever call site logs first.
         LiftMarkLogging.bootstrap()
+
+        // Build auth + inbox-poller from a single APIClient + TokenStore so
+        // they share session state. Initializing here (rather than as
+        // property-initializer defaults) keeps the wiring obvious and lets
+        // the poller observe the same AuthenticationStore the rest of the
+        // app drives via login/logout.
+        let api = APIClient(baseURL: nil)
+        let tokens = TokenStore()
+        let auth = AuthenticationStore(api: api, tokenStore: tokens)
+        let flags = FeatureFlagsStore()
+        _authStore = State(initialValue: auth)
+        _featureFlags = State(initialValue: flags)
+        _inboxPoller = State(initialValue: InboxPollerService(
+            authStore: auth,
+            apiClient: api,
+            featureFlags: flags
+        ))
 
         // Reset data before any views load (for test isolation)
         if ProcessInfo.processInfo.arguments.contains("--reset-data") {
@@ -115,6 +135,9 @@ struct LiftMarkApp: App {
                 .environment(settingsStore)
                 .environment(gymStore)
                 .environment(equipmentStore)
+                .environment(authStore)
+                .environment(inboxPoller)
+                .environment(featureFlags)
                 .onAppear {
                     planStore.loadPlans()
                     sessionStore.loadSessions()
@@ -126,6 +149,9 @@ struct LiftMarkApp: App {
                         Task {
                             await CKSyncEngineManager.shared.start()
                         }
+                        Task { @MainActor in
+                            await inboxPoller.pollIfAuthenticated()
+                        }
                     }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
@@ -134,6 +160,9 @@ struct LiftMarkApp: App {
                         if !Self.isRunningTests {
                             Task {
                                 await CKSyncEngineManager.shared.start()
+                            }
+                            Task { @MainActor in
+                                await inboxPoller.pollIfAuthenticated()
                             }
                         }
                     default:

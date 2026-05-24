@@ -4,12 +4,16 @@ struct HomeView: View {
     @Environment(WorkoutPlanStore.self) private var planStore
     @Environment(SessionStore.self) private var sessionStore
     @Environment(SettingsStore.self) private var settingsStore
+    @Environment(InboxPollerService.self) private var inboxPoller
+    @Environment(FeatureFlagsStore.self) private var featureFlags
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @Environment(NavigationCoordinator.self) private var navCoordinator
     @State private var showImport = false
     @State private var showExercisePicker = false
     @State private var editingTileIndex: Int?
+
+    private var inboxCount: Int { inboxPoller.pendingCount }
 
     // Cached max-lift computations to avoid O(n³) work on every body evaluation
     @State private var cachedMaxWeights: [String: Double] = [:]
@@ -60,6 +64,44 @@ struct HomeView: View {
                     .accessibilityIdentifier("resume-workout-banner")
                     .accessibilityLabel("Resume \(activeSession.name), \(setProgressText(for: activeSession))")
                     .accessibilityHint("Returns to the active workout")
+                }
+
+                // Inbox card — shown only when the feature flag is on AND
+                // something is waiting locally. See
+                // `spec/services/feature-flags.md`.
+                if featureFlags.isEnabled(.workoutInbox) && inboxCount > 0 {
+                    Button {
+                        navCoordinator.selectedTab = .plans
+                    } label: {
+                        HStack {
+                            Image(systemName: "tray.full")
+                                .font(.title2)
+                                .foregroundStyle(LiftMarkTheme.primary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(inboxCount == 1
+                                     ? "1 workout in your inbox"
+                                     : "\(inboxCount) workouts in your inbox")
+                                    .font(.headline)
+                                    .foregroundStyle(LiftMarkTheme.label)
+                                Text("Tap to review")
+                                    .font(.subheadline)
+                                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                        }
+                        .padding()
+                        .background(LiftMarkTheme.secondaryBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD)
+                                .strokeBorder(LiftMarkTheme.tertiaryLabel.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("home-inbox-card")
+                    .accessibilityLabel("\(inboxCount) workouts in your inbox. Tap to review.")
                 }
 
                 // Max Lifts Section

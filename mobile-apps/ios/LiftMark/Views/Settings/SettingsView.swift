@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(SettingsStore.self) private var settingsStore
+    @Environment(FeatureFlagsStore.self) private var featureFlags
     @State private var selectedSection: SettingsSection? = .general
     @State private var healthKitAuthStatus: HealthKitAuthStatus = .notDetermined
     @State private var liveActivitiesEnabled = false
@@ -70,6 +71,15 @@ struct SettingsView: View {
         switch section {
         case .general:
             List {
+                // Account is gated on the workout-inbox flag for now —
+                // sign-in is currently only useful for the inbox. When
+                // another auth-requiring feature ships (billing, etc.),
+                // shift this gate to an `anyAuthFeatureEnabled` predicate.
+                if featureFlags.isEnabled(.workoutInbox) {
+                    Section("Account") {
+                        SettingsAccountSection()
+                    }
+                }
                 Section("Appearance") {
                     AppearancePicker(selection: appearanceBinding(settings: settings))
                         .accessibilityIdentifier("picker-theme")
@@ -130,6 +140,9 @@ struct SettingsView: View {
                 Section(section.rawValue) {
                     SettingsDeveloperSection()
                 }
+                Section("Feature Flags") {
+                    SettingsFeatureFlagsSection()
+                }
             }
         case .about:
             List {
@@ -152,6 +165,12 @@ struct SettingsView: View {
     @ViewBuilder
     private func iPhoneLayout(settings: UserSettings) -> some View {
         List {
+            if featureFlags.isEnabled(.workoutInbox) {
+                Section("Account") {
+                    SettingsAccountSection()
+                }
+            }
+
             Section("Appearance") {
                 AppearancePicker(selection: appearanceBinding(settings: settings))
                     .accessibilityIdentifier("picker-theme")
@@ -190,10 +209,16 @@ struct SettingsView: View {
             Section("Developer") {
                 SettingsDeveloperSection()
             }
+            Section("Feature Flags") {
+                SettingsFeatureFlagsSection()
+            }
             #else
             if settings.developerModeEnabled {
                 Section("Developer") {
                     SettingsDeveloperSection()
+                }
+                Section("Feature Flags") {
+                    SettingsFeatureFlagsSection()
                 }
             }
             #endif

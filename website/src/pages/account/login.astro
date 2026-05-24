@@ -1,0 +1,88 @@
+---
+import AccountLayout from '../../layouts/AccountLayout.astro';
+---
+
+<AccountLayout title="Sign in" description="Sign in to your LiftMark account.">
+  <div class="auth-page">
+    <h1>Sign in</h1>
+    <p class="muted">No account? <a href="/account/signup">Create one</a>.</p>
+
+    <form id="login-form" class="account-form" novalidate>
+      <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+      </div>
+      <div>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <div class="row-actions">
+        <button type="submit" class="btn" id="submit-btn">Sign in</button>
+        <a href="/account/forgot" style="margin-left:auto; font-size: 0.9rem;">Forgot password?</a>
+      </div>
+      <div id="login-msg"></div>
+    </form>
+  </div>
+
+  <script>
+    import { api, setSession, escapeHtml } from '../../scripts/api.js';
+
+    const form = document.getElementById('login-form');
+    const msg = document.getElementById('login-msg');
+    const submitBtn = document.getElementById('submit-btn');
+
+    function showMsg(kind, html) {
+      msg.innerHTML = '<div class="inline-msg ' + kind + '">' + html + '</div>';
+    }
+
+    async function resend(email) {
+      try {
+        await api('/v1/auth/password/resend-verification', {
+          method: 'POST',
+          auth: false,
+          body: { email },
+        });
+        showMsg('ok', 'Verification email re-sent.');
+      } catch {
+        showMsg('err', 'Network error sending verification.');
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.innerHTML = '';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      submitBtn.disabled = true;
+      try {
+        const { status, body } = await api('/v1/auth/password/login', {
+          method: 'POST',
+          auth: false,
+          body: { email, password },
+        });
+        if (status === 200 && body && body.access_jwt && body.refresh_token) {
+          setSession(body.access_jwt, body.refresh_token, body.user);
+          window.location.replace('/account/');
+          return;
+        }
+        if (status === 401) {
+          showMsg('err', 'Invalid credentials.');
+          return;
+        }
+        if (status === 403) {
+          showMsg('warn',
+            'Email not verified. <button type="button" class="btn btn-secondary btn-small" id="resend-btn">Resend verification</button>'
+          );
+          document.getElementById('resend-btn').addEventListener('click', () => resend(email));
+          return;
+        }
+        showMsg('err', escapeHtml((body && body.error) || ('Sign-in failed (HTTP ' + status + ')')));
+      } catch (err) {
+        showMsg('err', 'Network error: ' + escapeHtml(err.message || String(err)));
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</AccountLayout>

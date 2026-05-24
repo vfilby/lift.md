@@ -1,0 +1,462 @@
+---
+import AccountLayout from '../../layouts/AccountLayout.astro';
+
+const exampleLmwf = `# Push Day
+@units: lbs
+
+## Bench Press
+- 135 x 5
+- 185 x 5
+- 225 x 5
+`;
+---
+
+<AccountLayout title="Account" description="LiftMark account dashboard.">
+  <div class="account-wrap">
+    <div id="loading" class="muted">Loading…</div>
+
+    <div id="dash" hidden>
+      <!-- (a) User header -->
+      <header class="account-header">
+        <div>
+          <h1 id="user-name">—</h1>
+          <div class="meta">
+            <span id="user-email" class="mono"></span>
+            · <span id="user-tier"></span>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button type="button" class="btn btn-secondary btn-small" id="signout-btn">Sign out</button>
+        </div>
+      </header>
+
+      <!-- (b) Tokens -->
+      <section class="account-card">
+        <div class="section-actions">
+          <h2 style="margin:0; flex:1;">Personal access tokens</h2>
+          <button type="button" class="btn btn-small" id="new-token-btn">+ Create token</button>
+          <button type="button" class="btn btn-secondary btn-small" id="refresh-tokens-btn">Refresh</button>
+        </div>
+
+        <form id="new-token-form" class="account-form" hidden style="margin-bottom: 1rem;">
+          <div class="field-row">
+            <div style="flex: 2;">
+              <label for="tok-name">Name</label>
+              <input id="tok-name" type="text" required placeholder="e.g. claude-code-laptop" />
+            </div>
+            <div style="flex: 1;">
+              <label for="tok-expires">Expires (optional)</label>
+              <input id="tok-expires" type="date" />
+            </div>
+          </div>
+          <div>
+            <label>Scopes</label>
+            <label style="font-weight: normal; display: inline; margin-right: 1rem;">
+              <input type="checkbox" id="scope-write" checked /> workouts:write
+            </label>
+            <label style="font-weight: normal; display: inline;">
+              <input type="checkbox" id="scope-read" checked /> workouts:read
+            </label>
+          </div>
+          <div class="row-actions">
+            <button type="submit" class="btn btn-small">Create</button>
+            <button type="button" class="btn btn-secondary btn-small" id="cancel-token-btn">Cancel</button>
+          </div>
+          <div id="new-token-msg"></div>
+        </form>
+
+        <div id="token-plaintext"></div>
+
+        <div id="tokens-wrap"></div>
+      </section>
+
+      <!-- (c) Inbox -->
+      <section class="account-card">
+        <div class="section-actions">
+          <h2 style="margin:0; flex:1;">Workout inbox</h2>
+          <select id="inbox-filter" class="btn-small" style="padding: 0.3rem 0.5rem; border-radius: 6px; border:1px solid var(--color-border); background:var(--color-bg);">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="ingested">Ingested</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button type="button" class="btn btn-secondary btn-small" id="refresh-inbox-btn">Refresh</button>
+        </div>
+        <div id="inbox-wrap"></div>
+      </section>
+
+      <!-- (d) Push workout -->
+      <section class="account-card">
+        <h2>Push a workout</h2>
+        <p class="muted" style="margin-top:-0.25rem;">Pushed via your web session — these will show <code>session</code> as the source.</p>
+        <form id="push-form" class="account-form">
+          <div>
+            <label for="push-lmwf">LMWF markdown</label>
+            <textarea id="push-lmwf" spellcheck="false" autocapitalize="off">{exampleLmwf}</textarea>
+          </div>
+          <div class="row-actions">
+            <button type="submit" class="btn">Push</button>
+            <span id="push-status" class="muted"></span>
+          </div>
+          <div id="push-result"></div>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    import {
+      api, apiRawText, getUser, getRefreshToken, clearSession, requireSessionOrRedirect,
+      escapeHtml, formatDate, formatDateShort,
+    } from '../../scripts/api.js';
+
+    if (!requireSessionOrRedirect()) {
+      // Stop further script execution; redirect is in flight.
+    } else {
+      init();
+    }
+
+    // ── state ──
+    let tokens = [];             // all tokens (incl. revoked)
+    let currentInboxFilter = '';
+
+    function tokenIsActive(t) {
+      if (t.revoked_at) return false;
+      if (t.expires_at && new Date(t.expires_at).getTime() < Date.now()) return false;
+      return true;
+    }
+
+    // Inbox source_token_id is either a PAT ULID (we render its prefix)
+    // or the literal sentinel "session" (web dashboard push).
+    function sourceLabel(id) {
+      if (id === 'session') return 'web session';
+      const t = tokens.find((t) => t.token_id === id);
+      return t ? t.prefix : (id || '').slice(0, 8);
+    }
+
+    async function init() {
+      // Fetch tokens (also returns tier/trial info) — first load also acts as auth check.
+      const { status, body } = await api('/v1/tokens', { method: 'GET' });
+      if (status === 401) {
+        clearSession();
+        window.location.replace('/account/login');
+        return;
+      }
+      if (status !== 200 || !body) {
+        document.getElementById('loading').textContent = 'Failed to load account (HTTP ' + status + ').';
+        return;
+      }
+
+      renderHeader(body);
+      tokens = body.tokens || [];
+      renderTokens();
+
+      document.getElementById('loading').hidden = true;
+      document.getElementById('dash').hidden = false;
+
+      // Inbox is reachable directly via the session JWT — no PAT needed.
+      await refreshInbox();
+
+      bindHandlers();
+    }
+
+    function renderHeader(body) {
+      const u = getUser() || {};
+      document.getElementById('user-name').textContent = u.display_name || u.email || 'Account';
+      document.getElementById('user-email').textContent = u.email || '';
+
+      const tier = body.tier || u.tier || 'free';
+      const trialEnds = body.trial_ends_at || u.trial_ends_at;
+      let tierHtml;
+      if (tier === 'pro') {
+        tierHtml = '<span class="badge badge-ok">Pro</span>';
+      } else if (tier === 'trial') {
+        const ends = trialEnds ? ' (ends ' + escapeHtml(formatDateShort(trialEnds)) + ')' : '';
+        tierHtml = '<span class="badge badge-warn">Trial' + ends + '</span>';
+      } else {
+        tierHtml = '<span class="badge">Free</span>';
+      }
+      document.getElementById('user-tier').innerHTML = tierHtml;
+    }
+
+    function renderTokens() {
+      const wrap = document.getElementById('tokens-wrap');
+      if (tokens.length === 0) {
+        wrap.innerHTML = '<p class="muted">No tokens yet. Create one to push workouts.</p>';
+        return;
+      }
+      let html = '<table class="account-table"><thead><tr>'
+        + '<th>Prefix</th><th>Name</th><th>Scopes</th><th>Created</th><th>Last used</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody>';
+      for (const t of tokens) {
+        const active = tokenIsActive(t);
+        const status = t.revoked_at
+          ? '<span class="badge badge-revoked">Revoked</span>'
+          : (t.expires_at && new Date(t.expires_at) < new Date())
+            ? '<span class="badge badge-err">Expired</span>'
+            : '<span class="badge badge-ok">Active</span>';
+        const scopes = (t.scopes || []).map((s) => '<span class="chip">' + escapeHtml(s) + '</span>').join('');
+        const revokeBtn = active
+          ? '<button type="button" class="btn btn-danger btn-small" data-revoke="' + escapeHtml(t.token_id) + '">Revoke</button>'
+          : '';
+        html += '<tr>'
+          + '<td class="mono">' + escapeHtml(t.prefix) + '</td>'
+          + '<td>' + escapeHtml(t.name) + '</td>'
+          + '<td>' + scopes + '</td>'
+          + '<td>' + escapeHtml(formatDate(t.created_at)) + '</td>'
+          + '<td>' + escapeHtml(t.last_used_at ? formatDate(t.last_used_at) : '—') + '</td>'
+          + '<td>' + status + '</td>'
+          + '<td>' + revokeBtn + '</td>'
+          + '</tr>';
+      }
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+
+      wrap.querySelectorAll('[data-revoke]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-revoke');
+          if (!confirm('Revoke this token? Any client using it will lose access.')) return;
+          btn.disabled = true;
+          const { status } = await api('/v1/tokens/' + encodeURIComponent(id), { method: 'DELETE' });
+          if (status === 204 || status === 200) {
+            await refreshTokens();
+          } else {
+            alert('Revoke failed (HTTP ' + status + ').');
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    async function refreshTokens() {
+      const { status, body } = await api('/v1/tokens', { method: 'GET' });
+      if (status !== 200 || !body) return;
+      tokens = body.tokens || [];
+      renderTokens();
+    }
+
+    async function refreshInbox() {
+      const wrap = document.getElementById('inbox-wrap');
+      wrap.innerHTML = '<p class="muted">Loading…</p>';
+      const q = currentInboxFilter ? '?status=' + encodeURIComponent(currentInboxFilter) : '';
+      const { status, body } = await api('/v1/workouts' + q, { method: 'GET' });
+      if (status !== 200 || !body) {
+        wrap.innerHTML = '<p class="inline-msg err">Inbox fetch failed (HTTP ' + status + ').</p>';
+        return;
+      }
+      const items = body.items || [];
+      if (items.length === 0) {
+        wrap.innerHTML = '<p class="muted">No inbox items.</p>';
+        return;
+      }
+      let html = '<table class="account-table"><thead><tr>'
+        + '<th></th><th>ID</th><th>Status</th><th>Created</th><th>Source</th><th>Workout</th><th>Exercises</th><th>Sets</th><th></th>'
+        + '</tr></thead><tbody>';
+      for (const it of items) {
+        const statusBadge = it.status === 'ingested'
+          ? '<span class="badge badge-ok">ingested</span>'
+          : it.status === 'rejected'
+            ? '<span class="badge badge-err">rejected</span>'
+            : '<span class="badge badge-warn">pending</span>';
+        const exList = (it.summary && it.summary.exercises) || [];
+        const detail = exList.map((e) =>
+          '<li>' + escapeHtml(e.name) + ' — ' + (e.setCount || 0) + ' set'
+            + ((e.setCount || 0) === 1 ? '' : 's')
+            + (e.groupType ? ' <span class="chip">' + escapeHtml(e.groupType) + '</span>' : '')
+          + '</li>'
+        ).join('');
+        const ackBtn = it.status === 'pending'
+          ? '<button type="button" class="btn btn-secondary btn-small" data-ack="' + escapeHtml(it.inbox_id) + '">Mark ingested</button>'
+          : '';
+        html += '<tr>'
+          + '<td><details class="row-detail"><summary></summary></details></td>'
+          + '<td><code title="' + escapeHtml(it.inbox_id) + '">' + escapeHtml(it.inbox_id.slice(0, 8)) + '</code></td>'
+          + '<td>' + statusBadge + '</td>'
+          + '<td>' + escapeHtml(formatDate(it.created_at)) + '</td>'
+          + '<td class="mono">' + escapeHtml(sourceLabel(it.source_token_id)) + '</td>'
+          + '<td>' + escapeHtml((it.summary && it.summary.workoutName) || '—') + '</td>'
+          + '<td>' + ((it.summary && it.summary.exerciseCount) ?? 0) + '</td>'
+          + '<td>' + ((it.summary && it.summary.totalSetCount) ?? 0) + '</td>'
+          + '<td>' + ackBtn + '</td>'
+          + '</tr>'
+          + '<tr class="row-expand" hidden data-expand="' + escapeHtml(it.inbox_id) + '">'
+          + '<td></td><td colspan="8"><ul style="margin:0; padding-left: 1.2rem;">' + detail + '</ul></td>'
+          + '</tr>';
+      }
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+
+      // Wire up row expansion + ack buttons.
+      wrap.querySelectorAll('details.row-detail').forEach((d, idx) => {
+        const tr = d.closest('tr');
+        const expandRow = tr.nextElementSibling;
+        d.addEventListener('toggle', () => {
+          if (expandRow) expandRow.hidden = !d.open;
+        });
+      });
+      wrap.querySelectorAll('[data-ack]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-ack');
+          btn.disabled = true;
+          const { status } = await api('/v1/workouts/' + encodeURIComponent(id) + '/ack', {
+            method: 'POST',
+          });
+          if (status === 204 || status === 200) {
+            await refreshInbox();
+          } else {
+            alert('Ack failed (HTTP ' + status + ').');
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    function bindHandlers() {
+      document.getElementById('signout-btn').addEventListener('click', async () => {
+        // Best-effort server-side revocation before clearing local state.
+        // We don't await/branch on the result — even if logout fails,
+        // clearing localStorage is the right user-visible outcome.
+        const refresh_token = getRefreshToken();
+        if (refresh_token) {
+          try {
+            await api('/v1/auth/logout', {
+              method: 'POST',
+              body: { refresh_token },
+            });
+          } catch {}
+        }
+        clearSession();
+        window.location.replace('/account/login');
+      });
+
+      const newTokenBtn = document.getElementById('new-token-btn');
+      const newTokenForm = document.getElementById('new-token-form');
+      const newTokenMsg = document.getElementById('new-token-msg');
+
+      newTokenBtn.addEventListener('click', () => {
+        newTokenForm.hidden = false;
+        newTokenBtn.disabled = true;
+        document.getElementById('tok-name').focus();
+      });
+      document.getElementById('cancel-token-btn').addEventListener('click', () => {
+        newTokenForm.hidden = true;
+        newTokenForm.reset();
+        newTokenMsg.innerHTML = '';
+        newTokenBtn.disabled = false;
+      });
+
+      newTokenForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        newTokenMsg.innerHTML = '';
+        const name = document.getElementById('tok-name').value.trim();
+        if (!name) { newTokenMsg.innerHTML = '<div class="inline-msg err">Name required.</div>'; return; }
+        const scopes = [];
+        if (document.getElementById('scope-write').checked) scopes.push('workouts:write');
+        if (document.getElementById('scope-read').checked) scopes.push('workouts:read');
+        if (scopes.length === 0) {
+          newTokenMsg.innerHTML = '<div class="inline-msg err">Select at least one scope.</div>';
+          return;
+        }
+        const expRaw = document.getElementById('tok-expires').value;
+        const body = { name, scopes };
+        if (expRaw) {
+          // Convert YYYY-MM-DD to end-of-day ISO so a same-day pick stays in the future.
+          body.expires_at = new Date(expRaw + 'T23:59:59Z').toISOString();
+        }
+        const submitBtn = newTokenForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        try {
+          const { status, body: resBody } = await api('/v1/tokens', { method: 'POST', body });
+          if (status === 201 && resBody) {
+            showPlaintext(resBody);
+            newTokenForm.hidden = true;
+            newTokenForm.reset();
+            newTokenBtn.disabled = false;
+            await refreshTokens();
+          } else if (status === 402) {
+            newTokenMsg.innerHTML = '<div class="inline-msg err">Subscription required to mint tokens.</div>';
+          } else if (status === 429) {
+            newTokenMsg.innerHTML = '<div class="inline-msg err">'
+              + escapeHtml((resBody && resBody.error) || 'Token limit reached.') + '</div>';
+          } else {
+            newTokenMsg.innerHTML = '<div class="inline-msg err">'
+              + escapeHtml((resBody && resBody.error) || ('Create failed (HTTP ' + status + ')')) + '</div>';
+          }
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      document.getElementById('refresh-tokens-btn').addEventListener('click', refreshTokens);
+      document.getElementById('refresh-inbox-btn').addEventListener('click', refreshInbox);
+      document.getElementById('inbox-filter').addEventListener('change', (e) => {
+        currentInboxFilter = e.target.value;
+        refreshInbox();
+      });
+
+      // Push form — uses the session JWT (default for apiRawText).
+      const pushForm = document.getElementById('push-form');
+      const pushStatus = document.getElementById('push-status');
+      const pushResult = document.getElementById('push-result');
+      pushForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        pushResult.innerHTML = '';
+        const lmwf = document.getElementById('push-lmwf').value;
+        const submitBtn = pushForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        pushStatus.textContent = 'Pushing…';
+        try {
+          const { status, body } = await apiRawText('/v1/workouts', lmwf);
+          pushStatus.textContent = '';
+          if (status === 201 && body) {
+            const summary = body.summary || {};
+            pushResult.innerHTML = '<div class="inline-msg ok">'
+              + 'Queued — <code>' + escapeHtml(body.inbox_id) + '</code><br>'
+              + escapeHtml(summary.workoutName || '') + ' · '
+              + (summary.exerciseCount ?? 0) + ' exercises · '
+              + (summary.totalSetCount ?? 0) + ' sets'
+              + '</div>';
+            await refreshInbox();
+          } else if (status === 422 && body) {
+            const errs = (body.errors || []).map((e) => '<li>' + escapeHtml(e) + '</li>').join('');
+            pushResult.innerHTML = '<div class="inline-msg err">'
+              + '<strong>Parse errors</strong><ul style="margin: 0.5rem 0 0; padding-left:1.2rem;">'
+              + errs + '</ul></div>';
+          } else {
+            pushResult.innerHTML = '<div class="inline-msg err">'
+              + escapeHtml((body && body.error) || ('Push failed (HTTP ' + status + ')')) + '</div>';
+          }
+        } catch (err) {
+          pushStatus.textContent = '';
+          pushResult.innerHTML = '<div class="inline-msg err">Network error: '
+            + escapeHtml(err.message || String(err)) + '</div>';
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    function showPlaintext(resBody) {
+      const wrap = document.getElementById('token-plaintext');
+      wrap.innerHTML = '<div class="inline-msg warn">'
+        + '<strong>Save this token now — it will not be shown again.</strong>'
+        + '<div style="margin-top:0.5rem; display:flex; gap: 0.5rem; align-items: center;">'
+        + '<code style="flex:1; user-select: all; overflow-wrap: anywhere; word-break: break-all;" id="pt-value">'
+        + escapeHtml(resBody.plaintext) + '</code>'
+        + '<button type="button" class="btn btn-secondary btn-small" id="copy-pt">Copy</button>'
+        + '<button type="button" class="btn btn-secondary btn-small" id="dismiss-pt">Dismiss</button>'
+        + '</div></div>';
+      document.getElementById('copy-pt').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(resBody.plaintext);
+          document.getElementById('copy-pt').textContent = 'Copied';
+        } catch {
+          document.getElementById('copy-pt').textContent = 'Copy failed';
+        }
+      });
+      document.getElementById('dismiss-pt').addEventListener('click', () => {
+        wrap.innerHTML = '';
+      });
+    }
+  </script>
+</AccountLayout>

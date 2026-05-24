@@ -5,6 +5,8 @@ struct WorkoutsView: View {
     @Environment(GymStore.self) private var gymStore
     @Environment(EquipmentStore.self) private var equipmentStore
     @Environment(NavigationCoordinator.self) private var navCoordinator
+    @Environment(InboxPollerService.self) private var inboxPoller
+    @Environment(FeatureFlagsStore.self) private var featureFlags
     @State private var searchText = ""
     @State private var showFavoritesOnly = false
     @State private var showEquipmentFilter = false
@@ -25,13 +27,31 @@ struct WorkoutsView: View {
     var body: some View {
         AdaptiveSplitView {
             // iPad sidebar - plan list
-            VStack(spacing: 0) {
-                searchBar
-                filterToggle
-                if showFilters {
-                    filterPanel
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if featureFlags.isEnabled(.workoutInbox) {
+                        InboxSectionView()
+                    }
+                    filterToggle
+                    if showFilters {
+                        filterPanel
+                    }
+                    if filteredPlans.isEmpty {
+                        emptyStateView
+                    } else {
+                        LazyVStack(spacing: LiftMarkTheme.spacingSM) {
+                            ForEach(Array(filteredPlans.enumerated()), id: \.element.id) { index, plan in
+                                iPadPlanRow(plan: plan, index: index)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, LiftMarkTheme.spacingSM)
+                        .accessibilityIdentifier("workout-list")
+                    }
                 }
-                iPadPlansList
+            }
+            .refreshable {
+                await inboxPoller.pollIfAuthenticated()
             }
         } detail: {
             // iPad detail - plan detail
@@ -46,6 +66,15 @@ struct WorkoutsView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("workouts-screen")
         .navigationTitle("Plans")
+        // The system `.searchable` modifier anchors to the top of the
+        // screen and floats over content on pull. We want the modern
+        // Mail/Safari pattern: a fixed search field above the tab bar
+        // that does not move when the user scrolls. `safeAreaInset`
+        // pins our own search bar to the bottom safe area and keeps the
+        // scroll content correctly inset above it.
+        .safeAreaInset(edge: .bottom) {
+            bottomSearchBar
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -149,34 +178,67 @@ struct WorkoutsView: View {
     // MARK: - iPhone Layout
 
     private var iPhoneLayout: some View {
-        VStack(spacing: 0) {
-            searchBar
-            filterToggle
-            if showFilters {
-                filterPanel
+        // Single ScrollView so pull-to-refresh applies to both the Inbox
+        // card and the plans list. `.refreshable` here triggers an inbox
+        // poll regardless of where the user pulls from.
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                if featureFlags.isEnabled(.workoutInbox) {
+                    InboxSectionView()
+                }
+                filterToggle
+                if showFilters {
+                    filterPanel
+                }
+                if filteredPlans.isEmpty {
+                    emptyStateView
+                } else {
+                    LazyVStack(spacing: LiftMarkTheme.spacingSM) {
+                        ForEach(Array(filteredPlans.enumerated()), id: \.element.id) { index, plan in
+                            planRow(plan: plan, index: index)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, LiftMarkTheme.spacingSM)
+                    .accessibilityIdentifier("workout-list")
+                }
             }
-            plansContent
+        }
+        .refreshable {
+            await inboxPoller.pollIfAuthenticated()
         }
     }
 
-    // MARK: - Search Bar
+    // MARK: - Bottom Search Bar
 
-    private var searchBar: some View {
+    private var bottomSearchBar: some View {
         HStack(spacing: LiftMarkTheme.spacingSM) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .font(.system(size: 14))
                 .accessibilityHidden(true)
-            TextField("Search plans...", text: $searchText)
+            TextField("Search plans", text: $searchText)
                 .font(.body)
+                .submitLabel(.search)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(LiftMarkTheme.tertiaryLabel)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
         }
         .padding(.horizontal, LiftMarkTheme.spacingMD)
         .padding(.vertical, LiftMarkTheme.spacingSM)
         .background(LiftMarkTheme.secondaryBackground)
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(LiftMarkTheme.tertiaryLabel.opacity(0.3), lineWidth: 1.5))
-        .padding(.horizontal)
-        .padding(.vertical, LiftMarkTheme.spacingSM)
+        .overlay(Capsule().stroke(LiftMarkTheme.tertiaryLabel.opacity(0.3), lineWidth: 1))
+        .padding(.horizontal, LiftMarkTheme.spacingMD)
+        .padding(.bottom, LiftMarkTheme.spacingSM)
+        .background(.bar)
         .accessibilityIdentifier("search-input")
     }
 

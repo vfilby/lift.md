@@ -1,0 +1,128 @@
+---
+import AccountLayout from '../../layouts/AccountLayout.astro';
+---
+
+<AccountLayout title="Sign up" description="Create a LiftMark account.">
+  <div class="auth-page">
+    <h1>Create an account</h1>
+    <p class="muted">Already have one? <a href="/account/login">Sign in</a>.</p>
+
+    <form id="signup-form" class="account-form" novalidate>
+      <div>
+        <label for="display_name">Display name</label>
+        <input id="display_name" name="display_name" type="text" autocomplete="name" required />
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+      </div>
+      <div>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" required />
+        <div class="field-hint">At least 12 characters.</div>
+      </div>
+      <div>
+        <label for="password_confirm">Confirm password</label>
+        <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="12" required />
+      </div>
+      <div>
+        <button type="submit" class="btn" id="submit-btn">Create account</button>
+      </div>
+      <div id="signup-msg"></div>
+    </form>
+
+    <div id="success-state" hidden>
+      <div class="inline-msg ok">
+        <strong>Check your email.</strong>
+        <p style="margin:0.5rem 0 0">
+          We sent a verification link to <span id="sent-email" class="mono"></span>.
+          Click it to activate your account.
+        </p>
+      </div>
+      <div class="section-actions" style="margin-top: 1rem;">
+        <button type="button" class="btn btn-secondary btn-small" id="resend-btn">Resend email</button>
+        <span id="resend-status" class="muted"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { api, escapeHtml } from '../../scripts/api.js';
+
+    const form = document.getElementById('signup-form');
+    const msg = document.getElementById('signup-msg');
+    const submitBtn = document.getElementById('submit-btn');
+    const successState = document.getElementById('success-state');
+    const sentEmailEl = document.getElementById('sent-email');
+    const resendBtn = document.getElementById('resend-btn');
+    const resendStatus = document.getElementById('resend-status');
+
+    let lastEmail = '';
+
+    function showMsg(kind, html) {
+      msg.innerHTML = '<div class="inline-msg ' + kind + '">' + html + '</div>';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.innerHTML = '';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('password_confirm').value;
+      const display_name = document.getElementById('display_name').value.trim();
+
+      if (password.length < 12) {
+        showMsg('err', 'Password must be at least 12 characters.');
+        return;
+      }
+      if (password !== confirm) {
+        showMsg('err', 'Passwords do not match.');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      try {
+        const { status, body } = await api('/v1/auth/password/signup', {
+          method: 'POST',
+          auth: false,
+          body: { email, password, display_name },
+        });
+        if (status === 201) {
+          lastEmail = email;
+          sentEmailEl.textContent = email;
+          form.hidden = true;
+          successState.hidden = false;
+          return;
+        }
+        if (status === 409) {
+          showMsg('err', 'An account already exists with this email. <a href="/account/login">Sign in</a>.');
+          return;
+        }
+        const err = (body && body.error) || ('Signup failed (HTTP ' + status + ')');
+        showMsg('err', escapeHtml(err));
+      } catch (err) {
+        showMsg('err', 'Network error: ' + escapeHtml(err.message || String(err)));
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    resendBtn.addEventListener('click', async () => {
+      if (!lastEmail) return;
+      resendBtn.disabled = true;
+      resendStatus.textContent = 'Sending...';
+      try {
+        await api('/v1/auth/password/resend-verification', {
+          method: 'POST',
+          auth: false,
+          body: { email: lastEmail },
+        });
+        resendStatus.textContent = 'Sent.';
+      } catch {
+        resendStatus.textContent = 'Network error.';
+      } finally {
+        resendBtn.disabled = false;
+      }
+    });
+  </script>
+</AccountLayout>

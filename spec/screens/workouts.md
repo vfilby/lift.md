@@ -8,15 +8,33 @@ Browse, search, filter, and manage all imported workout plans. Supports tablet s
 
 ## Layout
 - **Header**: Tab header from navigator
-- **Body** (phone): Search bar + filter panel + FlatList of plan cards
-- **Body** (tablet): SplitView with list on left, WorkoutDetailView on right
+- **Body** (phone): Inbox section + Search bar + filter panel + FlatList of plan cards
+- **Body** (tablet): Inbox section (top of left pane) + SplitView with list on left, WorkoutDetailView on right
 - **Footer**: None
+
+### Inbox section
+
+Always visible at the top of the screen, between the header and the search bar. Surfaces workouts pushed to this user from outside the app (e.g., via Claude Code + PAT — see [`../services/workout-inbox.md`](../services/workout-inbox.md)).
+
+- Header row: "Inbox" + a count badge (hidden when zero).
+- When empty: a single muted row reading "No new workouts in your inbox."
+- When non-empty: one row per inbox item showing the workout name, exercise count, set count, and a relative-time stamp ("2h ago"). Tap opens an Inbox Detail sheet (read-only preview + actions).
+- Each row has a leading swipe action **Discard** (red) and trailing swipe actions **Add to Plans** and **Start**. Long-press shows the same three actions in a context menu.
+- Items in the Inbox section are NOT in the user's plan library yet. They do not respond to search, filter, or favorite. They are not exported via backup.
 
 ## UI Elements
 
 | Element | testID | Type |
 |---------|--------|------|
 | Screen container | `workouts-screen` | View |
+| Inbox section | `inbox-section` | View |
+| Inbox count badge | `inbox-count-badge` | View |
+| Inbox empty row | `inbox-empty` | View |
+| Inbox row (per item) | `inbox-row-{inbox_id}` | View |
+| Inbox row Discard | `inbox-row-discard-{inbox_id}` | Button |
+| Inbox row Add to Plans | `inbox-row-add-{inbox_id}` | Button |
+| Inbox row Start | `inbox-row-start-{inbox_id}` | Button |
+| Inbox detail sheet | `inbox-detail-sheet` | Sheet |
 | Search input | `search-input` | TextInput |
 | Filter toggle | `filter-toggle` | TouchableOpacity |
 | Favorites filter switch | `switch-filter-favorites` | Switch |
@@ -33,6 +51,12 @@ Browse, search, filter, and manage all imported workout plans. Supports tablet s
 | Setup equipment button | `button-setup-equipment` | TouchableOpacity |
 
 ## User Interactions
+- **Tap inbox row** → opens Inbox Detail sheet (read-only preview + Discard / Add to Plans / Start actions)
+- **Swipe inbox row left** → reveals Add to Plans + Start
+- **Swipe inbox row right** → reveals Discard
+- **Tap Inbox → Add to Plans** → promotes item to a plan, removes from inbox, deletes server row
+- **Tap Inbox → Start** → promotes (as above) and opens the new plan's detail screen so the user can tap Start there (v1)
+- **Tap Inbox → Discard** → removes from local inbox + deletes server row (no confirmation; can re-push externally)
 - **Type in search** → filters plans by query
 - **Toggle "Show Filters"** → expands/collapses filter card
 - **Toggle favorites switch** → filters to favorited plans only

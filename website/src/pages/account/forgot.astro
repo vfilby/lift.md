@@ -1,0 +1,53 @@
+---
+import AccountLayout from '../../layouts/AccountLayout.astro';
+---
+
+<AccountLayout title="Forgot password" description="Request a password reset link.">
+  <div class="auth-page">
+    <h1>Forgot password</h1>
+    <p class="muted">We'll email you a reset link if we have an account on file.</p>
+
+    <form id="forgot-form" class="account-form" novalidate>
+      <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+      </div>
+      <div class="row-actions">
+        <button type="submit" class="btn" id="submit-btn">Send reset link</button>
+        <a href="/account/login" style="margin-left:auto; font-size: 0.9rem;">Back to sign in</a>
+      </div>
+      <div id="forgot-msg"></div>
+    </form>
+  </div>
+
+  <script>
+    import { api, escapeHtml } from '../../scripts/api.js';
+
+    const form = document.getElementById('forgot-form');
+    const msg = document.getElementById('forgot-msg');
+    const submitBtn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.innerHTML = '';
+      const email = document.getElementById('email').value.trim();
+      submitBtn.disabled = true;
+      try {
+        // The endpoint always 204s to prevent enumeration. Show the same
+        // message regardless of outcome.
+        await api('/v1/auth/password/reset-request', {
+          method: 'POST',
+          auth: false,
+          body: { email },
+        });
+        msg.innerHTML =
+          '<div class="inline-msg ok">If we have an account with that email, we sent a reset link.</div>';
+      } catch (err) {
+        msg.innerHTML =
+          '<div class="inline-msg err">Network error: ' + escapeHtml(err.message || String(err)) + '</div>';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</AccountLayout>
