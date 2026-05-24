@@ -22,6 +22,7 @@ enum MigrationGoldenShapes {
         "template_exercises",
         "template_sets",
         "user_settings",
+        "workout_inbox",
         "workout_sessions",
         "workout_templates",
     ]

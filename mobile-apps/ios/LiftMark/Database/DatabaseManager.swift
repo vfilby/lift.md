@@ -11,7 +11,7 @@ final class DatabaseManager: @unchecked Sendable {
     private let dbLock = NSLock()
 
     private static let dbName = "liftmark.db"
-    static let currentSchemaVersion = 15
+    static let currentSchemaVersion = 16
 
     private init() {}
 
@@ -197,6 +197,7 @@ final class DatabaseManager: @unchecked Sendable {
         if currentVersion < 13 && targetVersion >= 13 { try migrateToV13(db) }
         if currentVersion < 14 && targetVersion >= 14 { try migrateToV14(db) }
         if currentVersion < 15 && targetVersion >= 15 { try migrateToV15(db) }
+        if currentVersion < 16 && targetVersion >= 16 { try migrateToV16(db) }
 
         try db.execute(sql: "UPDATE schema_version SET version = ?", arguments: [targetVersion])
     }
@@ -820,6 +821,24 @@ final class DatabaseManager: @unchecked Sendable {
         try db.execute(sql: "ALTER TABLE user_settings ADD COLUMN ai_prompt_include_recent_workouts INTEGER DEFAULT 1")
         try db.execute(sql: "ALTER TABLE user_settings ADD COLUMN ai_prompt_include_progression INTEGER DEFAULT 1")
         try db.execute(sql: "ALTER TABLE user_settings ADD COLUMN ai_prompt_include_equipment INTEGER DEFAULT 1")
+    }
+
+    // MARK: - V16: workout_inbox (device-local, not synced)
+
+    private static func migrateToV16(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE workout_inbox (
+                inbox_id              TEXT PRIMARY KEY NOT NULL,
+                fetched_at            TEXT NOT NULL,
+                created_at_server     TEXT NOT NULL,
+                source_token_id       TEXT,
+                lmwf_text             TEXT NOT NULL,
+                workout_json          TEXT NOT NULL,
+                summary_name          TEXT NOT NULL,
+                summary_exercise_count INTEGER NOT NULL DEFAULT 0,
+                summary_set_count     INTEGER NOT NULL DEFAULT 0
+            )
+            """)
     }
 
     private static func insertMeasurementV12(_ db: Database, setId: String, parentType: String, role: String, kind: String, value: Double, unit: String?, updatedAt: String?) throws {

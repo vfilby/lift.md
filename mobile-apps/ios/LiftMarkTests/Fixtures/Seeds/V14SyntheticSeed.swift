@@ -2,13 +2,14 @@ import Foundation
 
 extension DatabaseSeeds {
 
-    // MARK: - Synthetic future (v16) — used to verify early-return behavior
+    // MARK: - Synthetic future (v17) — used to verify early-return behavior
     //
     // File is named V14SyntheticSeed.swift for historical reasons; the seed now
-    // represents a "from the future" DB at schema_version=16. DDL matches the
-    // current head (v15) so the shape is valid — only the version marker is ahead.
+    // represents a "from the future" DB at schema_version=17. DDL matches the
+    // current head (v16, which added workout_inbox) so the shape is valid — only
+    // the version marker is ahead.
 
-    static let v16SyntheticDDL: String = #"""
+    static let v17SyntheticDDL: String = #"""
     CREATE TABLE workout_templates (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, tags TEXT,
         default_weight_unit TEXT, source_markdown TEXT,
@@ -94,6 +95,14 @@ extension DatabaseSeeds {
     CREATE TABLE sync_engine_state (
         id TEXT PRIMARY KEY DEFAULT 'default', data BLOB NOT NULL
     );
+    CREATE TABLE workout_inbox (
+        inbox_id TEXT PRIMARY KEY NOT NULL, fetched_at TEXT NOT NULL,
+        created_at_server TEXT NOT NULL, source_token_id TEXT,
+        lmwf_text TEXT NOT NULL, workout_json TEXT NOT NULL,
+        summary_name TEXT NOT NULL,
+        summary_exercise_count INTEGER NOT NULL DEFAULT 0,
+        summary_set_count INTEGER NOT NULL DEFAULT 0
+    );
     CREATE TABLE schema_version (version INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX idx_template_exercises_workout ON template_exercises(workout_template_id);
     CREATE INDEX idx_template_sets_exercise ON template_sets(template_exercise_id);
@@ -112,7 +121,7 @@ extension DatabaseSeeds {
     CREATE INDEX idx_set_measurements_group ON set_measurements(set_id, group_index);
     """#
 
-    static let v16SyntheticData: String = #"""
+    static let v17SyntheticData: String = #"""
     INSERT INTO user_settings
       (id, default_weight_unit, enable_workout_timer, auto_start_rest_timer, theme, notifications_enabled,
        anthropic_api_key_status, healthkit_enabled, live_activities_enabled, keep_screen_awake,
@@ -129,6 +138,6 @@ extension DatabaseSeeds {
     INSERT INTO gyms (id, name, is_default, created_at, updated_at, deleted_at) VALUES
       ('\#(gymHome)', 'Home Gym', 1, '\#(ts1)', '\#(ts1)', NULL);
 
-    INSERT INTO schema_version (version) VALUES (16);
+    INSERT INTO schema_version (version) VALUES (17);
     """#
 }
