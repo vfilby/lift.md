@@ -1,18 +1,7 @@
-.PHONY: test build deploy diff destroy typecheck install install-cdk bundle sync-dict
-
-# Wrap AWS-calling commands in aws-vault-op, which pulls the file-backend
-# passphrase and MFA TOTP from 1Password before invoking aws-vault. Falls back
-# to plain aws-vault if the wrapper isn't installed. MFA is enforced via
-# ~/.aws/config. Override with AWS_VAULT= to bypass (e.g. in CI where
-# credentials come from the environment).
-ifeq ($(shell command -v aws-vault-op 2>/dev/null),)
-$(warning aws-vault-op not found — falling back to aws-vault (expect passphrase + MFA prompts))
-AWS_VAULT_CMD := aws-vault
-else
-AWS_VAULT_CMD := aws-vault-op
-endif
-
-AWS_VAULT ?= $(AWS_VAULT_CMD) exec liftmark-validator-deploy --
+.PHONY: test test-watch typecheck install install-cdk bundle sync-dict \
+        dev-up dev-down dev-bootstrap \
+        synth diff-beta diff-prod deploy-beta deploy-prod \
+        destroy-beta destroy-prod sso-login
 
 # ── App dependencies ──
 install:
@@ -36,28 +25,82 @@ typecheck:
 sync-dict:
 	cp ../spec/data/exercise-dictionary.json src/data/exercise-dictionary.json
 
+# ── Local dev stack (DynamoDB Local + Mailpit in Docker + table bootstrap) ──
+# Mailpit web UI: http://localhost:8025  (SMTP listener on localhost:1025)
+dev-up:
+	docker compose up -d
+	@echo "Waiting for DynamoDB Local to become healthy..."
+	@until docker compose ps dynamodb-local --format json 2>/dev/null | grep -q '"Health":"healthy"'; do sleep 0.5; done
+	@echo "Waiting for Mailpit to become healthy..."
+	@until docker compose ps mailpit --format json 2>/dev/null | grep -q '"Health":"healthy"'; do sleep 0.5; done
+	@echo "Mailpit UI: http://localhost:8025"
+	npx tsx scripts/ddb-local-bootstrap.ts
+
+dev-bootstrap:
+	npx tsx scripts/ddb-local-bootstrap.ts
+
+dev-down:
+	docker compose down
+
 # ── Bundle Lambda code ──
+# @node-rs/argon2 ships a platform-specific .node binary that esbuild can't
+# inline. We mark it external and install the linux-arm64 variant into
+# dist/node_modules at bundle time. Lambda runtime requires it from there.
 bundle: sync-dict
+	rm -rf dist
+	mkdir -p dist
 	npx esbuild src/handler.ts \
 		--bundle \
 		--platform=node \
 		--target=node22 \
 		--outfile=dist/handler.js \
 		--format=cjs \
-		--loader:.json=json
+		--loader:.json=json \
+		--external:@node-rs/argon2
+	@printf '{"dependencies":{"@node-rs/argon2":"^2.0.2"}}\n' > dist/package.json
+	# --cpu/--os/--libc tells npm to install the Lambda-platform variant of
+	# the argon2 .node binary even when bundling from a different host. We
+	# need optional deps here — that's how napi-rs ships its binaries.
+	cd dist && npm install \
+		--cpu=arm64 --os=linux --libc=glibc \
+		--omit=dev --no-audit --no-fund --no-package-lock --silent
 
 # ── CDK commands ──
-# Both stacks deploy together: LmwfEdgeStack (us-east-1 cert) and
-# LmwfValidatorStack (Lambda + API + S3 + CloudFront).
-build: bundle
-	cd cdk && $(AWS_VAULT) npx cdk synth --all
+# Auth: AWS SSO via `aws sso login --sso-session liftmark`. Each env has
+# its own profile (liftmark-beta, liftmark-prod) configured in ~/.aws/config.
+# Beta and prod each get two stacks: an edge stack (us-east-1, hosted zone +
+# CloudFront cert) and a validator stack (main region, Lambda + API + DDB +
+# CloudFront + DNS + alarms).
 
-diff: bundle
-	cd cdk && $(AWS_VAULT) npx cdk diff --strict --all
+sso-login:
+	aws sso login --sso-session liftmark
 
-deploy: bundle
-	cd cdk && $(AWS_VAULT) npx cdk deploy --all --require-approval any-change \
-	    --outputs-file outputs.json
+# Credential-free; just synth all stacks to check the templates compile.
+synth:
+	cd cdk && npx cdk synth --no-staging
 
-destroy:
-	cd cdk && $(AWS_VAULT) npx cdk destroy --all
+diff-beta: bundle
+	cd cdk && npx cdk diff --profile liftmark-beta --strict \
+	    LmwfBetaEdgeStack LmwfBetaValidatorStack
+
+diff-prod: bundle
+	cd cdk && npx cdk diff --profile liftmark-prod --strict \
+	    LmwfProdEdgeStack LmwfProdValidatorStack
+
+deploy-beta: bundle
+	cd cdk && npx cdk deploy --profile liftmark-beta --require-approval never \
+	    --outputs-file outputs-beta.json \
+	    LmwfBetaEdgeStack LmwfBetaValidatorStack
+
+deploy-prod: bundle
+	cd cdk && npx cdk deploy --profile liftmark-prod --require-approval any-change \
+	    --outputs-file outputs-prod.json \
+	    LmwfProdEdgeStack LmwfProdValidatorStack
+
+destroy-beta:
+	cd cdk && npx cdk destroy --profile liftmark-beta \
+	    LmwfBetaEdgeStack LmwfBetaValidatorStack
+
+destroy-prod:
+	cd cdk && npx cdk destroy --profile liftmark-prod \
+	    LmwfProdEdgeStack LmwfProdValidatorStack

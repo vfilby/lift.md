@@ -1,6 +1,11 @@
-# Deploy User IAM Policy
+# Deploy User IAM Policies
 
-`deploy-user-policy.json` is the inline policy attached to the IAM user `liftmark-deploy` (account `341556346945`). It grants `sts:AssumeRole` on the LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in both `us-west-2` (Lambda + API Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert), gated on MFA. All real permissions live in the bootstrap roles themselves, scoped by `../deploy-policy.json`, which CDK maintains.
+Two inline policies for two IAM users:
+
+- **`deploy-user-policy.json`** — human user `liftmark-deploy`, MFA-gated. Used by Vincent's CLI via SSO. (NOTE: file still references the pre-move account `341556346945`; current beta is `323146837100`.)
+- **`ci-deploy-beta-policy.json`** — CI user `liftmark-ci-deploy-beta` in account `323146837100`, no MFA (machine creds can't satisfy MFA). Used by Concourse to deploy `LmwfBetaEdgeStack` + `LmwfBetaValidatorStack`.
+
+Both grant `sts:AssumeRole` on the LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in both `us-west-2` (Lambda + API Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert). All real permissions live in the bootstrap roles themselves, scoped by `../deploy-policy.json`, which CDK maintains.
 
 ## Applying
 
@@ -14,6 +19,20 @@ aws iam put-user-policy \
   --policy-name CdkAssumeBootstrapRoles \
   --policy-document file://deploy-user-policy.json
 ```
+
+For the CI user (one-time setup against beta account):
+
+```bash
+# create user, attach policy, mint access key
+aws --profile liftmark-beta iam create-user --user-name liftmark-ci-deploy-beta
+aws --profile liftmark-beta iam put-user-policy \
+  --user-name liftmark-ci-deploy-beta \
+  --policy-name CdkAssumeBootstrapRolesBeta \
+  --policy-document file://ci-deploy-beta-policy.json
+aws --profile liftmark-beta iam create-access-key --user-name liftmark-ci-deploy-beta
+```
+
+The `create-access-key` output is the only time the secret is visible — copy `AccessKeyId` + `SecretAccessKey` straight into Concourse (`fly set-pipeline -v aws_access_key_id=… -v aws_secret_access_key=…`).
 
 ## Prerequisites
 

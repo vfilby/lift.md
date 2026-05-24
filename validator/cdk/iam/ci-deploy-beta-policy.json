@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AssumeCDKBootstrapRolesBeta",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": [
+        "arn:aws:iam::323146837100:role/cdk-lmwf-deploy-role-323146837100-us-west-2",
+        "arn:aws:iam::323146837100:role/cdk-lmwf-file-publishing-role-323146837100-us-west-2",
+        "arn:aws:iam::323146837100:role/cdk-lmwf-image-publishing-role-323146837100-us-west-2",
+        "arn:aws:iam::323146837100:role/cdk-lmwf-lookup-role-323146837100-us-west-2",
+        "arn:aws:iam::323146837100:role/cdk-lmwf-deploy-role-323146837100-us-east-1",
+        "arn:aws:iam::323146837100:role/cdk-lmwf-file-publishing-role-323146837100-us-east-1",
+        "arn:aws:iam::323146837100:role/cdk-lmwf-image-publishing-role-323146837100-us-east-1",
+        "arn:aws:iam::323146837100:role/cdk-lmwf-lookup-role-323146837100-us-east-1"
+      ]
+    }
+  ]
+}

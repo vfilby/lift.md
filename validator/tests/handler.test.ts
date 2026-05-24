@@ -1,8 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import { handler } from '../src/handler.js';
-import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type { ApiGatewayRequestContextV2 } from 'hono/aws-lambda';
 
-function makeEvent(overrides: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {
+// Mirror of Hono's internal APIGatewayProxyEventV2 (not exported by the
+// adapter). Synthesizes the event shape its Lambda handler expects.
+interface ApiGwV2Event {
+  version: string;
+  routeKey: string;
+  headers: Record<string, string | undefined>;
+  cookies?: string[];
+  rawPath: string;
+  rawQueryString: string;
+  body: string | null;
+  isBase64Encoded: boolean;
+  requestContext: ApiGatewayRequestContextV2;
+  queryStringParameters?: Record<string, string | undefined>;
+  pathParameters?: Record<string, string | undefined>;
+  stageVariables?: Record<string, string | undefined>;
+}
+
+function makeEvent(overrides: Partial<ApiGwV2Event> = {}): ApiGwV2Event {
   return {
     version: '2.0',
     routeKey: 'POST /validate',
@@ -28,8 +45,9 @@ function makeEvent(overrides: Partial<APIGatewayProxyEventV2> = {}): APIGatewayP
       timeEpoch: 0,
     },
     isBase64Encoded: false,
+    body: null,
     ...overrides,
-  } as APIGatewayProxyEventV2;
+  } as ApiGwV2Event;
 }
 
 function parseBody(result: { body?: string }): any {
@@ -38,7 +56,7 @@ function parseBody(result: { body?: string }): any {
 
 describe('Lambda Handler', () => {
   it('returns 400 for missing body', async () => {
-    const event = makeEvent({ body: undefined });
+    const event = makeEvent({ body: null });
     const result = await handler(event);
     expect(result).toHaveProperty('statusCode', 400);
   });

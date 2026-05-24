@@ -106,7 +106,7 @@ Quick example:
 make install
 make install-cdk
 
-# Run tests (97 tests)
+# Run tests
 make test
 
 # Type check
@@ -115,6 +115,33 @@ make typecheck
 # Deploy (credentials in aws-vault under profile `liftmark-validator-deploy`)
 make deploy
 ```
+
+### Local dev stack
+
+The validator runs as a regular Node HTTP server locally (via Hono's
+node-server adapter) — no AWS account or Lambda emulator required.
+DynamoDB Local in Docker provides storage parity with prod.
+
+```bash
+# Start DDB Local + create tables from the same schemas CDK uses
+make dev-up
+
+# Run the validator on http://localhost:3000
+DDB_ENDPOINT=http://localhost:8000 npm run dev
+
+# Hit it
+curl -X POST http://localhost:3000/validate \
+  -H "Content-Type: application/json" \
+  -d '{"markdown":"# Test\n## Squat\n- 135 x 5"}'
+
+# Tear down (data persists in the lmwf-dynamodb-data volume)
+make dev-down
+```
+
+Table schemas live in `src/infra/tables.ts` and are consumed by both
+the CDK stack (`cdk/stack.ts`) and the local bootstrap script
+(`scripts/ddb-local-bootstrap.ts`). Add a table by appending to that
+file, then run `make dev-up` locally and `make deploy` to roll it out.
 
 ## Credentials & deploy setup
 
