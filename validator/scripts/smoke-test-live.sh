@@ -34,7 +34,13 @@ if [ ! -d "$VALID_DIR" ] || [ ! -d "$ERROR_DIR" ]; then
 fi
 
 post() {
-  curl -fsS --max-time 30 -X POST "$ENDPOINT" \
+  # --retry handles transient curl/network failures (worker host has
+  # flaky outbound on some paths — see Concourse setup notes). We do
+  # NOT use -f because we want to inspect 4xx response bodies (the
+  # validator returns structured error JSON on bad input).
+  curl -sS --max-time 30 \
+    --retry 3 --retry-delay 1 --retry-all-errors --retry-connrefused \
+    -X POST "$ENDPOINT" \
     -H 'Content-Type: text/markdown' \
     --data-binary @"$1"
 }
@@ -54,34 +60,49 @@ failures=()
 echo "==> POST $ENDPOINT (timeout 30s/req)"
 echo
 
+check_one() {
+  local f="$1" expected="$2" name response curl_rc actual
+  name=$(basename "$f")
+  # Stay under the CloudFront WAF rate limit (84 fixtures back-to-back
+  # without throttling triggers 429s that retry can't always recover from
+  # cleanly).
+  sleep 0.3
+  set +e
+  response=$(post "$f" 2>/tmp/smoke.curl.err)
+  curl_rc=$?
+  set -e
+  if [ "$curl_rc" -ne 0 ]; then
+    printf '  FAIL %s (curl exit=%d: %s)\n' "$name" "$curl_rc" "$(tr -d '\n' < /tmp/smoke.curl.err | head -c 200)"
+    return 1
+  fi
+  actual=$(printf '%s' "$response" | extract_success 2>/dev/null || echo "<unparseable>")
+  if [ "$actual" = "$expected" ]; then
+    printf '  OK   %s\n' "$name"
+    return 0
+  fi
+  printf '  FAIL %s (success=%s, expected %s)\n' "$name" "$actual" "$expected"
+  printf '       response: %s\n' "$(printf '%s' "$response" | head -c 300)"
+  return 1
+}
+
 echo "--- valid/ (expect success: true) ---"
 for f in "$VALID_DIR"/*.md; do
-  name=$(basename "$f")
-  if response=$(post "$f" 2>/dev/null) && [ "$(printf '%s' "$response" | extract_success)" = "true" ]; then
+  if check_one "$f" "true"; then
     valid_ok=$((valid_ok + 1))
-    printf '  OK   %s\n' "$name"
   else
     valid_fail=$((valid_fail + 1))
-    failures+=("valid/$name")
-    printf '  FAIL %s\n' "$name"
-    printf '       response: %s\n' "${response:-<curl error>}" | head -c 400
-    printf '\n'
+    failures+=("valid/$(basename "$f")")
   fi
 done
 
 echo
 echo "--- errors/ (expect success: false) ---"
 for f in "$ERROR_DIR"/*.md; do
-  name=$(basename "$f")
-  if response=$(post "$f" 2>/dev/null) && [ "$(printf '%s' "$response" | extract_success)" = "false" ]; then
+  if check_one "$f" "false"; then
     error_ok=$((error_ok + 1))
-    printf '  OK   %s\n' "$name"
   else
     error_fail=$((error_fail + 1))
-    failures+=("errors/$name")
-    printf '  FAIL %s\n' "$name"
-    printf '       response: %s\n' "${response:-<curl error>}" | head -c 400
-    printf '\n'
+    failures+=("errors/$(basename "$f")")
   fi
 done
 
