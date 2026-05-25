@@ -277,9 +277,17 @@ function handler(event) {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
     });
 
+    // Prod CloudFront answers for both the apex (liftmark.app) and the
+    // legacy workoutformat.liftmark.app subdomain. Wildcard SAN on the cert
+    // (`*.liftmark.app`) already covers it.
+    const cfDomainNames =
+      env.name === 'prod'
+        ? [domainName, `workoutformat.${domainName}`]
+        : [domainName];
+
     const distribution = new cloudfront.Distribution(this, 'SiteDistribution', {
       defaultRootObject: 'index.html',
-      domainNames: [domainName],
+      domainNames: cfDomainNames,
       certificate: cloudFrontCertificate,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
@@ -341,6 +349,46 @@ function handler(event) {
         new route53targets.CloudFrontTarget(distribution),
       ),
     });
+
+    // Prod-only: apex zone owns the brand. Delegate beta as a subdomain and
+    // keep the legacy workoutformat.liftmark.app subdomain pointing at the
+    // current prod CloudFront so existing callers (iOS, docs, links) keep
+    // resolving after the registrar cuts NS over to the new apex HZ.
+    if (env.name === 'prod') {
+      // NS delegation for beta.liftmark.app → beta-account HZ name servers.
+      // Hardcoded because cross-account HZ lookup needs extra IAM and the
+      // beta NS set is stable (only changes if the beta HZ is destroyed).
+      new route53.NsRecord(this, 'BetaSubdomainDelegation', {
+        zone: hostedZone,
+        recordName: 'beta',
+        values: [
+          'ns-991.awsdns-59.net.',
+          'ns-56.awsdns-07.com.',
+          'ns-1444.awsdns-52.org.',
+          'ns-1938.awsdns-50.co.uk.',
+        ],
+        ttl: cdk.Duration.minutes(5),
+      });
+
+      // workoutformat.liftmark.app → same CloudFront as the apex. The legacy
+      // subdomain becomes a permanent alias for the new prod stack; old prod
+      // CloudFront/Lambda in account 341556346945 can be decommissioned once
+      // this is live.
+      new route53.ARecord(this, 'WorkoutFormatAliasRecord', {
+        zone: hostedZone,
+        recordName: 'workoutformat',
+        target: route53.RecordTarget.fromAlias(
+          new route53targets.CloudFrontTarget(distribution),
+        ),
+      });
+      new route53.AaaaRecord(this, 'WorkoutFormatAliasRecordIpv6', {
+        zone: hostedZone,
+        recordName: 'workoutformat',
+        target: route53.RecordTarget.fromAlias(
+          new route53targets.CloudFrontTarget(distribution),
+        ),
+      });
+    }
 
     // ── CloudWatch alarms ──
     new cloudwatch.Alarm(this, 'LambdaErrorAlarm', {
