@@ -4,6 +4,7 @@ Two inline policies for two IAM users:
 
 - **`deploy-user-policy.json`** — human user `liftmark-deploy`, MFA-gated. Used by Vincent's CLI via SSO. (NOTE: file still references the pre-move account `341556346945`; current beta is `323146837100`.)
 - **`ci-deploy-beta-policy.json`** — CI user `liftmark-ci-deploy-beta` in account `323146837100`, no MFA (machine creds can't satisfy MFA). Used by Concourse to deploy `LmwfBetaEdgeStack` + `LmwfBetaValidatorStack`.
+- **`ci-deploy-prod-policy.json`** — CI user `liftmark-ci-deploy-prod` in account `825347768149`, same structure as the beta CI policy. Used by Concourse to deploy `LmwfProdEdgeStack` + `LmwfProdValidatorStack` when the manual gate is clicked.
 
 Both grant `sts:AssumeRole` on the LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in both `us-west-2` (Lambda + API Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert). All real permissions live in the bootstrap roles themselves, scoped by `../deploy-policy.json`, which CDK maintains.
 
@@ -20,19 +21,38 @@ aws iam put-user-policy \
   --policy-document file://deploy-user-policy.json
 ```
 
-For the CI user (one-time setup against beta account):
+For the CI user (one-time setup per env):
 
 ```bash
-# create user, attach policy, mint access key
+# beta
 aws --profile liftmark-beta iam create-user --user-name liftmark-ci-deploy-beta
 aws --profile liftmark-beta iam put-user-policy \
   --user-name liftmark-ci-deploy-beta \
   --policy-name CdkAssumeBootstrapRolesBeta \
   --policy-document file://ci-deploy-beta-policy.json
 aws --profile liftmark-beta iam create-access-key --user-name liftmark-ci-deploy-beta
+
+# prod
+aws --profile liftmark-prod iam create-user --user-name liftmark-ci-deploy-prod
+aws --profile liftmark-prod iam put-user-policy \
+  --user-name liftmark-ci-deploy-prod \
+  --policy-name CdkAssumeBootstrapRolesProd \
+  --policy-document file://ci-deploy-prod-policy.json
+aws --profile liftmark-prod iam create-access-key --user-name liftmark-ci-deploy-prod
 ```
 
-The `create-access-key` output is the only time the secret is visible — copy `AccessKeyId` + `SecretAccessKey` straight into Concourse (`fly set-pipeline -v aws_access_key_id=… -v aws_secret_access_key=…`).
+The `create-access-key` output is the only time the secret is visible — copy `AccessKeyId` + `SecretAccessKey` straight into Concourse:
+
+```bash
+fly -t home set-pipeline -p liftmark-validator -c liftmark-validator.yml \
+  -v aws_access_key_id=<beta-key>      -v aws_secret_access_key=<beta-secret> \
+  -v aws_access_key_id_prod=<prod-key> -v aws_secret_access_key_prod=<prod-secret>
+```
+
+### Prod prerequisites (before clicking the deploy gate)
+
+- CDK bootstrap is run in account `825347768149` for both `us-west-2` and `us-east-1` with `--qualifier lmwf --toolkit-stack-name LmwfCdkToolkit` (otherwise the assume-role targets in `ci-deploy-prod-policy.json` won't exist).
+- The `liftmark.app` hosted zone gets created by `LmwfProdEdgeStack` — after the first deploy, the registrar's nameservers need to be updated to the new HZ's NS records (`HostedZoneNameServers` output).
 
 ## Prerequisites
 
