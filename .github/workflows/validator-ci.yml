@@ -6,12 +6,16 @@ on:
     paths:
       - 'validator/**'
       - 'website/**'
+      # SKILL.md is bundled into the website at build time via ?raw import,
+      # so a skill-only change still needs a website rebuild + deploy.
+      - 'tools/claude-skill/**'
       - '.github/workflows/validator-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'validator/**'
       - 'website/**'
+      - 'tools/claude-skill/**'
       - '.github/workflows/validator-ci.yml'
 
 # Allow only one full pipeline run per branch at a time.
