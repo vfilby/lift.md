@@ -48,14 +48,20 @@ struct WorkoutExportService {
     /// Export a single workout session as a portable JSON file.
     /// Returns the file URL for sharing.
     func exportSingleSessionAsJson(_ session: WorkoutSession) throws -> URL {
-        let exportData: [String: Any] = [
+        let fileName = buildSessionFileName(name: session.name, date: session.date)
+        return try writeExportFile(buildSingleSessionPayload(session), fileName: fileName)
+    }
+
+    /// Single-session payload as an in-memory dictionary — the same shape
+    /// `exportSingleSessionAsJson` writes to disk. Used by OutboxPusherService
+    /// to POST a completed session to the server outbox without round-tripping
+    /// through the filesystem. See `spec/services/workout-outbox.md`.
+    func buildSingleSessionPayload(_ session: WorkoutSession) -> [String: Any] {
+        return [
             "exportedAt": ISO8601DateFormatter().string(from: Date()),
             "appVersion": appVersion(),
             "session": stripSession(session)
         ]
-
-        let fileName = buildSessionFileName(name: session.name, date: session.date)
-        return try writeExportFile(exportData, fileName: fileName)
     }
 
     /// Build a sanitized file name: workout-{name}-{date}.json

@@ -170,4 +170,26 @@ final class MockAPIClient: APIClientProtocol, @unchecked Sendable {
             throw nextError
         }
     }
+
+    func sendData<Res: Decodable>(
+        path: String,
+        method: String,
+        bodyData: Data,
+        accessToken: String?
+    ) async throws -> Res {
+        sentPaths.append(path)
+        if let nextError {
+            self.nextError = nil
+            throw nextError
+        }
+        guard let dict = nextDecodableResponse else {
+            throw APIError.server(status: 500, message: "Mock: no response queued")
+        }
+        nextDecodableResponse = nil
+        let data = try JSONSerialization.data(withJSONObject: dict)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(Res.self, from: data)
+    }
 }

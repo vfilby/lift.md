@@ -31,6 +31,17 @@ protocol APIClientProtocol: AnyObject, Sendable {
         body: Req?,
         accessToken: String?
     ) async throws
+
+    /// Send a pre-serialized JSON body. Used when the body is a
+    /// `[String: Any]` (e.g. the WorkoutExportService payload reused by the
+    /// outbox push) and a Swift Encodable wrapper would force a needless
+    /// re-encoding round trip.
+    func sendData<Res: Decodable>(
+        path: String,
+        method: String,
+        bodyData: Data,
+        accessToken: String?
+    ) async throws -> Res
 }
 
 // MARK: - APIClient
@@ -114,6 +125,22 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         _ = try await perform(path: path, method: method, body: body, accessToken: accessToken)
     }
 
+    func sendData<Res: Decodable>(
+        path: String,
+        method: String,
+        bodyData: Data,
+        accessToken: String?
+    ) async throws -> Res {
+        let (data, _) = try await performRaw(
+            path: path, method: method, bodyData: bodyData, accessToken: accessToken
+        )
+        do {
+            return try decoder.decode(Res.self, from: data)
+        } catch {
+            throw APIError.decoding(error)
+        }
+    }
+
     // MARK: - Private
 
     private func perform<Req: Encodable>(
@@ -137,6 +164,50 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 throw APIError.decoding(error)
             }
         }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw APIError.transport(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.transport(URLError(.badServerResponse))
+        }
+
+        switch http.statusCode {
+        case 200..<300:
+            return (data, http)
+        case 401:
+            throw APIError.unauthorized
+        case 403:
+            throw APIError.forbidden(message: Self.errorMessage(from: data))
+        case 404:
+            throw APIError.notFound
+        case 409:
+            throw APIError.conflict(message: Self.errorMessage(from: data))
+        default:
+            throw APIError.server(status: http.statusCode, message: Self.errorMessage(from: data))
+        }
+    }
+
+    private func performRaw(
+        path: String,
+        method: String,
+        bodyData: Data,
+        accessToken: String?
+    ) async throws -> (Data, HTTPURLResponse) {
+        let url = baseURL.appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path)
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = bodyData
 
         let data: Data
         let response: URLResponse

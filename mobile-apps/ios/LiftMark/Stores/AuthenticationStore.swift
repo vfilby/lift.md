@@ -164,6 +164,14 @@ final class AuthenticationStore {
         } catch {
             Logger.shared.warn(.database, "Failed to wipe inbox on logout: \(error)")
         }
+
+        // Outbox pending queue is also session-scoped device state — pushes
+        // queued under the old identity aren't transferable.
+        do {
+            try OutboxPendingQueueRepository().clear()
+        } catch {
+            Logger.shared.warn(.database, "Failed to wipe outbox queue on logout: \(error)")
+        }
     }
 
     // MARK: - Email verification

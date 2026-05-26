@@ -74,11 +74,24 @@ final class SessionStore {
             // Keep activeSession non-nil to avoid disrupting navigation to the summary screen.
             sessions = try repository.getCompleted()
             lastError = nil
+            // Signal the outbox pusher to enqueue this for server upload.
+            // Posted only *after* the durable status flip succeeds, so a
+            // crash between local-commit and enqueue can't leave a phantom
+            // queue row. See `spec/services/workout-outbox.md`.
+            NotificationCenter.default.post(
+                name: Self.sessionDidComplete,
+                object: nil,
+                userInfo: ["sessionId": session.id]
+            )
         } catch {
             lastError = error
             Logger.shared.error(.database, "Failed to complete session", error: error)
         }
     }
+
+    /// Fired after a `WorkoutSession` durably transitions to `completed`.
+    /// `userInfo["sessionId"]` is the `WorkoutSession.id`.
+    static let sessionDidComplete = Notification.Name("SessionStore.sessionDidComplete")
 
     func clearActiveSession() {
         activeSession = nil

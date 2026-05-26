@@ -12,7 +12,7 @@
 - **File extension**: `.db`
 - **Foreign keys**: `PRAGMA foreign_keys = ON`
 - **Schema version**: Tracked in `grdb_migrations` (authoritative) and `schema_version` (legacy; still on disk during the bridge transition — see [`../services/migrator.md`](../services/migrator.md)).
-- **Current version**: 16
+- **Current version**: 17
 
 ### Version History
 
@@ -36,6 +36,7 @@ Observable changes per schema version. Full migration contract lives in [`migrat
 | 14  | `user_settings` += `default_weight_step_lbs` (REAL, default 2.5). |
 | 15  | `user_settings` += `ai_prompt_include_format_pointer`, `ai_prompt_include_recent_workouts`, `ai_prompt_include_progression`, `ai_prompt_include_equipment` (INTEGER, default 1). |
 | 16  | `workout_inbox` table created (device-local, not synced, not exported). |
+| 17  | `outbox_pending_queue` table created (device-local, not synced, not exported). |
 
 ### Forward Compatibility
 
@@ -90,6 +91,8 @@ v12_set_measurements
 v13_default_timer_countdown
 v14_default_weight_step_lbs
 v15_ai_prompt_toggles
+v16_workout_inbox
+v17_outbox_pending_queue
 ```
 
 The mapping is a wire-level contract — identifiers **must not change** after first ship. Canonical definition in [`../services/migrator.md`](../services/migrator.md).
@@ -389,6 +392,26 @@ CREATE TABLE IF NOT EXISTS workout_inbox (
 ```
 
 Upsert key is `inbox_id` — re-polling the same item is a no-op.
+
+---
+
+### outbox_pending_queue
+
+Device-local retry queue for pushing completed sessions to the server outbox (`POST /v1/workouts/outbox`). Introduced in v17. See [`../services/workout-outbox.md`](../services/workout-outbox.md).
+
+**Not synced via CloudKit** and **excluded from `.db` backup exports** — the queue is in-flight push state for *this* device only. Server-side `workout_outbox` rows are the durable record of completed workouts available to agents.
+
+```sql
+CREATE TABLE IF NOT EXISTS outbox_pending_queue (
+  client_session_id   TEXT PRIMARY KEY NOT NULL,    -- WorkoutSession.id
+  enqueued_at         TEXT NOT NULL,                -- ISO 8601
+  attempt_count       INTEGER NOT NULL DEFAULT 0,
+  next_attempt_after  TEXT,                         -- ISO 8601; null = eligible now
+  last_error          TEXT                          -- short message, diagnostic only
+);
+```
+
+Lifecycle: a row is inserted when a `WorkoutSession` transitions to `completed`, and deleted when `OutboxPusherService` confirms a 2xx server response or a non-retryable 4xx.
 
 ---
 

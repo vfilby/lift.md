@@ -10,6 +10,7 @@ struct LiftMarkApp: App {
     @State private var equipmentStore = EquipmentStore()
     @State private var authStore: AuthenticationStore
     @State private var inboxPoller: InboxPollerService
+    @State private var outboxPusher: OutboxPusherService
     @State private var featureFlags: FeatureFlagsStore
     @State private var pendingImportContent: String? = Self.importContentFromLaunchArgs()
 
@@ -34,6 +35,10 @@ struct LiftMarkApp: App {
             authStore: auth,
             apiClient: api,
             featureFlags: flags
+        ))
+        _outboxPusher = State(initialValue: OutboxPusherService(
+            authStore: auth,
+            apiClient: api
         ))
 
         // Reset data before any views load (for test isolation)
@@ -137,6 +142,7 @@ struct LiftMarkApp: App {
                 .environment(equipmentStore)
                 .environment(authStore)
                 .environment(inboxPoller)
+                .environment(outboxPusher)
                 .environment(featureFlags)
                 .onAppear {
                     planStore.loadPlans()
@@ -152,6 +158,9 @@ struct LiftMarkApp: App {
                         Task { @MainActor in
                             await inboxPoller.pollIfAuthenticated()
                         }
+                        Task { @MainActor in
+                            await outboxPusher.flushIfAuthenticated()
+                        }
                     }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
@@ -164,10 +173,20 @@ struct LiftMarkApp: App {
                             Task { @MainActor in
                                 await inboxPoller.pollIfAuthenticated()
                             }
+                            Task { @MainActor in
+                                await outboxPusher.flushIfAuthenticated()
+                            }
                         }
                     default:
                         break
                     }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: SessionStore.sessionDidComplete)) { note in
+                    guard
+                        let sessionId = note.userInfo?["sessionId"] as? String,
+                        !Self.isRunningTests
+                    else { return }
+                    outboxPusher.enqueue(clientSessionId: sessionId)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .syncCompleted)) { notification in
                     let changed = notification.userInfo?["changedRecordTypes"] as? Set<String> ?? []

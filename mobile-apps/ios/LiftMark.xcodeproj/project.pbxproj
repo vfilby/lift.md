@@ -150,6 +150,7 @@
 		A2994975FB6B2B6580CA34C5 /* PlateCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4406CB6F8705596A59036876 /* PlateCalculatorTests.swift */; };
 		A3275CAEA4376A2F94A89A9B /* AuthenticationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92856F532EAAA8940E6CFDF5 /* AuthenticationStore.swift */; };
 		A47498AD84CC4B09D112D56A /* RestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C826AE567713686B32DDE784 /* RestTimerView.swift */; };
+		A6F4017919B1551AFD9AE57E /* OutboxPusherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D265C4177D34E4EE964C09C3 /* OutboxPusherService.swift */; };
 		A729B0D0216DC029A3343B47 /* ExerciseCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2EE730B57432DA41F655940 /* ExerciseCardView.swift */; };
 		A90938BAE05DAF9D8E577DC9 /* ActiveWorkoutHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87897A37B7987C30AF2FB898 /* ActiveWorkoutHeader.swift */; };
 		AAE6D732A65618504DA14D3B /* GeneratePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C78EB6FBD871ABC0072F7C /* GeneratePromptView.swift */; };
@@ -160,6 +161,7 @@
 		B391EB80E72BA000101D5666 /* WorkoutGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D211B6F3FC0D3B798CCF7F /* WorkoutGenerationService.swift */; };
 		B65C76AE0A8148FEA0518541 /* HistoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE07A8ED79EB88BFE43E5D3 /* HistoryDetailView.swift */; };
 		B65E08E944C710E6569FF173 /* WorkoutDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA3A038D0DDA3325870FBB86 /* WorkoutDetailView.swift */; };
+		B7FFCD8C43EF830EDB879E0E /* OutboxPendingQueueRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0A969D1C2B1A381AFA580D /* OutboxPendingQueueRepository.swift */; };
 		B80B632C58FCF969672CD7A9 /* LiftMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2A9274874F0DB09EC0507F /* LiftMarkTests.swift */; };
 		B85DE5789943AAD087F8090A /* FileImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BBB53853F20402D24BEFB4 /* FileImportServiceTests.swift */; };
 		B904699BA329321042BAADA6 /* WorkoutExportIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790A5CDE07EFFF281DAC47FA /* WorkoutExportIntegrationTests.swift */; };
@@ -383,6 +385,7 @@
 		97D5191B081A643D264F9790 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		98B9D49ADC3DBA06998FBE66 /* InboxWorkoutMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxWorkoutMapperTests.swift; sourceTree = "<group>"; };
 		9998EA6926EF208F23FBFCC9 /* tick.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = tick.mp3; sourceTree = "<group>"; };
+		9B0A969D1C2B1A381AFA580D /* OutboxPendingQueueRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxPendingQueueRepository.swift; sourceTree = "<group>"; };
 		9BC1EDB3B698CE8E8A2E4E92 /* MigratorBridgeAlertUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratorBridgeAlertUITests.swift; sourceTree = "<group>"; };
 		9E064AE978D172E88F26E1DF /* complete.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = complete.mp3; sourceTree = "<group>"; };
 		9E0BE62F2191556A9EF27651 /* DeviceLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLayout.swift; sourceTree = "<group>"; };
@@ -436,6 +439,7 @@
 		D029E8EF3D26021C1DE6232F /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
 		D1EFBC8A65FA33DF6A782E26 /* InboxItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItem.swift; sourceTree = "<group>"; };
 		D2122EC8E298186859FF9B07 /* RestTimerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerState.swift; sourceTree = "<group>"; };
+		D265C4177D34E4EE964C09C3 /* OutboxPusherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxPusherService.swift; sourceTree = "<group>"; };
 		D52CCE91FC19D155114865A3 /* SessionRepository+Assembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionRepository+Assembly.swift"; sourceTree = "<group>"; };
 		D83446B2AFC5D21A415A51FA /* NavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinator.swift; sourceTree = "<group>"; };
 		D844A8C060DBA370C2F04E98 /* V8Seed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V8Seed.swift; sourceTree = "<group>"; };
@@ -571,6 +575,7 @@
 				4FD57CEFF5022DFA698C39EF /* Logger.swift */,
 				F60A15DD48ACEE99146D8D6B /* MarkdownParser.swift */,
 				777DBE3773D5EB279EFB7089 /* MarkdownParserHelpers.swift */,
+				D265C4177D34E4EE964C09C3 /* OutboxPusherService.swift */,
 				6CBE5F077F0F3EA293E45AE5 /* PlateCalculator.swift */,
 				3F69FC1D6757DC923E65FCFF /* SecureStorage.swift */,
 				6A259EFF7FFA8F1DD3070318 /* SessionLMWFEncoder.swift */,
@@ -769,6 +774,7 @@
 				141619DC6350D35EABA37E12 /* MigratorBridge+Migrator.swift */,
 				6A2AEF2440BDB5076F5D02A3 /* MigratorBridgeBackup.swift */,
 				0470585628866D2538B4ED7A /* MigratorBridgeFailure.swift */,
+				9B0A969D1C2B1A381AFA580D /* OutboxPendingQueueRepository.swift */,
 				FB133008B74E2A84E1FC8E73 /* SessionRepository.swift */,
 				D52CCE91FC19D155114865A3 /* SessionRepository+Assembly.swift */,
 				CCB0A56E364FE14701AC12C4 /* SessionRepository+Create.swift */,
@@ -1214,6 +1220,8 @@
 				D0AEAE241057BCFCF3BE3A6B /* MigratorBridgeFailure.swift in Sources */,
 				55C41D670ADEC7A15EB4EFAA /* NavigationCoordinator.swift in Sources */,
 				EEC4CAC229BCFC6336C2AECE /* OnboardingView.swift in Sources */,
+				B7FFCD8C43EF830EDB879E0E /* OutboxPendingQueueRepository.swift in Sources */,
+				A6F4017919B1551AFD9AE57E /* OutboxPusherService.swift in Sources */,
 				F37EC6ABED84F7A871698B2A /* PlateCalculator.swift in Sources */,
 				8A5E5266EC0AF8521010B53C /* RestTimerState.swift in Sources */,
 				A47498AD84CC4B09D112D56A /* RestTimerView.swift in Sources */,

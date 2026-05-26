@@ -13,6 +13,7 @@ enum MigrationGoldenShapes {
     static let expectedTablesAtHead: [String] = [
         "gym_equipment",
         "gyms",
+        "outbox_pending_queue",
         "schema_version",
         "session_exercises",
         "session_sets",

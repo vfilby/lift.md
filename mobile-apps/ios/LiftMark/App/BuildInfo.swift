@@ -1,4 +1,4 @@
 // Auto-generated at build time — do not edit
 enum BuildInfo {
-    static let gitHash = "d3318f2"
+    static let gitHash = "1ccb165"
 }

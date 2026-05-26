@@ -11,7 +11,7 @@ final class DatabaseManager: @unchecked Sendable {
     private let dbLock = NSLock()
 
     private static let dbName = "liftmark.db"
-    static let currentSchemaVersion = 16
+    static let currentSchemaVersion = 17
 
     private init() {}
 
@@ -198,6 +198,7 @@ final class DatabaseManager: @unchecked Sendable {
         if currentVersion < 14 && targetVersion >= 14 { try migrateToV14(db) }
         if currentVersion < 15 && targetVersion >= 15 { try migrateToV15(db) }
         if currentVersion < 16 && targetVersion >= 16 { try migrateToV16(db) }
+        if currentVersion < 17 && targetVersion >= 17 { try migrateToV17(db) }
 
         try db.execute(sql: "UPDATE schema_version SET version = ?", arguments: [targetVersion])
     }
@@ -837,6 +838,20 @@ final class DatabaseManager: @unchecked Sendable {
                 summary_name          TEXT NOT NULL,
                 summary_exercise_count INTEGER NOT NULL DEFAULT 0,
                 summary_set_count     INTEGER NOT NULL DEFAULT 0
+            )
+            """)
+    }
+
+    // MARK: - V17: outbox_pending_queue (device-local push queue)
+
+    private static func migrateToV17(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE outbox_pending_queue (
+                client_session_id   TEXT PRIMARY KEY NOT NULL,
+                enqueued_at         TEXT NOT NULL,
+                attempt_count       INTEGER NOT NULL DEFAULT 0,
+                next_attempt_after  TEXT,
+                last_error          TEXT
             )
             """)
     }

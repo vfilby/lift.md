@@ -663,6 +663,18 @@ extension MigratorBridge {
                 """)
         }
 
+        m.registerMigration("v17_outbox_pending_queue") { db in
+            try db.execute(sql: """
+                CREATE TABLE outbox_pending_queue (
+                    client_session_id   TEXT PRIMARY KEY NOT NULL,
+                    enqueued_at         TEXT NOT NULL,
+                    attempt_count       INTEGER NOT NULL DEFAULT 0,
+                    next_attempt_after  TEXT,
+                    last_error          TEXT
+                )
+                """)
+        }
+
         return m
     }
 
