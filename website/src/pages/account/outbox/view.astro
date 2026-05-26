@@ -1,0 +1,227 @@
+---
+import AccountLayout from '../../../layouts/AccountLayout.astro';
+---
+
+<AccountLayout title="Workout detail" description="A single completed workout from your outbox.">
+  <div class="account-wrap">
+    <header class="account-header">
+      <div>
+        <h1 id="session-name" style="margin:0;">Workout</h1>
+        <div class="meta" id="session-meta"></div>
+      </div>
+      <div class="row-actions">
+        <a class="btn btn-secondary btn-small" href="/account/outbox">← All workouts</a>
+        <button type="button" class="btn btn-danger btn-small" id="delete-btn" disabled>Delete</button>
+      </div>
+    </header>
+
+    <div id="loading" class="muted account-card">Loading…</div>
+    <div id="detail" hidden></div>
+  </div>
+
+  <script>
+    import {
+      api, clearSession, requireSessionOrRedirect,
+      escapeHtml, formatDate,
+    } from '../../../scripts/api.js';
+
+    if (requireSessionOrRedirect()) {
+      init();
+    }
+
+    let outboxId = null;
+
+    function getOutboxIdFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('id');
+    }
+
+    function formatDurationSeconds(s) {
+      if (s === null || s === undefined || Number.isNaN(Number(s))) return '—';
+      const n = Number(s);
+      if (!Number.isFinite(n) || n <= 0) return '—';
+      const h = Math.floor(n / 3600);
+      const m = Math.floor((n % 3600) / 60);
+      const sec = Math.floor(n % 60);
+      if (h > 0) return h + 'h ' + m + 'm';
+      if (m > 0) return m + 'm ' + sec + 's';
+      return sec + 's';
+    }
+
+    function valueOrDash(v) {
+      if (v === null || v === undefined || v === '') return '—';
+      return v;
+    }
+
+    function fmtWeight(value, unit) {
+      if (value === null || value === undefined) return '—';
+      return value + (unit ? ' ' + unit : '');
+    }
+
+    async function init() {
+      outboxId = getOutboxIdFromUrl();
+      const loading = document.getElementById('loading');
+      if (!outboxId) {
+        loading.textContent = 'Missing workout id in URL.';
+        return;
+      }
+
+      const { status, body } = await api('/v1/workouts/outbox/' + encodeURIComponent(outboxId), {
+        method: 'GET',
+      });
+      if (status === 401) {
+        clearSession();
+        window.location.replace('/account/login');
+        return;
+      }
+      if (status === 404) {
+        loading.innerHTML = '<p class="inline-msg err">Workout not found — it may have been deleted or evicted from your last-20 window.</p>';
+        return;
+      }
+      if (status !== 200 || !body) {
+        loading.textContent = 'Failed to load (HTTP ' + status + ').';
+        return;
+      }
+
+      render(body);
+
+      document.getElementById('delete-btn').disabled = false;
+      document.getElementById('delete-btn').addEventListener('click', onDelete);
+    }
+
+    function render(body) {
+      const session = (body.payload && body.payload.session) || {};
+      const exercises = Array.isArray(session.exercises) ? session.exercises : [];
+
+      // Header
+      document.getElementById('session-name').textContent =
+        session.name || body.session_name || 'Workout';
+
+      const metaParts = [];
+      if (body.session_completed_at || session.endTime) {
+        metaParts.push('Completed ' + formatDate(body.session_completed_at || session.endTime));
+      }
+      if (session.duration) {
+        metaParts.push(formatDurationSeconds(session.duration));
+      }
+      metaParts.push(exercises.length + ' exercise' + (exercises.length === 1 ? '' : 's'));
+      const totalSets = exercises.reduce(
+        (sum, e) => sum + (Array.isArray(e.sets) ? e.sets.length : 0),
+        0
+      );
+      metaParts.push(totalSets + ' set' + (totalSets === 1 ? '' : 's'));
+      if (body.source_device_id) {
+        metaParts.push('device ' + body.source_device_id.slice(0, 8));
+      }
+      document.getElementById('session-meta').textContent = metaParts.join(' · ');
+
+      // Per-exercise rendering
+      const detail = document.getElementById('detail');
+      if (exercises.length === 0) {
+        detail.innerHTML = '<div class="account-card"><p class="muted">No exercises in this session.</p></div>';
+        document.getElementById('loading').hidden = true;
+        detail.hidden = false;
+        return;
+      }
+
+      let html = '';
+      for (const ex of exercises) {
+        html += renderExercise(ex);
+      }
+      detail.innerHTML = html;
+      document.getElementById('loading').hidden = true;
+      detail.hidden = false;
+    }
+
+    function renderExercise(ex) {
+      const name = escapeHtml(ex.exerciseName || ex.name || 'Exercise');
+      const sets = Array.isArray(ex.sets) ? ex.sets : [];
+      const groupBadge = ex.groupType
+        ? ' <span class="chip">' + escapeHtml(ex.groupType)
+          + (ex.groupName ? ': ' + escapeHtml(ex.groupName) : '')
+          + '</span>'
+        : '';
+
+      let rows = '';
+      sets.forEach((s, idx) => {
+        const target = {
+          weight: fmtWeight(s.targetWeight, s.targetWeightUnit),
+          reps: valueOrDash(s.targetReps),
+          time: s.targetTime ? s.targetTime + 's' : '—',
+          rpe: valueOrDash(s.targetRpe),
+        };
+        const actual = {
+          weight: fmtWeight(s.actualWeight, s.actualWeightUnit),
+          reps: valueOrDash(s.actualReps),
+          time: s.actualTime ? s.actualTime + 's' : '—',
+          rpe: valueOrDash(s.actualRpe),
+        };
+        const flags = [];
+        if (s.isDropset) flags.push('drop');
+        if (s.isPerSide) flags.push('per-side');
+        if (s.isAmrap) flags.push('AMRAP');
+        const flagsCell = flags.length
+          ? flags.map((f) => '<span class="chip">' + escapeHtml(f) + '</span>').join(' ')
+          : '';
+
+        const statusBadge = s.status === 'completed'
+          ? '<span class="badge badge-ok">done</span>'
+          : s.status === 'skipped'
+            ? '<span class="badge">skipped</span>'
+            : '<span class="badge badge-warn">' + escapeHtml(s.status || 'pending') + '</span>';
+
+        rows += '<tr>'
+          + '<td>' + (idx + 1) + '</td>'
+          + '<td>' + statusBadge + '</td>'
+          + '<td>' + escapeHtml(target.weight) + '</td>'
+          + '<td>' + escapeHtml(String(target.reps)) + '</td>'
+          + '<td>' + escapeHtml(actual.weight) + '</td>'
+          + '<td>' + escapeHtml(String(actual.reps)) + '</td>'
+          + '<td>' + escapeHtml(target.time) + ' / ' + escapeHtml(actual.time) + '</td>'
+          + '<td>' + escapeHtml(String(target.rpe)) + ' / ' + escapeHtml(String(actual.rpe)) + '</td>'
+          + '<td>' + flagsCell + '</td>'
+          + '</tr>';
+      });
+
+      return '<section class="account-card">'
+        + '<h2 style="margin-top:0;">' + name + groupBadge + '</h2>'
+        + '<table class="account-table">'
+        + '<thead><tr>'
+        + '<th style="width:2.5rem;">#</th>'
+        + '<th></th>'
+        + '<th>Target wt</th>'
+        + '<th>Target reps</th>'
+        + '<th>Actual wt</th>'
+        + '<th>Actual reps</th>'
+        + '<th>Time t/a</th>'
+        + '<th>RPE t/a</th>'
+        + '<th></th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table>'
+        + (ex.notes ? '<p class="muted" style="margin: 0.75rem 0 0;">' + escapeHtml(ex.notes) + '</p>' : '')
+        + '</section>';
+    }
+
+    async function onDelete() {
+      if (!outboxId) return;
+      if (!confirm('Delete this workout from your outbox? Agents will no longer see it. This does not affect the workout in the iOS app.')) {
+        return;
+      }
+      const btn = document.getElementById('delete-btn');
+      btn.disabled = true;
+      const { status } = await api('/v1/workouts/outbox/' + encodeURIComponent(outboxId), {
+        method: 'DELETE',
+      });
+      if (status === 204 || status === 200) {
+        window.location.replace('/account/outbox');
+      } else if (status === 401) {
+        clearSession();
+        window.location.replace('/account/login');
+      } else {
+        alert('Delete failed (HTTP ' + status + ').');
+        btn.disabled = false;
+      }
+    }
+  </script>
+</AccountLayout>

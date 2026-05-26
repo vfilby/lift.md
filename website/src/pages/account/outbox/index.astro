@@ -1,0 +1,116 @@
+---
+import AccountLayout from '../../../layouts/AccountLayout.astro';
+---
+
+<AccountLayout title="Workout outbox" description="Completed workouts visible to your agents.">
+  <div class="account-wrap">
+    <header class="account-header">
+      <div>
+        <h1 style="margin:0;">Workout outbox</h1>
+        <div class="meta">
+          The last 20 workouts you've completed — agents read these for context, encouragement, and progression checks.
+        </div>
+      </div>
+      <div class="row-actions">
+        <a class="btn btn-secondary btn-small" href="/account">← Account</a>
+        <button type="button" class="btn btn-secondary btn-small" id="refresh-btn">Refresh</button>
+      </div>
+    </header>
+
+    <section class="account-card">
+      <div id="loading" class="muted">Loading…</div>
+      <div id="outbox-wrap" hidden></div>
+    </section>
+  </div>
+
+  <script>
+    import {
+      api, clearSession, requireSessionOrRedirect,
+      escapeHtml, formatDate,
+    } from '../../../scripts/api.js';
+
+    if (requireSessionOrRedirect()) {
+      init();
+    }
+
+    async function init() {
+      await refresh();
+      document.getElementById('refresh-btn').addEventListener('click', refresh);
+    }
+
+    function formatDurationSeconds(s) {
+      if (s === null || s === undefined || Number.isNaN(s)) return '—';
+      const n = Number(s);
+      if (!Number.isFinite(n) || n <= 0) return '—';
+      const h = Math.floor(n / 3600);
+      const m = Math.floor((n % 3600) / 60);
+      const sec = Math.floor(n % 60);
+      if (h > 0) return h + 'h ' + m + 'm';
+      if (m > 0) return m + 'm ' + sec + 's';
+      return sec + 's';
+    }
+
+    function countsFromPayload(item) {
+      // The list endpoint returns the summary projection on the server, but it
+      // currently mirrors the full payload — fall back gracefully if the
+      // server adds set/exercise count fields later.
+      if (typeof item.exercise_count === 'number' && typeof item.set_count === 'number') {
+        return { ex: item.exercise_count, sets: item.set_count };
+      }
+      return { ex: null, sets: null };
+    }
+
+    async function refresh() {
+      const wrap = document.getElementById('outbox-wrap');
+      const loading = document.getElementById('loading');
+      loading.hidden = false;
+      loading.textContent = 'Loading…';
+      wrap.hidden = true;
+
+      const { status, body } = await api('/v1/workouts/outbox', { method: 'GET' });
+      if (status === 401) {
+        clearSession();
+        window.location.replace('/account/login');
+        return;
+      }
+      if (status !== 200 || !body) {
+        loading.textContent = 'Failed to load outbox (HTTP ' + status + ').';
+        return;
+      }
+
+      const items = body.items || [];
+      if (items.length === 0) {
+        loading.hidden = false;
+        loading.innerHTML = '<p class="muted">No completed workouts yet — finish one in the iOS app and it\'ll show up here.</p>';
+        return;
+      }
+
+      let html = '<table class="account-table"><thead><tr>'
+        + '<th>Session</th>'
+        + '<th>Completed</th>'
+        + '<th>Source device</th>'
+        + '<th></th>'
+        + '</tr></thead><tbody>';
+
+      for (const it of items) {
+        const href = '/account/outbox/view?id=' + encodeURIComponent(it.outbox_id);
+        const deviceLabel = it.source_device_id
+          ? '<code class="mono" title="' + escapeHtml(it.source_device_id) + '">'
+              + escapeHtml(it.source_device_id.slice(0, 8)) + '</code>'
+          : '<span class="muted">—</span>';
+
+        html += '<tr>'
+          + '<td><a href="' + href + '">' + escapeHtml(it.session_name || 'Workout') + '</a></td>'
+          + '<td>' + escapeHtml(formatDate(it.session_completed_at)) + '</td>'
+          + '<td>' + deviceLabel + '</td>'
+          + '<td><a class="btn btn-secondary btn-small" href="' + href + '">View</a></td>'
+          + '</tr>';
+      }
+      html += '</tbody></table>';
+
+      wrap.innerHTML = html;
+      loading.hidden = true;
+      wrap.hidden = false;
+    }
+  </script>
+</AccountLayout>

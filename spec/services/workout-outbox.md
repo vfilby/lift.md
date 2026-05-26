@@ -205,6 +205,25 @@ Local `outbox_pending_queue` table is wiped on logout — the queue is session-s
 - A second device with the same session synced down via CloudKit will not push it — the queue is only seeded by the completion event, not by sync. Each device pushes only sessions it owns the completion of.
 - Editing a completed workout after push **does not retroactively update the server**. The outbox is a snapshot at completion time, not a live mirror of `workout_sessions`. (Future: add `PATCH /v1/workouts/outbox/:outbox_id` if this proves limiting. Out of scope v1.)
 
+## Web surface
+
+Logged-in users can browse their own outbox at `liftmark.app/account/outbox` so they can see what their agents will read back. Same session JWT the rest of `/account/*` uses; PATs are not involved here.
+
+### Pages
+
+- **`/account/outbox`** — list view. Calls `GET /v1/workouts/outbox`, renders the last 20 items in a table (session name, completed-at, duration, exercise/set count, source device id). Each row links to the detail page. Empty state: "No completed workouts yet — finish one in the iOS app and it'll show up here."
+- **`/account/outbox/view?id=<outbox_id>`** — detail view. Calls `GET /v1/workouts/outbox/:id`, renders the full `payload.session.exercises[]` as a per-exercise table with target vs actual columns (weight, reps, time, RPE). Includes a **Delete** button that calls `DELETE /v1/workouts/outbox/:id` and navigates back to the list — privacy escape hatch for the user.
+
+Both pages share `AccountLayout` and the `account-table` / `badge` / `mono` styling already established by `/account/index.astro` and `/account/login.astro`. Both gate on `requireSessionOrRedirect()` and 401-redirect to `/account/login` on auth loss.
+
+### Why query-param routing for detail
+
+Astro builds static and the site upload is via S3 + CloudFront. A truly dynamic route (`/account/outbox/[id].astro`) would need `getStaticPaths` we can't satisfy at build time. The detail page is a static HTML shell that reads `?id=` at runtime and fetches client-side, so the same compiled HTML serves every detail URL. Browser back/forward and shareable links still work since the URL changes.
+
+### Cross-link from the account index
+
+`/account/index.astro` gets a small "Workout outbox" section pointing to the list page. Mirrors the existing "Workout inbox" section's affordance level (it's a side door, not the headline feature).
+
 ## Telemetry
 
 `Logger.shared.info(.network, ...)` events on iOS:
