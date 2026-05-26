@@ -129,6 +129,25 @@ export const TABLES = {
     ],
     pointInTimeRecovery: true,
   },
+  workout_outbox: {
+    logicalName: 'workout_outbox',
+    // PK/SK mirror workout_inbox so trim-on-write can do a single sorted
+    // query under the user's partition. Ring-buffer retention (last 20) is
+    // enforced in the repository, not by a GSI or TTL — see
+    // spec/services/workout-outbox.md.
+    partitionKey: { name: 'user_id', type: 'S' },
+    sortKey: { name: 'outbox_id', type: 'S' },
+    globalSecondaryIndexes: [
+      {
+        // Dedup lookup on POST: given (user_id, client_session_id),
+        // determine if this session has already been pushed.
+        indexName: 'client-session-index',
+        partitionKey: { name: 'user_id', type: 'S' },
+        sortKey: { name: 'client_session_id', type: 'S' },
+      },
+    ],
+    pointInTimeRecovery: true,
+  },
 } as const satisfies Record<string, TableSchema>;
 
 export type TableLogicalName = keyof typeof TABLES;

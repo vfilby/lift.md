@@ -31,6 +31,7 @@ import {
   markIngested,
   type InboxStatus,
 } from '../repositories/workout_inbox.js';
+import { outboxRouter } from './workout_outbox.js';
 
 const MAX_INPUT_BYTES = 1_048_576; // 1MB
 const MAX_INPUT_LINES = 50_000;
@@ -139,6 +140,10 @@ function log(entry: Record<string, unknown>): void {
 type Variables = AuthVariables & { requestId: string; startTime: number };
 
 export const workoutsRouter = new Hono<{ Variables: Variables }>();
+
+// Mount /v1/workouts/outbox BEFORE the dynamic :inbox_id routes below so
+// the literal "outbox" segment isn't captured as an inbox_id param.
+workoutsRouter.route('/outbox', outboxRouter);
 
 workoutsRouter.post('/', requireScope('workouts:write'), async (c) => {
   const requestId = c.var.requestId;
