@@ -80,8 +80,90 @@ Exercise-level note — target ranges, cues, substitutions.
 
 4. **Return** the validated LMWF to the user in a single fenced code block. Do not include the validator's JSON unless asked — the user wants the workout, not the diagnostics.
 
+## Account-aware workflow (when a bearer token is available)
+
+If `LIFTMARK_PAT` is set in the environment (or the user pastes a token like `lm_pat_live_…` into the conversation), you can close the feedback loop: read recent training before generating, and push the validated workout straight to the user's LiftMark inbox so it shows up in the iOS app.
+
+Without a token, fall back to the basic workflow above — generate, validate, hand the LMWF back to the user.
+
+### Before generating: read recent completed workouts (outbox)
+
+Required scope: `workouts:read`. Returns the user's last 20 completed sessions (newest first), so you can avoid same-muscle adjacency, stage progressions on actual loads/reps, and acknowledge what they just finished.
+
+```bash
+curl -fsS https://workoutformat.liftmark.app/v1/workouts/outbox \
+  -H "Authorization: Bearer $LIFTMARK_PAT"
+```
+
+Response shape (summary list):
+
+```json
+{
+  "items": [
+    {
+      "outbox_id": "01HXXXX…",
+      "session_name": "Push Day",
+      "session_completed_at": "2026-05-25T18:28:00Z",
+      "source_device_id": "…",
+      "created_at": "…"
+    }
+  ]
+}
+```
+
+For per-set detail on one session (target vs actual weight, reps, time, RPE):
+
+```bash
+curl -fsS https://workoutformat.liftmark.app/v1/workouts/outbox/<outbox_id> \
+  -H "Authorization: Bearer $LIFTMARK_PAT"
+```
+
+Returns `{ outbox_id, session_name, session_completed_at, payload: { session: { name, date, duration, exercises: [{exerciseName, sets: [{targetWeight, targetWeightUnit, targetReps, actualWeight, actualReps, actualTime, …}]}] } } }`. Read the most recent 2–3 sessions before generating — that's usually enough context.
+
+### After validating: push the workout (inbox)
+
+Required scope: `workouts:write`. The workout lands in the iOS app's Plans → Inbox section for the user to review and start.
+
+```bash
+curl -fsS -X POST https://workoutformat.liftmark.app/v1/workouts \
+  -H "Authorization: Bearer $LIFTMARK_PAT" \
+  -H "Content-Type: text/markdown" \
+  --data-binary @workout.md
+```
+
+Or with the LMWF in a JSON wrapper:
+
+```bash
+curl -fsS -X POST https://workoutformat.liftmark.app/v1/workouts \
+  -H "Authorization: Bearer $LIFTMARK_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{"lmwf": "# Push Day\n@units: lbs\n..."}'
+```
+
+Response on success (HTTP 201):
+
+```json
+{
+  "inbox_id": "01HXXXX…",
+  "status": "pending",
+  "created_at": "…",
+  "summary": { "workoutName": "...", "exerciseCount": 5, "totalSetCount": 14, "exercises": [...] },
+  "warnings": []
+}
+```
+
+After a successful push, surface the inbox_id + summary line to the user (e.g. "Queued — Push Day, 5 exercises, 14 sets. Open the LiftMark app to start it."). Do **not** push without validating first — `/v1/workouts` re-validates server-side and returns 422 on parse errors, but pre-validating with `validate.sh` is faster and gives you a chance to fix issues before involving the user's account.
+
+### Token handling
+
+- Never log or echo the token. Use `Authorization: Bearer "$LIFTMARK_PAT"` directly — don't print it into transcripts.
+- A 401 means the token is missing, malformed, revoked, or expired. A 403 means scope mismatch (e.g. trying to push with a read-only token).
+- Token management lives at https://liftmark.app/account — users mint and revoke tokens there.
+
 ## Reference
 
 - Full spec (markdown): https://workoutformat.liftmark.app/spec.md
 - Human docs + in-browser validator: https://workoutformat.liftmark.app/
 - Validator API: `POST https://workoutformat.liftmark.app/validate` (Content-Type `application/json` with `{"markdown": "..."}` or `text/markdown` with the raw body)
+- Inbox API (push, requires `workouts:write` PAT): `POST https://workoutformat.liftmark.app/v1/workouts`
+- Outbox API (read recent completions, requires `workouts:read` PAT): `GET https://workoutformat.liftmark.app/v1/workouts/outbox` and `GET …/outbox/<outbox_id>`
