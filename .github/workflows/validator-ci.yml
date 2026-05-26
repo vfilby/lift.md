@@ -1,4 +1,4 @@
-name: Validator CI
+name: Validator
 
 on:
   push:
@@ -12,32 +12,195 @@ on:
       - 'validator/**'
       - '.github/workflows/validator-ci.yml'
 
+# Allow only one full pipeline run per branch at a time.
+concurrency:
+  group: validator-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
-  typecheck-and-test:
+  # ── Stage 1: validate ──────────────────────────────────────────────────
+  # Matrix gives parallel typecheck + test jobs (mirrors Concourse's
+  # validator-typecheck / validator-test fan-out).
+  validate:
+    name: validate (${{ matrix.check }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [typecheck, test]
     defaults:
       run:
         working-directory: validator
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: validator/package-lock.json
+      - run: npm ci
+      - name: ${{ matrix.check }}
+        run: npm run ${{ matrix.check }}
 
-      - name: Install dependencies
-        run: npm ci
+  # ── Stage 2: build ─────────────────────────────────────────────────────
+  # Produces validator/dist/ and uploads it as an artifact so deploy jobs
+  # deploy exactly what was tested.
+  build:
+    name: build
+    needs: validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: validator
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: validator/package-lock.json
+      - run: npm ci
+      - name: Bundle lambda
+        run: make bundle
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator-bundle
+          path: validator/dist
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Type check
-        run: npm run typecheck
+  # ── Stage 3: deploy-beta ───────────────────────────────────────────────
+  # `environment: beta` populates the Deployments tab + can scope secrets
+  # (AWS_ACCESS_KEY_ID/SECRET) per environment.
+  deploy-beta:
+    name: deploy-beta
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: beta
+      url: https://beta.liftmark.app
+    env:
+      AWS_DEFAULT_REGION: us-west-2
+      AWS_REGION: us-west-2
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: validator/package-lock.json
+      - name: Install app deps
+        working-directory: validator
+        run: npm ci --no-audit --no-fund
+      - name: Install CDK deps
+        working-directory: validator/cdk
+        run: npm ci --no-audit --no-fund
+      - name: Download bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: validator-bundle
+          path: validator/dist
+      - name: CDK deploy (beta)
+        working-directory: validator/cdk
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          BUILD_COMMIT="${{ github.sha }}"
+          BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "==> deploy metadata: commit=$BUILD_COMMIT  builtAt=$BUILD_TIMESTAMP"
+          npx cdk deploy \
+            --require-approval never \
+            --context buildCommit=$BUILD_COMMIT \
+            --context buildTimestamp=$BUILD_TIMESTAMP \
+            --outputs-file outputs-beta.json \
+            LmwfBetaEdgeStack LmwfBetaValidatorStack
+          echo "==> outputs:"
+          cat outputs-beta.json
 
-      - name: Run tests
-        run: npm test
+  # ── Stage 4: smoke-beta ────────────────────────────────────────────────
+  smoke-beta:
+    name: smoke-beta
+    needs: deploy-beta
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Smoke test beta
+        run: |
+          chmod +x validator/scripts/smoke-test-live.sh
+          validator/scripts/smoke-test-live.sh https://beta.liftmark.app "${{ github.sha }}"
 
-      - name: Build
-        run: npm run build
+  # ── Stage 5: deploy-prod ───────────────────────────────────────────────
+  # Auto-promotes after smoke-beta passes (matches Concourse behaviour).
+  # To add a manual gate later: Settings → Environments → production →
+  # "Required reviewers".
+  deploy-prod:
+    name: deploy-prod
+    needs: smoke-beta
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://liftmark.app
+    env:
+      AWS_DEFAULT_REGION: us-west-2
+      AWS_REGION: us-west-2
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: validator/package-lock.json
+      - name: Install app deps
+        working-directory: validator
+        run: npm ci --no-audit --no-fund
+      - name: Install CDK deps
+        working-directory: validator/cdk
+        run: npm ci --no-audit --no-fund
+      - name: Download bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: validator-bundle
+          path: validator/dist
+      - name: CDK deploy (prod)
+        working-directory: validator/cdk
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          BUILD_COMMIT="${{ github.sha }}"
+          BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "==> deploy metadata: commit=$BUILD_COMMIT  builtAt=$BUILD_TIMESTAMP"
+          npx cdk deploy \
+            --require-approval never \
+            --context buildCommit=$BUILD_COMMIT \
+            --context buildTimestamp=$BUILD_TIMESTAMP \
+            --outputs-file outputs-prod.json \
+            LmwfProdEdgeStack LmwfProdValidatorStack
+          echo "==> outputs:"
+          cat outputs-prod.json
+
+  # ── Stage 6: smoke-prod ────────────────────────────────────────────────
+  smoke-prod:
+    name: smoke-prod
+    needs: deploy-prod
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Smoke test prod
+        run: |
+          chmod +x validator/scripts/smoke-test-live.sh
+          validator/scripts/smoke-test-live.sh https://liftmark.app "${{ github.sha }}"
