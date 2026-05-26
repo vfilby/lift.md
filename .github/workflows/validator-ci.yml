@@ -148,6 +148,10 @@ jobs:
             LmwfBetaEdgeStack LmwfBetaValidatorStack
           echo "==> outputs:"
           cat outputs-beta.json
+      - name: AWS console links (beta)
+        run: |
+          chmod +x validator/ci/aws-console-links.sh
+          validator/ci/aws-console-links.sh beta validator/cdk/outputs-beta.json
 
   # ── Stage 4: smoke-beta ────────────────────────────────────────────────
   smoke-beta:
@@ -219,6 +223,10 @@ jobs:
             LmwfProdEdgeStack LmwfProdValidatorStack
           echo "==> outputs:"
           cat outputs-prod.json
+      - name: AWS console links (prod)
+        run: |
+          chmod +x validator/ci/aws-console-links.sh
+          validator/ci/aws-console-links.sh prod validator/cdk/outputs-prod.json
 
   # ── Stage 6: smoke-prod ────────────────────────────────────────────────
   smoke-prod:

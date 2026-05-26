@@ -169,6 +169,11 @@ jobs:
                   --outputs-file outputs-beta.json \
                   LmwfBetaEdgeStack LmwfBetaValidatorStack
                 cat outputs-beta.json
+                # AWS console deep-links (echoed to task log — Concourse has
+                # no first-class step-summary surface, so this lands in the
+                # job output).
+                apt-get update -qq && apt-get install -y -qq python3 >/dev/null
+                bash ../ci/aws-console-links.sh beta outputs-beta.json
 
   # ── Stage 4: smoke-beta ──────────────────────────────────────────────
   - name: smoke-beta
@@ -242,6 +247,8 @@ jobs:
                   --outputs-file outputs-prod.json \
                   LmwfProdEdgeStack LmwfProdValidatorStack
                 cat outputs-prod.json
+                apt-get update -qq && apt-get install -y -qq python3 >/dev/null
+                bash ../ci/aws-console-links.sh prod outputs-prod.json
 
   # ── Stage 6: smoke-prod ──────────────────────────────────────────────
   - name: smoke-prod
