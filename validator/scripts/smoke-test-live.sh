@@ -25,6 +25,25 @@ BASE_URL="${1%/}"
 ENDPOINT="$BASE_URL/validate"
 EXPECTED_COMMIT="${2:-}"
 
+echo "==> GET $BASE_URL/ (static site)"
+set +e
+site_status=$(curl -fsS --max-time 30 --retry 3 --retry-delay 1 --retry-all-errors \
+  -o /tmp/smoke.site.html -w '%{http_code}' "$BASE_URL/" 2>/tmp/smoke.site.err)
+curl_rc=$?
+set -e
+if [ "$curl_rc" -ne 0 ]; then
+  echo "FAIL: GET $BASE_URL/ (curl exit=$curl_rc, http=$site_status): $(tr -d '\n' < /tmp/smoke.site.err | head -c 200)" >&2
+  exit 2
+fi
+site_bytes=$(wc -c < /tmp/smoke.site.html | tr -d ' ')
+if [ "$site_bytes" -lt 200 ]; then
+  echo "FAIL: GET $BASE_URL/ returned $site_status with only $site_bytes bytes (expected an index.html, not an S3 error)" >&2
+  echo "      body: $(head -c 300 /tmp/smoke.site.html)" >&2
+  exit 2
+fi
+echo "    ✓ $site_status, $site_bytes bytes"
+echo
+
 echo "==> GET $BASE_URL/version"
 set +e
 version_body=$(curl -fsS --max-time 30 --retry 3 --retry-delay 1 --retry-all-errors \

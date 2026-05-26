@@ -11,6 +11,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import { Construct } from 'constructs';
@@ -333,6 +334,27 @@ function handler(event) {
           compress: true,
         },
       },
+    });
+
+    // ── Static site upload + CloudFront invalidation ──
+    // Built by the website workspace into ../../website/dist before
+    // `cdk deploy` runs (validator-ci.yml `build` job and `make deploy-*`
+    // both depend on `website-build`). Pointed at the same S3 bucket the
+    // distribution serves, with prune=true so removed pages disappear and
+    // a wildcard invalidation so viewers see the new content immediately.
+    //
+    // Keeping the site upload inside CDK means both GHA and Concourse
+    // pipelines do the exact same deploy (just `cdk deploy`), which is the
+    // whole reason we're not doing this with a separate `aws s3 sync` step.
+    new s3deploy.BucketDeployment(this, 'SiteContents', {
+      sources: [s3deploy.Source.asset(path.join(__dirname, '..', '..', 'website', 'dist'))],
+      destinationBucket: siteBucket,
+      distribution,
+      distributionPaths: ['/*'],
+      prune: true,
+      // Default Lambda is 128 MiB / 900 s. Site is ~250 KiB today; bump
+      // memory only if/when assets grow enough to OOM the copy Lambda.
+      memoryLimit: 256,
     });
 
     // ── DNS: env's apex → CloudFront ──

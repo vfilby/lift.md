@@ -1,4 +1,4 @@
-.PHONY: install build deploy-beta deploy-prod dev
+.PHONY: install build dev
 
 install:
 	npm install
@@ -9,14 +9,10 @@ dev:
 build:
 	npm run build
 
-deploy-beta: build
-	aws s3 sync dist/ s3://liftmark-beta-site-323146837100/ \
-	  --profile liftmark-beta --delete
-	@DIST_ID=$$(jq -r '."LmwfBetaValidatorStack"."DistributionId"' ../validator/cdk/outputs-beta.json); \
-	  aws cloudfront create-invalidation --profile liftmark-beta \
-	    --distribution-id $$DIST_ID --paths "/*"
-
-deploy-prod: build
-	# Mirror of deploy-beta — wired in once liftmark-prod-site bucket exists.
-	@echo "Prod deploy not yet wired — pending prod account migration"
-	@exit 1
+# Deploys are driven from validator/Makefile — the validator CDK stack
+# uploads website/dist to the per-env S3 bucket via BucketDeployment and
+# triggers the CloudFront invalidation in the same step. Run:
+#
+#   cd ../validator && make deploy-beta     # or deploy-prod
+#
+# That target builds the site (this Makefile's `build`) before invoking cdk.

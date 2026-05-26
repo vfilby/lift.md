@@ -5,3 +5,7 @@ cdk/dist/
 cdk/cdk.out/
 *.js.map
 *.d.ts.map
+
+# Concourse pipeline variable file (AWS keys for fly set-pipeline)
+ci/vars.local.yml
+ci/vars.*.local.yml

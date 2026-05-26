@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'validator/**'
+      - 'website/**'
       - '.github/workflows/validator-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'validator/**'
+      - 'website/**'
       - '.github/workflows/validator-ci.yml'
 
 # Allow only one full pipeline run per branch at a time.
@@ -47,30 +49,46 @@ jobs:
         run: npm run ${{ matrix.check }}
 
   # ── Stage 2: build ─────────────────────────────────────────────────────
-  # Produces validator/dist/ and uploads it as an artifact so deploy jobs
-  # deploy exactly what was tested.
+  # Produces validator/dist/ and website/dist/ and uploads both as artifacts
+  # so deploy jobs deploy exactly what was tested. CDK's BucketDeployment
+  # in stack.ts picks up website/dist at deploy time.
   build:
     name: build
     needs: validate
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: validator
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: validator/package-lock.json
-      - run: npm ci
+          cache-dependency-path: |
+            validator/package-lock.json
+            website/package-lock.json
+      - name: Install validator deps
+        working-directory: validator
+        run: npm ci
       - name: Bundle lambda
+        working-directory: validator
         run: make bundle
-      - name: Upload bundle
+      - name: Install website deps
+        working-directory: website
+        run: npm ci --no-audit --no-fund
+      - name: Build website
+        working-directory: website
+        run: npm run build
+      - name: Upload validator bundle
         uses: actions/upload-artifact@v4
         with:
           name: validator-bundle
           path: validator/dist
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload website bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-bundle
+          path: website/dist
           if-no-files-found: error
           retention-days: 7
 
@@ -102,11 +120,16 @@ jobs:
       - name: Install CDK deps
         working-directory: validator/cdk
         run: npm ci --no-audit --no-fund
-      - name: Download bundle
+      - name: Download validator bundle
         uses: actions/download-artifact@v4
         with:
           name: validator-bundle
           path: validator/dist
+      - name: Download website bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: website-bundle
+          path: website/dist
       - name: CDK deploy (beta)
         working-directory: validator/cdk
         env:
@@ -168,11 +191,16 @@ jobs:
       - name: Install CDK deps
         working-directory: validator/cdk
         run: npm ci --no-audit --no-fund
-      - name: Download bundle
+      - name: Download validator bundle
         uses: actions/download-artifact@v4
         with:
           name: validator-bundle
           path: validator/dist
+      - name: Download website bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: website-bundle
+          path: website/dist
       - name: CDK deploy (prod)
         working-directory: validator/cdk
         env:

@@ -1,4 +1,5 @@
 .PHONY: test test-watch typecheck install install-cdk bundle sync-dict \
+        website-build \
         dev-up dev-down dev-bootstrap \
         synth diff-beta diff-prod deploy-beta deploy-prod \
         destroy-beta destroy-prod sso-login
@@ -65,6 +66,13 @@ bundle: sync-dict
 		--cpu=arm64 --os=linux --libc=glibc \
 		--omit=dev --no-audit --no-fund --no-package-lock --silent
 
+# ── Website build ──
+# CDK's BucketDeployment in stack.ts uploads ../website/dist to the per-env
+# site bucket. Building here (not inside cdk synth) keeps the CDK app pure
+# TS and the build tool boundary explicit.
+website-build:
+	cd ../website && npm ci --no-audit --no-fund && npm run build
+
 # ── CDK commands ──
 # Auth: AWS SSO via `aws sso login --sso-session liftmark`. Each env has
 # its own profile (liftmark-beta, liftmark-prod) configured in ~/.aws/config.
@@ -79,11 +87,11 @@ sso-login:
 synth:
 	cd cdk && npx cdk synth --no-staging
 
-diff-beta: bundle
+diff-beta: bundle website-build
 	cd cdk && npx cdk diff --profile liftmark-beta --strict \
 	    LmwfBetaEdgeStack LmwfBetaValidatorStack
 
-diff-prod: bundle
+diff-prod: bundle website-build
 	cd cdk && npx cdk diff --profile liftmark-prod --strict \
 	    LmwfProdEdgeStack LmwfProdValidatorStack
 
@@ -92,14 +100,14 @@ diff-prod: bundle
 BUILD_COMMIT    := $(shell git rev-parse HEAD)
 BUILD_TIMESTAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-deploy-beta: bundle
+deploy-beta: bundle website-build
 	cd cdk && npx cdk deploy --profile liftmark-beta --require-approval never \
 	    --context buildCommit=$(BUILD_COMMIT) \
 	    --context buildTimestamp=$(BUILD_TIMESTAMP) \
 	    --outputs-file outputs-beta.json \
 	    LmwfBetaEdgeStack LmwfBetaValidatorStack
 
-deploy-prod: bundle
+deploy-prod: bundle website-build
 	cd cdk && npx cdk deploy --profile liftmark-prod --require-approval any-change \
 	    --context buildCommit=$(BUILD_COMMIT) \
 	    --context buildTimestamp=$(BUILD_TIMESTAMP) \
