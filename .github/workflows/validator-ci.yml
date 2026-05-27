@@ -17,6 +17,10 @@ on:
       - 'website/**'
       - 'tools/claude-skill/**'
       - '.github/workflows/validator-ci.yml'
+  # Manual trigger for "redeploy without code change" cases — e.g. rotating
+  # a Secrets Manager value the Lambda reads at deploy time, or recovering
+  # from a flaky deploy step. Use `gh workflow run Validator --ref main`.
+  workflow_dispatch:
 
 # Allow only one full pipeline run per branch at a time.
 concurrency:
