@@ -9,5 +9,10 @@ export default defineConfig({
     // execution keeps everything deterministic at the cost of ~few
     // seconds of wall time — acceptable for a service-tier test suite.
     fileParallelism: false,
+    // e2e/ holds Playwright specs; they have their own runner (see
+    // e2e/playwright.config.ts) and would crash here ("test() not
+    // expected"). Vitest's default `exclude` already covers
+    // node_modules/.git; we extend it.
+    exclude: ['**/node_modules/**', '**/.git/**', 'e2e/**'],
   },
 });

@@ -100,12 +100,138 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # ── Stage 2.5: e2e-local ──────────────────────────────────────────────
+  # Browser-driven E2E suite (Playwright) against a local validator +
+  # website stack with DynamoDB Local + Mailpit. Runs on PR + push so a
+  # PR cannot be merged unless the user-facing UI works end-to-end.
+  # See spec/services/validator-e2e.md for the contract this suite
+  # enforces.
+  e2e-local:
+    name: e2e-local
+    needs: build
+    runs-on: ubuntu-latest
+    # NOTE: do NOT use GHA `services:` for DynamoDB Local — the default
+    # image command runs WITHOUT `-sharedDb`, so the bootstrap script
+    # writes tables into one credential-scoped namespace and the
+    # validator (which uses different SDK retries / credential
+    # discovery internally) can read from another, leading to
+    # ResourceNotFoundException. The repo's docker-compose.yml already
+    # passes `-sharedDb`; we re-use it here so CI stays in lock-step
+    # with `scripts/e2e-local.sh`.
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            validator/package-lock.json
+            validator/e2e/package-lock.json
+            website/package-lock.json
+      - name: Install validator deps
+        working-directory: validator
+        run: npm ci --no-audit --no-fund
+      - name: Install website deps
+        working-directory: website
+        run: npm ci --no-audit --no-fund
+      - name: Install E2E deps
+        working-directory: validator/e2e
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright browser
+        working-directory: validator/e2e
+        run: npx playwright install --with-deps chromium
+      - name: Download website bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: website-bundle
+          path: website/dist
+      - name: Bring up DDB Local + Mailpit
+        working-directory: validator
+        run: |
+          set -euo pipefail
+          docker compose up -d
+          echo "==> waiting for DynamoDB Local"
+          for i in $(seq 1 60); do
+            if docker compose ps dynamodb-local --format json 2>/dev/null | grep -q '"Health":"healthy"'; then break; fi
+            sleep 0.5
+          done
+          echo "==> waiting for Mailpit"
+          for i in $(seq 1 60); do
+            if docker compose ps mailpit --format json 2>/dev/null | grep -q '"Health":"healthy"'; then break; fi
+            sleep 0.5
+          done
+      - name: Bootstrap DynamoDB tables
+        working-directory: validator
+        run: npx tsx scripts/ddb-local-bootstrap.ts
+        env:
+          DDB_ENDPOINT: http://localhost:8000
+          AWS_REGION: us-west-2
+          AWS_ACCESS_KEY_ID: local
+          AWS_SECRET_ACCESS_KEY: local
+      - name: Start validator + run Playwright
+        working-directory: validator
+        run: |
+          set -euo pipefail
+          SECRET="ci-e2e-secret-$(openssl rand -hex 16)"
+          export PORT=3001
+          export WEBSITE_DIST="$PWD/../website/dist"
+          export DDB_ENDPOINT=http://localhost:8000
+          export DDB_TABLE_USERS=lmwf-local-users
+          export DDB_TABLE_IDENTITIES=lmwf-local-identities
+          export DDB_TABLE_PAT_TOKENS=lmwf-local-pat_tokens
+          export DDB_TABLE_ENTITLEMENTS=lmwf-local-entitlements
+          export DDB_TABLE_REFRESH_TOKENS=lmwf-local-refresh_tokens
+          export DDB_TABLE_WORKOUT_INBOX=lmwf-local-workout_inbox
+          export DDB_TABLE_WORKOUT_OUTBOX=lmwf-local-workout_outbox
+          export AWS_REGION=us-west-2
+          export AWS_ACCESS_KEY_ID=local
+          export AWS_SECRET_ACCESS_KEY=local
+          export SMTP_HOST=localhost
+          export SMTP_PORT=1025
+          export SMTP_FROM=noreply@local.test
+          export JWT_SECRET="ci-jwt-$(openssl rand -hex 16)"
+          export E2E_TEST_SECRET="$SECRET"
+          export LMWF_ENV=beta
+          export BUILD_COMMIT="${{ github.sha }}"
+          export BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          npx tsx src/server.ts > /tmp/validator.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/version >/dev/null 2>&1; then break; fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "validator exited during boot"; cat /tmp/validator.log; exit 1
+            fi
+            sleep 0.5
+          done
+          curl -fsS http://localhost:3001/version || (cat /tmp/validator.log && exit 1)
+          cd e2e
+          LMWF_E2E_MODE=local \
+          LMWF_E2E_BASE_URL=http://localhost:3001 \
+          LMWF_E2E_TEST_SECRET="$SECRET" \
+          LMWF_E2E_MAILPIT_URL=http://localhost:8025 \
+            npx playwright test
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: validator/e2e/playwright-report
+          retention-days: 14
+      - name: Upload validator log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator-log
+          path: /tmp/validator.log
+          retention-days: 14
+
   # ── Stage 3: deploy-beta ───────────────────────────────────────────────
   # `environment: beta` populates the Deployments tab + can scope secrets
   # (AWS_ACCESS_KEY_ID/SECRET) per environment.
   deploy-beta:
     name: deploy-beta
-    needs: build
+    needs: [build, e2e-local]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
@@ -174,13 +300,73 @@ jobs:
           chmod +x validator/scripts/smoke-test-live.sh
           validator/scripts/smoke-test-live.sh https://beta.liftmark.app "${{ github.sha }}"
 
+  # ── Stage 4.5: e2e-beta ────────────────────────────────────────────────
+  # Browser-driven E2E suite against the live beta hostname. Uses the
+  # /v1/__test__/mint-token endpoint (gated by E2E_TEST_SECRET — beta
+  # only) to drive email-verify and password-reset flows without
+  # inspecting SES. Blocks deploy-prod.
+  #
+  # The shared secret is auto-generated by CDK into Secrets Manager as
+  # lmwf-beta-e2e-test-secret. This job fetches it at runtime using the
+  # beta AWS creds (env-scoped, same as deploy-beta).
+  e2e-beta:
+    name: e2e-beta
+    needs: smoke-beta
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: beta
+    env:
+      AWS_DEFAULT_REGION: us-west-2
+      AWS_REGION: us-west-2
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: validator/e2e/package-lock.json
+      - name: Install E2E deps
+        working-directory: validator/e2e
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright browser
+        working-directory: validator/e2e
+        run: npx playwright install --with-deps chromium
+      - name: Fetch E2E test secret from beta Secrets Manager
+        id: get-secret
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id lmwf-beta-e2e-test-secret \
+            --query SecretString --output text)
+          # Mask before exposing as an output so it never lands in logs.
+          echo "::add-mask::$SECRET"
+          echo "secret=$SECRET" >> "$GITHUB_OUTPUT"
+      - name: Run Playwright against beta
+        working-directory: validator/e2e
+        env:
+          LMWF_E2E_MODE: remote
+          LMWF_E2E_BASE_URL: https://beta.liftmark.app
+          LMWF_E2E_TEST_SECRET: ${{ steps.get-secret.outputs.secret }}
+        run: npx playwright test
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-beta
+          path: validator/e2e/playwright-report
+          retention-days: 14
+
   # ── Stage 5: deploy-prod ───────────────────────────────────────────────
-  # Auto-promotes after smoke-beta passes (matches Concourse behaviour).
-  # To add a manual gate later: Settings → Environments → production →
-  # "Required reviewers".
+  # Promotes after smoke-beta AND e2e-beta both pass. To add a manual
+  # gate later: Settings → Environments → production → "Required
+  # reviewers".
   deploy-prod:
     name: deploy-prod
-    needs: smoke-beta
+    needs: [smoke-beta, e2e-beta]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:

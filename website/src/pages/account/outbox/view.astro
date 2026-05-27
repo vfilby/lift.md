@@ -25,11 +25,11 @@ import AccountLayout from '../../../layouts/AccountLayout.astro';
       escapeHtml, formatDate,
     } from '../../../scripts/api.js';
 
+    let outboxId = null;
+
     if (requireSessionOrRedirect()) {
       init();
     }
-
-    let outboxId = null;
 
     function getOutboxIdFromUrl() {
       const params = new URLSearchParams(window.location.search);
