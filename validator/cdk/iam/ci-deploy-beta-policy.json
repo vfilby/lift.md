@@ -15,6 +15,12 @@
         "arn:aws:iam::323146837100:role/cdk-lmwf-image-publishing-role-323146837100-us-east-1",
         "arn:aws:iam::323146837100:role/cdk-lmwf-lookup-role-323146837100-us-east-1"
       ]
+    },
+    {
+      "Sid": "ReadE2ETestSecret",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:us-west-2:323146837100:secret:lmwf-beta-e2e-test-secret-*"
     }
   ]
 }
