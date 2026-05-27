@@ -50,28 +50,28 @@ protocol APIClientProtocol: AnyObject, Sendable {
 /// in/out. Maps HTTP status codes to `APIError`. No retry/refresh logic —
 /// `AuthenticationStore` owns the refresh-on-401 dance.
 final class APIClient: APIClientProtocol, @unchecked Sendable {
-    private let baseURL: URL
+    /// Hard-coded base URL (test injection / `LMWF_API_BASE_URL` plist
+    /// override). When nil, `currentBaseURL()` consults the
+    /// `feature_flag.useBetaApi` UserDefaults key per request so a runtime
+    /// flag flip takes effect on the very next call without rebuilding
+    /// the client. See `spec/services/feature-flags.md`.
+    private let staticBaseURL: URL?
     private let session: URLSession
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    /// - Parameter baseURL: Override; if nil, reads `LMWF_API_BASE_URL` from
-    ///   Info.plist, otherwise defaults to the beta host (DEBUG) or the prod
-    ///   host (RELEASE). NOTE: prod still points at beta until migration
-    ///   completes — adjust the RELEASE default when prod is live.
+    /// - Parameter baseURL: Hard-override. When nil, the client reads
+    ///   `LMWF_API_BASE_URL` from Info.plist (also a hard-override), and
+    ///   otherwise resolves prod vs beta per request from the
+    ///   `feature_flag.useBetaApi` UserDefaults key. Default off → prod.
     init(baseURL: URL? = nil, session: URLSession = .shared) {
         if let baseURL {
-            self.baseURL = baseURL
+            self.staticBaseURL = baseURL
         } else if let plistValue = Bundle.main.object(forInfoDictionaryKey: "LMWF_API_BASE_URL") as? String,
                   let url = URL(string: plistValue) {
-            self.baseURL = url
+            self.staticBaseURL = url
         } else {
-            #if DEBUG
-            self.baseURL = URL(string: "https://beta.liftmark.app")!
-            #else
-            // TODO: switch to https://liftmark.app once prod migration ships.
-            self.baseURL = URL(string: "https://beta.liftmark.app")!
-            #endif
+            self.staticBaseURL = nil
         }
         self.session = session
 
@@ -143,13 +143,32 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     // MARK: - Private
 
+    /// Resolves the base URL for the *next* request. Reads the
+    /// `useBetaApi` feature flag from UserDefaults so a toggle in
+    /// Settings is honored on the very next API call. The hard-coded
+    /// override (constructor / Info.plist) still wins when set —
+    /// production builds always hit prod by default.
+    private func currentBaseURL() -> URL {
+        if let staticBaseURL { return staticBaseURL }
+        // Flag absent → prod; flag set → use whatever it says.
+        let useBeta: Bool
+        if UserDefaults.standard.object(forKey: "feature_flag.useBetaApi") != nil {
+            useBeta = UserDefaults.standard.bool(forKey: "feature_flag.useBetaApi")
+        } else {
+            useBeta = false
+        }
+        return useBeta
+            ? URL(string: "https://beta.liftmark.app")!
+            : URL(string: "https://liftmark.app")!
+    }
+
     private func perform<Req: Encodable>(
         path: String,
         method: String,
         body: Req?,
         accessToken: String?
     ) async throws -> (Data, HTTPURLResponse) {
-        let url = baseURL.appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path)
+        let url = currentBaseURL().appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path)
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -199,7 +218,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         bodyData: Data,
         accessToken: String?
     ) async throws -> (Data, HTTPURLResponse) {
-        let url = baseURL.appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path)
+        let url = currentBaseURL().appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path)
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")

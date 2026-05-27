@@ -29,6 +29,7 @@ Current flags:
 | Flag             | Default | Gates                                                                  |
 |------------------|---------|------------------------------------------------------------------------|
 | `workoutInbox`   | off     | Home inbox card, Plans Inbox section, `InboxPollerService` networking. |
+| `useBetaApi`     | off     | Routes the API base URL to `beta.liftmark.app` instead of the default `liftmark.app`. Off = prod. **Toggling forces a sign-out** because tokens issued by one env aren't valid in the other. |
 
 ## Storage
 
@@ -38,6 +39,14 @@ Current flags:
 - Writes invalidate the in-memory `@Observable` store so all observing views recompute.
 
 `FeatureFlagsStore` is a `@MainActor @Observable` exposed via `@Environment`. UI reads via `flags.isEnabled(.workoutInbox)`; writes via `flags.set(.workoutInbox, true)`.
+
+### Special case: `useBetaApi`
+
+Unlike the other flags (which gate UI / poller behavior), `useBetaApi` changes the **HTTP base URL** that `APIClient` talks to. `APIClient` resolves the base URL **per request** by reading `feature_flag.useBetaApi` from UserDefaults — so a flip in Settings takes effect on the next outbound call without restarting the app or rebuilding the client.
+
+Side effect on toggle: every session token (`lmwf_access_jwt`, `lmwf_refresh_token`) and every device-local server-keyed table (`workout_inbox`, `outbox_pending_queue`) was issued/scoped to the *previous* environment. To avoid 401-loops and orphan rows, the Settings row for `useBetaApi` calls `authStore.logout()` immediately after `flags.set(.useBetaApi, ...)`. `logout()` already wipes tokens + inbox + outbox queue.
+
+This is the only flag that's special-cased in the Settings UI; future flags with similar side effects should follow the same pattern (per-flag effect inline at the toggle site, never inside `FeatureFlagsStore` itself).
 
 ## Gating pattern
 

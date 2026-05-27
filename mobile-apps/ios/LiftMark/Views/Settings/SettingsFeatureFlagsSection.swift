@@ -15,13 +15,14 @@ struct SettingsFeatureFlagsSection: View {
 
 private struct FeatureFlagRow: View {
     @Environment(FeatureFlagsStore.self) private var flags
+    @Environment(AuthenticationStore.self) private var authStore
     let flag: FeatureFlag
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Toggle(isOn: Binding(
                 get: { flags.isEnabled(flag) },
-                set: { flags.set(flag, $0) }
+                set: { handleToggle(to: $0) }
             )) {
                 Text(flag.title)
             }
@@ -30,5 +31,20 @@ private struct FeatureFlagRow: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityIdentifier("feature-flag-\(flag.rawValue)")
+    }
+
+    /// Per-flag side effects when the toggle flips. Most flags need no
+    /// extra action; `useBetaApi` forces a sign-out so env-specific
+    /// tokens + caches don't collide with the new environment.
+    private func handleToggle(to newValue: Bool) {
+        let old = flags.isEnabled(flag)
+        flags.set(flag, newValue)
+        guard old != newValue else { return }
+        switch flag {
+        case .useBetaApi:
+            Task { await authStore.logout() }
+        case .workoutInbox:
+            break
+        }
     }
 }

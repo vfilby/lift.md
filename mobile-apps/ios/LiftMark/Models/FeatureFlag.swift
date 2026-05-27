@@ -7,6 +7,7 @@ import Foundation
 /// the feature has shipped on-by-default for a full release cycle.
 enum FeatureFlag: String, CaseIterable, Identifiable {
     case workoutInbox
+    case useBetaApi
 
     var id: String { rawValue }
 
@@ -14,6 +15,7 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .workoutInbox: return "Workout Inbox"
+        case .useBetaApi: return "Use Beta API"
         }
     }
 
@@ -22,6 +24,8 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
         switch self {
         case .workoutInbox:
             return "Pulls workouts pushed to your account (via Claude Code, etc.) into a local inbox on the Plans tab."
+        case .useBetaApi:
+            return "Route account + sync API calls to beta.liftmark.app instead of prod. Toggling signs you out — tokens from one env don't work in the other."
         }
     }
 
@@ -30,6 +34,7 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
     var defaultValue: Bool {
         switch self {
         case .workoutInbox: return false
+        case .useBetaApi: return false
         }
     }
 
