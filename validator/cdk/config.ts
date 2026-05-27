@@ -17,6 +17,23 @@ export interface EnvConfig {
   domainName: string;
   /** Stripe API mode. Used by app code to pick test vs live keys. */
   stripeMode: 'test' | 'live';
+  /**
+   * Optional MAIL FROM subdomain for SES. When set, CDK configures the SES
+   * EmailIdentity with `${sesMailFromSubdomain}.${domainName}` as the
+   * MAIL FROM domain — bounces and complaints report against that
+   * subdomain instead of `bounces.<region>.amazonses.com`, improving
+   * deliverability. CDK auto-publishes the MX + SPF TXT records. Leave
+   * undefined to keep the SES default. Per-env so an active SES support
+   * case in one env doesn't get nudged by an unrelated DNS change.
+   */
+  sesMailFromSubdomain?: string;
+  /**
+   * Optional DMARC TXT policy published at `_dmarc.${domainName}`. e.g.
+   * `'v=DMARC1; p=none;'` for monitor-only. Leave undefined to skip
+   * publishing a DMARC record. Per-env for the same reason as
+   * sesMailFromSubdomain.
+   */
+  dmarcPolicy?: string;
 }
 
 export const ENVS: Record<EnvName, EnvConfig> = {
@@ -26,6 +43,10 @@ export const ENVS: Record<EnvName, EnvConfig> = {
     region: 'us-west-2',
     domainName: 'beta.liftmark.app',
     stripeMode: 'test',
+    // No sesMailFromSubdomain / dmarcPolicy: beta has an in-flight SES
+    // production-access support case (177985180300561). Avoid changing
+    // beta's SES posture until that's resolved; mirror prod's config
+    // here after.
   },
   prod: {
     name: 'prod',
@@ -33,6 +54,8 @@ export const ENVS: Record<EnvName, EnvConfig> = {
     region: 'us-west-2',
     domainName: 'liftmark.app',
     stripeMode: 'live',
+    sesMailFromSubdomain: 'mail',
+    dmarcPolicy: 'v=DMARC1; p=none;',
   },
 };
 

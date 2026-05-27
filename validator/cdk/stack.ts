@@ -96,19 +96,40 @@ export class LmwfValidatorStack extends cdk.Stack {
     }
 
     // ── SES email identity ──
-    // Validates the env's apex domain for sending. DKIM/SPF records are
+    // Validates the env's apex domain for sending. DKIM CNAMEs are
     // auto-published into the hosted zone — `dkimSigning: true` (default)
-    // creates the three CNAME records the verification flow needs.
+    // creates the three records the verification flow needs.
+    //
+    // Optional MAIL FROM subdomain (env.sesMailFromSubdomain) and DMARC
+    // policy (env.dmarcPolicy) are opt-in per env so an env with an
+    // in-flight SES support case isn't perturbed by an unrelated DNS
+    // change. See cdk/config.ts.
     //
     // We intentionally stay in the SES sandbox for v1: outbound mail only
     // to verified recipients. Promotion to production access is a manual
     // AWS Support ticket — out of scope for IaC.
+    const mailFromDomain = env.sesMailFromSubdomain
+      ? `${env.sesMailFromSubdomain}.${env.domainName}`
+      : undefined;
     const emailIdentity = new ses.EmailIdentity(this, 'EmailIdentity', {
       identity: ses.Identity.publicHostedZone(hostedZone),
       // dkimSigning defaults to true with publicHostedZone — listed
       // explicitly for visibility.
       dkimSigning: true,
+      mailFromDomain,
     });
+
+    // ── DMARC ──
+    // Monitor-only by default (p=none). CDK doesn't model DMARC natively
+    // because it's just a TXT record in the env's hosted zone.
+    if (env.dmarcPolicy) {
+      new route53.TxtRecord(this, 'DmarcRecord', {
+        zone: hostedZone,
+        recordName: '_dmarc',
+        values: [env.dmarcPolicy],
+        ttl: cdk.Duration.minutes(60),
+      });
+    }
 
     // ── JWT signing secret ──
     // Auto-generated 64-char hex string, rotated manually for now. The
