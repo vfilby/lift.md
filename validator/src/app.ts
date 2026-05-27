@@ -5,6 +5,7 @@ import { parseWorkout } from './parser/index.js';
 import { authRouter } from './routes/auth/index.js';
 import { tokensRouter } from './routes/tokens.js';
 import { workoutsRouter } from './routes/workouts.js';
+import { testRouter } from './routes/__test__/index.js';
 
 interface ValidateRequest {
   markdown: string;
@@ -64,6 +65,13 @@ app.use('*', async (c, next) => {
 app.route('/v1/auth', authRouter);
 app.route('/v1/tokens', tokensRouter);
 app.route('/v1/workouts', workoutsRouter);
+
+// Test-only endpoints (e.g. /v1/__test__/mint-token). The router's gate
+// middleware 404s every request unless E2E_TEST_SECRET is set,
+// LMWF_ENV !== 'prod', and the X-Test-Secret header matches — so it is
+// safe to always mount. See spec/services/validator-e2e.md and
+// routes/__test__/index.ts.
+app.route('/v1/__test__', testRouter);
 
 // Deploy metadata. Set at deploy time via CDK context → Lambda env. Read
 // per-request rather than at module load so tests can set/clear env vars

@@ -1,0 +1,19 @@
+{
+  "name": "lmwf-validator-e2e",
+  "version": "1.0.0",
+  "description": "Browser-driven E2E suite for the LMWF validator + website. See spec/services/validator-e2e.md.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "PWDEBUG=1 playwright test",
+    "report": "playwright show-report",
+    "install-browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
