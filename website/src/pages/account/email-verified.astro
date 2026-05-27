@@ -1,0 +1,39 @@
+---
+import AccountLayout from '../../layouts/AccountLayout.astro';
+---
+
+<AccountLayout title="Email verified" description="Your LiftMark email has been verified.">
+  <div class="auth-page">
+    <div id="success-state">
+      <h1>Email verified</h1>
+      <div class="inline-msg ok" style="margin-top: 1rem;">
+        Your email has been confirmed. You can sign in now.
+      </div>
+      <div class="row-actions" style="margin-top: 1.25rem;">
+        <a class="btn" href="/account/login">Sign in</a>
+      </div>
+    </div>
+
+    <div id="error-state" hidden>
+      <h1>Verification failed</h1>
+      <div class="inline-msg err" style="margin-top: 1rem;">
+        This verification link is invalid or has expired. Verification links are good for 24 hours.
+      </div>
+      <p class="field-hint" style="margin: 0.75rem 0 0;">
+        Try signing in — if your email is still unverified you'll be able to request a fresh link from there.
+      </p>
+      <div class="row-actions" style="margin-top: 1.25rem;">
+        <a class="btn" href="/account/login">Sign in</a>
+        <a class="btn btn-secondary" href="/account/signup">Start over</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error')) {
+      document.getElementById('success-state').hidden = true;
+      document.getElementById('error-state').hidden = false;
+    }
+  </script>
+</AccountLayout>

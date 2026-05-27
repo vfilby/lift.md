@@ -15,6 +15,7 @@
 import { Hono } from 'hono';
 import { signJwt, verifyJwt } from '../../infra/jwt.js';
 import { sendEmail } from '../../infra/email.js';
+import { renderTransactionalEmail } from '../../infra/email_template.js';
 import { hashPassword, verifyPassword } from '../../infra/password.js';
 import { audit } from '../../infra/audit.js';
 import {
@@ -92,8 +93,15 @@ async function sendVerificationEmail(
   await sendEmail({
     to: email,
     subject: 'Verify your LiftMark email',
-    text: `Welcome to LiftMark. Verify your email by opening this link (expires in 24h):\n\n${link}\n\nIf you didn't sign up, you can ignore this message.`,
-    html: `<p>Welcome to LiftMark.</p><p>Verify your email by opening this link (expires in 24h):</p><p><a href="${link}">${link}</a></p><p>If you didn't sign up, you can ignore this message.</p>`,
+    text: `Welcome to LiftMark.\n\nConfirm your email by opening this link (it expires in 24 hours):\n\n${link}\n\nIf you didn't sign up, you can safely ignore this message.\n\n— LiftMark · https://liftmark.app`,
+    html: renderTransactionalEmail({
+      heading: 'Confirm your email',
+      intro: 'Thanks for signing up for LiftMark. Tap the button below to confirm this email address and finish setting up your account.',
+      ctaLabel: 'Confirm email',
+      ctaUrl: link,
+      footnote: 'This link expires in 24 hours.',
+      closingNote: "If you didn't sign up, you can safely ignore this message.",
+    }),
   });
 }
 
@@ -105,12 +113,22 @@ async function sendResetEmail(
     { sub: identityId, type: 'password_reset' satisfies 'password_reset' },
     '1h',
   );
-  const link = `${appBaseUrl()}/v1/auth/password/reset?token=${encodeURIComponent(token)}`;
+  // Reset link targets the website's /account/reset page (which POSTs the
+  // token + new password back to the API). The /v1/auth/password/reset
+  // route is POST-only, so a GET click on a link pointing there would 405.
+  const link = `${appBaseUrl()}/account/reset?token=${encodeURIComponent(token)}`;
   await sendEmail({
     to: email,
     subject: 'Reset your LiftMark password',
-    text: `A password reset was requested for your LiftMark account. This link expires in 1 hour:\n\n${link}\n\nIf you didn't request a reset, you can ignore this message.`,
-    html: `<p>A password reset was requested for your LiftMark account. This link expires in 1 hour:</p><p><a href="${link}">${link}</a></p><p>If you didn't request a reset, you can ignore this message.</p>`,
+    text: `A password reset was requested for your LiftMark account.\n\nOpen this link to choose a new password (it expires in 1 hour):\n\n${link}\n\nIf you didn't request a reset, you can safely ignore this message — your password is unchanged.\n\n— LiftMark · https://liftmark.app`,
+    html: renderTransactionalEmail({
+      heading: 'Reset your password',
+      intro: 'A password reset was requested for your LiftMark account. Tap the button below to choose a new password.',
+      ctaLabel: 'Choose a new password',
+      ctaUrl: link,
+      footnote: 'This link expires in 1 hour.',
+      closingNote: "If you didn't request a reset, you can safely ignore this message — your password is unchanged.",
+    }),
   });
 }
 
@@ -260,22 +278,22 @@ async function verifyToken(token: string): Promise<{
   return { ok: true, user_id: identity.user_id, identity_id: identity.identity_id };
 }
 
+// GET /verify redirects to a website page rather than serving HTML from
+// the Lambda — the website's AccountLayout owns the visual story, the
+// Lambda only owns state. Success → /account/email-verified, failure →
+// /account/email-verified?error=invalid (the page reads the param).
 passwordRouter.get('/verify', async (c) => {
   const token = c.req.query('token');
+  const successUrl = `${appBaseUrl()}/account/email-verified`;
+  const errorUrl = `${appBaseUrl()}/account/email-verified?error=invalid`;
   if (!token) {
-    return c.html('<h1>Invalid verification link</h1>', 400);
+    return c.redirect(errorUrl, 302);
   }
   const result = await verifyToken(token);
   if (!result.ok) {
-    return c.html(
-      '<!doctype html><meta charset="utf-8"><title>Verification failed</title><h1>Invalid or expired verification token</h1>',
-      400,
-    );
+    return c.redirect(errorUrl, 302);
   }
-  return c.html(
-    '<!doctype html><meta charset="utf-8"><title>Email verified</title><h1>Email verified</h1><p>You can close this window.</p>',
-    200,
-  );
+  return c.redirect(successUrl, 302);
 });
 
 passwordRouter.post('/verify', async (c) => {

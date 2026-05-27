@@ -173,7 +173,7 @@ live('password auth routes', () => {
     expect(typeof loginBody.user.trial_ends_at).toBe('string');
   });
 
-  it('GET /verify returns an HTML success page', async () => {
+  it('GET /verify redirects to the website success page on a valid token', async () => {
     const email = uniqueEmail('get-verify');
     const password = 'correct-horse-battery-staple';
     const signupRes = await signup(email, password);
@@ -183,11 +183,31 @@ live('password auth routes', () => {
 
     const res = await app.request(
       `/v1/auth/password/verify?token=${encodeURIComponent(token)}`,
+      { redirect: 'manual' },
     );
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/text\/html/);
-    const body = await res.text();
-    expect(body.toLowerCase()).toContain('email verified');
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toMatch(/\/account\/email-verified$/);
+    expect(location).not.toContain('error=');
+  });
+
+  it('GET /verify redirects to the error page on an invalid token', async () => {
+    const res = await app.request(
+      '/v1/auth/password/verify?token=not-a-real-token',
+      { redirect: 'manual' },
+    );
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toContain('/account/email-verified');
+    expect(location).toContain('error=invalid');
+  });
+
+  it('GET /verify with no token redirects to the error page', async () => {
+    const res = await app.request('/v1/auth/password/verify', {
+      redirect: 'manual',
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location') ?? '').toContain('error=invalid');
   });
 
   it('login fails with 401 on bad password', async () => {
