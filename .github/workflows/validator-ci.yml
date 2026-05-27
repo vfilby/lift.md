@@ -110,16 +110,14 @@ jobs:
     name: e2e-local
     needs: build
     runs-on: ubuntu-latest
-    services:
-      dynamodb:
-        image: amazon/dynamodb-local:latest
-        ports:
-          - 8000:8000
-      mailpit:
-        image: axllent/mailpit:latest
-        ports:
-          - 1025:1025
-          - 8025:8025
+    # NOTE: do NOT use GHA `services:` for DynamoDB Local — the default
+    # image command runs WITHOUT `-sharedDb`, so the bootstrap script
+    # writes tables into one credential-scoped namespace and the
+    # validator (which uses different SDK retries / credential
+    # discovery internally) can read from another, leading to
+    # ResourceNotFoundException. The repo's docker-compose.yml already
+    # passes `-sharedDb`; we re-use it here so CI stays in lock-step
+    # with `scripts/e2e-local.sh`.
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -147,6 +145,21 @@ jobs:
         with:
           name: website-bundle
           path: website/dist
+      - name: Bring up DDB Local + Mailpit
+        working-directory: validator
+        run: |
+          set -euo pipefail
+          docker compose up -d
+          echo "==> waiting for DynamoDB Local"
+          for i in $(seq 1 60); do
+            if docker compose ps dynamodb-local --format json 2>/dev/null | grep -q '"Health":"healthy"'; then break; fi
+            sleep 0.5
+          done
+          echo "==> waiting for Mailpit"
+          for i in $(seq 1 60); do
+            if docker compose ps mailpit --format json 2>/dev/null | grep -q '"Health":"healthy"'; then break; fi
+            sleep 0.5
+          done
       - name: Bootstrap DynamoDB tables
         working-directory: validator
         run: npx tsx scripts/ddb-local-bootstrap.ts
