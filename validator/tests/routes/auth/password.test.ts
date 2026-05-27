@@ -220,6 +220,46 @@ live('password auth routes', () => {
     expect(second.status).toBe(409);
   });
 
+  it('signup rolls back user + identity if email send fails (retry works)', async () => {
+    // Point SMTP at a port nothing is listening on so the send throws.
+    // We rebuild the transport so the next sendEmail call picks up the
+    // bad host, then restore + rebuild after.
+    const origPort = process.env.SMTP_PORT;
+    const origHost = process.env.SMTP_HOST;
+    const { _resetEmailTransportForTests } = await import(
+      '../../../src/infra/email.js'
+    );
+    process.env.SMTP_HOST = '127.0.0.1';
+    process.env.SMTP_PORT = '1'; // refused
+    _resetEmailTransportForTests();
+
+    const email = uniqueEmail('rollback');
+    const password = 'correct-horse-battery-staple';
+
+    try {
+      const res = await signup(email, password);
+      expect(res.status).toBe(503);
+
+      // Same email must signup cleanly on retry — proves the row was rolled
+      // back. (Restoring SMTP first so the retry's send actually succeeds.)
+      if (origHost !== undefined) process.env.SMTP_HOST = origHost;
+      else delete process.env.SMTP_HOST;
+      if (origPort !== undefined) process.env.SMTP_PORT = origPort;
+      else delete process.env.SMTP_PORT;
+      _resetEmailTransportForTests();
+
+      const retry = await signup(email, password);
+      expect(retry.status).toBe(201);
+    } finally {
+      // Ensure env is restored even on failure.
+      if (origHost !== undefined) process.env.SMTP_HOST = origHost;
+      else delete process.env.SMTP_HOST;
+      if (origPort !== undefined) process.env.SMTP_PORT = origPort;
+      else delete process.env.SMTP_PORT;
+      _resetEmailTransportForTests();
+    }
+  });
+
   it('signup rejects short passwords', async () => {
     const res = await signup(uniqueEmail('short'), 'short');
     expect(res.status).toBe(400);

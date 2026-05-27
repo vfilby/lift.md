@@ -17,6 +17,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import {
+  DeleteCommand,
   GetCommand,
   PutCommand,
   UpdateCommand,
@@ -94,6 +95,20 @@ export async function updateUserTier(
       ExpressionAttributeNames: { '#tier': 'tier' },
       ExpressionAttributeValues: { ':tier': tier },
       ConditionExpression: 'attribute_exists(user_id)',
+    }),
+  );
+}
+
+/// Hard-delete a user row. Used for rolling back a partial signup when a
+/// downstream step (e.g. sending the verification email) fails after the
+/// user + identity rows already exist. The signup route is the only
+/// expected caller — general-purpose user deletion is not a supported
+/// operation in v1.
+export async function deleteUser(user_id: string): Promise<void> {
+  await ddb.send(
+    new DeleteCommand({
+      TableName: tableName('users'),
+      Key: { user_id },
     }),
   );
 }

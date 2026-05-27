@@ -19,13 +19,14 @@ import { hashPassword, verifyPassword } from '../../infra/password.js';
 import { audit } from '../../infra/audit.js';
 import {
   createIdentity,
+  deleteIdentity,
   getIdentityById,
   getIdentityByProviderSub,
   markEmailVerified,
   updatePasswordHash,
 } from '../../repositories/identities.js';
 import { createRefreshToken } from '../../repositories/refresh_tokens.js';
-import { createUser, getUserById } from '../../repositories/users.js';
+import { createUser, deleteUser, getUserById } from '../../repositories/users.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 12;
@@ -177,7 +178,53 @@ passwordRouter.post('/signup', async (c) => {
     password_updated_at: new Date().toISOString(),
   });
 
-  await sendVerificationEmail(email, identity.identity_id);
+  // Email send is the last step that can fail. If it throws (e.g. SES
+  // sandbox rejecting an unverified recipient, transient SMTP error), the
+  // user + identity rows we just wrote would otherwise be orphans — and
+  // the next signup attempt from the same address would 409 on the dupe
+  // check, even though the first attempt never sent an email. Roll back
+  // both rows on failure so retries work.
+  try {
+    await sendVerificationEmail(email, identity.identity_id);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'signup_email_failed_rolling_back',
+      user_id: user.user_id,
+      identity_id: identity.identity_id,
+      email,
+      error: errMsg,
+    }));
+    // Best-effort cleanup. If either delete fails the orphan persists and
+    // will need manual cleanup — logged separately so it's findable.
+    try {
+      await deleteIdentity(identity.identity_id);
+    } catch (cleanupErr) {
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'signup_rollback_identity_delete_failed',
+        identity_id: identity.identity_id,
+        error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+      }));
+    }
+    try {
+      await deleteUser(user.user_id);
+    } catch (cleanupErr) {
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'signup_rollback_user_delete_failed',
+        user_id: user.user_id,
+        error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+      }));
+    }
+    return c.json(
+      {
+        error: 'Could not send verification email. Please try again, or contact support if this persists.',
+      },
+      503,
+    );
+  }
 
   return c.json(
     {
