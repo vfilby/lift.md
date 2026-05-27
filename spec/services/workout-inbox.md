@@ -108,7 +108,7 @@ Row actions (swipe or context menu):
 | Add to Plans    | Promote: insert a `WorkoutPlan` from `workout_json`; delete the inbox row; `DELETE` the server row.                                                       |
 | Start Workout   | Promote (as above), then open the newly created plan's detail screen. v1 stops here — the user taps Start on the detail screen. (Future: skip the detail screen and open Active Workout directly.) |
 
-Tap on a row (not swipe) opens a read-only detail sheet with the same three actions in a footer.
+Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) — workout name, tags, default unit, description, and a card per exercise listing each set's target weight/reps/time/RPE plus per-set modifier chips (drop, per-side, rest, tempo). Footer holds the same three actions; selecting one dismisses the sheet and runs the action on the parent (`InboxSectionView` owns the queue/server reconciliation).
 
 ### Conflict + dedup rules
 

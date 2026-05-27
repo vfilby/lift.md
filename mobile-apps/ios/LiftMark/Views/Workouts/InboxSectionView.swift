@@ -18,6 +18,11 @@ struct InboxSectionView: View {
     @State private var inFlightInboxId: String?
     @State private var actionError: String?
     @State private var isExpanded: Bool = true
+    /// Drives the `.sheet(item:)` for the read-only preview. Holding the
+    /// full decoded payload + the originating InboxItem id keeps the sheet
+    /// independent of any reload that happens while it's open — if the
+    /// underlying row vanishes the sheet still renders until dismissed.
+    @State private var previewing: PreviewPayload?
 
     private let repository: InboxItemRepository
     private let apiClient: APIClientProtocol
@@ -59,6 +64,32 @@ struct InboxSectionView: View {
         .onReceive(NotificationCenter.default.publisher(for: InboxPollerService.inboxDidChange)) { _ in
             reload()
         }
+        .sheet(item: $previewing) { payload in
+            InboxPreviewSheet(
+                workout: payload.workout,
+                createdAtServer: payload.createdAtServer,
+                sourceTokenId: payload.sourceTokenId,
+                onDiscard: {
+                    Task { await discard(byId: payload.inboxId) }
+                },
+                onAddToPlans: {
+                    Task { await promote(byId: payload.inboxId, openDetail: false) }
+                },
+                onStart: {
+                    Task { await promote(byId: payload.inboxId, openDetail: true) }
+                }
+            )
+        }
+    }
+
+    /// Bundle of state passed to the preview sheet. `Identifiable` so it can
+    /// drive `.sheet(item:)`.
+    private struct PreviewPayload: Identifiable {
+        let inboxId: String
+        let workout: InboxWorkout
+        let createdAtServer: Date
+        let sourceTokenId: String?
+        var id: String { inboxId }
     }
 
     // MARK: - Subviews
@@ -169,6 +200,14 @@ struct InboxSectionView: View {
         .padding(LiftMarkTheme.spacingSM)
         .background(LiftMarkTheme.background)
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
+        .contentShape(Rectangle())
+        // Tap the row to preview. Decoding happens inline so a malformed
+        // JSON blob fails as a logged warning instead of presenting an
+        // empty sheet.
+        .onTapGesture {
+            guard !isBusy else { return }
+            presentPreview(for: item)
+        }
         .accessibilityIdentifier("inbox-row-\(item.id)")
         .contextMenu {
             Button {
@@ -216,12 +255,37 @@ struct InboxSectionView: View {
 
     // MARK: - Actions
 
+    private func presentPreview(for item: InboxItem) {
+        let data = Data(item.workoutJSON.utf8)
+        do {
+            let workout = try JSONDecoder().decode(InboxWorkout.self, from: data)
+            previewing = PreviewPayload(
+                inboxId: item.id,
+                workout: workout,
+                createdAtServer: item.createdAtServer,
+                sourceTokenId: item.sourceTokenId
+            )
+        } catch {
+            actionError = "Couldn't preview this workout — it may be malformed."
+            Logger.shared.error(.network, "inbox preview decode failed", error: error)
+        }
+    }
+
     private func reload() {
         do {
             items = try repository.list()
         } catch {
             Logger.shared.error(.database, "Inbox reload failed", error: error)
         }
+    }
+
+    /// Resolve an item by id then discard. Used by the preview sheet,
+    /// which holds an id rather than a reference so a mid-flight reload
+    /// can't desync the action target.
+    @MainActor
+    private func discard(byId id: String) async {
+        guard let item = items.first(where: { $0.id == id }) else { return }
+        await discard(item)
     }
 
     @MainActor
@@ -245,6 +309,12 @@ struct InboxSectionView: View {
 
         await sendServerDelete(inboxId: item.id, action: "discard")
         reload()
+    }
+
+    @MainActor
+    private func promote(byId id: String, openDetail: Bool) async {
+        guard let item = items.first(where: { $0.id == id }) else { return }
+        await promote(item, openDetail: openDetail)
     }
 
     @MainActor
