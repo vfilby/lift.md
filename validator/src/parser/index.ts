@@ -672,6 +672,21 @@ function parseGroupedExercises(
     }
   }
 
+  // Warn on a superset that contains only a single member. A superset pairs two or
+  // more exercises performed back-to-back, so a one-member superset is almost always
+  // an authoring mistake that is invisible in the source markdown.
+  if (isSuperset && childExercises.length === 1) {
+    context.warnings.push({
+      line: headerLine.lineNumber,
+      message:
+        `Superset '${groupName}' contains only one exercise ` +
+        `('${childExercises[0].exerciseName}'). A superset pairs two or more exercises ` +
+        `performed back-to-back — add another exercise to this superset, or convert it ` +
+        `to a regular exercise or section if it was not meant to be a superset.`,
+      code: 'SINGLE_MEMBER_SUPERSET',
+    });
+  }
+
   return [parentExercise, ...childExercises];
 }
 

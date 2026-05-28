@@ -329,6 +329,41 @@ describe('Supersets', () => {
     // data is null when success is false
     expect(result.data).toBeNull();
   });
+
+  it('warns when a superset contains only one member', () => {
+    const markdown = `# Workout
+
+## Superset
+### Bicep Curls
+- 20 x 10`;
+    const result = parseWorkout(markdown);
+
+    // Still a valid file — single-member superset is a warning, not an error.
+    expect(result.success).toBe(true);
+
+    const singleMemberWarnings = result.warnings.filter((w) =>
+      w.includes('contains only one exercise')
+    );
+    expect(singleMemberWarnings.length).toBe(1);
+    // Warning points at the superset block line (## Superset is line 3) and names the lone member.
+    expect(singleMemberWarnings[0]).toContain('Line 3:');
+    expect(singleMemberWarnings[0]).toContain("Superset");
+    expect(singleMemberWarnings[0]).toContain("Bicep Curls");
+  });
+
+  it('does NOT warn when a superset contains two or more members', () => {
+    const markdown = `# Workout
+
+## Superset
+### Bicep Curls
+- 20 x 10
+### Tricep Extensions
+- 20 x 10`;
+    const result = parseWorkout(markdown);
+
+    expect(result.success).toBe(true);
+    expect(result.warnings.some((w) => w.includes('contains only one exercise'))).toBe(false);
+  });
 });
 
 // MARK: - Sections
