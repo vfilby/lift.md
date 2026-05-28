@@ -52,7 +52,13 @@ jobs:
   validate:
     name: validate (${{ matrix.check }})
     needs: changes
-    if: needs.changes.outputs.validator == 'true'
+    # Gate at the STEP level, not the job level. A skipped *matrix* job
+    # reports a single check named literally `validate (${{ matrix.check }})`
+    # — the matrix never expands — so the required contexts `validate (test)`
+    # / `validate (typecheck)` would never report and would block iOS PRs
+    # forever. Letting the job run but skipping its steps preserves matrix
+    # expansion (correct check names, reported green) while doing no work on
+    # non-validator PRs.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -63,13 +69,17 @@ jobs:
         working-directory: validator
     steps:
       - uses: actions/checkout@v6
+        if: needs.changes.outputs.validator == 'true'
       - uses: actions/setup-node@v6
+        if: needs.changes.outputs.validator == 'true'
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: validator/package-lock.json
-      - run: npm ci
+      - if: needs.changes.outputs.validator == 'true'
+        run: npm ci
       - name: ${{ matrix.check }}
+        if: needs.changes.outputs.validator == 'true'
         run: npm run ${{ matrix.check }}
 
   # ── Stage 2: build ─────────────────────────────────────────────────────
