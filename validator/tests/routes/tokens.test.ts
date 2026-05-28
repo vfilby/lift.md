@@ -240,4 +240,76 @@ live('PAT issuance routes (/v1/tokens)', () => {
     const body = (await res.json()) as { scopes: string[] };
     expect(body.scopes).toEqual(['workouts:read']);
   });
+
+  it('rejects an unknown scope with 400 (allowlist) and surfaces allowed_scopes', async () => {
+    const { session_jwt } = await signupAndLogin('bad-scope');
+    const res = await createPat(session_jwt, {
+      name: 'evil',
+      scopes: ['workouts:read', 'admin'],
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as {
+      error: string;
+      allowed_scopes: string[];
+    };
+    expect(body.error).toMatch(/unknown scope/i);
+    expect(body.allowed_scopes).toEqual(['workouts:read', 'workouts:write']);
+  });
+
+  it('rejects a scopes array over the length cap with 400', async () => {
+    const { session_jwt } = await signupAndLogin('many-scopes');
+    const res = await createPat(session_jwt, {
+      name: 'flood',
+      // 17 entries (cap is 16) — all valid strings, rejected purely on length.
+      scopes: Array.from({ length: 17 }, () => 'workouts:read'),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/at most/i);
+  });
+
+  // ── I1: cross-user IDOR regression (PAT) ────────────────────────────
+  // User A cannot revoke user B's token. Revoke is owner-scoped and silently
+  // idempotent (204, no enumeration), so the assertion is that B's token is
+  // still usable afterward — A's call had no effect on B's resource.
+  it("user A's revoke of user B's token_id is a no-op (B's token still active)", async () => {
+    const userA = await signupAndLogin('idor-pat-a');
+    const userB = await signupAndLogin('idor-pat-b');
+    const bToken = (await (
+      await createPat(userB.session_jwt, { name: 'b-token' })
+    ).json()) as { token_id: string };
+
+    // A attempts to revoke B's token by its public id.
+    const del = await app.request(`/v1/tokens/${bToken.token_id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${userA.session_jwt}` },
+    });
+    // Idempotent / no enumeration — never 404, but it must not actually revoke.
+    expect(del.status).toBe(204);
+
+    // B's token is untouched (no revoked_at).
+    const list = (await (
+      await app.request('/v1/tokens', {
+        headers: { authorization: `Bearer ${userB.session_jwt}` },
+      })
+    ).json()) as { tokens: Array<{ token_id: string; revoked_at?: string }> };
+    const found = list.tokens.find((t) => t.token_id === bToken.token_id);
+    expect(found).toBeDefined();
+    expect(found?.revoked_at).toBeUndefined();
+  });
+
+  it("user A's token list never includes user B's tokens", async () => {
+    const userA = await signupAndLogin('idor-list-a');
+    const userB = await signupAndLogin('idor-list-b');
+    const bToken = (await (
+      await createPat(userB.session_jwt, { name: 'b-only' })
+    ).json()) as { token_id: string };
+
+    const list = (await (
+      await app.request('/v1/tokens', {
+        headers: { authorization: `Bearer ${userA.session_jwt}` },
+      })
+    ).json()) as { tokens: Array<{ token_id: string }> };
+    expect(list.tokens.find((t) => t.token_id === bToken.token_id)).toBeUndefined();
+  });
 });

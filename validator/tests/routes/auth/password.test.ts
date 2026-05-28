@@ -134,9 +134,13 @@ live('password auth routes', () => {
     expect(mail.Subject).toMatch(/verify/i);
     const token = extractToken(mail.Text || mail.HTML);
 
-    // login before verify → 403
+    // login before verify → uniform 401 (no "email not verified" oracle).
+    // Unverified state is surfaced only via resend-verification, never by
+    // a distinguishable response that would confirm the password (L3).
     const preVerify = await login(email, password);
-    expect(preVerify.status).toBe(403);
+    expect(preVerify.status).toBe(401);
+    const preVerifyBody = (await preVerify.json()) as { error: string };
+    expect(preVerifyBody.error).toBe('Invalid credentials');
 
     const verifyRes = await postJson('/v1/auth/password/verify', { token });
     expect(verifyRes.status).toBe(200);
@@ -322,6 +326,17 @@ live('password auth routes', () => {
       new_password: newPassword,
     });
     expect(resetRes.status).toBe(200);
+
+    // Reset bumped the account access-token cutoff (H1): in-flight access
+    // JWTs minted before the reset are now rejected by the auth middleware.
+    // (The middleware gate itself is exercised in middleware/session.test.ts.)
+    const { getIdentityByProviderSub } = await import(
+      '../../../src/repositories/identities.js'
+    );
+    const { getUserById } = await import('../../../src/repositories/users.js');
+    const identity = await getIdentityByProviderSub('password', email);
+    const user = await getUserById(identity!.user_id);
+    expect(user?.tokens_valid_after).toBeTruthy();
 
     // Old password no longer works.
     const oldLogin = await login(email, oldPassword);
@@ -548,5 +563,154 @@ live('password auth routes', () => {
       password: 'correct-horse-battery-staple',
     });
     expect(res.status).toBe(401);
+  });
+
+  // ── L3: unverified login surfaces only via resend, never via login ──
+
+  it('login for an unverified account returns uniform 401 (no 403 oracle); resend still works', async () => {
+    const email = uniqueEmail('unverified');
+    const password = 'correct-horse-battery-staple';
+    await signup(email, password);
+
+    const res = await login(email, password);
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { error: string; resend_url?: string };
+    expect(body.error).toBe('Invalid credentials');
+    // The response must NOT hint that the email is merely unverified, nor
+    // expose a resend_url — that would confirm the password is correct.
+    expect(body.resend_url).toBeUndefined();
+    expect(JSON.stringify(body)).not.toMatch(/verif/i);
+
+    // The unverified user still learns their state through the
+    // password-less resend-verification flow.
+    await deleteAllMail();
+    const resend = await postJson('/v1/auth/password/resend-verification', {
+      email,
+    });
+    expect(resend.status).toBe(204);
+    const mail = await fetchMailTo(email);
+    expect(mail.Subject).toMatch(/verify/i);
+  });
+
+  // ── H1: reset revokes all sessions/refresh tokens ──
+
+  it('reset revokes every existing refresh token for the account (H1)', async () => {
+    const email = uniqueEmail('reset-revoke');
+    const oldPassword = 'correct-horse-battery-staple';
+    const newPassword = 'a-brand-new-passphrase-here';
+
+    await signup(email, oldPassword);
+    const verifyMail = await fetchMailTo(email);
+    await postJson('/v1/auth/password/verify', {
+      token: extractToken(verifyMail.Text || verifyMail.HTML),
+    });
+
+    // Establish an active session (refresh token) — the "attacker's"
+    // foothold that a reset must evict.
+    const loginRes = await login(email, oldPassword);
+    const { refresh_token } = (await loginRes.json()) as {
+      refresh_token: string;
+    };
+    // Sanity: the refresh token works before reset.
+    const beforeReset = await app.request('/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refresh_token }),
+    });
+    expect(beforeReset.status).toBe(200);
+    const rotated = (await beforeReset.json()) as { refresh_token: string };
+
+    // Reset the password.
+    await deleteAllMail();
+    await postJson('/v1/auth/password/reset-request', { email });
+    const resetMail = await fetchMailTo(email);
+    const resetTok = extractToken(resetMail.Text || resetMail.HTML);
+    const resetRes = await postJson('/v1/auth/password/reset', {
+      token: resetTok,
+      new_password: newPassword,
+    });
+    expect(resetRes.status).toBe(200);
+
+    // The previously-rotated refresh token must now be dead — the reset
+    // cascaded revokeAllForUser, so the attacker's foothold is gone.
+    const afterReset = await app.request('/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refresh_token: rotated.refresh_token }),
+    });
+    expect(afterReset.status).toBe(401);
+  });
+
+  // ── L1: reset token is single-use (replay rejected after the change) ──
+
+  it('reset token cannot be replayed after the password has changed (L1)', async () => {
+    const email = uniqueEmail('reset-replay');
+    const oldPassword = 'correct-horse-battery-staple';
+    const firstNew = 'first-new-passphrase-aaa';
+    const secondNew = 'second-new-passphrase-bbb';
+
+    await signup(email, oldPassword);
+    const verifyMail = await fetchMailTo(email);
+    await postJson('/v1/auth/password/verify', {
+      token: extractToken(verifyMail.Text || verifyMail.HTML),
+    });
+
+    await deleteAllMail();
+    await postJson('/v1/auth/password/reset-request', { email });
+    const resetMail = await fetchMailTo(email);
+    const resetTok = extractToken(resetMail.Text || resetMail.HTML);
+
+    // Reset-token iat has 1s granularity; the single-use gate rejects a
+    // token issued in a strictly earlier second than the stamped
+    // password_updated_at. Sleep just over 1s so the reset lands in a
+    // later second than the token was issued, making the replay
+    // deterministically detectable.
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const first = await postJson('/v1/auth/password/reset', {
+      token: resetTok,
+      new_password: firstNew,
+    });
+    expect(first.status).toBe(200);
+
+    // Replaying the SAME token must now fail — even though the JWT itself
+    // is still within its 1h validity.
+    const replay = await postJson('/v1/auth/password/reset', {
+      token: resetTok,
+      new_password: secondNew,
+    });
+    expect(replay.status).toBe(400);
+
+    // And the attacker's chosen password never took effect: only the
+    // legitimate first reset password works.
+    expect((await login(email, firstNew)).status).toBe(200);
+    expect((await login(email, secondNew)).status).toBe(401);
+  });
+
+  // ── M2: httpOnly refresh cookie on login ──
+
+  it('login sets an httpOnly lmwf_refresh cookie scoped to /v1/auth (M2)', async () => {
+    const email = uniqueEmail('cookie-login');
+    const password = 'correct-horse-battery-staple';
+    await signup(email, password);
+    const mail = await fetchMailTo(email);
+    await postJson('/v1/auth/password/verify', {
+      token: extractToken(mail.Text || mail.HTML),
+    });
+
+    const res = await login(email, password);
+    expect(res.status).toBe(200);
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/lmwf_refresh=lm_refresh_[A-Za-z0-9_-]{32}/);
+    expect(setCookie).toMatch(/HttpOnly/i);
+    expect(setCookie).toMatch(/Secure/i);
+    expect(setCookie).toMatch(/SameSite=Strict/i);
+    expect(setCookie).toMatch(/Path=\/v1\/auth/i);
+    expect(setCookie).toMatch(/Max-Age=\d+/i);
+
+    // The cookie value matches the JSON body token (one credential, two
+    // delivery channels).
+    const body = (await res.json()) as { refresh_token: string };
+    expect(setCookie).toContain(`lmwf_refresh=${body.refresh_token}`);
   });
 });

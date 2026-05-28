@@ -11,7 +11,7 @@
  *   - POST   /v1/workouts/outbox              push (workouts:write)
  *   - GET    /v1/workouts/outbox              list last 20 (workouts:read)
  *   - GET    /v1/workouts/outbox/:outbox_id   fetch one (workouts:read)
- *   - DELETE /v1/workouts/outbox/:outbox_id   user-initiated removal (workouts:read)
+ *   - DELETE /v1/workouts/outbox/:outbox_id   user-initiated removal (workouts:write)
  */
 import { Hono } from 'hono';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
@@ -215,7 +215,9 @@ outboxRouter.get('/:outbox_id', requireScope('workouts:read'), async (c) => {
   });
 });
 
-outboxRouter.delete('/:outbox_id', requireScope('workouts:read'), async (c) => {
+// State-changing, so it requires workouts:write: a read-only PAT handed to a
+// third-party agent must not be able to prune the user's history.
+outboxRouter.delete('/:outbox_id', requireScope('workouts:write'), async (c) => {
   const outboxId = c.req.param('outbox_id');
   const startTime = c.var.startTime;
   try {

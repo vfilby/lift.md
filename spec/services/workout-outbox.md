@@ -113,11 +113,11 @@ All resource endpoints accept **session JWT OR PAT** per [[feedback-auth-modalit
 | POST   | `/v1/workouts/outbox`               | `workouts:write`  | Push a completed session. Body: full single-session export envelope. Returns the created item summary.   |
 | GET    | `/v1/workouts/outbox`               | `workouts:read`   | List up to the last 20 items (newest first). Returns summaries (no full payload).                        |
 | GET    | `/v1/workouts/outbox/:outbox_id`    | `workouts:read`   | Fetch one item including full `payload_json`.                                                            |
-| DELETE | `/v1/workouts/outbox/:outbox_id`    | `workouts:read`   | User-initiated removal (privacy). Returns 204; 404 if not owned.                                         |
+| DELETE | `/v1/workouts/outbox/:outbox_id`    | `workouts:write`  | User-initiated removal (privacy). Returns 204; 404 if not owned.                                         |
 
 Notes:
 - **No ack/ingest lifecycle.** Outbox items don't transition states — they exist (most-recent-N) or are reaped. There is no "ingested" because the consumers (agents) are stateless callers.
-- **DELETE uses `workouts:read` scope, not a separate write scope**, matching the inbox DELETE convention. Rationale: if a token can read history, it can prune its view of it. Tokens with no read access cannot delete blindly.
+- **DELETE requires `workouts:write`**, matching the inbox DELETE convention. Rationale: deletion is a state-changing action, so a read-only PAT (handed to a third-party agent for least-privilege history access) must not be able to prune the user's history. Only a token granted `workouts:write` may delete.
 - **List response shape** mirrors inbox list — summary projection per row, deterministic ordering newest-first.
 
 ### Validation on POST

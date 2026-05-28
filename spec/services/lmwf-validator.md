@@ -144,7 +144,12 @@ Matches the iOS parser error and warning codes exactly:
 The TypeScript parser MUST pass the same test cases as the native iOS parser (`MarkdownParserTests.swift`). Both parsers must produce identical results for identical inputs. Any new test case added to either parser must be added to both.
 
 ## Deployment
-- Runtime: Node.js 20 on AWS Lambda (arm64)
-- Infrastructure: AWS SAM (`template.yaml`)
-- CORS: All origins allowed
-- No authentication required
+- Runtime: Node.js 22 on AWS Lambda (arm64)
+- Infrastructure: AWS CDK (`validator/cdk/`) — edge stack (us-east-1: hosted zone, ACM cert, CLOUDFRONT-scoped WAFv2 web ACL) + main stack (Lambda, HTTP API, DynamoDB, CloudFront, DNS, alarms)
+- The public `/validate` and `/version` endpoints require no authentication; the `/v1/*` auth/PAT/workout routes are bearer-authenticated (session JWT or PAT)
+
+### Edge security controls
+- **CORS**: explicit origin allowlist (no wildcard), derived per-env via `corsAllowedOrigins()` in `validator/cdk/config.ts` — the env site domain, the legacy `workoutformat.` prod subdomain, and (beta only) the local Astro dev origin. `allowCredentials: true` so the SameSite refresh-token cookie flow works.
+- **Security response headers**: a CloudFront `ResponseHeadersPolicy` is attached to every behavior — strict CSP (`default-src 'self'`, no `unsafe-inline`; inline site scripts load via CSP hashes), HSTS (1y, includeSubDomains, preload), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` + `frame-ancestors 'none'`, `Referrer-Policy: strict-origin-when-cross-origin`.
+- **WAF**: CLOUDFRONT-scoped WAFv2 web ACL (in the us-east-1 edge stack, wired to the distribution via `crossRegionReferences`) — AWS managed rule groups (Common, KnownBadInputs, AmazonIpReputationList), a broad per-IP rate limit, and a stricter per-IP rate-based rule scoped to `/v1/auth/*` to blunt credential stuffing. Per-account application lockout is a deferred follow-up (needs a DDB counter table).
+- **Access logging**: the HTTP API stage writes a JSON access log (source IP, route, status, auth subject/principal) to CloudWatch Logs.

@@ -11,7 +11,8 @@
  *   - POST   /v1/workouts             push a workout (workouts:write)
  *   - GET    /v1/workouts             list pending/ingested/rejected (workouts:read)
  *   - GET    /v1/workouts/:inbox_id   fetch full item incl. lmwf_text (workouts:read)
- *   - POST   /v1/workouts/:inbox_id/ack  mark ingested (workouts:read)
+ *   - POST   /v1/workouts/:inbox_id/ack  mark ingested (workouts:write)
+ *   - DELETE /v1/workouts/:inbox_id   hard-delete the row (workouts:write)
  *
  * Scopes are enforced for PATs only — session JWTs implicitly satisfy any
  * scope (the user is logged in and inspecting their own account).
@@ -28,6 +29,7 @@ import {
   deleteInboxItem,
   getInboxItem,
   getInboxItemsByUser,
+  InvalidCursorError,
   markIngested,
   type InboxStatus,
 } from '../repositories/workout_inbox.js';
@@ -342,10 +344,20 @@ workoutsRouter.get('/', requireScope('workouts:read'), async (c) => {
     limit = DEFAULT_LIMIT;
   }
 
-  const { items, nextCursor } = await getInboxItemsByUser(
-    c.var.user.user_id,
-    { status, sinceCursor, limit },
-  );
+  let items: Awaited<ReturnType<typeof getInboxItemsByUser>>['items'];
+  let nextCursor: string | undefined;
+  try {
+    ({ items, nextCursor } = await getInboxItemsByUser(c.var.user.user_id, {
+      status,
+      sinceCursor,
+      limit,
+    }));
+  } catch (err) {
+    if (err instanceof InvalidCursorError) {
+      return c.json({ error: 'Invalid pagination cursor' }, 400);
+    }
+    throw err;
+  }
 
   return c.json({
     items: items.map((it) => ({
@@ -385,7 +397,7 @@ workoutsRouter.get('/:inbox_id', requireScope('workouts:read'), async (c) => {
   });
 });
 
-workoutsRouter.post('/:inbox_id/ack', requireScope('workouts:read'), async (c) => {
+workoutsRouter.post('/:inbox_id/ack', requireScope('workouts:write'), async (c) => {
   const inboxId = c.req.param('inbox_id');
   try {
     await markIngested(c.var.user.user_id, inboxId);
@@ -400,9 +412,11 @@ workoutsRouter.post('/:inbox_id/ack', requireScope('workouts:read'), async (c) =
 
 // Hard-delete an inbox row. Used by iOS on Discard and after Promote/Start
 // — the local app has committed (or thrown away) the workout and the server
-// row is no longer needed. The condition expression scopes the delete to
-// the caller's user_id, so foreign rows 404 silently with no existence leak.
-workoutsRouter.delete('/:inbox_id', requireScope('workouts:read'), async (c) => {
+// row is no longer needed. State-changing, so it requires workouts:write: a
+// read-only PAT must not be able to delete. The condition expression scopes
+// the delete to the caller's user_id, so foreign rows 404 silently with no
+// existence leak.
+workoutsRouter.delete('/:inbox_id', requireScope('workouts:write'), async (c) => {
   const inboxId = c.req.param('inbox_id');
   try {
     await deleteInboxItem(c.var.user.user_id, inboxId);

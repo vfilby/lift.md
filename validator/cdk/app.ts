@@ -33,5 +33,6 @@ for (const cfg of Object.values(ENVS)) {
     envConfig: cfg,
     hostedZone: edge.hostedZone,
     cloudFrontCertificate: edge.certificate,
+    webAclArn: edge.webAclArn,
   });
 }

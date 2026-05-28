@@ -22,7 +22,7 @@
  * that must reject one auth shape outright can still import them.
  */
 import { createMiddleware } from 'hono/factory';
-import { verifyJwt } from '../infra/jwt.js';
+import { verifyJwt, tokenIssuedBefore } from '../infra/jwt.js';
 import {
   getTokenByHash,
   hashToken,
@@ -131,6 +131,11 @@ async function authenticateSession(
   }
   const user = await getUserById(payload.sub);
   if (!user) {
+    return { kind: 'fail', response: c.json({ error: 'Unauthorized' }, 401) };
+  }
+  // Reject access tokens minted before the account token cutoff (password
+  // reset / logout-all) — mirrors sessionMiddleware. No extra DDB read.
+  if (tokenIssuedBefore(payload.iat, user.tokens_valid_after)) {
     return { kind: 'fail', response: c.json({ error: 'Unauthorized' }, 401) };
   }
   return {

@@ -18,6 +18,7 @@ import * as ses from 'aws-cdk-lib/aws-ses';
 import { Construct } from 'constructs';
 import * as path from 'path';
 import type { EnvConfig } from './config';
+import { corsAllowedOrigins } from './config';
 import { TABLES, type AttributeType, type TableSchema } from '../src/infra/tables';
 
 function toDdbAttributeType(t: AttributeType): dynamodb.AttributeType {
@@ -77,13 +78,19 @@ export interface LmwfValidatorStackProps extends cdk.StackProps {
   envConfig: EnvConfig;
   hostedZone: route53.IHostedZone;
   cloudFrontCertificate: acm.ICertificate;
+  /**
+   * ARN of the CLOUDFRONT-scoped WAFv2 web ACL created in the us-east-1 edge
+   * stack. Resolved via crossRegionReferences and set on the distribution's
+   * `webAclId`.
+   */
+  webAclArn: string;
 }
 
 export class LmwfValidatorStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LmwfValidatorStackProps) {
     super(scope, id, props);
 
-    const { envConfig, hostedZone, cloudFrontCertificate } = props;
+    const { envConfig, hostedZone, cloudFrontCertificate, webAclArn } = props;
     const env = envConfig; // shorthand for the rest of this constructor
     const domainName = env.domainName;
 
@@ -285,11 +292,33 @@ export class LmwfValidatorStack extends cdk.Stack {
       apiName: `lmwf-validator-${env.name}`,
       description: `LMWF Validator API (${env.name}) — CloudFront origin`,
       corsPreflight: {
-        allowOrigins: ['*'],
-        allowMethods: [apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.OPTIONS],
+        // Explicit origin allowlist (no `*`). Credentialed CORS — required
+        // once the refresh token moves to a SameSite cookie — cannot use a
+        // wildcard, and bearer-header auth gains nothing from `*` either.
+        // Derived per-env from config (site domain + legacy prod subdomain +
+        // optional local dev origin on beta).
+        allowOrigins: corsAllowedOrigins(env),
+        allowCredentials: true,
+        allowMethods: [
+          apigw.CorsHttpMethod.GET,
+          apigw.CorsHttpMethod.POST,
+          apigw.CorsHttpMethod.PUT,
+          apigw.CorsHttpMethod.DELETE,
+          apigw.CorsHttpMethod.OPTIONS,
+        ],
         allowHeaders: ['Content-Type', 'Authorization'],
         maxAge: cdk.Duration.hours(24),
       },
+    });
+
+    // ── API access logging (L14) ──
+    // JSON access log capturing source IP, route, status, and the auth
+    // subject/principal so a credential-spray campaign leaves a per-IP /
+    // per-route forensic timeline. (The failed-login audit() records are
+    // owned by the auth layer in src/.)
+    const apiAccessLogGroup = new logs.LogGroup(this, 'ApiAccessLogGroup', {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     const cfnStage = httpApi.defaultStage?.node.defaultChild as apigw.CfnStage;
@@ -297,6 +326,26 @@ export class LmwfValidatorStack extends cdk.Stack {
       cfnStage.defaultRouteSettings = {
         throttlingBurstLimit: 10,
         throttlingRateLimit: 5,
+      };
+      cfnStage.accessLogSettings = {
+        destinationArn: apiAccessLogGroup.logGroupArn,
+        format: JSON.stringify({
+          requestId: '$context.requestId',
+          ip: '$context.identity.sourceIp',
+          requestTime: '$context.requestTime',
+          httpMethod: '$context.httpMethod',
+          routeKey: '$context.routeKey',
+          path: '$context.path',
+          status: '$context.status',
+          protocol: '$context.protocol',
+          responseLength: '$context.responseLength',
+          // JWT authorizer principal/subject when present (auth routes set it).
+          principalId: '$context.authorizer.principalId',
+          authSub: '$context.authorizer.claims.sub',
+          userAgent: '$context.identity.userAgent',
+          integrationStatus: '$context.integrationStatus',
+          integrationLatency: '$context.integrationLatency',
+        }),
       };
     }
 
@@ -361,6 +410,59 @@ function handler(event) {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
     });
 
+    // ── Security response headers (M1) ──
+    // Attached to every behavior of the distribution below. Provides the CSP,
+    // HSTS, anti-clickjacking, nosniff, and Referrer-Policy controls the site
+    // and authenticated /account portal were missing entirely.
+    //
+    // CSP: `default-src 'self'` with no `'unsafe-inline'`. The website ships
+    // two inline <script> blocks (Base.astro); the website agent adds the
+    // matching CSP hashes via Astro's build so they load under `script-src
+    // 'self' <hash>`. We deliberately keep `'self'`-only here rather than
+    // weakening to `'unsafe-inline'` — coordinate hashes, do not relax this.
+    // `img-src 'self' data:` permits inlined icons/SVGs; everything else is
+    // locked to same-origin.
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "connect-src 'self'",
+      "img-src 'self' data:",
+      "font-src 'self'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'none'",
+      "form-action 'self'",
+    ].join('; ');
+
+    const responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(
+      this,
+      'SecurityHeadersPolicy',
+      {
+        responseHeadersPolicyName: `lmwf-${env.name}-security-headers`,
+        comment: `LMWF ${env.name} — CSP + HSTS + anti-clickjacking + nosniff`,
+        securityHeadersBehavior: {
+          contentSecurityPolicy: { contentSecurityPolicy: csp, override: true },
+          strictTransportSecurity: {
+            accessControlMaxAge: cdk.Duration.days(365),
+            includeSubdomains: true,
+            preload: true,
+            override: true,
+          },
+          contentTypeOptions: { override: true }, // X-Content-Type-Options: nosniff
+          frameOptions: {
+            frameOption: cloudfront.HeadersFrameOption.DENY,
+            override: true,
+          },
+          referrerPolicy: {
+            referrerPolicy:
+              cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+            override: true,
+          },
+        },
+      },
+    );
+
     // Prod CloudFront answers for both the apex (liftmark.app) and the
     // legacy workoutformat.liftmark.app subdomain. Wildcard SAN on the cert
     // (`*.liftmark.app`) already covers it.
@@ -373,6 +475,10 @@ function handler(event) {
       defaultRootObject: 'index.html',
       domainNames: cfDomainNames,
       certificate: cloudFrontCertificate,
+      // CLOUDFRONT-scoped WAFv2 web ACL (managed rules + rate limits),
+      // created in the us-east-1 edge stack and resolved here via
+      // crossRegionReferences. (M3)
+      webAclId: webAclArn,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
@@ -380,6 +486,7 @@ function handler(event) {
       defaultBehavior: {
         origin: s3Origin,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        responseHeadersPolicy,
         cachePolicy:
           env.name === 'beta'
             ? cloudfront.CachePolicy.CACHING_DISABLED
@@ -395,6 +502,7 @@ function handler(event) {
         '/validate': {
           origin: apiOrigin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          responseHeadersPolicy,
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
           originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
@@ -403,6 +511,7 @@ function handler(event) {
         '/v1/*': {
           origin: apiOrigin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          responseHeadersPolicy,
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
           originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
@@ -411,6 +520,7 @@ function handler(event) {
         '/version': {
           origin: apiOrigin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          responseHeadersPolicy,
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
           originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,

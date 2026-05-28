@@ -514,6 +514,74 @@ live('Workout inbox routes (/v1/workouts)', () => {
     expect(get.status).toBe(200);
   });
 
+  it('read-only PAT cannot ack (403) — destructive action requires workouts:write', async () => {
+    // Owner (full scopes) creates an item.
+    const owner = await mintUserAndPat('ro-ack-owner');
+    const created = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${owner.plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: VALID_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    // A read-only PAT for the SAME user must not be able to flip its state.
+    const readOnly = await createToken({
+      user_id: owner.user_id,
+      name: 'ro-ack',
+      scopes: ['workouts:read'],
+      mode: 'test',
+    });
+    const ack = await app.request(`/v1/workouts/${created.inbox_id}/ack`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${readOnly.plaintext}` },
+    });
+    expect(ack.status).toBe(403);
+
+    // State is unchanged.
+    const after = (await (
+      await app.request(`/v1/workouts/${created.inbox_id}`, {
+        headers: { authorization: `Bearer ${owner.plaintext}` },
+      })
+    ).json()) as { status: string };
+    expect(after.status).toBe('pending');
+  });
+
+  it('read-only PAT cannot delete (403) — destructive action requires workouts:write', async () => {
+    const owner = await mintUserAndPat('ro-del-owner');
+    const created = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${owner.plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: VALID_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    const readOnly = await createToken({
+      user_id: owner.user_id,
+      name: 'ro-del',
+      scopes: ['workouts:read'],
+      mode: 'test',
+    });
+    const del = await app.request(`/v1/workouts/${created.inbox_id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${readOnly.plaintext}` },
+    });
+    expect(del.status).toBe(403);
+
+    // Row survives.
+    const after = await app.request(`/v1/workouts/${created.inbox_id}`, {
+      headers: { authorization: `Bearer ${owner.plaintext}` },
+    });
+    expect(after.status).toBe(200);
+  });
+
   it('pagination: limit=2 over 3 items yields next_cursor and second page returns the rest', async () => {
     const { plaintext } = await mintUserAndPat('pagination');
     for (let i = 0; i < 3; i++) {
@@ -557,6 +625,146 @@ live('Workout inbox routes (/v1/workouts)', () => {
       [...page1.items, ...page2.items].map((i) => i.inbox_id),
     );
     expect(seen.size).toBe(3);
+  });
+
+  it('malformed `since` cursor returns 400 (not 500)', async () => {
+    const { plaintext } = await mintUserAndPat('bad-cursor');
+    // Not even valid base64-of-JSON.
+    const res = await app.request('/v1/workouts?since=%%%not-base64%%%', {
+      headers: { authorization: `Bearer ${plaintext}` },
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/cursor/i);
+  });
+
+  it('well-formed base64 but wrong-shape `since` cursor returns 400', async () => {
+    const { plaintext } = await mintUserAndPat('wrong-shape-cursor');
+    const cursor = Buffer.from(
+      JSON.stringify({ not: 'a key' }),
+      'utf8',
+    ).toString('base64');
+    const res = await app.request(
+      `/v1/workouts?since=${encodeURIComponent(cursor)}`,
+      { headers: { authorization: `Bearer ${plaintext}` } },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("forged cross-tenant `since` cursor (another user's id) returns 400, never B's data", async () => {
+    // User A has items and a real cursor.
+    const userA = await mintUserAndPat('cursor-a');
+    const userB = await mintUserAndPat('cursor-b');
+    // Forge a cursor that references B's user_id but is presented by A.
+    const forged = Buffer.from(
+      JSON.stringify({ user_id: userB.user_id, inbox_id: 'fake' }),
+      'utf8',
+    ).toString('base64');
+    const res = await app.request(
+      `/v1/workouts?since=${encodeURIComponent(forged)}`,
+      { headers: { authorization: `Bearer ${userA.plaintext}` } },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  // ── I1: cross-user IDOR regression (inbox) ──────────────────────────
+  // User A authenticates and targets ids that belong to user B. Every path
+  // must 404 (B's existence is never an oracle) and must not mutate B's data.
+  it("user A cannot read user B's inbox item (404, no existence oracle)", async () => {
+    const userA = await mintUserAndPat('idor-read-a');
+    const userB = await mintUserAndPat('idor-read-b');
+    const bItem = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${userB.plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: VALID_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    const res = await app.request(`/v1/workouts/${bItem.inbox_id}`, {
+      headers: { authorization: `Bearer ${userA.plaintext}` },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("user A cannot ack user B's inbox item (404), B's item stays pending", async () => {
+    const userA = await mintUserAndPat('idor-ack-a');
+    const userB = await mintUserAndPat('idor-ack-b');
+    const bItem = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${userB.plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: VALID_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    const ack = await app.request(`/v1/workouts/${bItem.inbox_id}/ack`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${userA.plaintext}` },
+    });
+    expect(ack.status).toBe(404);
+
+    // B's item is untouched.
+    const after = (await (
+      await app.request(`/v1/workouts/${bItem.inbox_id}`, {
+        headers: { authorization: `Bearer ${userB.plaintext}` },
+      })
+    ).json()) as { status: string };
+    expect(after.status).toBe('pending');
+  });
+
+  it("user A cannot delete user B's inbox item (404), B's item survives", async () => {
+    const userA = await mintUserAndPat('idor-del-a');
+    const userB = await mintUserAndPat('idor-del-b');
+    const bItem = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${userB.plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: VALID_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    const del = await app.request(`/v1/workouts/${bItem.inbox_id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${userA.plaintext}` },
+    });
+    expect(del.status).toBe(404);
+
+    const after = await app.request(`/v1/workouts/${bItem.inbox_id}`, {
+      headers: { authorization: `Bearer ${userB.plaintext}` },
+    });
+    expect(after.status).toBe(200);
+  });
+
+  it("user A's list never includes user B's items", async () => {
+    const userA = await mintUserAndPat('idor-list-a');
+    const userB = await mintUserAndPat('idor-list-b');
+    const bItem = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${userB.plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: VALID_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    const list = (await (
+      await app.request('/v1/workouts', {
+        headers: { authorization: `Bearer ${userA.plaintext}` },
+      })
+    ).json()) as { items: Array<{ inbox_id: string }> };
+    expect(list.items.find((i) => i.inbox_id === bItem.inbox_id)).toBeUndefined();
   });
 });
 

@@ -30,7 +30,7 @@
  * before this field was added.
  */
 import { createMiddleware } from 'hono/factory';
-import { verifyJwt } from '../infra/jwt.js';
+import { verifyJwt, tokenIssuedBefore } from '../infra/jwt.js';
 import { getUserById, type User } from '../repositories/users.js';
 
 export type AuthnAge = 'fresh' | 'rotated';
@@ -103,6 +103,13 @@ export const sessionMiddleware = createMiddleware<{
 
   const user = await getUserById(payload.sub);
   if (!user) {
+    return c.json(UNAUTHORIZED, 401);
+  }
+
+  // Reject access tokens minted before the account's token cutoff (bumped on
+  // password reset / logout-all). Closes the ≤1h access-token tail of H1 with
+  // no extra DDB read — `user` is already loaded above.
+  if (tokenIssuedBefore(payload.iat, user.tokens_valid_after)) {
     return c.json(UNAUTHORIZED, 401);
   }
 

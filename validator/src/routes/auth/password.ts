@@ -5,6 +5,31 @@
  * Tokens (verify, reset) are HS256 JWTs typed via the `type` claim so a
  * verify token can't be reused as a reset token and vice versa.
  *
+ * ── Login response contract ──
+ *
+ * Bad creds, unknown account, AND unverified-email all return the SAME
+ * generic 401 `{error:'Invalid credentials'}` (L3 anti-enumeration). The
+ * handler NEVER returns a distinguishable "email not verified" response,
+ * which would confirm a correct password. Unverified users discover their
+ * state via the password-less /resend-verification flow. The unknown-account
+ * branch runs a dummy argon2 verify so its timing matches the real path.
+ *
+ * On success, login returns `{access_jwt, refresh_token, user}` in the JSON
+ * body (iOS bearer flow) AND sets `lmwf_refresh` as an httpOnly cookie (M2,
+ * browser flow). See the cookie contract in refresh.ts.
+ *
+ * ── Password reset = full account recovery (H1 + L1) ──
+ *
+ * POST /reset, on success:
+ *   1. stamps the new hash + password_updated_at (updatePasswordHash),
+ *   2. revokes EVERY refresh token for the account (revokeAllForUser), and
+ *   3. is single-use: a reset token whose `iat` predates the stamped
+ *      password_updated_at is rejected (isTokenStaleForPassword), so a
+ *      replayed reset link fails even within its 1h JWT validity.
+ * Access JWTs minted before the reset are 1h-lived and SHOULD additionally
+ * be gated on isTokenStaleForPassword at the session-verification layer
+ * (middleware) for immediate access-token invalidation.
+ *
  * Email-enumeration safety: signup/login report a single generic error
  * on bad creds; reset-request and resend-verification always 204
  * regardless of whether the address exists.
@@ -12,8 +37,10 @@
  * NOTE: no rate limiting here — that belongs at the API Gateway / WAF
  * layer (or an in-memory bucket per IP in front of these handlers).
  */
+import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
-import { signJwt, verifyJwt } from '../../infra/jwt.js';
+import { setCookie } from 'hono/cookie';
+import { signJwt, verifyJwt, isTokenStaleForPassword } from '../../infra/jwt.js';
 import { sendEmail } from '../../infra/email.js';
 import { renderTransactionalEmail } from '../../infra/email_template.js';
 import { hashPassword, verifyPassword } from '../../infra/password.js';
@@ -26,12 +53,48 @@ import {
   markEmailVerified,
   updatePasswordHash,
 } from '../../repositories/identities.js';
-import { createRefreshToken } from '../../repositories/refresh_tokens.js';
-import { createUser, deleteUser, getUserById } from '../../repositories/users.js';
+import {
+  createRefreshToken,
+  refreshLifetimeSeconds,
+  revokeAllForUser,
+} from '../../repositories/refresh_tokens.js';
+import {
+  bumpTokensValidAfter,
+  createUser,
+  deleteUser,
+  getUserById,
+} from '../../repositories/users.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 12;
 const MAX_DISPLAY_NAME = 80;
+
+// httpOnly refresh-token cookie. Scoped to /v1/auth so it only rides
+// requests to the auth endpoints (login, refresh, logout). SameSite=Strict
+// is the CSRF mitigation on these state-changing routes. iOS clients ignore
+// it and use the JSON `refresh_token` bearer instead; the web client lets
+// the browser carry it automatically.
+const REFRESH_COOKIE = 'lmwf_refresh';
+const REFRESH_COOKIE_PATH = '/v1/auth';
+
+// Timing-equalisation dummy hash for the login no-such-account branch.
+// Without a verify on the missing-identity path, a non-existent email
+// returns measurably faster than a real one (which runs argon2), leaking
+// account existence via response time. We run a verify against this
+// constant hash so both paths pay the same argon2 cost. Computed lazily on
+// first use (argon2 is async) and cached for the process lifetime.
+let dummyPasswordHash: string | undefined;
+async function timingEqualisingVerify(password: string): Promise<void> {
+  if (!dummyPasswordHash) {
+    // The dummy input only needs to be *something* to hash — its value is
+    // irrelevant since the result is discarded. Derive it from a random UUID
+    // rather than a literal so there is no password-like constant in source.
+    dummyPasswordHash = await hashPassword(randomUUID());
+  }
+  // Result intentionally discarded — we only want the CPU cost, and the
+  // password never matches this constant hash.
+  await verifyPassword(password, dummyPasswordHash);
+}
 
 interface SignupBody {
   email?: unknown;
@@ -70,6 +133,20 @@ interface VerifyTokenPayload {
 interface ResetTokenPayload {
   sub: string;
   type: 'password_reset';
+}
+
+/**
+ * Reduce a transport error to a coarse, non-sensitive category for logging.
+ * Nodemailer surfaces a `code` (e.g. 'ECONNREFUSED', 'EAUTH', 'EENVELOPE')
+ * which is safe to log; the free-form `message` can echo the recipient
+ * address or server banners, so it is never logged verbatim (L15).
+ */
+function classifyEmailError(err: unknown): string {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code?: unknown }).code;
+    if (typeof code === 'string' && code.length <= 32) return code;
+  }
+  return 'send_failed';
 }
 
 function appBaseUrl(): string {
@@ -205,14 +282,17 @@ passwordRouter.post('/signup', async (c) => {
   try {
     await sendVerificationEmail(email, identity.identity_id);
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
+    // PII discipline (L15): never log the plaintext email, and never log
+    // the verbatim transport error (it can echo the recipient address or
+    // SMTP server internals). Keep the stable correlation ids (user_id /
+    // identity_id) and reduce the cause to a coarse category so the line
+    // is still triageable without leaking.
     console.error(JSON.stringify({
       level: 'error',
       event: 'signup_email_failed_rolling_back',
       user_id: user.user_id,
       identity_id: identity.identity_id,
-      email,
-      error: errMsg,
+      error_category: classifyEmailError(err),
     }));
     // Best-effort cleanup. If either delete fails the orphan persists and
     // will need manual cleanup — logged separately so it's findable.
@@ -328,8 +408,18 @@ passwordRouter.post('/login', async (c) => {
   }
   const email = emailRaw.toLowerCase();
 
+  // Uniform-failure contract (anti-enumeration, L3):
+  // Every failure below — unknown account, no password set, wrong
+  // password, unverified email, missing user row — returns the SAME
+  // generic 401. We deliberately do NOT distinguish "email not verified"
+  // here: doing so only AFTER a correct password confirms the password to
+  // an attacker. Unverified users learn their state through the
+  // resend-verification flow instead, which never requires a password.
   const identity = await getIdentityByProviderSub('password', email);
   if (!identity || !identity.password_hash) {
+    // Equalise timing: a missing account would otherwise return before
+    // any argon2 work, leaking existence. Pay the same hashing cost.
+    await timingEqualisingVerify(password);
     return c.json({ error: 'Invalid credentials' }, 401);
   }
   const ok = await verifyPassword(password, identity.password_hash);
@@ -337,13 +427,7 @@ passwordRouter.post('/login', async (c) => {
     return c.json({ error: 'Invalid credentials' }, 401);
   }
   if (!identity.email_verified) {
-    return c.json(
-      {
-        error: 'Email not verified',
-        resend_url: '/v1/auth/password/resend-verification',
-      },
-      403,
-    );
+    return c.json({ error: 'Invalid credentials' }, 401);
   }
   const user = await getUserById(identity.user_id);
   if (!user) {
@@ -389,6 +473,17 @@ passwordRouter.post('/login', async (c) => {
     token_hash: refreshRow.token_hash,
     family_root_hash: refreshRow.family_root_hash,
     device_label: deviceLabel,
+  });
+
+  // Also set the refresh token as an httpOnly cookie for browser clients
+  // (M2). iOS keeps using the JSON `refresh_token` bearer below; both are
+  // returned/accepted so neither client breaks.
+  setCookie(c, REFRESH_COOKIE, refresh_token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Strict',
+    path: REFRESH_COOKIE_PATH,
+    maxAge: refreshLifetimeSeconds(refreshRow.expires_at),
   });
 
   return c.json(
@@ -462,8 +557,40 @@ passwordRouter.post('/reset', async (c) => {
   if (!identity) {
     return c.json({ error: 'Invalid or expired reset token' }, 400);
   }
+  // Single-use enforcement: a reset token minted before the most recent
+  // password change is stale. Once this handler runs once it stamps
+  // password_updated_at = now, so the SAME token (whose iat now predates
+  // that stamp) is rejected on replay — even within its 1h validity. This
+  // also rejects a reset token captured before an unrelated password change.
+  if (isTokenStaleForPassword(payload.iat, identity.password_updated_at)) {
+    return c.json({ error: 'Invalid or expired reset token' }, 400);
+  }
   const hashed = await hashPassword(newPassword);
+  // Order: stamp the new hash + password_updated_at FIRST so the reset
+  // token is immediately spent (the iat gate above will reject it on
+  // replay), THEN revoke every existing session/refresh token. If the
+  // cascade partially failed the worst case is a few un-revoked tokens
+  // the user can clear via logout-all after re-login — but the stolen
+  // reset token is already dead.
   await updatePasswordHash(identity.identity_id, hashed);
+  // Revoke every refresh token for the whole ACCOUNT, not just this
+  // identity: a password reset is an account-recovery action and the
+  // user's intent is "lock everyone else out, on every device and every
+  // sign-in method". revokeAllForUser subsumes the identity-scoped
+  // cascade used on identity-delete (routes/auth/index.ts), so we don't
+  // also call revokeAllForIdentity here — it would be a redundant scan.
+  const revoked = await revokeAllForUser(identity.user_id, 'password_reset');
+  // Account-wide access-token cutoff: kills the ≤1h access JWTs already in
+  // flight (including any minted via a different sign-in method), so the
+  // attacker's stolen access token stops working at the next request rather
+  // than lingering for up to an hour. Refresh tokens are already revoked above.
+  await bumpTokensValidAfter(identity.user_id);
+  audit({
+    event: 'password_reset',
+    user_id: identity.user_id,
+    identity_id: identity.identity_id,
+    refresh_tokens_revoked: revoked,
+  });
   return c.json({ message: 'Password updated' }, 200);
 });
 

@@ -29,9 +29,9 @@ import AccountLayout from '../../../layouts/AccountLayout.astro';
       escapeHtml, formatDate,
     } from '../../../scripts/api.js';
 
-    if (requireSessionOrRedirect()) {
-      init();
-    }
+    requireSessionOrRedirect().then((ok) => {
+      if (ok) init();
+    });
 
     async function init() {
       await refresh();

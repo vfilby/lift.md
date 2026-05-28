@@ -110,6 +110,20 @@ export interface CreateRefreshTokenInput {
 const REFRESH_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
 
 /**
+ * Whole seconds of refresh lifetime remaining until `expires_at`, clamped
+ * to >= 0. Used to set the `Max-Age` on the httpOnly refresh cookie so the
+ * browser drops it on the same wall-clock date the server-side family
+ * expires (the cookie never out-lives the row). Defaults to the full
+ * lifetime when no expiry is supplied (a brand-new login).
+ */
+export function refreshLifetimeSeconds(expires_at?: string): number {
+  const expiryMs = expires_at
+    ? new Date(expires_at).getTime()
+    : Date.now() + REFRESH_LIFETIME_MS;
+  return Math.max(0, Math.floor((expiryMs - Date.now()) / 1000));
+}
+
+/**
  * SHA-256 hex of a refresh-token plaintext. Used both at write time and
  * at lookup time so the same function defines "what gets stored".
  */

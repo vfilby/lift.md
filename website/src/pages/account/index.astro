@@ -115,15 +115,14 @@ const exampleLmwf = `# Push Day
 
   <script>
     import {
-      api, apiRawText, getUser, getRefreshToken, clearSession, requireSessionOrRedirect,
+      api, apiRawText, getUser, clearSession, requireSessionOrRedirect,
       escapeHtml, formatDate, formatDateShort,
     } from '../../scripts/api.js';
 
-    if (!requireSessionOrRedirect()) {
-      // Stop further script execution; redirect is in flight.
-    } else {
-      init();
-    }
+    requireSessionOrRedirect().then((ok) => {
+      // Returns false when a redirect to /account/login is in flight.
+      if (ok) init();
+    });
 
     // ── state ──
     let tokens = [];             // all tokens (incl. revoked)
@@ -399,18 +398,17 @@ const exampleLmwf = `# Push Day
         // the token still gets revoked, but a cold-start round-trip can
         // never stall the user on the dashboard. (Awaiting it here caused
         // the e2e sign-out test to time out against a freshly-deployed,
-        // cold beta Lambda.) The fetch is dispatched synchronously below,
-        // capturing the current Authorization header before clearSession.
-        const refresh_token = getRefreshToken();
-        if (refresh_token) {
-          try {
-            api('/v1/auth/logout', {
-              method: 'POST',
-              body: { refresh_token },
-              keepalive: true,
-            }).catch(() => {});
-          } catch {}
-        }
+        // cold beta Lambda.) The refresh token is now an httpOnly cookie,
+        // so the request carries no readable body — `credentials: 'include'`
+        // lets the server read and revoke the cookie's family.
+        try {
+          api('/v1/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+            body: {},
+            keepalive: true,
+          }).catch(() => {});
+        } catch {}
         clearSession();
         window.location.replace('/account/login');
       });

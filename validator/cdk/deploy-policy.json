@@ -80,8 +80,6 @@
         "iam:CreateRole",
         "iam:DeleteRole",
         "iam:GetRole",
-        "iam:PassRole",
-        "iam:AttachRolePolicy",
         "iam:DetachRolePolicy",
         "iam:PutRolePolicy",
         "iam:DeleteRolePolicy",
@@ -94,6 +92,39 @@
         "arn:aws:iam::*:role/LmwfEdgeStack-*",
         "arn:aws:iam::*:role/cdk-lmwf-*"
       ]
+    },
+    {
+      "Sid": "IAMPassRoleToLambdaOnly",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::*:role/LmwfValidatorStack-*",
+        "arn:aws:iam::*:role/LmwfEdgeStack-*",
+        "arn:aws:iam::*:role/cdk-lmwf-*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "IAMAttachRolePolicyAllowlist",
+      "Effect": "Allow",
+      "Action": "iam:AttachRolePolicy",
+      "Resource": [
+        "arn:aws:iam::*:role/LmwfValidatorStack-*",
+        "arn:aws:iam::*:role/LmwfEdgeStack-*",
+        "arn:aws:iam::*:role/cdk-lmwf-*"
+      ],
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": [
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+            "arn:aws:iam::*:policy/LmwfCdkDeployPolicy"
+          ]
+        }
+      }
     },
     {
       "Sid": "CloudWatchLogs",

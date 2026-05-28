@@ -34,6 +34,33 @@ export interface EnvConfig {
    * sesMailFromSubdomain.
    */
   dmarcPolicy?: string;
+  /**
+   * When true, the browser-facing CORS allowlist (HTTP API corsPreflight)
+   * includes the local Astro dev origin so the website workspace can hit the
+   * env's API from `localhost` during development. Beta only — never prod.
+   */
+  allowLocalDevOrigin?: boolean;
+}
+
+/** Local Astro dev-server origin, allowed only when `allowLocalDevOrigin`. */
+export const LOCAL_DEV_ORIGIN = 'http://localhost:4321';
+
+/**
+ * Browser origins permitted to make credentialed requests to the env's HTTP
+ * API. Replaces the previous wildcard CORS: an explicit allowlist is required
+ * once the refresh token moves to a SameSite cookie (credentialed CORS cannot
+ * use `*`). The legacy `workoutformat.` prod subdomain is included because the
+ * prod CloudFront still answers for it.
+ */
+export function corsAllowedOrigins(env: EnvConfig): string[] {
+  const origins = [`https://${env.domainName}`];
+  if (env.name === 'prod') {
+    origins.push(`https://workoutformat.${env.domainName}`);
+  }
+  if (env.allowLocalDevOrigin) {
+    origins.push(LOCAL_DEV_ORIGIN);
+  }
+  return origins;
 }
 
 export const ENVS: Record<EnvName, EnvConfig> = {
@@ -47,6 +74,7 @@ export const ENVS: Record<EnvName, EnvConfig> = {
     // production-access support case (177985180300561). Avoid changing
     // beta's SES posture until that's resolved; mirror prod's config
     // here after.
+    allowLocalDevOrigin: true,
   },
   prod: {
     name: 'prod',

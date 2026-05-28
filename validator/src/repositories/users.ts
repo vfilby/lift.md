@@ -35,6 +35,14 @@ export interface User {
   tier: UserTier;
   signup_ip?: string;
   signup_user_agent?: string;
+  /**
+   * Account-wide access-token cutoff (ISO-8601). Any access JWT whose `iat`
+   * predates this instant is rejected by the auth middleware. Bumped on
+   * password reset and logout-all so those actions invalidate the ≤1h access
+   * tokens already in flight, not just the refresh tokens. Absent on legacy
+   * rows, which the middleware treats as "no cutoff".
+   */
+  tokens_valid_after?: string;
 }
 
 export interface CreateUserInput {
@@ -94,6 +102,28 @@ export async function updateUserTier(
       UpdateExpression: 'SET #tier = :tier',
       ExpressionAttributeNames: { '#tier': 'tier' },
       ExpressionAttributeValues: { ':tier': tier },
+      ConditionExpression: 'attribute_exists(user_id)',
+    }),
+  );
+}
+
+/**
+ * Bump the account-wide access-token cutoff to `at` (default: now). Call
+ * after revoking all refresh tokens (password reset / logout-all) so that
+ * access JWTs minted before this instant are also rejected at the auth
+ * middleware. Idempotent and monotonic in practice — callers always pass a
+ * non-decreasing timestamp. No-ops safely if the user row is gone.
+ */
+export async function bumpTokensValidAfter(
+  user_id: string,
+  at: string = new Date().toISOString(),
+): Promise<void> {
+  await ddb.send(
+    new UpdateCommand({
+      TableName: tableName('users'),
+      Key: { user_id },
+      UpdateExpression: 'SET tokens_valid_after = :t',
+      ExpressionAttributeValues: { ':t': at },
       ConditionExpression: 'attribute_exists(user_id)',
     }),
   );

@@ -27,9 +27,9 @@ import AccountLayout from '../../../layouts/AccountLayout.astro';
 
     let outboxId = null;
 
-    if (requireSessionOrRedirect()) {
-      init();
-    }
+    requireSessionOrRedirect().then((ok) => {
+      if (ok) init();
+    });
 
     function getOutboxIdFromUrl() {
       const params = new URLSearchParams(window.location.search);
