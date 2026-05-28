@@ -321,17 +321,22 @@ const exampleLmwf = `# Push Day
     }
 
     function bindHandlers() {
-      document.getElementById('signout-btn').addEventListener('click', async () => {
-        // Best-effort server-side revocation before clearing local state.
-        // We don't await/branch on the result — even if logout fails,
-        // clearing localStorage is the right user-visible outcome.
+      document.getElementById('signout-btn').addEventListener('click', () => {
+        // Best-effort server-side revocation. Fire-and-forget: we do NOT
+        // await it. `keepalive` lets the request outlive the redirect, so
+        // the token still gets revoked, but a cold-start round-trip can
+        // never stall the user on the dashboard. (Awaiting it here caused
+        // the e2e sign-out test to time out against a freshly-deployed,
+        // cold beta Lambda.) The fetch is dispatched synchronously below,
+        // capturing the current Authorization header before clearSession.
         const refresh_token = getRefreshToken();
         if (refresh_token) {
           try {
-            await api('/v1/auth/logout', {
+            api('/v1/auth/logout', {
               method: 'POST',
               body: { refresh_token },
-            });
+              keepalive: true,
+            }).catch(() => {});
           } catch {}
         }
         clearSession();
