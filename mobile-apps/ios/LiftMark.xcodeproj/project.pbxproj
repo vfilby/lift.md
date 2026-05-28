@@ -1759,7 +1759,7 @@
 			repositoryURL = "https://github.com/jpsim/Yams.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.1.0;
+				minimumVersion = 6.2.2;
 			};
 		};
 		C21050608BE79B97D9DAA152 /* XCRemoteSwiftPackageReference "swift-log" */ = {
@@ -1767,7 +1767,7 @@
 			repositoryURL = "https://github.com/apple/swift-log.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.5.0;
+				minimumVersion = 1.13.0;
 			};
 		};
 		E5A0C4B28CC82C9E0A371F5A /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
@@ -1775,7 +1775,7 @@
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 9.10.0;
+				minimumVersion = 9.14.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
