@@ -345,6 +345,24 @@ jobs:
           # Mask before exposing as an output so it never lands in logs.
           echo "::add-mask::$SECRET"
           echo "secret=$SECRET" >> "$GITHUB_OUTPUT"
+      # Warm the beta Lambda before the suite runs. deploy-beta ships a
+      # fresh function version and smoke-beta only makes a couple of
+      # sequential calls (one warm instance); Playwright then hits the API
+      # with 4 parallel workers, triggering concurrent cold starts that
+      # blew the action/navigation timeouts (sign-out redirect, first PAT
+      # create). Fire several concurrent rounds so Lambda scales out and
+      # the suite lands on warm instances.
+      - name: Warm beta Lambda
+        run: |
+          set -uo pipefail
+          echo "==> warming https://beta.liftmark.app"
+          for round in 1 2 3; do
+            for i in $(seq 1 8); do
+              curl -s -o /dev/null --max-time 30 https://beta.liftmark.app/version &
+            done
+            wait
+          done
+          echo "==> warm-up complete"
       - name: Run Playwright against beta
         working-directory: validator/e2e
         env:
