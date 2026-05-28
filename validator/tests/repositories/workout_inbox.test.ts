@@ -20,7 +20,6 @@ liveDdb('workout_inbox repository', () => {
       user_id,
       source_token_id: 'tok-1',
       lmwf_text: '# Push Day\n## Bench Press\n- 135 x 5',
-      parsed_json: { workoutName: 'Push Day' },
       status: 'pending',
     });
 
@@ -37,7 +36,6 @@ liveDdb('workout_inbox repository', () => {
       user_id,
       source_token_id: 'tok',
       lmwf_text: 'a',
-      parsed_json: {},
       status: 'pending',
     });
     // Spread the timestamps so the SK ordering is unambiguous.
@@ -46,7 +44,6 @@ liveDdb('workout_inbox repository', () => {
       user_id,
       source_token_id: 'tok',
       lmwf_text: 'b',
-      parsed_json: {},
       status: 'pending',
     });
 
@@ -63,14 +60,12 @@ liveDdb('workout_inbox repository', () => {
       user_id,
       source_token_id: 'tok',
       lmwf_text: 'p',
-      parsed_json: {},
       status: 'pending',
     });
     await createInboxItem({
       user_id,
       source_token_id: 'tok',
       lmwf_text: 'r',
-      parsed_json: {},
       status: 'rejected',
     });
 
@@ -88,7 +83,6 @@ liveDdb('workout_inbox repository', () => {
         user_id,
         source_token_id: 'tok',
         lmwf_text: `item-${i}`,
-        parsed_json: {},
         status: 'pending',
       });
       // Ensure distinct created_at values.
@@ -119,7 +113,6 @@ liveDdb('workout_inbox repository', () => {
       user_id,
       source_token_id: 'tok',
       lmwf_text: 'x',
-      parsed_json: {},
       status: 'pending',
     });
 
