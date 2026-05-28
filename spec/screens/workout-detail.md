@@ -33,7 +33,9 @@ Display full details of a workout plan template — exercises, sets, tags, metad
 | Exercise edit button | `edit-plan-exercise-{exerciseId}` | Button |
 
 ## User Interactions
-- **Tap share button (header)** → exports plan's original markdown (`sourceMarkdown`) as `.md` file via `exportPlanAsMarkdown` → share sheet
+- **Tap share button (header)** → exports the plan's original LMWF markdown (`sourceMarkdown`) to a `plan-{sanitized-name}.md` file in the cache directory via `exportPlanAsMarkdown(plan)`, then presents the iOS share sheet (`UIActivityViewController`) for that file URL using the shared `.shareSheet(item:)` modifier. The user can then save it to Files, AirDrop it, or share it into another app.
+  - **Critical**: The share button must actually present a share sheet. Presenting `UIActivityViewController` directly on `connectedScenes.first?.rootViewController` is a known no-op when the first connected scene is inactive — always route through the `.shareSheet(item:)` modifier (see `ShareSheet.swift`, GH #70).
+  - If `sourceMarkdown` is null or empty, an "Export Failed" alert is shown instead.
 - **Tap favorite heart** → toggles favorite, reloads plan
 - **Tap "Start Workout"** → checks for active session → starts workout → navigates to `/workout/active`
   - If active session exists: alert with "Resume Workout" option
@@ -50,7 +52,7 @@ Display full details of a workout plan template — exercises, sets, tags, metad
 ## Error/Empty States
 - **Plan not loaded**: LoadingView
 - **Load error**: Alert with error message, navigates back on dismiss
-- **Export failure**: Alert if `sourceMarkdown` is not available (e.g., plan was not imported from markdown)
+- **Export failure**: "Export Failed" alert if `sourceMarkdown` is not available (e.g., plan was not imported from markdown) or the file write fails
 
 ## WorkoutDetailView Component Details
 

@@ -14,9 +14,9 @@ Export all completed workout sessions as a single JSON file. Returns the file UR
 
 Export a single workout session as a JSON file. Returns the file URI of the written file.
 
-### `exportPlanAsMarkdown(plan): Promise<string>`
+### `exportPlanAsMarkdown(plan): URL`
 
-Export a workout plan's original markdown source as a `.md` file. Returns the file URI of the written file. Throws if `plan.sourceMarkdown` is null or undefined.
+Export a workout plan's original LMWF markdown source as a `.md` file written to the cache directory. Returns the file URL of the written file. Throws `ExportError.noMarkdownSource` if `plan.sourceMarkdown` is null or empty. The returned URL is presented via the shared `.shareSheet(item:)` modifier so the user can save/AirDrop/share the file.
 
 ### `buildSessionFileName(name, date): string`
 
@@ -82,5 +82,5 @@ All exported files are written to the app's cache directory.
 ## Error Handling
 
 - Throws `ExportError("No completed workouts to export")` when `exportSessionsAsJson()` is called with no completed sessions available.
-- Throws `ExportError("No markdown source available")` when `exportPlanAsMarkdown()` is called and `plan.sourceMarkdown` is null or undefined.
+- Throws `ExportError.noMarkdownSource` ("No markdown source available.") when `exportPlanAsMarkdown()` is called and `plan.sourceMarkdown` is null or empty.
 - File system errors propagate as exceptions.
