@@ -197,6 +197,104 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
         XCTAssertNotEqual(item.summary.name, "WRONG NAME FROM SERVER")
     }
 
+    // MARK: - 6. Durability: no ack, recover after a local-cache wipe (#164)
+
+    /// The poll must NOT call `/ack`. Acking on fetch transitioned the row to
+    /// `ingested` server-side, and the poller listed only `status=pending` —
+    /// so once a device's local cache was wiped (logout / reinstall / the v18
+    /// table drop) the item was stranded forever. Regression guard for #164.
+    func testPollerDoesNotAck() async throws {
+        DatabaseManager.shared.deleteDatabase()
+        defer { DatabaseManager.shared.deleteDatabase() }
+
+        let mock = RoutingMockAPIClient()
+        mock.listResponse = ["items": [["inbox_id": "01POLL"]], "next_cursor": NSNull()]
+        mock.detailResponse = Self.detailPayload(inboxId: "01POLL")
+
+        let ctx = try makeAuthedPoller(mock: mock)
+        defer { ctx.tokenStore.clear() }
+
+        await ctx.poller.pollIfAuthenticated()
+
+        XCTAssertEqual(try ctx.repo.count(), 1)
+        XCTAssertFalse(
+            mock.sentPaths.contains { $0.contains("/ack") },
+            "poller must never ack — that's what stranded items in #164. Sent: \(mock.sentPaths)"
+        )
+    }
+
+    /// The list call carries no `status` filter, so the server returns every
+    /// live row (including ones a prior build had acked into `ingested`).
+    func testPollerListsWithoutStatusFilter() async throws {
+        DatabaseManager.shared.deleteDatabase()
+        defer { DatabaseManager.shared.deleteDatabase() }
+
+        let mock = RoutingMockAPIClient()
+        mock.listResponse = ["items": [], "next_cursor": NSNull()]
+
+        let ctx = try makeAuthedPoller(mock: mock)
+        defer { ctx.tokenStore.clear() }
+
+        await ctx.poller.pollIfAuthenticated()
+
+        XCTAssertTrue(
+            mock.sentPaths.contains("/v1/workouts"),
+            "expected an unfiltered list call; sent: \(mock.sentPaths)"
+        )
+        XCTAssertFalse(
+            mock.sentPaths.contains { $0.contains("status=pending") },
+            "list must not filter by status — that hid acked items in #164"
+        )
+    }
+
+    /// A wiped local cache (logout / reinstall / migration drop) must self-heal:
+    /// the next poll re-fetches the still-present server rows. This is the
+    /// user-facing recovery path for #164.
+    func testPollerRepopulatesAfterLocalWipe() async throws {
+        DatabaseManager.shared.deleteDatabase()
+        defer { DatabaseManager.shared.deleteDatabase() }
+
+        let mock = RoutingMockAPIClient()
+        mock.listResponse = ["items": [["inbox_id": "01POLL"]], "next_cursor": NSNull()]
+        mock.detailResponse = Self.detailPayload(inboxId: "01POLL")
+
+        let ctx = try makeAuthedPoller(mock: mock)
+        defer { ctx.tokenStore.clear() }
+
+        await ctx.poller.pollIfAuthenticated()
+        XCTAssertEqual(try ctx.repo.count(), 1)
+
+        // Simulate logout-wipe / reinstall: the local table is gone but the
+        // server still holds the row (we never acked/deleted it).
+        try ctx.repo.clear()
+        XCTAssertEqual(try ctx.repo.count(), 0)
+
+        await ctx.poller.pollIfAuthenticated()
+        XCTAssertEqual(try ctx.repo.count(), 1, "item must come back after a wipe")
+        XCTAssertEqual(try ctx.repo.list().first?.summary.name, "Lift Day 1")
+    }
+
+    /// Items already cached locally are not re-downloaded — the poll re-lists
+    /// the whole inbox cheaply but only fetches detail for genuinely new items.
+    func testPollerSkipsAlreadyCachedItems() async throws {
+        DatabaseManager.shared.deleteDatabase()
+        defer { DatabaseManager.shared.deleteDatabase() }
+
+        let mock = RoutingMockAPIClient()
+        mock.listResponse = ["items": [["inbox_id": "01POLL"]], "next_cursor": NSNull()]
+        mock.detailResponse = Self.detailPayload(inboxId: "01POLL")
+
+        let ctx = try makeAuthedPoller(mock: mock)
+        defer { ctx.tokenStore.clear() }
+
+        await ctx.poller.pollIfAuthenticated()
+        await ctx.poller.pollIfAuthenticated()
+
+        let detailFetches = mock.sentPaths.filter { $0 == "/v1/workouts/01POLL" }.count
+        XCTAssertEqual(detailFetches, 1, "cached item must not be re-fetched on the second poll")
+        XCTAssertEqual(try ctx.repo.count(), 1)
+    }
+
     // MARK: - 5. v17 -> v18 migration drops the pre-parse columns
 
     func testV18MigrationDropsPreParseColumns() throws {
@@ -235,6 +333,43 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    private struct PollerContext {
+        let poller: InboxPollerService
+        let repo: InboxItemRepository
+        let tokenStore: TokenStore
+    }
+
+    /// Wires an authenticated `InboxPollerService` over the supplied mock with
+    /// the workout-inbox flag on and a live (default) repository.
+    private func makeAuthedPoller(mock: RoutingMockAPIClient) throws -> PollerContext {
+        let tokenStore = TokenStore(service: "app.liftmark.inbox.tests.\(UUID().uuidString)")
+        tokenStore.clear()
+        tokenStore.saveAccessToken(Self.makeJWT(expSecondsFromNow: 3600))
+        tokenStore.saveRefreshToken("refresh-junk")
+
+        let auth = AuthenticationStore(api: mock, tokenStore: tokenStore)
+        let flags = FeatureFlagsStore(defaults: makeTransientDefaults())
+        flags.set(.workoutInbox, true)
+        let repo = InboxItemRepository()
+        let poller = InboxPollerService(
+            authStore: auth,
+            apiClient: mock,
+            inboxRepository: repo,
+            featureFlags: flags
+        )
+        return PollerContext(poller: poller, repo: repo, tokenStore: tokenStore)
+    }
+
+    /// A minimal valid detail payload for the arms-superset fixture.
+    private static func detailPayload(inboxId: String) -> [String: Any] {
+        [
+            "inbox_id": inboxId,
+            "created_at": "2026-05-01T12:00:00Z",
+            "source_token_id": "session",
+            "lmwf_text": armsSupersetLMWF,
+        ]
+    }
 
     private func makeTransientDefaults() -> UserDefaults {
         let suite = "inbox.tests.\(UUID().uuidString)"
@@ -278,7 +413,9 @@ private final class RoutingMockAPIClient: APIClientProtocol, @unchecked Sendable
     ) async throws -> Res {
         sentPaths.append(path)
         let dict: [String: Any]
-        if path.contains("status=pending") {
+        // The list call is the bare collection path; anything with an
+        // inbox_id segment after it is a detail fetch.
+        if path == "/v1/workouts" || path.hasPrefix("/v1/workouts?") {
             dict = listResponse
         } else {
             dict = detailResponse

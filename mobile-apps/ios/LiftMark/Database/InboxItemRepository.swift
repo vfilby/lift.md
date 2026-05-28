@@ -36,6 +36,19 @@ struct InboxItemRepository {
         }
     }
 
+    /// Cheap existence check by `inbox_id` — used by the poller to skip
+    /// re-downloading the detail for items already cached (rows are immutable).
+    func exists(id: String) throws -> Bool {
+        let dbQueue = try dbManager.database()
+        return try dbQueue.read { db in
+            try Bool.fetchOne(
+                db,
+                sql: "SELECT EXISTS(SELECT 1 FROM workout_inbox WHERE inbox_id = ?)",
+                arguments: [id]
+            ) ?? false
+        }
+    }
+
     func get(id: String) throws -> InboxItem? {
         let dbQueue = try dbManager.database()
         return try dbQueue.read { db in
