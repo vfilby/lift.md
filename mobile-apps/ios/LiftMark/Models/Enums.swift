@@ -50,6 +50,27 @@ enum GroupType: String, Codable, Hashable, CaseIterable {
     case section
 }
 
+/// Shared rules for grouping exercises into supersets.
+///
+/// A superset only means something when it has two or more members to
+/// alternate between. A "single-member superset" (a superset block that
+/// happens to contain exactly one exercise — almost always an authoring
+/// mistake) is not a real superset: there is nothing to alternate with.
+/// Both the plan (pre-start) view and the active (in-progress) view use
+/// this predicate so they render single-member supersets identically — as
+/// a standalone exercise with no SUPERSET badge or grouped card.
+enum SupersetGrouping {
+    /// Minimum number of child exercises required for a superset to be
+    /// rendered as a grouped superset.
+    static let minimumMembers = 2
+
+    /// True when a collection of superset children is large enough to be
+    /// treated as a real (grouped) superset.
+    static func isRealSuperset(childCount: Int) -> Bool {
+        childCount >= minimumMembers
+    }
+}
+
 // MARK: - Theme
 
 enum AppTheme: String, Codable, Hashable, CaseIterable {

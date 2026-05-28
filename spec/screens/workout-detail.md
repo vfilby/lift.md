@@ -106,3 +106,4 @@ Each set row MUST display all data that was parsed from the workout plan. The fo
 - Purple "SUPERSET" badge
 - Multiple exercise names joined with "&"
 - Interleaved set display across exercises
+- **Single-member supersets**: a superset block that resolves to only one exercise is not a real superset (there is nothing to alternate with). It is rendered as a plain standalone exercise — no SUPERSET badge, no grouped card — exactly as the active workout view renders it. A superset is treated as a real (grouped) superset only when it has 2 or more members (`SupersetGrouping.isRealSuperset`). The validator emits a `SINGLE_MEMBER_SUPERSET` warning so the authoring error is visible in the source.

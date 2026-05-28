@@ -131,7 +131,6 @@ struct PlanExerciseCard: View {
     let exercise: PlannedExercise
     let sectionName: String?
     let exerciseIndex: Int
-    let supersetIndex: Int
     let onEdit: () -> Void
 
     var body: some View {
@@ -146,18 +145,12 @@ struct PlanExerciseCard: View {
                     .frame(minWidth: 20)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    // Superset badge
-                    if exercise.groupType == .superset {
-                        Text("SUPERSET")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.purple)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Color.purple.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .accessibilityIdentifier("superset-\(supersetIndex)")
-                    }
+                    // No SUPERSET badge here: a standalone card is only used for
+                    // real (non-grouped) exercises and single-member supersets.
+                    // A single-member superset is not a real superset (nothing to
+                    // alternate with), so it renders as a plain exercise — matching
+                    // the active workout view. Real supersets (2+ members) render
+                    // via PlanSupersetCard, which carries the badge.
 
                     // Exercise name
                     Text(exercise.exerciseName)

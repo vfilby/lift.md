@@ -334,6 +334,33 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         }
     }
 
+    func testBuildDisplayItemsSingleMemberSupersetRendersStandalone() {
+        // A superset block that contains only one exercise is not a real
+        // superset (nothing to alternate with). It should render as a plain
+        // standalone exercise, matching the plan view — not as a 1-member
+        // superset group.
+        let parentId = "parent1"
+        let parent = makeExercise(id: parentId, name: "Superset", groupType: .superset, sets: [])
+        let onlyChild = makeExercise(id: "c1", name: "Cable Tricep Pushdown", orderIndex: 1, parentExerciseId: parentId, sets: [makeSet()])
+
+        let items = ActiveWorkoutViewModel.buildDisplayItems(from: [parent, onlyChild])
+        XCTAssertEqual(items.count, 1)
+
+        if case .single(let ex, _, let num) = items[0] {
+            XCTAssertEqual(ex.exerciseName, "Cable Tricep Pushdown")
+            XCTAssertEqual(num, 1)
+        } else {
+            XCTFail("Expected .single for a single-member superset, got \(items[0])")
+        }
+    }
+
+    func testSupersetGroupingPredicate() {
+        XCTAssertFalse(SupersetGrouping.isRealSuperset(childCount: 0))
+        XCTAssertFalse(SupersetGrouping.isRealSuperset(childCount: 1))
+        XCTAssertTrue(SupersetGrouping.isRealSuperset(childCount: 2))
+        XCTAssertTrue(SupersetGrouping.isRealSuperset(childCount: 5))
+    }
+
     // MARK: - Display Items: Section Divider
 
     func testBuildDisplayItemsSection() {
