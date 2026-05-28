@@ -263,8 +263,11 @@ const exampleLmwf = `# Push Day
         wrap.innerHTML = '<p class="muted">No inbox items.</p>';
         return;
       }
+      // Triage-first layout: the top-level row carries only what the user
+      // needs to decide what to do — title, created date, status, actions.
+      // Everything identifying/quantitative lives in the expandable detail.
       let html = '<table class="account-table"><thead><tr>'
-        + '<th></th><th>ID</th><th>Status</th><th>Created</th><th>Source</th><th>Workout</th><th>Exercises</th><th>Sets</th><th></th>'
+        + '<th></th><th>Title</th><th>Date</th><th>Status</th><th>Actions</th>'
         + '</tr></thead><tbody>';
       for (const it of items) {
         const statusBadge = it.status === 'ingested'
@@ -272,36 +275,65 @@ const exampleLmwf = `# Push Day
           : it.status === 'rejected'
             ? '<span class="badge badge-err">rejected</span>'
             : '<span class="badge badge-warn">pending</span>';
-        const exList = (it.summary && it.summary.exercises) || [];
-        const detail = exList.map((e) =>
-          '<li>' + escapeHtml(e.name) + ' — ' + (e.setCount || 0) + ' set'
-            + ((e.setCount || 0) === 1 ? '' : 's')
-            + (e.groupType ? ' <span class="chip">' + escapeHtml(e.groupType) + '</span>' : '')
-          + '</li>'
-        ).join('');
+
+        const summary = it.summary || {};
+        const title = summary.workoutName || '—';
+        const exerciseCount = summary.exerciseCount ?? 0;
+        const totalSetCount = summary.totalSetCount ?? 0;
+
+        // Detail breakdown: group exercises by section (groupName) so the
+        // user can see the structure without downloading. Ungrouped
+        // exercises render as a flat list.
+        const exList = summary.exercises || [];
+        const detailItems = exList.map((e) => {
+          const sets = e.setCount || 0;
+          const groupChip = e.groupType
+            ? ' <span class="chip">' + escapeHtml(e.groupType) + '</span>'
+            : '';
+          return '<li>' + escapeHtml(e.name) + ' — ' + sets + ' set'
+            + (sets === 1 ? '' : 's') + groupChip + '</li>';
+        }).join('');
+        const breakdown = detailItems
+          ? '<ul style="margin:0.5rem 0 0; padding-left: 1.2rem;">' + detailItems + '</ul>'
+          : '<p class="muted" style="margin:0.5rem 0 0;">No exercise detail available.</p>';
+
+        const tags = (summary.tags || []).length
+          ? summary.tags.map((t) => '<span class="chip">' + escapeHtml(t) + '</span>').join('')
+          : '';
+
         const ackBtn = it.status === 'pending'
           ? '<button type="button" class="btn btn-secondary btn-small" data-ack="' + escapeHtml(it.inbox_id) + '">Mark ingested</button>'
           : '';
+        const dlBtn = '<button type="button" class="btn btn-secondary btn-small" data-download="' + escapeHtml(it.inbox_id) + '">Download</button>';
+        const delBtn = '<button type="button" class="btn btn-danger btn-small" data-delete="' + escapeHtml(it.inbox_id) + '">Delete</button>';
+
         html += '<tr>'
           + '<td><details class="row-detail"><summary></summary></details></td>'
-          + '<td><code title="' + escapeHtml(it.inbox_id) + '">' + escapeHtml(it.inbox_id.slice(0, 8)) + '</code></td>'
-          + '<td>' + statusBadge + '</td>'
+          + '<td>' + escapeHtml(title) + '</td>'
           + '<td>' + escapeHtml(formatDate(it.created_at)) + '</td>'
-          + '<td class="mono">' + escapeHtml(sourceLabel(it.source_token_id)) + '</td>'
-          + '<td>' + escapeHtml((it.summary && it.summary.workoutName) || '—') + '</td>'
-          + '<td>' + ((it.summary && it.summary.exerciseCount) ?? 0) + '</td>'
-          + '<td>' + ((it.summary && it.summary.totalSetCount) ?? 0) + '</td>'
-          + '<td>' + ackBtn + '</td>'
+          + '<td>' + statusBadge + '</td>'
+          + '<td><div class="row-actions">' + ackBtn + dlBtn + delBtn + '</div></td>'
           + '</tr>'
           + '<tr class="row-expand" hidden data-expand="' + escapeHtml(it.inbox_id) + '">'
-          + '<td></td><td colspan="8"><ul style="margin:0; padding-left: 1.2rem;">' + detail + '</ul></td>'
+          + '<td></td><td colspan="4">'
+          + '<div class="muted" style="font-size:0.8rem;">'
+          + 'ID <code title="' + escapeHtml(it.inbox_id) + '">' + escapeHtml(it.inbox_id.slice(0, 8)) + '</code>'
+          + ' · source <span class="mono">' + escapeHtml(sourceLabel(it.source_token_id)) + '</span>'
+          + '</div>'
+          + (tags ? '<div style="margin-top:0.4rem;">' + tags + '</div>' : '')
+          + '<div style="margin-top:0.4rem;">'
+          + exerciseCount + ' exercise' + (exerciseCount === 1 ? '' : 's')
+          + ' · ' + totalSetCount + ' set' + (totalSetCount === 1 ? '' : 's')
+          + '</div>'
+          + breakdown
+          + '</td>'
           + '</tr>';
       }
       html += '</tbody></table>';
       wrap.innerHTML = html;
 
       // Wire up row expansion + ack buttons.
-      wrap.querySelectorAll('details.row-detail').forEach((d, idx) => {
+      wrap.querySelectorAll('details.row-detail').forEach((d) => {
         const tr = d.closest('tr');
         const expandRow = tr.nextElementSibling;
         d.addEventListener('toggle', () => {
@@ -323,6 +355,59 @@ const exampleLmwf = `# Push Day
           }
         });
       });
+      wrap.querySelectorAll('[data-delete]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-delete');
+          if (!confirm('Delete this inbox item? This cannot be undone.')) return;
+          btn.disabled = true;
+          const { status } = await api('/v1/workouts/' + encodeURIComponent(id), {
+            method: 'DELETE',
+          });
+          if (status === 204 || status === 200) {
+            await refreshInbox();
+          } else {
+            alert('Delete failed (HTTP ' + status + ').');
+            btn.disabled = false;
+          }
+        });
+      });
+      wrap.querySelectorAll('[data-download]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-download');
+          btn.disabled = true;
+          try {
+            // The list response carries only the summary; fetch the detail
+            // to get the original LMWF markdown for download.
+            const { status, body } = await api('/v1/workouts/' + encodeURIComponent(id), {
+              method: 'GET',
+            });
+            if (status !== 200 || !body || typeof body.lmwf_text !== 'string') {
+              alert('Download failed (HTTP ' + status + ').');
+              return;
+            }
+            downloadLmwf(body.lmwf_text, (body.summary && body.summary.workoutName) || id);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    // Trigger a client-side download of the LMWF markdown as a .md file.
+    function downloadLmwf(text, name) {
+      const safe = (name || 'workout')
+        .replace(/[^a-z0-9._ -]/gi, '')
+        .trim()
+        .replace(/\s+/g, '-') || 'workout';
+      const blob = new Blob([text], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = safe + '.lmwf.md';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
 
     function bindHandlers() {
