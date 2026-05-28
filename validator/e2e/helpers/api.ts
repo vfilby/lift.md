@@ -151,6 +151,27 @@ export async function login(opts: {
   };
 }
 
+/**
+ * Hard-delete any user matching this email (and all their related rows)
+ * via /v1/__test__/delete-user-by-email. No-op when the user doesn't
+ * exist. Used to make signup tests rerunnable when SES sandbox forces
+ * us to reuse a verified address.
+ */
+export async function deleteTestUser(email: string): Promise<void> {
+  const res = await fetch(`${getBaseUrl()}/v1/__test__/delete-user-by-email`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-test-secret': getTestSecret(),
+    },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`delete-user-by-email failed (${res.status}): ${text}`);
+  }
+}
+
 export async function seedOutboxItem(opts: {
   userId: string;
   sessionName?: string;

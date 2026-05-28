@@ -6,6 +6,7 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
@@ -178,6 +179,30 @@ export class LmwfValidatorStack extends cdk.Stack {
             },
           })
         : undefined;
+
+    // Grant the CI deploy user read access to the e2e secret so the
+    // e2e-beta workflow step can `aws secretsmanager get-secret-value`
+    // before invoking Playwright. Lives on the secret's resource policy
+    // (not the user's inline policy under iam/) so the grant is created
+    // and torn down alongside the secret — no manual put-user-policy
+    // and no risk of the iam/ JSON drifting from what's on AWS.
+    if (e2eTestSecret) {
+      e2eTestSecret.addToResourcePolicy(
+        new iam.PolicyStatement({
+          actions: ['secretsmanager:GetSecretValue'],
+          principals: [
+            new iam.ArnPrincipal(
+              `arn:aws:iam::${cdk.Stack.of(this).account}:user/liftmark-ci-deploy-beta`,
+            ),
+          ],
+          // Secrets Manager resource policies require an explicit Resource
+          // element; '*' resolves to the secret this policy is attached to.
+          // Without this, CFN returns "A required element is missing from
+          // the policy."
+          resources: ['*'],
+        }),
+      );
+    }
 
     // ── SMTP credentials (manually managed) ──
     // SES SMTP requires an IAM user converted to SMTP credentials —
