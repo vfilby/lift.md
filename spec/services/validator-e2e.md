@@ -88,6 +88,36 @@ Unit tests cover: secret missing → 404; secret wrong → 404 (not 401, to
 avoid disclosing existence); secret right + unknown email → 404; happy
 path → 200 with a JWT that verifies under `JWT_SECRET`.
 
+## Verified recipient for signup test
+
+SES on beta is in sandbox mode: outbound mail is rejected for any
+recipient that isn't explicitly verified. The signup test exercises the
+real `POST /v1/auth/password/signup` → `sendVerificationEmail` path, so
+the test recipient has to be verified or the endpoint 503s and the
+test sees a `waitForResponse` timeout.
+
+The remote E2E mode uses a single verified address
+(`crusted_staid_0k@icloud.com`) for that one test. SES sandbox
+verification is exact-match — plus-addressing variants count as
+different addresses — so re-using one verified address is the only
+viable option without graduating SES out of sandbox.
+
+To keep that single address re-runnable across CI invocations, the
+test calls a second test-only endpoint before signup:
+
+```
+POST /v1/__test__/delete-user-by-email
+X-Test-Secret: <shared secret>
+{ "email": "..." }
+→ 200 { "deleted": true | false, "user_id"?: "..." }
+```
+
+Hard-deletes the user identified by the (`password`, email) identity,
+along with every referencing row (identities, pat_tokens,
+refresh_tokens, entitlements, workout_inbox, workout_outbox).
+Idempotent — returns 200 with `deleted: false` when no such user
+exists. Same activation gate as `/v1/__test__/mint-token`.
+
 ## Local serving
 
 The validator gets one new affordance for E2E: when

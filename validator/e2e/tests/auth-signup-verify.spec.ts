@@ -1,10 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { uniqueEmail } from '../helpers/env.js';
+import { deleteTestUser } from '../helpers/api.js';
+import { signupTestEmail, uniqueEmail } from '../helpers/env.js';
 import { getLatestToken } from '../helpers/tokens.js';
 
 test('full signup → email verify flow', async ({ page, request }) => {
-  const email = uniqueEmail('signup');
+  const email = signupTestEmail();
   const password = 'correct horse battery staple';
+
+  // In remote mode `email` is a single verified-in-SES address that
+  // gets reused across runs; wipe any leftover user from a prior run so
+  // the signup endpoint doesn't 409. No-op when the user doesn't exist.
+  await deleteTestUser(email);
 
   await page.goto('/account/signup');
 
