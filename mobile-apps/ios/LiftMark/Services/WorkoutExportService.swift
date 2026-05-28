@@ -2,14 +2,17 @@ import Foundation
 import GRDB
 
 /// Errors thrown during workout export operations.
-enum ExportError: LocalizedError {
+enum ExportError: LocalizedError, Equatable {
     case noCompletedWorkouts
+    case noMarkdownSource
     case fileWriteFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .noCompletedWorkouts:
             return "No completed workouts to export."
+        case .noMarkdownSource:
+            return "No markdown source available."
         case .fileWriteFailed(let reason):
             return "Failed to write export file: \(reason)"
         }
@@ -64,8 +67,10 @@ struct WorkoutExportService {
         ]
     }
 
-    /// Build a sanitized file name: workout-{name}-{date}.json
-    func buildSessionFileName(name: String, date: String) -> String {
+    /// Sanitize a display name into a filename-safe slug:
+    /// lowercase, accents stripped, special chars removed, spaces → hyphens,
+    /// truncated to 50 chars.
+    func sanitizeName(_ name: String) -> String {
         var sanitized = name.lowercased()
         sanitized = sanitized.folding(options: .diacriticInsensitive, locale: .current)
         sanitized = sanitized.replacingOccurrences(
@@ -87,13 +92,46 @@ struct WorkoutExportService {
         if sanitized.count > 50 {
             sanitized = String(sanitized.prefix(50))
         }
+        return sanitized
+    }
 
+    /// Build a sanitized file name: workout-{name}-{date}.json
+    func buildSessionFileName(name: String, date: String) -> String {
+        let sanitized = sanitizeName(name)
         let datePart = date.split(separator: "T").first.map(String.init)
             ?? ISO8601DateFormatter().string(from: Date()).split(separator: "T").first.map(String.init)
             ?? "unknown"
         let namePart = sanitized.isEmpty ? "workout" : sanitized
 
         return "workout-\(namePart)-\(datePart).json"
+    }
+
+    /// Build a sanitized file name for a plan markdown export: plan-{name}.md
+    func buildPlanFileName(name: String) -> String {
+        let sanitized = sanitizeName(name)
+        let namePart = sanitized.isEmpty ? "workout" : sanitized
+        return "plan-\(namePart).md"
+    }
+
+    /// Export a workout plan's original LMWF markdown source as a `.md` file.
+    /// Returns the file URL for sharing. Throws `ExportError.noMarkdownSource`
+    /// when the plan has no `sourceMarkdown` (e.g. it was built without an
+    /// original markdown source). See `spec/services/export.md`.
+    func exportPlanAsMarkdown(_ plan: WorkoutPlan) throws -> URL {
+        guard let markdown = plan.sourceMarkdown, !markdown.isEmpty else {
+            throw ExportError.noMarkdownSource
+        }
+        let fileName = buildPlanFileName(name: plan.name)
+        guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            throw ExportError.fileWriteFailed("Cache directory is unavailable")
+        }
+        let fileURL = cacheDir.appendingPathComponent(fileName)
+        do {
+            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+        } catch {
+            throw ExportError.fileWriteFailed(error.localizedDescription)
+        }
+        return fileURL
     }
 
     /// Export all app data as a unified JSON file for backup/transfer.

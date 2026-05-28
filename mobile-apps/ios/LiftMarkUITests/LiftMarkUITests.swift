@@ -75,6 +75,10 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "history-export")
     }
 
+    func testPlanExport() throws {
+        runner.runScenario(named: "plan-export")
+    }
+
     func testShareTargetImport() throws {
         runner.runScenario(named: "share-target-import")
     }
