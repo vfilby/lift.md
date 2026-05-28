@@ -781,6 +781,7 @@ Short sprints with full recovery.
 - ⚠️ Mixed section levels — exercises and sections (groups with nested headers) at the same heading level. This is valid but may indicate structural issues (e.g., `## Warmup` as a section alongside `## Bench Press` as a standalone exercise).
 - ⚠️ `EXERCISE_ALIAS_SUGGESTION` — alias used in place of canonical name (e.g., `Bench` → `Bench Press`)
 - ⚠️ `EXERCISE_NAME_SUGGESTION` — fuzzy "did you mean?" hint for likely typos near a canonical name
+- ⚠️ `SINGLE_MEMBER_SUPERSET` — a superset block that contains only one exercise. A superset pairs two or more exercises performed back-to-back, so a one-member superset is almost always an authoring mistake that is otherwise invisible in the source markdown. The warning points at the superset block line and names the lone member. The file still parses (it is a warning, not an error); the fix is to add another exercise to the superset or convert it to a regular exercise/section.
 
 ### Error Examples
 
