@@ -76,8 +76,15 @@ struct WorkoutDetailView: View {
                     }
                 }
                 processedIds.insert(exercise.id)
-                if !children.isEmpty {
+                if SupersetGrouping.isRealSuperset(childCount: children.count) {
                     items.append(.superset(parent: exercise, children: children))
+                } else {
+                    // Single-member superset is not a real superset — render the
+                    // lone child as a standalone exercise (no SUPERSET badge),
+                    // matching the active workout view.
+                    for child in children {
+                        items.append(.single(exercise: child))
+                    }
                 }
             } else if exercise.parentExerciseId != nil {
                 // Skip orphan children already handled
@@ -99,8 +106,14 @@ struct WorkoutDetailView: View {
                             }
                         }
                         processedIds.insert(child.id)
-                        if !grandchildren.isEmpty {
+                        if SupersetGrouping.isRealSuperset(childCount: grandchildren.count) {
                             items.append(.superset(parent: child, children: grandchildren))
+                        } else {
+                            // Single-member superset inside a section — render the
+                            // lone grandchild standalone, matching the active view.
+                            for grandchild in grandchildren {
+                                items.append(.single(exercise: grandchild))
+                            }
                         }
                     } else {
                         items.append(.single(exercise: child))
@@ -189,7 +202,6 @@ struct WorkoutDetailView: View {
                                                 exercise: exercise,
                                                 sectionName: section.name,
                                                 exerciseIndex: globalExerciseIndex(for: exercise),
-                                                supersetIndex: supersetIndexFor(exercise),
                                                 onEdit: { editingPlanExercise = exercise }
                                             )
                                         case .superset(let parent, let children):
@@ -448,24 +460,6 @@ struct WorkoutDetailView: View {
     private func reprocessPlan() {
         guard let plan, let markdown = plan.sourceMarkdown else { return }
         planStore.reprocessPlan(id: plan.id, fromMarkdown: markdown)
-    }
-
-    private func supersetIndexFor(_ exercise: PlannedExercise) -> Int {
-        guard let plan else { return 0 }
-        var seen: [String: Int] = [:]
-        var index = 0
-        for ex in plan.exercises {
-            if ex.groupType == .superset, let name = ex.groupName {
-                if seen[name] == nil {
-                    seen[name] = index
-                    index += 1
-                }
-                if ex.id == exercise.id {
-                    return seen[name] ?? 0
-                }
-            }
-        }
-        return 0
     }
 
     // MARK: - Regenerate Markdown

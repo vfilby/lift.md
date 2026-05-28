@@ -188,6 +188,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 - Sets are displayed **interleaved round-robin**: child A set 1, child B set 1, child A set 2, child B set 2, etc.
 - Each set row shows the exercise name label to identify which exercise it belongs to
 - The superset parent and its children are NOT rendered as separate standalone cards
+- **Single-member supersets**: a superset parent with only one child is not a real superset (nothing to alternate with). The lone child is rendered as a standalone exercise card, not a grouped superset card. A superset is grouped only when it has 2 or more members (`SupersetGrouping.isRealSuperset`). The plan (pre-start) view applies the same rule, so both views render single-member supersets identically.
 - **Exercise numbering**: Superset parents and section headers are excluded from the numbered badge index. Only exercises with sets (regular exercises and superset children) receive a sequential number. A superset with 2 children counts as 2 exercises in the numbering sequence.
 - **Session creation**: When creating a session from a plan, `parentExerciseId` must be mapped from plan exercise IDs to the corresponding session exercise IDs so superset grouping is preserved
 

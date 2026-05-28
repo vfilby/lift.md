@@ -74,8 +74,14 @@ enum ActiveWorkoutViewModel {
                     }
                 }
                 processedIds.insert(exercise.id)
-                if !children.isEmpty {
+                if SupersetGrouping.isRealSuperset(childCount: children.count) {
                     items.append(.superset(parent: exercise, children: children))
+                } else {
+                    // Single-member superset is not a real superset — render the
+                    // lone child as a standalone exercise, matching the plan view.
+                    for child in children {
+                        items.append(.single(exercise: child.exercise, exerciseIndex: child.exerciseIndex, displayNumber: child.displayNumber))
+                    }
                 }
             } else if exercise.parentExerciseId != nil {
                 // Skip orphan children (already handled by superset parent)
@@ -103,8 +109,14 @@ enum ActiveWorkoutViewModel {
                             }
                         }
                         processedIds.insert(child.id)
-                        if !grandchildren.isEmpty {
+                        if SupersetGrouping.isRealSuperset(childCount: grandchildren.count) {
                             items.append(.superset(parent: child, children: grandchildren))
+                        } else {
+                            // Single-member superset inside a section — render the
+                            // lone grandchild standalone, matching the plan view.
+                            for grandchild in grandchildren {
+                                items.append(.single(exercise: grandchild.exercise, exerciseIndex: grandchild.exerciseIndex, displayNumber: grandchild.displayNumber))
+                            }
                         }
                     } else {
                         items.append(.single(exercise: child, exerciseIndex: childIndex, displayNumber: displayNumber))
