@@ -3,20 +3,8 @@ name: Validator
 on:
   push:
     branches: [main]
-    paths:
-      - 'validator/**'
-      - 'website/**'
-      # SKILL.md is bundled into the website at build time via ?raw import,
-      # so a skill-only change still needs a website rebuild + deploy.
-      - 'tools/claude-skill/**'
-      - '.github/workflows/validator-ci.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'validator/**'
-      - 'website/**'
-      - 'tools/claude-skill/**'
-      - '.github/workflows/validator-ci.yml'
   # Manual trigger for "redeploy without code change" cases — e.g. rotating
   # a Secrets Manager value the Lambda reads at deploy time, or recovering
   # from a flaky deploy step. Use `gh workflow run Validator --ref main`.
@@ -32,11 +20,39 @@ permissions:
   deployments: write
 
 jobs:
+  # ── Stage 0: changes ───────────────────────────────────────────────────
+  # Path filtering lives at the JOB level (not the workflow `on:` level) so
+  # that validate/build can stay *required* status checks. A workflow skipped
+  # by an `on: paths:` filter reports no status at all, leaving a required
+  # check pending forever and blocking the merge. A job skipped by `if:`
+  # reports "skipped", which rulesets count as a pass — so iOS-only PRs sail
+  # through while validator PRs are still gated. Push-only deploy jobs gate on
+  # this output too, so an iOS-only merge to main doesn't redeploy validator.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      validator: ${{ steps.filter.outputs.validator }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            validator:
+              - 'validator/**'
+              - 'website/**'
+              # SKILL.md is bundled into the website at build time via ?raw
+              # import, so a skill-only change still needs a website rebuild.
+              - 'tools/claude-skill/**'
+              - '.github/workflows/validator-ci.yml'
+
   # ── Stage 1: validate ──────────────────────────────────────────────────
   # Matrix gives parallel typecheck + test jobs (mirrors Concourse's
   # validator-typecheck / validator-test fan-out).
   validate:
     name: validate (${{ matrix.check }})
+    needs: changes
+    if: needs.changes.outputs.validator == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -62,7 +78,8 @@ jobs:
   # in stack.ts picks up website/dist at deploy time.
   build:
     name: build
-    needs: validate
+    needs: [changes, validate]
+    if: ${{ needs.changes.outputs.validator == 'true' && needs.validate.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -108,7 +125,8 @@ jobs:
   # enforces.
   e2e-local:
     name: e2e-local
-    needs: build
+    needs: [changes, build]
+    if: ${{ needs.changes.outputs.validator == 'true' && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     # NOTE: do NOT use GHA `services:` for DynamoDB Local — the default
     # image command runs WITHOUT `-sharedDb`, so the bootstrap script
@@ -231,8 +249,8 @@ jobs:
   # (AWS_ACCESS_KEY_ID/SECRET) per environment.
   deploy-beta:
     name: deploy-beta
-    needs: [build, e2e-local]
-    if: github.event_name == 'push'
+    needs: [changes, build, e2e-local]
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs.build.result == 'success' && needs['e2e-local'].result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: beta
@@ -290,8 +308,8 @@ jobs:
   # ── Stage 4: smoke-beta ────────────────────────────────────────────────
   smoke-beta:
     name: smoke-beta
-    needs: deploy-beta
-    if: github.event_name == 'push'
+    needs: [changes, deploy-beta]
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs['deploy-beta'].result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -311,8 +329,8 @@ jobs:
   # beta AWS creds (env-scoped, same as deploy-beta).
   e2e-beta:
     name: e2e-beta
-    needs: smoke-beta
-    if: github.event_name == 'push'
+    needs: [changes, smoke-beta]
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs['smoke-beta'].result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: beta
@@ -384,8 +402,8 @@ jobs:
   # reviewers".
   deploy-prod:
     name: deploy-prod
-    needs: [smoke-beta, e2e-beta]
-    if: github.event_name == 'push'
+    needs: [changes, smoke-beta, e2e-beta]
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs['smoke-beta'].result == 'success' && needs['e2e-beta'].result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -443,8 +461,8 @@ jobs:
   # ── Stage 6: smoke-prod ────────────────────────────────────────────────
   smoke-prod:
     name: smoke-prod
-    needs: deploy-prod
-    if: github.event_name == 'push'
+    needs: [changes, deploy-prod]
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs['deploy-prod'].result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
