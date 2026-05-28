@@ -63,6 +63,35 @@ Both `ack` and `DELETE` require the row to belong to the authenticated user (404
 
 Resource endpoints (`/v1/workouts/*`) accept session JWT **OR** PAT — see `validator/src/middleware/auth.ts`. Pushes from the web portal use the session; pushes from Claude Code use a PAT.
 
+### Web portal inbox table
+
+The account dashboard (`website/src/pages/account/index.astro`) renders the inbox as a triage-first table. The top-level row carries only what the user needs to decide what to do; identifying and quantitative detail collapses into an expandable row.
+
+Top-level columns:
+
+| Column   | Content                                                              |
+|----------|---------------------------------------------------------------------|
+| ▸        | Expander toggle (`details.row-detail`).                             |
+| Title    | `summary.workoutName` (falls back to `—`).                         |
+| Date     | `created_at`, formatted.                                            |
+| Status   | Badge: `pending` / `ingested` / `rejected`.                        |
+| Actions  | `Mark ingested` (pending only), `Download`, `Delete`.              |
+
+Deliberately **not** in the top-level row: inbox ID, source/source-token, exercise count, set count.
+
+Expanded detail row (one per item, hidden until the expander opens):
+
+- ID (first 8 chars, full ID on hover) + source label, small/muted.
+- Tags, if any (chips).
+- Exercise count + total set count.
+- Per-exercise breakdown: name, set count, and a group-type chip (superset/circuit) when present — so the user can tell what the workout contains without downloading it.
+
+Actions wire to the resource endpoints (session JWT):
+
+- **Mark ingested** → `POST /v1/workouts/:inbox_id/ack`, then refresh.
+- **Download** → `GET /v1/workouts/:inbox_id` for the full `lmwf_text`, then triggers a client-side download of a `<name>.lmwf.md` file.
+- **Delete** → `DELETE /v1/workouts/:inbox_id` (confirmed), then refresh.
+
 ## iOS side
 
 ### Local persistence
