@@ -113,14 +113,14 @@ jobs:
         working-directory: website
         run: npm run build
       - name: Upload validator bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: validator-bundle
           path: validator/dist
           if-no-files-found: error
           retention-days: 7
       - name: Upload website bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-bundle
           path: website/dist
@@ -241,14 +241,14 @@ jobs:
             npx playwright test
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: validator/e2e/playwright-report
           retention-days: 14
       - name: Upload validator log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: validator-log
           path: /tmp/validator.log
@@ -400,7 +400,7 @@ jobs:
         run: npx playwright test
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-beta
           path: validator/e2e/playwright-report
