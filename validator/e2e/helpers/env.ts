@@ -46,3 +46,23 @@ export function getMailpitUrl(): string {
 export function uniqueEmail(label: string): string {
   return `e2e-${label}-${Date.now()}-${Math.floor(Math.random() * 1e9)}@example.com`;
 }
+
+/**
+ * Address that's verified in SES sandbox for the target env. Used by
+ * the signup test in `remote` mode, where SES rejects any unverified
+ * recipient and `@example.com` would 503 the signup endpoint.
+ *
+ * SES sandbox compares the full recipient verbatim (no plus-addressing
+ * normalization), so re-using one verified address is the only viable
+ * option without leaving the sandbox. The test pairs this with
+ * /v1/__test__/delete-user-by-email pre-cleanup so successive runs
+ * don't trip the 409 dupe-check on signup.
+ *
+ * In `local` mode SES is replaced by Mailpit, so we still want unique
+ * addresses per run for parallel-worker safety.
+ */
+export function signupTestEmail(): string {
+  return getMode() === 'remote'
+    ? 'crusted_staid_0k@icloud.com'
+    : uniqueEmail('signup');
+}

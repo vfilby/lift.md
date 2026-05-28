@@ -12,7 +12,16 @@ test('create + revoke a personal access token', async ({ page }) => {
   await page.locator('#new-token-btn').click();
   const tokenName = `e2e-pat-${Date.now()}`;
   await page.locator('#tok-name').fill(tokenName);
-  await page.locator('#new-token-form button[type=submit]').click();
+
+  // Wait for the server's response BEFORE asserting on DOM that's only
+  // populated after that response lands — beta cold-starts can blow the
+  // default 5s expect timeout and produce flakes.
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith('/v1/tokens') && r.request().method() === 'POST' && r.status() === 201,
+    ),
+    page.locator('#new-token-form button[type=submit]').click(),
+  ]);
 
   // Plaintext block surfaces once after create.
   await expect(page.locator('#token-plaintext')).toContainText(/lm_pat_/);

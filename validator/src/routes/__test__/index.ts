@@ -13,18 +13,22 @@
  *
  * See spec/services/validator-e2e.md → "Test-only token endpoint".
  */
+import { DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import type { MiddlewareHandler } from 'hono';
+import { ddb, tableName } from '../../infra/ddb.js';
 import { signJwt } from '../../infra/jwt.js';
 import { hashPassword } from '../../infra/password.js';
 import {
   createIdentity,
   getIdentityByProviderSub,
+  listIdentitiesByUserId,
   markEmailVerified,
 } from '../../repositories/identities.js';
 import {
   createUser,
+  deleteUser,
   updateUserTier,
   type UserTier,
 } from '../../repositories/users.js';
@@ -243,4 +247,115 @@ testRouter.post('/mint-token', async (c) => {
     type === 'email_verify' ? '24h' : '1h',
   );
   return c.json({ token }, 200);
+});
+
+interface DeleteUserBody {
+  email?: unknown;
+}
+
+/**
+ * Hard-delete a user and every row that references them, identified by
+ * the password-provider email. Idempotent — returns 200 even when no
+ * user exists for the email.
+ *
+ * Exists so the `remote` E2E suite can re-use a single verified
+ * recipient (SES sandbox is exact-match on the recipient address; see
+ * spec/services/validator-e2e.md → "Verified recipient for signup
+ * test"). Without this, the second test run hits the 409 dupe-check on
+ * /v1/auth/password/signup.
+ *
+ * Same gate as the rest of /v1/__test__: missing/wrong secret → 404,
+ * LMWF_ENV=prod → 404.
+ */
+testRouter.post('/delete-user-by-email', async (c) => {
+  let body: DeleteUserBody;
+  try {
+    body = await c.req.json<DeleteUserBody>();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const emailRaw = body.email;
+  if (typeof emailRaw !== 'string' || emailRaw.length === 0) {
+    return c.json({ error: 'email must be a string' }, 400);
+  }
+  const email = emailRaw.toLowerCase();
+
+  const identity = await getIdentityByProviderSub('password', email);
+  if (!identity) {
+    return c.json({ deleted: false, reason: 'no_such_user' }, 200);
+  }
+  const user_id = identity.user_id;
+
+  // identities — there may be more than one (linked accounts).
+  const identities = await listIdentitiesByUserId(user_id);
+  await Promise.all(
+    identities.map((i) =>
+      ddb.send(
+        new DeleteCommand({
+          TableName: tableName('identities'),
+          Key: { identity_id: i.identity_id },
+        }),
+      ),
+    ),
+  );
+
+  // Tables with PK=token_hash and a user_id GSI: pat_tokens, refresh_tokens.
+  for (const t of ['pat_tokens', 'refresh_tokens'] as const) {
+    const q = await ddb.send(
+      new QueryCommand({
+        TableName: tableName(t),
+        IndexName: 'user_id-index',
+        KeyConditionExpression: 'user_id = :uid',
+        ExpressionAttributeValues: { ':uid': user_id },
+      }),
+    );
+    await Promise.all(
+      (q.Items ?? []).map((item) =>
+        ddb.send(
+          new DeleteCommand({
+            TableName: tableName(t),
+            Key: { token_hash: (item as { token_hash: string }).token_hash },
+          }),
+        ),
+      ),
+    );
+  }
+
+  // entitlements: PK is user_id.
+  await ddb.send(
+    new DeleteCommand({
+      TableName: tableName('entitlements'),
+      Key: { user_id },
+    }),
+  );
+
+  // workout_inbox / workout_outbox: composite (user_id, <sk>).
+  for (const t of ['workout_inbox', 'workout_outbox'] as const) {
+    const skName = t === 'workout_inbox' ? 'inbox_id' : 'outbox_id';
+    const q = await ddb.send(
+      new QueryCommand({
+        TableName: tableName(t),
+        KeyConditionExpression: 'user_id = :uid',
+        ExpressionAttributeValues: { ':uid': user_id },
+      }),
+    );
+    await Promise.all(
+      (q.Items ?? []).map((item) =>
+        ddb.send(
+          new DeleteCommand({
+            TableName: tableName(t),
+            Key: {
+              user_id,
+              [skName]: (item as Record<string, string>)[skName],
+            },
+          }),
+        ),
+      ),
+    );
+  }
+
+  await deleteUser(user_id);
+
+  return c.json({ deleted: true, user_id }, 200);
 });
