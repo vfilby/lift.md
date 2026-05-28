@@ -91,7 +91,8 @@ When toggled off mid-session, `CrashReporter.setEnabled(false)` calls `SentrySDK
 - `zoneName` — CloudKit zone name (e.g. `LiftMarkData`)
 - `fieldName` — CloudKit field name implicated in `invalidArguments`
 - `fkTable` — FK target table for merge errors (e.g. `session_sets`)
-- `partialFailureCount` — integer
+- `partialFailureCount` — integer (also used by `OutboxPusherService` to carry the count of completed workouts stranded by an auth failure)
+- `tag` — short stable event-category marker (e.g. `"data_loss"`, `"outbox_auth_failure"`); enables single-rule Sentry alerts
 - `sdkVersion`, `osVersion`, `buildType` — already on every event via Sentry defaults
 
 Record IDs (UUIDs) are allowed in breadcrumbs but **not** in captured error metadata, because Sentry's search makes high-cardinality UUIDs noisy without being useful.
@@ -126,6 +127,7 @@ Tags attached to captured events:
 | Tag | Values | Purpose |
 |-----|--------|---------|
 | `tag: "data_loss"` | set on `SyncSessionGuard` data-loss-detected / restore-failed paths, and on `migrator_bridge_restore_failed` | Target for a single alert rule |
+| `tag: "outbox_auth_failure"` | set on `OutboxPusherService` flush cycles that cannot push completed workouts because the session is missing/expired (GH #143) | Target an alert: a user has completed workouts that silently aren't syncing |
 | `data_integrity_risk` | `"true"` on every migrator failure event except `skipped_already_done`, `skipped_fresh_install`, `build_number_changed` | Target for a single migrator-failure alert rule. See [`migrator.md`](migrator.md) §5.4. |
 
 ### `beforeSend` hook

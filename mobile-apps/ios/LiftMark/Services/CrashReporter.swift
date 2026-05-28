@@ -70,6 +70,12 @@ final class CrashReporter: @unchecked Sendable {
     /// regardless of whether Sentry is initialized. Only set from unit tests.
     nonisolated(unsafe) static var migratorEventRecorder: ((String, [String: String]) -> Void)?
 
+    /// Test seam — when set, every `captureError` invocation is recorded here
+    /// (with the allowlist-filtered metadata) regardless of whether Sentry is
+    /// initialized. Only set from unit tests. Lets us assert on capture sites
+    /// without standing up the real SentrySDK.
+    nonisolated(unsafe) static var captureErrorRecorder: ((Error, LogCategory, [String: String]) -> Void)?
+
     private init() {
         // Default master toggle to true on first launch.
         if UserDefaults.standard.object(forKey: Self.crashReportingEnabledKey) == nil {
@@ -149,8 +155,9 @@ final class CrashReporter: @unchecked Sendable {
 
     /// Report a sync-class non-fatal error. Only allowlisted metadata keys are forwarded.
     func captureError(_ error: Error, category: LogCategory, metadata: [String: String]? = nil) {
-        guard isStarted, Self.isCrashReportingEnabled else { return }
         let filtered = Self.filter(metadata: metadata, allowlist: Self.syncMetadataAllowlist)
+        Self.captureErrorRecorder?(error, category, filtered)
+        guard isStarted, Self.isCrashReportingEnabled else { return }
         SentrySDK.capture(error: error) { scope in
             scope.setTag(value: category.rawValue, key: "category")
             for (key, value) in filtered {

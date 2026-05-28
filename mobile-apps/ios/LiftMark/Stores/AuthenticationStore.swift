@@ -89,7 +89,21 @@ final class AuthenticationStore {
     var currentUser: AuthenticatedUser?
     var lastError: AuthError?
 
+    /// Set `true` when the refresh chain dies (refresh token rejected with
+    /// 401 in `refreshIfNeeded`). Distinguishes a *silently expired* session
+    /// from a *user-initiated* logout: the expired-session path drops the dead
+    /// tokens but must NOT wipe device-local session state (outbox/inbox) the
+    /// way `logout()` does, so completed-but-unsynced workouts survive until
+    /// the user signs back in (GH #143). Reset on a successful `login(...)`.
+    private(set) var sessionExpired: Bool = false
+
     var isAuthenticated: Bool { currentUser != nil }
+
+    /// Invoked on a successful login so queued outbox pushes drain immediately
+    /// rather than waiting for the next foreground transition. Wired up by
+    /// `LiftMarkApp` to call `OutboxPusherService.flushIfAuthenticated()`.
+    /// Left nil in tests that don't exercise the flush.
+    var onAuthenticated: (() -> Void)?
 
     init(api: APIClientProtocol, tokenStore: TokenStore) {
         self.api = api
@@ -117,6 +131,10 @@ final class AuthenticationStore {
             tokenStore.saveRefreshToken(response.refreshToken)
             currentUser = response.user
             lastError = nil
+            // A fresh session clears any prior "needs re-auth" state and drains
+            // any completed-but-unsynced workouts queued under the old session.
+            sessionExpired = false
+            onAuthenticated?()
             return response.user
         } catch let error as APIError {
             let mapped = Self.mapLoginError(error)
@@ -151,6 +169,8 @@ final class AuthenticationStore {
         tokenStore.clear()
         currentUser = nil
         lastError = nil
+        // A deliberate sign-out is a clean state, not a lapsed one.
+        sessionExpired = false
 
         // Inbox is treated as session-scoped device state — wipe on
         // sign-out. The server is the source of truth; signing back in
@@ -233,9 +253,18 @@ final class AuthenticationStore {
             return response.accessJwt
         } catch let error as APIError {
             if case .unauthorized = error {
-                // Refresh chain is dead — drop local session.
-                tokenStore.clear()
-                currentUser = nil
+                // Refresh chain is dead — the access/refresh pair is useless, so
+                // drop the dead tokens and the in-memory user. CRITICAL: this is
+                // an *expired session*, NOT a user-initiated logout. We must NOT
+                // call `logout()` (which wipes the outbox/inbox), or completed-
+                // but-unsynced workouts would be silently lost (GH #143). Surface
+                // `sessionExpired` so the UI can prompt re-auth and the queued
+                // pushes survive to drain after the next successful login.
+                markSessionExpired()
+                Logger.shared.warn(
+                    .network,
+                    "auth refresh failed (401) — session expired, prompting re-auth; outbox preserved"
+                )
             }
             throw error
         }
@@ -256,18 +285,35 @@ final class AuthenticationStore {
             // exp check would pass on our just-minted token. Bypass by
             // calling the refresh endpoint directly via the same path.
             guard let refresh = tokenStore.loadRefreshToken() else {
+                markSessionExpired()
                 throw APIError.unauthorized
             }
-            let response: RefreshResponse = try await api.send(
-                path: "/v1/auth/refresh",
-                method: "POST",
-                body: RefreshRequest(refreshToken: refresh),
-                accessToken: nil
-            )
-            tokenStore.saveAccessToken(response.accessJwt)
-            tokenStore.saveRefreshToken(response.refreshToken)
-            return try await block(response.accessJwt)
+            do {
+                let response: RefreshResponse = try await api.send(
+                    path: "/v1/auth/refresh",
+                    method: "POST",
+                    body: RefreshRequest(refreshToken: refresh),
+                    accessToken: nil
+                )
+                tokenStore.saveAccessToken(response.accessJwt)
+                tokenStore.saveRefreshToken(response.refreshToken)
+                return try await block(response.accessJwt)
+            } catch APIError.unauthorized {
+                // Refresh chain is dead even on the forced retry. Same handling
+                // as `refreshIfNeeded`: expired session, not a logout. Preserve
+                // device-local queues (GH #143).
+                markSessionExpired()
+                throw APIError.unauthorized
+            }
         }
+    }
+
+    /// Drop the dead session tokens and flag re-auth needed WITHOUT wiping the
+    /// outbox/inbox (that is `logout()`'s job, for deliberate sign-out only).
+    private func markSessionExpired() {
+        tokenStore.clear()
+        currentUser = nil
+        sessionExpired = true
     }
 
     // MARK: - Private

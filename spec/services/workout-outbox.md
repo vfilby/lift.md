@@ -197,7 +197,40 @@ No outbox-browsing UI — the surface for "my completed workouts" remains the Hi
 
 ### Sign-out behavior
 
-Local `outbox_pending_queue` table is wiped on logout — the queue is session-scoped device state, matching the inbox convention. Server-side outbox rows stay (they outlive any single device install).
+Local `outbox_pending_queue` table is wiped on **user-initiated logout** — the queue is session-scoped device state, matching the inbox convention. Server-side outbox rows stay (they outlive any single device install).
+
+**Critical distinction — expired session vs. logout:** a *user-initiated* logout (Settings → Sign out) wipes the queue. A *silently expired session* (refresh token rejected with 401 during `refreshIfNeeded`) must **not** wipe the queue. The completed workouts in the queue still belong to the same user and the same server account; they just couldn't be pushed because the access/refresh chain lapsed. Dropping them here is exactly the data-loss bug this service must prevent (see GH #143). Tokens may be cleared in the expired-session path (an expired refresh token is useless), but the outbox queue survives so that re-authentication can drain it. See [AuthenticationStore re-auth state](#re-authentication-state) below.
+
+### Auth-failure handling during flush
+
+When a flush cannot push because the device is effectively signed out — either `!authStore.isAuthenticated` at the top of `flushIfAuthenticated()`, or a `POST` returns 401 even after `withAuthorizedRequest` tried to refresh — the service must fail **loudly and recoverably**:
+
+1. **Keep the queued items.** Auth failure is never a reason to delete a row. The completed workouts stay enqueued and become eligible to push the moment the user re-authenticates.
+2. **Log to the device log.** `Logger.shared.error(.sync, "outbox flush blocked: authentication required", metadata: [...])` so the on-device debug log records the unsynced state (this is the authoritative on-device record per [logger.md](logger.md)).
+3. **Capture to Sentry once per flush cycle** (not per item — avoid event-quota spam) via `CrashReporter.shared.captureError(_:category:metadata:)` with `category: .sync` and `metadata["tag"] = "outbox_auth_failure"`. The `pendingCount` of stranded items is attached under the allowlisted `partialFailureCount` key. See [sentry.md](sentry.md) for the tag/allowlist.
+4. **Reflect the unsynced state observably.** `lastError` is set to a user-facing "Sign in to sync" message and `pendingCount` continues to reflect the stranded rows so the app-level [auth-sync banner](#auth-sync-banner-ui) can render.
+
+This is the one normal-operation path (alongside the giveup-4xx case) that *does* emit a Sentry capture: a user who completed a workout that silently never synced is a real, actionable failure, not a transient network blip.
+
+### Auth-sync banner (UI)
+
+An app-level banner is shown at the root (`ContentView`) when there are completed workouts that cannot sync because the device needs sign-in:
+
+```
+outboxPusher.pendingCount > 0 && (!authStore.isAuthenticated || authStore.sessionExpired)
+```
+
+- Copy: "N workout(s) waiting to sync — sign in to upload." Tapping it presents `LoginView`.
+- Accessibility identifier `auth-sync-banner` for UI tests.
+- A successful login resets `sessionExpired` and triggers `flushIfAuthenticated()`, which drains the queue and clears the banner.
+
+### Re-authentication state
+
+`AuthenticationStore` exposes an observable `private(set) var sessionExpired: Bool` (default `false`):
+
+- Set to `true` when `refreshIfNeeded()` receives `APIError.unauthorized` — the refresh chain is dead and the user must sign in again. The store clears the dead tokens and `currentUser` in this path (an expired refresh token is useless), but **does not** invoke the user-initiated `logout()` codepath and therefore **does not** wipe the `outbox_pending_queue` or inbox. This is the load-bearing distinction that makes a silently-completed workout recoverable (GH #143).
+- Reset to `false` on a successful `login(...)`. A successful login also kicks `OutboxPusherService.flushIfAuthenticated()` so queued completions sync immediately rather than waiting for the next foreground transition.
+- `isAuthenticated` remains `currentUser != nil`; `sessionExpired` is an orthogonal signal that the *last known* session lapsed and re-auth is needed. The banner condition treats either `!isAuthenticated` or `sessionExpired` as "needs sign-in".
 
 ### Conflict + dedup rules
 
@@ -233,8 +266,9 @@ Astro builds static and the site upload is via S3 + CloudFront. A truly dynamic 
 - `outbox_push_success` — `{client_session_id, outbox_id}`
 - `outbox_push_giveup_4xx` — `{client_session_id, status, body_snippet}` (logged via `Logger.shared.error`)
 - `outbox_flush_complete` — `{pushed, retried, failed, queue_size_after}`
+- `outbox flush blocked: authentication required` — `{pendingCount}` (logged via `Logger.shared.error(.sync, …)`; also a single Sentry capture per flush cycle with `tag: "outbox_auth_failure"`)
 
-No Sentry error captures for normal flows (network blips are not bugs). 4xx-other-than-429 is a real bug; log via Sentry.
+No Sentry error captures for normal flows (network blips are not bugs). 4xx-other-than-429 is a real bug; log via Sentry. **Auth failure with a non-empty queue is also a real, user-impacting bug** (a completed workout silently never synced — GH #143); it captures once per flush cycle.
 
 ## Out of scope (v1)
 
