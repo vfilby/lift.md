@@ -11,6 +11,9 @@ struct WorkoutDetailView: View {
     @State private var showEditMarkdown = false
     @State private var navigateToActiveWorkout = false
     @State private var editingPlanExercise: PlannedExercise?
+    @State private var exportFile: ExportFile?
+    @State private var showExportError = false
+    @State private var exportErrorMessage = ""
 
     private var plan: WorkoutPlan? {
         planStore.getPlan(id: planId)
@@ -239,6 +242,12 @@ struct WorkoutDetailView: View {
         .navigationDestination(isPresented: $navigateToActiveWorkout) {
             ActiveWorkoutView()
         }
+        .shareSheet(item: $exportFile)
+        .alert("Export Failed", isPresented: $showExportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportErrorMessage)
+        }
         .onAppear {
             if plan == nil && !isEmbedded {
                 dismiss()
@@ -426,12 +435,13 @@ struct WorkoutDetailView: View {
     }
 
     private func sharePlan() {
-        guard let plan, let markdown = plan.sourceMarkdown else { return }
-        // Share the markdown via share sheet
-        let activityVC = UIActivityViewController(activityItems: [markdown], applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(activityVC, animated: true)
+        guard let plan else { return }
+        do {
+            let url = try WorkoutExportService().exportPlanAsMarkdown(plan)
+            exportFile = ExportFile(url: url)
+        } catch {
+            exportErrorMessage = error.localizedDescription
+            showExportError = true
         }
     }
 

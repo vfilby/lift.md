@@ -14,6 +14,9 @@ struct WorkoutsView: View {
     @State private var selectedGymId: String?
     @State private var showImport = false
     @State private var selectedPlanId: String?
+    @State private var exportFile: ExportFile?
+    @State private var showExportError = false
+    @State private var exportErrorMessage = ""
 
     private var filteredPlans: [WorkoutPlan] {
         planStore.plans.filter { plan in
@@ -99,6 +102,12 @@ struct WorkoutsView: View {
         }
         .sheet(isPresented: $showImport) {
             ImportView()
+        }
+        .shareSheet(item: $exportFile)
+        .alert("Export Failed", isPresented: $showExportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportErrorMessage)
         }
         .navigationDestination(for: AppDestination.self) { destination in
             switch destination {
@@ -509,12 +518,13 @@ struct WorkoutsView: View {
 
     private func sharePlan() {
         guard let id = selectedPlanId,
-              let plan = planStore.getPlan(id: id),
-              let markdown = plan.sourceMarkdown else { return }
-        let activityVC = UIActivityViewController(activityItems: [markdown], applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(activityVC, animated: true)
+              let plan = planStore.getPlan(id: id) else { return }
+        do {
+            let url = try WorkoutExportService().exportPlanAsMarkdown(plan)
+            exportFile = ExportFile(url: url)
+        } catch {
+            exportErrorMessage = error.localizedDescription
+            showExportError = true
         }
     }
 
