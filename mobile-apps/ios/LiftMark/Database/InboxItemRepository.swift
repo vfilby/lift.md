@@ -21,8 +21,7 @@ struct InboxItemRepository {
         return try dbQueue.read { db in
             let rows = try Row.fetchAll(db, sql: """
                 SELECT inbox_id, fetched_at, created_at_server, source_token_id,
-                       lmwf_text, workout_json, summary_name,
-                       summary_exercise_count, summary_set_count
+                       lmwf_text
                 FROM workout_inbox
                 ORDER BY created_at_server DESC
                 """)
@@ -42,8 +41,7 @@ struct InboxItemRepository {
         return try dbQueue.read { db in
             let row = try Row.fetchOne(db, sql: """
                 SELECT inbox_id, fetched_at, created_at_server, source_token_id,
-                       lmwf_text, workout_json, summary_name,
-                       summary_exercise_count, summary_set_count
+                       lmwf_text
                 FROM workout_inbox
                 WHERE inbox_id = ?
                 """, arguments: [id])
@@ -64,27 +62,18 @@ struct InboxItemRepository {
             try db.execute(sql: """
                 INSERT INTO workout_inbox (
                     inbox_id, fetched_at, created_at_server, source_token_id,
-                    lmwf_text, workout_json, summary_name,
-                    summary_exercise_count, summary_set_count
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    lmwf_text
+                ) VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(inbox_id) DO UPDATE SET
                     created_at_server = excluded.created_at_server,
                     source_token_id   = excluded.source_token_id,
-                    lmwf_text         = excluded.lmwf_text,
-                    workout_json      = excluded.workout_json,
-                    summary_name      = excluded.summary_name,
-                    summary_exercise_count = excluded.summary_exercise_count,
-                    summary_set_count = excluded.summary_set_count
+                    lmwf_text         = excluded.lmwf_text
                 """, arguments: [
                     item.id,
                     Self.makeFormatter(fractional: true).string(from: item.fetchedAt),
                     Self.makeFormatter(fractional: true).string(from: item.createdAtServer),
                     item.sourceTokenId,
                     item.lmwfText,
-                    item.workoutJSON,
-                    item.summaryName,
-                    item.summaryExerciseCount,
-                    item.summarySetCount,
                 ])
         }
     }
@@ -126,14 +115,15 @@ struct InboxItemRepository {
             ?? Date()
     }
 
+    // Parsing `lmwf_text` into the in-memory summary happens here, once per
+    // load (not on every SwiftUI render). `InboxItem.init` derives the
+    // summary from `lmwfText` when none is supplied.
     private static func assemble(_ row: Row) -> InboxItem? {
         guard
             let id: String = row["inbox_id"],
             let fetchedAt: String = row["fetched_at"],
             let createdAtServer: String = row["created_at_server"],
-            let lmwfText: String = row["lmwf_text"],
-            let workoutJSON: String = row["workout_json"],
-            let summaryName: String = row["summary_name"]
+            let lmwfText: String = row["lmwf_text"]
         else { return nil }
 
         return InboxItem(
@@ -141,11 +131,7 @@ struct InboxItemRepository {
             fetchedAt: parseDate(fetchedAt),
             createdAtServer: parseDate(createdAtServer),
             sourceTokenId: row["source_token_id"],
-            lmwfText: lmwfText,
-            workoutJSON: workoutJSON,
-            summaryName: summaryName,
-            summaryExerciseCount: row["summary_exercise_count"] ?? 0,
-            summarySetCount: row["summary_set_count"] ?? 0
+            lmwfText: lmwfText
         )
     }
 }

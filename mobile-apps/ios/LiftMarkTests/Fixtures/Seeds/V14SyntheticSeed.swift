@@ -2,12 +2,12 @@ import Foundation
 
 extension DatabaseSeeds {
 
-    // MARK: - Synthetic future (v18) — used to verify early-return behavior
+    // MARK: - Synthetic future (v19) — used to verify early-return behavior
     //
     // File is named V14SyntheticSeed.swift for historical reasons; the seed now
-    // represents a "from the future" DB at schema_version=18. DDL matches the
-    // current head (v17, which added outbox_pending_queue) so the shape is
-    // valid — only the version marker is ahead.
+    // represents a "from the future" DB at schema_version=19. DDL matches the
+    // current head (v18, which slimmed workout_inbox) so the shape is valid —
+    // only the version marker is ahead.
 
     static let v17SyntheticDDL: String = #"""
     CREATE TABLE workout_templates (
@@ -98,10 +98,7 @@ extension DatabaseSeeds {
     CREATE TABLE workout_inbox (
         inbox_id TEXT PRIMARY KEY NOT NULL, fetched_at TEXT NOT NULL,
         created_at_server TEXT NOT NULL, source_token_id TEXT,
-        lmwf_text TEXT NOT NULL, workout_json TEXT NOT NULL,
-        summary_name TEXT NOT NULL,
-        summary_exercise_count INTEGER NOT NULL DEFAULT 0,
-        summary_set_count INTEGER NOT NULL DEFAULT 0
+        lmwf_text TEXT NOT NULL
     );
     CREATE TABLE schema_version (version INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX idx_template_exercises_workout ON template_exercises(workout_template_id);
@@ -138,6 +135,6 @@ extension DatabaseSeeds {
     INSERT INTO gyms (id, name, is_default, created_at, updated_at, deleted_at) VALUES
       ('\#(gymHome)', 'Home Gym', 1, '\#(ts1)', '\#(ts1)', NULL);
 
-    INSERT INTO schema_version (version) VALUES (18);
+    INSERT INTO schema_version (version) VALUES (19);
     """#
 }

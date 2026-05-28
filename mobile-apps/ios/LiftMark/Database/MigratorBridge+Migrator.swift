@@ -675,6 +675,25 @@ extension MigratorBridge {
                 """)
         }
 
+        // v18: slim workout_inbox — drop the persisted server pre-parse
+        // (workout_json + summary_*). The table is a device-local cache
+        // repopulated from the server on the next poll, so dropping &
+        // recreating with lmwf_text + metadata only is clean and equivalent.
+        // lmwf_text is now the single source of truth; the list summary is
+        // derived in memory by parsing it on load.
+        m.registerMigration("v18_workout_inbox_drop_preparse") { db in
+            try db.execute(sql: "DROP TABLE IF EXISTS workout_inbox")
+            try db.execute(sql: """
+                CREATE TABLE workout_inbox (
+                    inbox_id              TEXT PRIMARY KEY NOT NULL,
+                    fetched_at            TEXT NOT NULL,
+                    created_at_server     TEXT NOT NULL,
+                    source_token_id       TEXT,
+                    lmwf_text             TEXT NOT NULL
+                )
+                """)
+        }
+
         return m
     }
 

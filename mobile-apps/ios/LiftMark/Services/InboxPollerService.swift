@@ -13,14 +13,15 @@ private struct InboxListResponse: Decodable {
     let nextCursor: String?
 }
 
-/// Detail payload from `GET /v1/workouts/:inbox_id`. `workout` is the full
-/// parsed `WorkoutPlan` (we store it as-is for promotion later).
+/// Detail payload from `GET /v1/workouts/:inbox_id`. We decode only
+/// `lmwf_text` + metadata. The server still returns a structured `workout`
+/// field for backward compatibility, but the client ignores it — `lmwf_text`
+/// is the single source of truth (parsed on-device for preview + promote).
 private struct InboxDetailResponse: Decodable {
     let inboxId: String
     let createdAt: Date
     let sourceTokenId: String?
     let lmwfText: String?
-    let workout: InboxWorkout?
 }
 
 // MARK: - InboxPollerService
@@ -177,41 +178,24 @@ final class InboxPollerService {
             ) as InboxDetailResponse
         }
 
-        guard let inboxWorkout = detail.workout else {
-            // Pre-full-payload rows. Server-side reaper will clean these
-            // up eventually; nothing useful for us to do client-side.
+        guard let lmwfText = detail.lmwfText, !lmwfText.isEmpty else {
+            // No raw markdown means nothing we can preview or promote.
+            // Server-side reaper will clean these up eventually; nothing
+            // useful for us to do client-side.
             Logger.shared.warn(
                 .network,
-                "inbox item missing workout payload — skipped",
+                "inbox item missing lmwf_text — skipped",
                 metadata: ["inboxId": inboxId]
             )
             return false
         }
-
-        let encoder = JSONEncoder()
-        let workoutData = try encoder.encode(inboxWorkout)
-        guard let workoutJSON = String(data: workoutData, encoding: .utf8) else {
-            throw APIError.decoding(
-                NSError(
-                    domain: "InboxPollerService",
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to UTF-8 encode workout JSON"]
-                )
-            )
-        }
-
-        let totalSets = inboxWorkout.exercises.reduce(0) { $0 + $1.sets.count }
 
         let item = InboxItem(
             id: detail.inboxId,
             fetchedAt: Date(),
             createdAtServer: detail.createdAt,
             sourceTokenId: detail.sourceTokenId,
-            lmwfText: detail.lmwfText ?? "",
-            workoutJSON: workoutJSON,
-            summaryName: inboxWorkout.name,
-            summaryExerciseCount: inboxWorkout.exercises.count,
-            summarySetCount: totalSets
+            lmwfText: lmwfText
         )
         try inboxRepository.upsert(item)
         return true

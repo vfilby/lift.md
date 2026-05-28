@@ -11,7 +11,7 @@ final class DatabaseManager: @unchecked Sendable {
     private let dbLock = NSLock()
 
     private static let dbName = "liftmark.db"
-    static let currentSchemaVersion = 17
+    static let currentSchemaVersion = 18
 
     private init() {}
 
@@ -199,6 +199,7 @@ final class DatabaseManager: @unchecked Sendable {
         if currentVersion < 15 && targetVersion >= 15 { try migrateToV15(db) }
         if currentVersion < 16 && targetVersion >= 16 { try migrateToV16(db) }
         if currentVersion < 17 && targetVersion >= 17 { try migrateToV17(db) }
+        if currentVersion < 18 && targetVersion >= 18 { try migrateToV18(db) }
 
         try db.execute(sql: "UPDATE schema_version SET version = ?", arguments: [targetVersion])
     }
@@ -852,6 +853,27 @@ final class DatabaseManager: @unchecked Sendable {
                 attempt_count       INTEGER NOT NULL DEFAULT 0,
                 next_attempt_after  TEXT,
                 last_error          TEXT
+            )
+            """)
+    }
+
+    // MARK: - V18: slim workout_inbox (drop persisted server pre-parse)
+
+    /// Drops the `workout_json` / `summary_*` columns from `workout_inbox`.
+    /// The table is a device-local cache repopulated from the server on the
+    /// next poll, so dropping & recreating with `lmwf_text` + metadata only
+    /// is cleaner (and equivalent) to per-column `ALTER`. `lmwf_text` is now
+    /// the single source of truth — the summary is derived in memory by
+    /// parsing it on load (see `InboxItem.Summary`).
+    private static func migrateToV18(_ db: Database) throws {
+        try db.execute(sql: "DROP TABLE IF EXISTS workout_inbox")
+        try db.execute(sql: """
+            CREATE TABLE workout_inbox (
+                inbox_id              TEXT PRIMARY KEY NOT NULL,
+                fetched_at            TEXT NOT NULL,
+                created_at_server     TEXT NOT NULL,
+                source_token_id       TEXT,
+                lmwf_text             TEXT NOT NULL
             )
             """)
     }

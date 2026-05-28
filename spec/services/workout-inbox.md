@@ -101,11 +101,15 @@ Local GRDB table `workout_inbox` — see `spec/data/database-schema.md`. Keyed b
 Stored columns:
 - `inbox_id` (PK, server ULID)
 - `fetched_at` — when this device first stored it
-- `lmwf_text` — markdown, used for "View source"
-- `workout_json` — the full parsed `WorkoutPlan` as JSON (the iOS-side decoder rehydrates on demand)
-- `summary_name`, `summary_exercise_count`, `summary_set_count` — denormalized for fast list rendering without parsing `workout_json`
+- `lmwf_text` — original markdown; the **single source of truth** for preview, promotion, and "View source"
 - `source_token_id` — for display ("From: Claude Code", etc.)
 - `created_at_server` — server-side `created_at`
+
+No pre-parse is persisted (the `workout_json` / `summary_*` columns were dropped in schema v18). The server still returns a `workout` field on the detail call for backward compatibility, but the client **ignores it** — `lmwf_text` is the only thing stored.
+
+The list/preview summary (name + exercise/set counts) is **derived in memory** by parsing `lmwf_text` with `MarkdownParser` when items are loaded (the repository assembles each `InboxItem` with a parsed summary; held in memory, never persisted). Parsing is pure string work, done at load time rather than on every SwiftUI render.
+
+Promotion and preview both parse `lmwf_text` through the canonical `MarkdownParser.parseWorkout` path — the same path every other import uses. This is the root-cause fix for grouping bugs (e.g. supersets): a promoted plan is byte-identical to importing that markdown as a file, with `parentExerciseId` grouping intact and `sourceMarkdown` set to `lmwf_text` (so Edit / Reprocess / Export work on inbox plans).
 
 The table is **device-local**. It is not synced via CloudKit and is not included in `.db` backup exports (server is the source of truth — a fresh install will repopulate from `/v1/workouts?status=pending`).
 
@@ -115,7 +119,7 @@ The table is **device-local**. It is not synced via CloudKit and is not included
 
 - Triggered on foreground transition and when user taps **Sync now** in Settings.
 - Single in-flight poll (`isPolling` gate).
-- Fetches the listing, then for each item the detail, then upserts into the local inbox table.
+- Fetches the listing, then for each item the detail, then upserts into the local inbox table. Only `lmwf_text` + metadata (`inbox_id`, `created_at`, `source_token_id`) are decoded and stored; the server's structured `workout` field is ignored.
 - Calls `/ack` once the upsert succeeds. Ack failure is non-fatal — server will return the same item next poll, the local upsert is a no-op (same `inbox_id`).
 - Per-item decode/store failures are logged and skipped; the item stays pending server-side for retry on next poll.
 
@@ -134,7 +138,7 @@ Row actions (swipe or context menu):
 | Action          | Behavior                                                                                                                                                  |
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Discard         | Local row deleted; `DELETE /v1/workouts/:inbox_id` fired. On network failure: row stays gone locally; server row dies on next sync (or is reaped by TTL). |
-| Add to Plans    | Promote: insert a `WorkoutPlan` from `workout_json`; delete the inbox row; `DELETE` the server row.                                                       |
+| Add to Plans    | Promote: parse `lmwf_text` via `MarkdownParser`, set the plan's `sourceMarkdown = lmwf_text`, insert the `WorkoutPlan`; delete the inbox row; `DELETE` the server row.                                                       |
 | Start Workout   | Promote (as above), then open the newly created plan's detail screen. v1 stops here — the user taps Start on the detail screen. (Future: skip the detail screen and open Active Workout directly.) |
 
 Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) — workout name, tags, default unit, description, and a card per exercise listing each set's target weight/reps/time/RPE plus per-set modifier chips (drop, per-side, rest, tempo). Footer holds the same three actions; selecting one dismisses the sheet and runs the action on the parent (`InboxSectionView` owns the queue/server reconciliation).
