@@ -11,7 +11,7 @@ The user explicitly decides what to do with each inbox item — discard, save to
 ```
 External client (PAT) ──POST /v1/workouts──► Server inbox (DDB)
                                                 │
-                                                │ GET /v1/workouts?status=pending
+                                                │ GET /v1/workouts   (all undeleted rows)
                                                 ▼
                                         iOS InboxPollerService
                                                 │
@@ -42,9 +42,25 @@ External client (PAT) ──POST /v1/workouts──► Server inbox (DDB)
 Each row stores:
 - `inbox_id` (ULID sort key, scoped by `user_id` partition key)
 - `lmwf_text` — original markdown; **the single source of truth**
-- `status` — `pending` until iOS has fetched the detail; `ingested` after iOS's GET acknowledges receipt
+- `status` — `pending` for every live row. A row stays in the inbox as long as it exists; the user removes it by importing or discarding, which **hard-deletes** the row (see Lifecycle below). `ingested` is a legacy state nothing sets anymore (it lingers only on rows acked by a pre-GH #164 client); it does **not** remove the row from the inbox, and clients list rows regardless of status.
 - `source_token_id` — PAT ULID or `"session"` for portal-pushed items
 - `created_at`, `ingested_at`
+
+#### Lifecycle (durability — GH #164)
+
+The server row **is** the inbox entry, and it is the durable source of truth. A
+row lives in exactly two states from the inbox's perspective: **present** (the
+row exists → it's in the inbox) and **gone** (the row was hard-deleted because
+the user imported or discarded it). There is no intermediate "the client has
+seen this" state that removes it from the listing.
+
+This is the root-cause fix for GH #164. The previous design had iOS `ack` each
+item on fetch (`pending`→`ingested`) and then list only `status=pending`. Once
+acked, an item could never be re-listed — so any loss of the device-local cache
+(logout wipe, reinstall, the v18 `DROP TABLE workout_inbox` migration, or a
+second device) stranded the item server-side as `ingested`, invisible and
+impossible to import or delete. The local table is now a pure disposable cache:
+it can be wiped at any time and the next poll rebuilds it from the server.
 
 The server does **not** persist the parsed result. Pushes are still validated
 on receipt (invalid LMWF is rejected with `422` and nothing is enqueued), but
@@ -64,10 +80,10 @@ degrade to `null` rather than failing the request.
 | Method | Path                          | Scope           | Description                                                                                 |
 |--------|-------------------------------|-----------------|---------------------------------------------------------------------------------------------|
 | POST   | `/v1/workouts`                | `workouts:write`| Push a new workout (LMWF body). Returns inbox item summary + warnings.                      |
-| GET    | `/v1/workouts?status=pending` | `workouts:read` | List pending items (latest first). Returns summary only.                                     |
+| GET    | `/v1/workouts`                | `workouts:read` | List items (latest first). iOS sends no `status` filter so it sees every live row; an optional `?status=` filter still works for the web portal. Returns summary only. |
 | GET    | `/v1/workouts/:inbox_id`      | `workouts:read` | Fetch one item including `workout` (full parsed plan) and `lmwf_text`.                      |
-| POST   | `/v1/workouts/:inbox_id/ack`  | `workouts:read` | Mark item `ingested`. Idempotent. iOS calls this once the item is stored in the local inbox.|
-| DELETE | `/v1/workouts/:inbox_id`      | `workouts:read` | Hard-delete the row. Called by iOS on Discard and after Promote/Start.                       |
+| POST   | `/v1/workouts/:inbox_id/ack`  | `workouts:read` | **Orphaned/legacy.** Marks item `ingested`. No client calls it anymore (iOS and the web portal both stopped — GH #164); kept only so old rows/clients don't 404. Idempotent. |
+| DELETE | `/v1/workouts/:inbox_id`      | `workouts:read` | Hard-delete the row. The **only** way an item leaves the inbox. Called by iOS on Discard and after Promote/Start. |
 
 Both `ack` and `DELETE` require the row to belong to the authenticated user (404 otherwise — no leak about whether the row exists).
 
@@ -86,8 +102,8 @@ Top-level columns:
 | ▸        | Expander toggle (`details.row-detail`).                             |
 | Title    | `summary.workoutName` (falls back to `—`).                         |
 | Date     | `created_at`, formatted.                                            |
-| Status   | Badge: `pending` / `ingested` / `rejected`.                        |
-| Actions  | `Mark ingested` (pending only), `Download`, `Delete`.              |
+| Status   | Badge: `pending` / `ingested` / `rejected`. `ingested` only appears on legacy rows left over from before GH #164 — nothing sets it anymore. |
+| Actions  | `Download`, `Delete`.                                              |
 
 Deliberately **not** in the top-level row: inbox ID, source/source-token, exercise count, set count.
 
@@ -100,9 +116,10 @@ Expanded detail row (one per item, hidden until the expander opens):
 
 Actions wire to the resource endpoints (session JWT):
 
-- **Mark ingested** → `POST /v1/workouts/:inbox_id/ack`, then refresh.
 - **Download** → `GET /v1/workouts/:inbox_id` for the full `lmwf_text`, then triggers a client-side download of a `<name>.lmwf.md` file.
 - **Delete** → `DELETE /v1/workouts/:inbox_id` (confirmed), then refresh.
+
+There is no "Mark ingested" action: an item leaves the inbox only by being deleted (here or imported/discarded on a device). The `/ack` endpoint still exists server-side but is now orphaned — see the endpoints table.
 
 ## iOS side
 
@@ -131,9 +148,10 @@ The table is **device-local**. It is not synced via CloudKit and is not included
 
 - Triggered on foreground transition and when user taps **Sync now** in Settings.
 - Single in-flight poll (`isPolling` gate).
-- Fetches the listing, then for each item the detail, then upserts into the local inbox table. Only `lmwf_text` + metadata (`inbox_id`, `created_at`, `source_token_id`) are decoded and stored; the server's structured `workout` field is ignored.
-- Calls `/ack` once the upsert succeeds. Ack failure is non-fatal — server will return the same item next poll, the local upsert is a no-op (same `inbox_id`).
-- Per-item decode/store failures are logged and skipped; the item stays pending server-side for retry on next poll.
+- Fetches the listing (`GET /v1/workouts`, **no** `status` filter so every live row is returned), then for each item *not already in the local table* the detail, then upserts into the local inbox table. Only `lmwf_text` + metadata (`inbox_id`, `created_at`, `source_token_id`) are decoded and stored; the server's structured `workout` field is ignored.
+- **Does not** `ack`. Items are never transitioned server-side by the poll; they remain in the inbox until the user imports or discards them (which `DELETE`s the row). This is what makes the local table a disposable cache that self-heals after a wipe/reinstall (GH #164).
+- Rows already present locally are skipped without re-fetching the detail — pending rows are immutable (a push always creates a new `inbox_id`), so re-fetching them is pure waste. Poll cost is proportional to *new* items, not the whole inbox.
+- Per-item decode/store failures are logged and skipped; the item stays in the inbox server-side for retry on next poll.
 
 Removed from the v1 poller:
 - Auto-creation of `WorkoutPlan` rows. The poller no longer touches `workout_templates`.
@@ -157,15 +175,16 @@ Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) �
 
 ### Conflict + dedup rules
 
-- Re-polling the same `inbox_id` is a no-op (upsert). Promotion creates a fresh `WorkoutPlan` UUID each time — so accidentally pushing the same workout twice yields two inbox items that promote to two distinct plans (or the user discards the duplicate).
+- Re-polling the same `inbox_id` is a no-op (the row is already cached, so it's skipped). Promotion creates a fresh `WorkoutPlan` UUID each time — so accidentally pushing the same workout twice yields two inbox items that promote to two distinct plans (or the user discards the duplicate).
 - Promotion is one-shot: once a `WorkoutPlan` is created from an inbox item, the inbox row is deleted. There is no "re-import from inbox history" — the server-side row is also deleted.
-- A signed-out user's inbox table is wiped on logout (treating inbox as session-scoped device state).
+- A signed-out user's inbox table is wiped on logout (treating inbox as session-scoped device state). This is now lossless: because the poll no longer acks, the server still holds every un-acted item, so signing back in repopulates the inbox from the next poll (GH #164).
+- A `DELETE` that fails (offline) leaves the row server-side; the local row is already gone, so the item reappears on the next poll. The user can re-discard. Accepted edge — the alternative (durably queueing the delete) is out of scope.
 
 ## Telemetry
 
 `Logger.shared.info(.network, ...)` events:
 
-- `inbox_poll_complete` — `{fetched, upserted, acked, errors}`
+- `inbox_poll_complete` — `{fetched, upserted, skipped, errors}`
 - `inbox_discard` — `{inbox_id}`
 - `inbox_promote` — `{inbox_id, plan_id, started: bool}`
 - Errors via `Logger.shared.error(.network, ...)` with full error.
@@ -174,5 +193,6 @@ No Sentry capture for normal flows; only unexpected decode/DB failures.
 
 ## Open items
 
-- TTL/reaping of stale server-side inbox rows (e.g., `ingested` for >30 days). Out of scope v1.
-- Multi-device behavior: two devices polling concurrently will both see the same pending items; ack is idempotent. First-to-act may delete the server row; the other device's promote will fail the server DELETE but local promote still succeeds. Acceptable for v1.
+- TTL/reaping of stale server-side inbox rows the user never acts on. Out of scope v1.
+- Multi-device behavior: two devices polling will both see the same items (the poll no longer mutates server state, so there's no first-to-fetch race). First-to-act `DELETE`s the server row; the other device's `DELETE` then 404s harmlessly, and that device drops the stale local row on its next poll only once it also acts — i.e. an item imported/discarded on device A can still linger in device B's local cache until device B acts on it. Reconciling the local cache down to the server set on every poll is a future improvement. Acceptable for v1.
+- The legacy `ingested` status + `/ack` endpoint now have no caller (both iOS and the web portal stopped using them in GH #164). The endpoint is kept so stale clients/rows don't 404; removing it (and the `ingested` status, badge, and filter option) entirely is a candidate cleanup.

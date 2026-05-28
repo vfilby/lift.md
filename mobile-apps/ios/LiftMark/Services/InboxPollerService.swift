@@ -2,8 +2,8 @@ import Foundation
 
 // MARK: - Wire Types
 
-/// Lightweight listing entry from `GET /v1/workouts?status=pending`. Only the
-/// `inbox_id` is needed here — the full payload comes from the detail call.
+/// Lightweight listing entry from `GET /v1/workouts`. Only the `inbox_id` is
+/// needed here — the full payload comes from the detail call.
 private struct InboxListItem: Decodable {
     let inboxId: String
 }
@@ -38,6 +38,12 @@ private struct InboxDetailResponse: Decodable {
 /// What it intentionally does NOT do:
 /// - Auto-create `WorkoutPlan` rows. Items live in the local inbox table
 ///   until the user explicitly Discards, Adds to Plans, or Starts.
+/// - `ack` items. The server row is the durable source of truth and stays
+///   put until the user imports/discards it (which `DELETE`s it). Acking on
+///   fetch is what stranded items after a local-cache wipe in GH #164.
+/// - Re-fetch items already in the local table. Inbox rows are immutable
+///   (a push mints a fresh `inbox_id`), so re-downloading their bodies every
+///   poll is pure waste.
 /// - Pagination follow-through (single page per run; server default is 50).
 @MainActor
 @Observable
@@ -87,7 +93,10 @@ final class InboxPollerService {
         do {
             listResponse = try await authStore.withAuthorizedRequest { token in
                 try await self.apiClient.send(
-                    path: "/v1/workouts?status=pending",
+                    // No `status` filter — every live row is part of the inbox
+                    // until the user imports/discards it. Filtering to
+                    // `status=pending` is what hid acked items forever (#164).
+                    path: "/v1/workouts",
                     method: "GET",
                     body: Optional<EmptyBody>.none,
                     accessToken: token
@@ -100,26 +109,21 @@ final class InboxPollerService {
         }
 
         var upserted = 0
-        var acked = 0
+        var skipped = 0
         var failures = 0
 
         for item in listResponse.items {
+            // Already cached → skip the detail download. Inbox rows are
+            // immutable (a push always mints a new inbox_id), so there's
+            // nothing to refresh; only genuinely new items cost a round-trip.
+            if (try? inboxRepository.exists(id: item.inboxId)) == true {
+                skipped += 1
+                continue
+            }
             do {
                 let didUpsert = try await fetchAndStore(inboxId: item.inboxId)
                 if didUpsert {
                     upserted += 1
-                    // Ack only after a successful local store. Ack failure
-                    // is non-fatal — re-poll will see the same item, and
-                    // the local upsert is a no-op (same inbox_id).
-                    do {
-                        try await ack(inboxId: item.inboxId)
-                        acked += 1
-                    } catch {
-                        Logger.shared.warn(
-                            .network,
-                            "ack failed for \(item.inboxId) — will retry next poll"
-                        )
-                    }
                 }
             } catch {
                 failures += 1
@@ -140,7 +144,7 @@ final class InboxPollerService {
             metadata: [
                 "fetched": String(listResponse.items.count),
                 "upserted": String(upserted),
-                "acked": String(acked),
+                "skipped": String(skipped),
                 "failures": String(failures),
                 "localCount": String(pendingCount),
             ]
@@ -199,17 +203,6 @@ final class InboxPollerService {
         )
         try inboxRepository.upsert(item)
         return true
-    }
-
-    private func ack(inboxId: String) async throws {
-        try await authStore.withAuthorizedRequest { token in
-            try await self.apiClient.sendEmpty(
-                path: "/v1/workouts/\(inboxId)/ack",
-                method: "POST",
-                body: Optional<EmptyBody>.none,
-                accessToken: token
-            )
-        }
     }
 }
 

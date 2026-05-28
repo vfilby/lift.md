@@ -301,9 +301,6 @@ const exampleLmwf = `# Push Day
           ? summary.tags.map((t) => '<span class="chip">' + escapeHtml(t) + '</span>').join('')
           : '';
 
-        const ackBtn = it.status === 'pending'
-          ? '<button type="button" class="btn btn-secondary btn-small" data-ack="' + escapeHtml(it.inbox_id) + '">Mark ingested</button>'
-          : '';
         const dlBtn = '<button type="button" class="btn btn-secondary btn-small" data-download="' + escapeHtml(it.inbox_id) + '">Download</button>';
         const delBtn = '<button type="button" class="btn btn-danger btn-small" data-delete="' + escapeHtml(it.inbox_id) + '">Delete</button>';
 
@@ -312,7 +309,7 @@ const exampleLmwf = `# Push Day
           + '<td>' + escapeHtml(title) + '</td>'
           + '<td>' + escapeHtml(formatDate(it.created_at)) + '</td>'
           + '<td>' + statusBadge + '</td>'
-          + '<td><div class="row-actions">' + ackBtn + dlBtn + delBtn + '</div></td>'
+          + '<td><div class="row-actions">' + dlBtn + delBtn + '</div></td>'
           + '</tr>'
           + '<tr class="row-expand" hidden data-expand="' + escapeHtml(it.inbox_id) + '">'
           + '<td></td><td colspan="4">'
@@ -332,27 +329,12 @@ const exampleLmwf = `# Push Day
       html += '</tbody></table>';
       wrap.innerHTML = html;
 
-      // Wire up row expansion + ack buttons.
+      // Wire up row expansion.
       wrap.querySelectorAll('details.row-detail').forEach((d) => {
         const tr = d.closest('tr');
         const expandRow = tr.nextElementSibling;
         d.addEventListener('toggle', () => {
           if (expandRow) expandRow.hidden = !d.open;
-        });
-      });
-      wrap.querySelectorAll('[data-ack]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-ack');
-          btn.disabled = true;
-          const { status } = await api('/v1/workouts/' + encodeURIComponent(id) + '/ack', {
-            method: 'POST',
-          });
-          if (status === 204 || status === 200) {
-            await refreshInbox();
-          } else {
-            alert('Ack failed (HTTP ' + status + ').');
-            btn.disabled = false;
-          }
         });
       });
       wrap.querySelectorAll('[data-delete]').forEach((btn) => {
