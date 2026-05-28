@@ -195,6 +195,11 @@ export class LmwfValidatorStack extends cdk.Stack {
               `arn:aws:iam::${cdk.Stack.of(this).account}:user/liftmark-ci-deploy-beta`,
             ),
           ],
+          // Secrets Manager resource policies require an explicit Resource
+          // element; '*' resolves to the secret this policy is attached to.
+          // Without this, CFN returns "A required element is missing from
+          // the policy."
+          resources: ['*'],
         }),
       );
     }
