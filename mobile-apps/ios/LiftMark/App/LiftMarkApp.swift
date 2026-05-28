@@ -36,10 +36,20 @@ struct LiftMarkApp: App {
             apiClient: api,
             featureFlags: flags
         ))
-        _outboxPusher = State(initialValue: OutboxPusherService(
+        let pusher = OutboxPusherService(
             authStore: auth,
             apiClient: api
-        ))
+        )
+        _outboxPusher = State(initialValue: pusher)
+
+        // On a successful (re-)login, drain any completed-but-unsynced workouts
+        // immediately rather than waiting for the next foreground transition.
+        // This is the recovery half of GH #143. `auth` retains `pusher` via this
+        // closure, but `auth` lives for the whole app lifetime so there is no
+        // leak concern.
+        auth.onAuthenticated = { [weak pusher] in
+            Task { @MainActor in await pusher?.flushIfAuthenticated() }
+        }
 
         // Reset data before any views load (for test isolation)
         if ProcessInfo.processInfo.arguments.contains("--reset-data") {

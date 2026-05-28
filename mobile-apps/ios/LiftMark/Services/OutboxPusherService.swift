@@ -81,10 +81,17 @@ final class OutboxPusherService {
         Task { await flushIfAuthenticated() }
     }
 
-    /// Drain the queue. Idempotent — silently returns if unauthenticated or a
-    /// flush is in flight.
+    /// Drain the queue. Idempotent — silently returns if a flush is in flight.
+    ///
+    /// If the device isn't authenticated but there ARE queued completions, the
+    /// queue is preserved and the failure is surfaced loudly (device log +
+    /// Sentry + observable `lastError`) so a silently-unsynced completed
+    /// workout can't go unnoticed (GH #143).
     func flushIfAuthenticated() async {
-        guard authStore.isAuthenticated else { return }
+        guard authStore.isAuthenticated else {
+            reportAuthFailure(reason: "not_authenticated")
+            return
+        }
         guard !isFlushing else { return }
         isFlushing = true
         lastError = nil
@@ -101,6 +108,7 @@ final class OutboxPusherService {
         var pushed = 0
         var retried = 0
         var failed = 0
+        var hitAuthFailure = false
 
         for item in items {
             let outcome = await pushOne(item)
@@ -109,8 +117,9 @@ final class OutboxPusherService {
             case .gaveUpClientError: failed += 1
             case .retryQueued: retried += 1
             case .authMissing:
-                // Lost auth mid-flush — bail; we'll resume next foreground.
-                break
+                // Lost auth mid-flush — the queue row is preserved (we never
+                // delete on auth failure). Bail; we'll resume after re-auth.
+                hitAuthFailure = true
             }
             if outcome == .authMissing { break }
         }
@@ -126,6 +135,50 @@ final class OutboxPusherService {
                 "retried": String(retried),
                 "failed": String(failed),
                 "queueSizeAfter": String(pendingCount),
+            ]
+        )
+
+        // Report once per flush cycle (not per item) to avoid Sentry spam.
+        if hitAuthFailure {
+            reportAuthFailure(reason: "push_401")
+        }
+    }
+
+    /// Loud, recoverable handling of an auth failure that leaves completed
+    /// workouts stranded in the queue. The rows are NEVER deleted here — the
+    /// caller guarantees the queue is untouched. Emits one device-log error and
+    /// one Sentry capture per flush cycle, and reflects the unsynced state in
+    /// the observable `lastError` / `pendingCount` so the app-level auth-sync
+    /// banner can render. See `spec/services/workout-outbox.md`.
+    private func reportAuthFailure(reason: String) {
+        let stranded = (try? queue.count()) ?? pendingCount
+        pendingCount = stranded
+        // Nothing queued → nothing was lost → stay quiet (e.g. a routine
+        // foreground flush while signed out with an empty queue).
+        guard stranded > 0 else { return }
+
+        lastError = "Sign in to sync \(stranded) completed workout\(stranded == 1 ? "" : "s")"
+
+        Logger.shared.error(
+            .sync,
+            "outbox flush blocked: authentication required",
+            metadata: [
+                "pendingCount": String(stranded),
+                "reason": reason,
+            ]
+        )
+
+        let err = NSError(
+            domain: "LiftMark.Outbox",
+            code: 401,
+            userInfo: [NSLocalizedDescriptionKey: "Outbox auth failure: \(stranded) completed workout(s) cannot sync"]
+        )
+        CrashReporter.shared.captureError(
+            err,
+            category: .sync,
+            metadata: [
+                "tag": "outbox_auth_failure",
+                "partialFailureCount": String(stranded),
             ]
         )
     }

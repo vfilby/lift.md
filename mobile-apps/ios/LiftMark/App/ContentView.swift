@@ -18,6 +18,9 @@ struct ContentView: View {
     var body: some View {
         MigratorBridgeAlertContainer {
             mainContent
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    AuthSyncBannerView()
+                }
         }
     }
 

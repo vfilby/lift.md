@@ -80,6 +80,75 @@ final class AuthenticationStoreTests: XCTestCase {
         XCTAssertEqual(mockAPI.sentPaths.count, 0, "Should not have hit the network for a valid token")
     }
 
+    // MARK: - sessionExpired (GH #143)
+
+    func testRefreshUnauthorizedSetsSessionExpiredAndClearsTokens() async {
+        let store = AuthenticationStore(api: mockAPI, tokenStore: tokenStore)
+
+        let expiredToken = Self.makeJWT(expSecondsFromNow: -60)
+        tokenStore.saveAccessToken(expiredToken)
+        tokenStore.saveRefreshToken("lm_refresh_dead")
+
+        mockAPI.nextError = APIError.unauthorized
+
+        XCTAssertFalse(store.sessionExpired)
+
+        do {
+            _ = try await store.refreshIfNeeded()
+            XCTFail("Expected unauthorized to propagate")
+        } catch {
+            // expected
+        }
+
+        XCTAssertTrue(store.sessionExpired, "Refresh 401 must flag the session as expired")
+        XCTAssertFalse(store.isAuthenticated)
+        XCTAssertNil(tokenStore.loadAccessToken(), "Dead access token should be cleared")
+        XCTAssertNil(tokenStore.loadRefreshToken(), "Dead refresh token should be cleared")
+        // The expired-session path must NOT have touched the user-initiated
+        // logout codepath. We assert it hit ONLY the refresh endpoint — never
+        // /v1/auth/logout (which is what clears the outbox/inbox).
+        XCTAssertEqual(mockAPI.sentPaths, ["/v1/auth/refresh"])
+        XCTAssertFalse(
+            mockAPI.sentPaths.contains("/v1/auth/logout"),
+            "Expired session must not invoke the logout (outbox-clearing) codepath"
+        )
+    }
+
+    func testSuccessfulLoginResetsSessionExpiredAndTriggersFlush() async throws {
+        let store = AuthenticationStore(api: mockAPI, tokenStore: tokenStore)
+
+        // Force the store into the expired state via a failed refresh.
+        let expiredToken = Self.makeJWT(expSecondsFromNow: -60)
+        tokenStore.saveAccessToken(expiredToken)
+        tokenStore.saveRefreshToken("lm_refresh_dead")
+        mockAPI.nextError = APIError.unauthorized
+        _ = try? await store.refreshIfNeeded()
+        XCTAssertTrue(store.sessionExpired)
+
+        // A successful login must clear the flag and fire onAuthenticated so
+        // the queued outbox pushes drain.
+        var flushed = false
+        store.onAuthenticated = { flushed = true }
+
+        let newAccess = Self.makeJWT(expSecondsFromNow: 3600)
+        mockAPI.nextDecodableResponse = [
+            "access_jwt": newAccess,
+            "refresh_token": "lm_refresh_new",
+            "user": [
+                "user_id": "user-test",
+                "email": "a@b.co",
+                "display_name": "Tester",
+                "tier": "free",
+            ],
+        ]
+
+        _ = try await store.login(email: "a@b.co", password: "pw")
+
+        XCTAssertFalse(store.sessionExpired, "Successful login must reset sessionExpired")
+        XCTAssertTrue(store.isAuthenticated)
+        XCTAssertTrue(flushed, "Successful login must trigger the outbox flush hook")
+    }
+
     func testRefreshIfNeededCallsRefreshEndpointWhenExpired() async throws {
         // Construct the store before the keychain has any tokens so the
         // init-time rehydrate doesn't fire its own background refresh
