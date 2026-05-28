@@ -96,8 +96,22 @@ function summarize(
   return summarizePlan(result.data);
 }
 
+/// Parse stored markdown into a WorkoutPlan ON READ. `lmwf_text` is the single
+/// source of truth — we no longer persist the parse (`parsed_json` is gone),
+/// so the `workout`/`summary` fields the API returns are derived here from the
+/// raw markdown every time. Items were validated on push, so this normally
+/// succeeds; if a row's markdown somehow fails to parse we return null and let
+/// callers degrade gracefully rather than 500.
+function deriveWorkout(lmwf_text: string): WorkoutPlan | null {
+  try {
+    return parseWorkout(lmwf_text).data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /// Derive the summary projection from a stored WorkoutPlan. Used by the
-/// list/get endpoints since parsed_json now stores the full WorkoutPlan.
+/// list/get endpoints, which derive the plan on read from `lmwf_text`.
 function summarizePlan(plan: WorkoutPlan): WorkoutSummary {
   const exercises: ExerciseSummary[] = plan.exercises.map((ex) => ({
     name: ex.exerciseName,
@@ -116,21 +130,11 @@ function summarizePlan(plan: WorkoutPlan): WorkoutSummary {
   };
 }
 
-/// Best-effort summary from an unknown parsed_json blob — old rows persisted
-/// before the full-payload migration stored only the summary itself, so we
-/// fall back to returning whatever's there if the shape doesn't look like a
-/// WorkoutPlan. New rows always go through summarizePlan().
-function projectSummaryFromStored(parsed: unknown): WorkoutSummary | null {
-  if (parsed === null || parsed === undefined) return null;
-  if (typeof parsed !== 'object') return null;
-  const obj = parsed as Record<string, unknown>;
-  // Heuristic: WorkoutPlan shape carries `exercises` with `sets` arrays.
-  // Pre-migration rows have `workoutName`+`exercises[].setCount` instead.
-  if (Array.isArray(obj.exercises) && 'name' in obj && !('workoutName' in obj)) {
-    return summarizePlan(parsed as WorkoutPlan);
-  }
-  // Looks like an already-projected summary — pass through.
-  return parsed as WorkoutSummary;
+/// Project the lightweight summary from a row's stored markdown, deriving the
+/// plan on read. Returns null if the markdown won't parse (graceful degrade).
+function summaryFromText(lmwf_text: string): WorkoutSummary | null {
+  const plan = deriveWorkout(lmwf_text);
+  return plan ? summarizePlan(plan) : null;
 }
 
 function log(entry: Record<string, unknown>): void {
@@ -273,15 +277,14 @@ workoutsRouter.post('/', requireScope('workouts:write'), async (c) => {
   // source — distinguishes "pushed via PAT X" from "pushed via the web
   // portal" in the audit trail. PAT pushes record the token's ULID.
   const sourceTokenId = c.var.pat_token_id ?? 'session';
-  // Persist the FULL parser result, not just the summary projection. iOS
-  // rehydrates a complete WorkoutPlan from this on ingest, so it needs
-  // every exercise's full set list (weights, reps, modifiers, notes).
-  // The summary projection is derived on read for the list endpoint.
+  // Persist only the raw markdown — `lmwf_text` is the single source of
+  // truth. We validated the parse above (422 on invalid), but we do NOT
+  // store the parsed result: `workout`/`summary` are derived on read from
+  // `lmwf_text` so there is no stale pre-parse to diverge from the markdown.
   const item = await createInboxItem({
     user_id: c.var.user.user_id,
     source_token_id: sourceTokenId,
     lmwf_text: markdown,
-    parsed_json: result.data,
     status: 'pending',
   });
 
@@ -351,7 +354,7 @@ workoutsRouter.get('/', requireScope('workouts:read'), async (c) => {
       created_at: it.created_at,
       ingested_at: it.ingested_at,
       source_token_id: it.source_token_id,
-      summary: projectSummaryFromStored(it.parsed_json),
+      summary: summaryFromText(it.lmwf_text),
     })),
     next_cursor: nextCursor ?? null,
   });
@@ -363,9 +366,12 @@ workoutsRouter.get('/:inbox_id', requireScope('workouts:read'), async (c) => {
   if (!item) {
     return c.json({ error: 'Inbox item not found' }, 404);
   }
-  // `workout` exposes the full stored WorkoutPlan so iOS can rehydrate
-  // without re-parsing LMWF locally. `summary` stays for clients that
-  // only need the lightweight projection (and matches what list returns).
+  // `workout` is the full WorkoutPlan derived on read from `lmwf_text` (the
+  // single source of truth — no persisted pre-parse). `summary` is the
+  // lightweight projection for clients that only need name + counts, and
+  // matches what list returns. Both degrade to null if the markdown won't
+  // parse, rather than failing the request.
+  const plan = deriveWorkout(item.lmwf_text);
   return c.json({
     inbox_id: item.inbox_id,
     user_id: item.user_id,
@@ -373,8 +379,8 @@ workoutsRouter.get('/:inbox_id', requireScope('workouts:read'), async (c) => {
     created_at: item.created_at,
     ingested_at: item.ingested_at,
     source_token_id: item.source_token_id,
-    summary: projectSummaryFromStored(item.parsed_json),
-    workout: item.parsed_json,
+    summary: plan ? summarizePlan(plan) : null,
+    workout: plan,
     lmwf_text: item.lmwf_text,
   });
 });

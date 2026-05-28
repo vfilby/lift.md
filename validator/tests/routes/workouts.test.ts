@@ -17,6 +17,23 @@ const VALID_LMWF = `# Push Day
 
 const INVALID_LMWF = `Just some text with no header at all.`;
 
+// A superset block (## Superset header + two ### exercise children). On read
+// the server re-parses this from `lmwf_text` and must reproduce the grouping:
+// both children carry `parentExerciseId` pointing at the superset parent.
+const SUPERSET_LMWF = `# Arm Day
+@units: lbs
+
+## Superset: Arms
+
+### Bicep Curl
+- 30 x 12
+- 30 x 12
+
+### Tricep Pushdown
+- 40 x 12
+- 40 x 12
+`;
+
 live('Workout inbox routes (/v1/workouts)', () => {
   let originalSecret: string | undefined;
   let app: typeof import('../../src/app.js').app;
@@ -278,6 +295,78 @@ live('Workout inbox routes (/v1/workouts)', () => {
     expect(body.workout.tags).toEqual(['strength', 'upper']);
     expect(body.workout.exercises).toHaveLength(1);
     expect(body.workout.exercises[0].sets).toHaveLength(3);
+  });
+
+  it('GET /v1/workouts/:id derives `workout` from lmwf_text alone (no persisted parsed_json), grouping intact', async () => {
+    // The server no longer stores a parsed payload — it persists only
+    // `lmwf_text` and derives `workout`/`summary` by re-parsing on read.
+    // This guards the #161 root cause: a superset's children must carry
+    // `parentExerciseId` pointing at the superset parent. If derivation
+    // ever regressed to dropping grouping, this would catch it.
+    const { plaintext } = await mintUserAndPat('derive-superset');
+    const created = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: SUPERSET_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    const res = await app.request(`/v1/workouts/${created.inbox_id}`, {
+      headers: { authorization: `Bearer ${plaintext}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lmwf_text: string;
+      summary: {
+        exercises: Array<{
+          name: string;
+          groupType: string | null;
+          groupName: string | null;
+          parentExerciseId: string | null;
+        }>;
+      };
+      workout: {
+        exercises: Array<{
+          id: string;
+          exerciseName: string;
+          groupType: string | null;
+          groupName: string | null;
+          parentExerciseId: string | null;
+        }>;
+      };
+    };
+
+    // Raw markdown still round-trips.
+    expect(body.lmwf_text).toBe(SUPERSET_LMWF);
+
+    // Derived plan exposes the superset parent + its two children.
+    const exs = body.workout.exercises;
+    expect(exs).toHaveLength(3);
+
+    // The superset parent has no parent of its own and carries the grouping.
+    const parent = exs.find((e) => e.groupType === 'superset' && !e.parentExerciseId);
+    expect(parent).toBeDefined();
+    expect(parent?.groupName).toBe('Superset: Arms');
+
+    const children = exs.filter((e) => e.parentExerciseId);
+    expect(children).toHaveLength(2);
+    // Both children point at the superset parent — the grouping link the
+    // old hand-written bridge dropped (#161 / #145).
+    for (const child of children) {
+      expect(child.parentExerciseId).toBe(parent?.id);
+    }
+    expect(children.map((c) => c.exerciseName).sort()).toEqual([
+      'Bicep Curl',
+      'Tricep Pushdown',
+    ]);
+
+    // The lightweight summary projection carries the same grouping fields.
+    const sumChildren = body.summary.exercises.filter((e) => e.parentExerciseId);
+    expect(sumChildren).toHaveLength(2);
   });
 
   it('GET /v1/workouts/:id non-existent returns 404', async () => {

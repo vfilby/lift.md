@@ -26,7 +26,6 @@ export interface InboxItem {
   user_id: string;
   source_token_id: string;
   lmwf_text: string;
-  parsed_json: unknown;
   status: InboxStatus;
   created_at: string;
   ingested_at?: string;
@@ -36,7 +35,6 @@ export interface CreateInboxItemInput {
   user_id: string;
   source_token_id: string;
   lmwf_text: string;
-  parsed_json: unknown;
   status: InboxStatus;
 }
 

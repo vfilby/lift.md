@@ -41,11 +41,23 @@ External client (PAT) ──POST /v1/workouts──► Server inbox (DDB)
 
 Each row stores:
 - `inbox_id` (ULID sort key, scoped by `user_id` partition key)
-- `lmwf_text` — original markdown
-- `parsed_json` — the full parsed `WorkoutPlan` (not just the summary projection)
+- `lmwf_text` — original markdown; **the single source of truth**
 - `status` — `pending` until iOS has fetched the detail; `ingested` after iOS's GET acknowledges receipt
 - `source_token_id` — PAT ULID or `"session"` for portal-pushed items
 - `created_at`, `ingested_at`
+
+The server does **not** persist the parsed result. Pushes are still validated
+on receipt (invalid LMWF is rejected with `422` and nothing is enqueued), but
+the parse output is discarded. The `workout` (full `WorkoutPlan`) and `summary`
+fields the read endpoints return are derived **on read** by re-parsing
+`lmwf_text` — so there is no stored pre-parse to drift away from the markdown.
+Inboxes are small (per-user, default 50), so parsing on read is cheap and needs
+no caching. If a row's markdown ever fails to parse on read, `workout`/`summary`
+degrade to `null` rather than failing the request.
+
+> DynamoDB is schemaless, so this needs no migration. Rows written before this
+> change may still carry a now-ignored `parsed_json` attribute; the server no
+> longer reads it, and new rows are written without it.
 
 ### Endpoints
 
