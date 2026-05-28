@@ -163,10 +163,15 @@ const exampleLmwf = `# Push Day
       document.getElementById('loading').hidden = true;
       document.getElementById('dash').hidden = false;
 
+      // Wire up handlers as soon as the dashboard is visible — they only
+      // touch static DOM (sign-out, create-token), not inbox data. Doing
+      // this BEFORE the inbox fetch closes a race where a user (or the
+      // E2E suite) clicks sign-out while `await refreshInbox()` is still
+      // pending against a cold backend, hitting an unbound button.
+      bindHandlers();
+
       // Inbox is reachable directly via the session JWT — no PAT needed.
       await refreshInbox();
-
-      bindHandlers();
     }
 
     function renderHeader(body) {
