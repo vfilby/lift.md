@@ -66,7 +66,7 @@ struct InboxSectionView: View {
         }
         .sheet(item: $previewing) { payload in
             InboxPreviewSheet(
-                workout: payload.workout,
+                plan: payload.plan,
                 createdAtServer: payload.createdAtServer,
                 sourceTokenId: payload.sourceTokenId,
                 onDiscard: {
@@ -83,10 +83,12 @@ struct InboxSectionView: View {
     }
 
     /// Bundle of state passed to the preview sheet. `Identifiable` so it can
-    /// drive `.sheet(item:)`.
+    /// drive `.sheet(item:)`. Holds the parsed `WorkoutPlan` (parsed from
+    /// `lmwf_text` via the canonical parser) so the preview renders exactly
+    /// what promotion would produce.
     private struct PreviewPayload: Identifiable {
         let inboxId: String
-        let workout: InboxWorkout
+        let plan: WorkoutPlan
         let createdAtServer: Date
         let sourceTokenId: String?
         var id: String { inboxId }
@@ -184,10 +186,10 @@ struct InboxSectionView: View {
         let isBusy = inFlightInboxId == item.id
         return HStack(spacing: LiftMarkTheme.spacingSM) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.summaryName)
+                Text(item.summary.name)
                     .font(.headline)
                     .lineLimit(1)
-                Text("\(item.summaryExerciseCount) exercises • \(item.summarySetCount) sets • \(relativeStamp(item.createdAtServer))")
+                Text("\(item.summary.exerciseCount) exercises • \(item.summary.setCount) sets • \(relativeStamp(item.createdAtServer))")
                     .font(.caption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .lineLimit(1)
@@ -201,8 +203,8 @@ struct InboxSectionView: View {
         .background(LiftMarkTheme.background)
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
         .contentShape(Rectangle())
-        // Tap the row to preview. Decoding happens inline so a malformed
-        // JSON blob fails as a logged warning instead of presenting an
+        // Tap the row to preview. Parsing happens inline so unparseable
+        // markdown fails as a logged warning instead of presenting an
         // empty sheet.
         .onTapGesture {
             guard !isBusy else { return }
@@ -256,19 +258,24 @@ struct InboxSectionView: View {
     // MARK: - Actions
 
     private func presentPreview(for item: InboxItem) {
-        let data = Data(item.workoutJSON.utf8)
-        do {
-            let workout = try JSONDecoder().decode(InboxWorkout.self, from: data)
-            previewing = PreviewPayload(
-                inboxId: item.id,
-                workout: workout,
-                createdAtServer: item.createdAtServer,
-                sourceTokenId: item.sourceTokenId
-            )
-        } catch {
+        // Parse the raw markdown through the canonical parser — the same
+        // path promotion uses — so the preview shows exactly what gets
+        // saved (grouping intact, etc.).
+        let result = MarkdownParser.parseWorkout(item.lmwfText)
+        guard let plan = result.data else {
             actionError = "Couldn't preview this workout — it may be malformed."
-            Logger.shared.error(.network, "inbox preview decode failed", error: error)
+            Logger.shared.error(
+                .network,
+                "inbox preview parse failed: \(result.errors.first ?? "unknown")"
+            )
+            return
         }
+        previewing = PreviewPayload(
+            inboxId: item.id,
+            plan: plan,
+            createdAtServer: item.createdAtServer,
+            sourceTokenId: item.sourceTokenId
+        )
     }
 
     private func reload() {
@@ -324,17 +331,21 @@ struct InboxSectionView: View {
         defer { inFlightInboxId = nil }
         actionError = nil
 
-        let inboxWorkout: InboxWorkout
-        do {
-            let data = Data(item.workoutJSON.utf8)
-            inboxWorkout = try JSONDecoder().decode(InboxWorkout.self, from: data)
-        } catch {
+        // Promote via the canonical import path: parse the raw markdown and
+        // stamp `sourceMarkdown` so the promoted plan is byte-identical to
+        // importing that markdown as a file (preserves superset grouping /
+        // parentExerciseId and enables Edit / Reprocess / Export). Mirrors
+        // `ImportView.importWorkout()`.
+        let result = MarkdownParser.parseWorkout(item.lmwfText)
+        guard var plan = result.data else {
             actionError = "Couldn't read this workout — it may be malformed."
-            Logger.shared.error(.network, "inbox promote decode failed", error: error)
+            Logger.shared.error(
+                .network,
+                "inbox promote parse failed: \(result.errors.first ?? "unknown")"
+            )
             return
         }
-
-        let plan = InboxWorkoutMapper.toWorkoutPlan(inboxWorkout)
+        plan.sourceMarkdown = item.lmwfText
         planStore.createPlan(plan)
         // createPlan stores error on planStore.lastError on failure; we
         // don't have a throws version. Trust the store's logging + keep

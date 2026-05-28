@@ -304,7 +304,7 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - Synthetic future seed: runner must not mutate a future-versioned DB
 
     func testV17SyntheticSeed_migrationRunnerIsNoOp() throws {
-        // Build a head-shaped DB with schema_version=17 to simulate "DB from the future".
+        // Build a head-shaped DB with schema_version=19 to simulate "DB from the future".
         let loaded = try DatabaseSeedLoader.load(
             ddl: DatabaseSeeds.v17SyntheticDDL,
             data: DatabaseSeeds.v17SyntheticData
@@ -316,14 +316,14 @@ final class DatabaseMigrationTests: XCTestCase {
         let beforeVersion = try q.read { try Int.fetchOne($0, sql: "SELECT version FROM schema_version LIMIT 1") }
         let beforeRows = try q.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM user_settings") ?? -1 }
 
-        // Runner should short-circuit: seedVersion (18) > currentVersion (17).
+        // Runner should short-circuit: seedVersion (19) > currentVersion (18).
         try DatabaseManager.runMigrations(on: q)
 
         let afterVersion = try q.read { try Int.fetchOne($0, sql: "SELECT version FROM schema_version LIMIT 1") }
         let afterRows = try q.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM user_settings") ?? -1 }
 
-        XCTAssertEqual(beforeVersion, 18, "seed sanity")
-        XCTAssertEqual(afterVersion, 18, "runner must not lower schema_version")
+        XCTAssertEqual(beforeVersion, 19, "seed sanity")
+        XCTAssertEqual(afterVersion, 19, "runner must not lower schema_version")
         XCTAssertEqual(beforeRows, afterRows, "runner must not mutate a future-versioned DB")
     }
 }

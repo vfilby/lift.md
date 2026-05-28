@@ -37,6 +37,7 @@ Observable changes per schema version. Full migration contract lives in [`migrat
 | 15  | `user_settings` += `ai_prompt_include_format_pointer`, `ai_prompt_include_recent_workouts`, `ai_prompt_include_progression`, `ai_prompt_include_equipment` (INTEGER, default 1). |
 | 16  | `workout_inbox` table created (device-local, not synced, not exported). |
 | 17  | `outbox_pending_queue` table created (device-local, not synced, not exported). |
+| 18  | `workout_inbox` slimmed: `workout_json`, `summary_name`, `summary_exercise_count`, `summary_set_count` dropped. The table is a device-local cache repopulated from the server on the next poll, so the migration drops & recreates it with `lmwf_text` + metadata only. The list/preview summary (name + exercise/set counts) is now derived in memory by parsing `lmwf_text` on load — no persisted pre-parse. |
 
 ### Forward Compatibility
 
@@ -93,6 +94,7 @@ v14_default_weight_step_lbs
 v15_ai_prompt_toggles
 v16_workout_inbox
 v17_outbox_pending_queue
+v18_workout_inbox_drop_preparse
 ```
 
 The mapping is a wire-level contract — identifiers **must not change** after first ship. Canonical definition in [`../services/migrator.md`](../services/migrator.md).
@@ -373,9 +375,11 @@ CREATE TABLE IF NOT EXISTS sync_engine_state (
 
 ### workout_inbox
 
-Device-local table holding workouts pushed to this user from outside the app (e.g., Claude Code via PAT) that have not yet been promoted to a plan or discarded. Introduced in v16. See [`../services/workout-inbox.md`](../services/workout-inbox.md).
+Device-local table holding workouts pushed to this user from outside the app (e.g., Claude Code via PAT) that have not yet been promoted to a plan or discarded. Introduced in v16; slimmed in v18 to drop the persisted server pre-parse. See [`../services/workout-inbox.md`](../services/workout-inbox.md).
 
 **Not synced via CloudKit** and **excluded from `.db` backup exports** — the server (`/v1/workouts?status=pending`) is the source of truth; a fresh install repopulates by polling.
+
+The raw `lmwf_text` markdown is the single source of truth. The app parses it on-device (via `MarkdownParser`) for both the list/preview summary and for promotion to a `WorkoutPlan` — so the promoted plan is byte-identical to importing the same markdown as a file (preserves superset grouping / `parentExerciseId` and sets `sourceMarkdown`). Nothing pre-parsed is persisted.
 
 ```sql
 CREATE TABLE IF NOT EXISTS workout_inbox (
@@ -383,11 +387,7 @@ CREATE TABLE IF NOT EXISTS workout_inbox (
   fetched_at            TEXT NOT NULL,               -- ISO8601, when this device first stored it
   created_at_server     TEXT NOT NULL,               -- ISO8601, server-side created_at
   source_token_id       TEXT,                        -- PAT ULID or "session"
-  lmwf_text             TEXT NOT NULL,               -- original markdown
-  workout_json          TEXT NOT NULL,               -- full parsed WorkoutPlan (JSON)
-  summary_name          TEXT NOT NULL,               -- denormalized for list rendering
-  summary_exercise_count INTEGER NOT NULL DEFAULT 0,
-  summary_set_count     INTEGER NOT NULL DEFAULT 0
+  lmwf_text             TEXT NOT NULL                -- original markdown (single source of truth)
 );
 ```
 

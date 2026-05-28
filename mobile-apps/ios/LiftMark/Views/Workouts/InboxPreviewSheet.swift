@@ -5,6 +5,10 @@ import SwiftUI
 /// actions table) — this is the "tap a row" surface that's been in the spec
 /// since v1 but was deferred.
 ///
+/// The preview renders a `WorkoutPlan` parsed from the item's `lmwf_text`
+/// via the canonical `MarkdownParser` — the exact plan promotion would
+/// produce, so what you see is what you save (grouping intact, etc.).
+///
 /// Why a dedicated read-only view (vs. reusing `WorkoutDetailView`)?
 /// `WorkoutDetailView` is bound to a `planStore`-resident plan and exposes
 /// edit affordances. The inbox preview shows a workout that has NOT been
@@ -19,7 +23,7 @@ import SwiftUI
 /// reconciliation. Same handlers as the swipe + context-menu surfaces in
 /// `InboxSectionView`.
 struct InboxPreviewSheet: View {
-    let workout: InboxWorkout
+    let plan: WorkoutPlan
     let createdAtServer: Date
     let sourceTokenId: String?
     let onDiscard: () -> Void
@@ -33,14 +37,14 @@ struct InboxPreviewSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {
                     headerCard
-                    ForEach(Array(workout.exercises.enumerated()), id: \.offset) { _, exercise in
+                    ForEach(Array(plan.exercises.enumerated()), id: \.offset) { _, exercise in
                         exerciseCard(exercise)
                     }
                 }
                 .padding(LiftMarkTheme.spacingMD)
             }
             .background(LiftMarkTheme.secondaryBackground.ignoresSafeArea())
-            .navigationTitle(workout.name)
+            .navigationTitle(plan.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -60,7 +64,7 @@ struct InboxPreviewSheet: View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             HStack(spacing: LiftMarkTheme.spacingSM) {
                 Label(
-                    "\(workout.exercises.count) exercise\(workout.exercises.count == 1 ? "" : "s")",
+                    "\(plan.exercises.count) exercise\(plan.exercises.count == 1 ? "" : "s")",
                     systemImage: "figure.strengthtraining.traditional"
                 )
                 .font(.subheadline)
@@ -70,17 +74,17 @@ struct InboxPreviewSheet: View {
             }
             .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
-            if let tags = workout.tags, !tags.isEmpty {
-                FlowingTagRow(tags: tags)
+            if !plan.tags.isEmpty {
+                FlowingTagRow(tags: plan.tags)
             }
 
-            if let unit = workout.defaultWeightUnit {
-                Text("Default unit: \(unit)")
+            if let unit = plan.defaultWeightUnit {
+                Text("Default unit: \(unit.rawValue)")
                     .font(.caption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
 
-            if let description = workout.description, !description.isEmpty {
+            if let description = plan.description, !description.isEmpty {
                 Text(description)
                     .font(.subheadline)
                     .foregroundStyle(LiftMarkTheme.label)
@@ -99,7 +103,7 @@ struct InboxPreviewSheet: View {
     }
 
     private var totalSetCount: Int {
-        workout.exercises.reduce(0) { $0 + $1.sets.count }
+        plan.exercises.reduce(0) { $0 + $1.sets.count }
     }
 
     private var receivedFootnote: String {
@@ -116,7 +120,7 @@ struct InboxPreviewSheet: View {
     // MARK: - Exercise card
 
     @ViewBuilder
-    private func exerciseCard(_ exercise: InboxExercise) -> some View {
+    private func exerciseCard(_ exercise: PlannedExercise) -> some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             // Group badge (superset / section) — renders EmptyView when not grouped.
             groupBadge(for: exercise)
@@ -146,7 +150,7 @@ struct InboxPreviewSheet: View {
             if !exercise.sets.isEmpty {
                 Divider()
                 ForEach(Array(exercise.sets.enumerated()), id: \.offset) { idx, set in
-                    setRow(index: idx + 1, set: set, defaultUnit: workout.defaultWeightUnit)
+                    setRow(index: idx + 1, set: set, defaultUnit: plan.defaultWeightUnit)
                 }
             }
         }
@@ -157,9 +161,9 @@ struct InboxPreviewSheet: View {
     }
 
     @ViewBuilder
-    private func groupBadge(for exercise: InboxExercise) -> some View {
+    private func groupBadge(for exercise: PlannedExercise) -> some View {
         switch exercise.groupType {
-        case "superset":
+        case .superset:
             Text("SUPERSET")
                 .font(.caption2.bold())
                 .padding(.horizontal, 8)
@@ -167,7 +171,7 @@ struct InboxPreviewSheet: View {
                 .foregroundStyle(.purple)
                 .background(Color.purple.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
-        case "section":
+        case .section:
             Text((exercise.groupName ?? "Section").uppercased())
                 .font(.caption2.bold())
                 .padding(.horizontal, 8)
@@ -175,14 +179,14 @@ struct InboxPreviewSheet: View {
                 .foregroundStyle(LiftMarkTheme.primary)
                 .background(LiftMarkTheme.primary.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
-        default:
+        case .none:
             EmptyView()
         }
     }
 
     // MARK: - Set row
 
-    private func setRow(index: Int, set: InboxSet, defaultUnit: String?) -> some View {
+    private func setRow(index: Int, set: PlannedSet, defaultUnit: WeightUnit?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: LiftMarkTheme.spacingSM) {
             Text("\(index)")
                 .font(.callout.monospacedDigit())
@@ -197,21 +201,22 @@ struct InboxPreviewSheet: View {
         .padding(.vertical, 2)
     }
 
-    private func setDescription(_ set: InboxSet, defaultUnit: String?) -> String {
+    private func setDescription(_ set: PlannedSet, defaultUnit: WeightUnit?) -> String {
         // Time-only sets render as duration; weighted sets render as "wt unit × reps".
         if let time = set.targetTime, set.targetWeight == nil, set.targetReps == nil {
             return formatDuration(time)
         }
         var parts: [String] = []
         if let w = set.targetWeight {
-            let unit = set.targetWeightUnit ?? defaultUnit ?? ""
+            let unit = set.targetWeightUnit ?? defaultUnit
             let weightStr = w == w.rounded() ? String(Int(w)) : String(w)
-            parts.append(weightStr + (unit.isEmpty ? "" : " \(unit)"))
+            let unitStr = unit.map { " \($0.rawValue)" } ?? ""
+            parts.append(weightStr + unitStr)
         }
         if let reps = set.targetReps {
-            let repsLabel = (set.isAmrap ?? false) ? "AMRAP" : "\(reps) rep\(reps == 1 ? "" : "s")"
+            let repsLabel = set.isAmrap ? "AMRAP" : "\(reps) rep\(reps == 1 ? "" : "s")"
             parts.append(parts.isEmpty ? repsLabel : "× \(repsLabel)")
-        } else if set.isAmrap ?? false {
+        } else if set.isAmrap {
             parts.append("× AMRAP")
         }
         if let time = set.targetTime {
@@ -233,10 +238,10 @@ struct InboxPreviewSheet: View {
     }
 
     @ViewBuilder
-    private func modifierChips(_ set: InboxSet) -> some View {
+    private func modifierChips(_ set: PlannedSet) -> some View {
         HStack(spacing: 4) {
-            if set.isDropset ?? false { chip("drop") }
-            if set.isPerSide ?? false { chip("per-side") }
+            if set.isDropset { chip("drop") }
+            if set.isPerSide { chip("per-side") }
             if let rest = set.restSeconds, rest > 0 { chip("rest \(formatDuration(rest))") }
             if let tempo = set.tempo, !tempo.isEmpty { chip("tempo \(tempo)") }
         }

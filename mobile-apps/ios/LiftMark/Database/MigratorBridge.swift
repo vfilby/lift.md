@@ -40,11 +40,12 @@ enum MigratorBridge {
         "v14_default_weight_step_lbs",
         "v15_ai_prompt_toggles",
         "v16_workout_inbox",
-        "v17_outbox_pending_queue"
+        "v17_outbox_pending_queue",
+        "v18_workout_inbox_drop_preparse"
     ]
 
     /// Highest bridge version == number of registered migrations.
-    static let currentVersion = 17
+    static let currentVersion = 18
 
     // MARK: - Outcome
 
