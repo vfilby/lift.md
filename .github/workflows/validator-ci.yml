@@ -169,7 +169,7 @@ jobs:
         working-directory: validator/e2e
         run: npx playwright install --with-deps chromium
       - name: Download website bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: website-bundle
           path: website/dist
@@ -283,12 +283,12 @@ jobs:
         working-directory: validator/cdk
         run: npm ci --no-audit --no-fund
       - name: Download validator bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: validator-bundle
           path: validator/dist
       - name: Download website bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: website-bundle
           path: website/dist
@@ -436,12 +436,12 @@ jobs:
         working-directory: validator/cdk
         run: npm ci --no-audit --no-fund
       - name: Download validator bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: validator-bundle
           path: validator/dist
       - name: Download website bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: website-bundle
           path: website/dist
