@@ -1,14 +1,18 @@
-# Deploy User IAM Policies
+# Deploy IAM
 
-Two inline policies for two IAM users:
+CI/CD deploys authenticate via **GitHub Actions OIDC** (see below) — there are no
+static-key CI users. One inline policy remains, for the human break-glass user:
 
-- **`deploy-user-policy.json`** — human user `liftmark-deploy`, MFA-gated. Used by Vincent's CLI via SSO. (NOTE: file still references the pre-move account `341556346945`; current beta is `323146837100`.)
-- **`ci-deploy-beta-policy.json`** — CI user `liftmark-ci-deploy-beta` in account `323146837100`, no MFA (machine creds can't satisfy MFA). Used by Concourse to deploy `LmwfBetaEdgeStack` + `LmwfBetaValidatorStack`.
-- **`ci-deploy-prod-policy.json`** — CI user `liftmark-ci-deploy-prod` in account `825347768149`, same structure as the beta CI policy. Used by Concourse to deploy `LmwfProdEdgeStack` + `LmwfProdValidatorStack` when the manual gate is clicked.
+- **`deploy-user-policy.json`** — human user `liftmark-deploy` (account `323146837100`),
+  MFA-gated, for CLI break-glass deploys. Grants `sts:AssumeRole` on the
+  LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in `us-west-2` (Lambda + API
+  Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert + WAF), plus the
+  site S3/CloudFront content actions. All real permissions live in the bootstrap roles
+  themselves, scoped by `../deploy-policy.json`, which CDK maintains.
 
-Both grant `sts:AssumeRole` on the LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in both `us-west-2` (Lambda + API Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert + WAF). All real permissions live in the bootstrap roles themselves, scoped by `../deploy-policy.json`, which CDK maintains.
-
-> The `ci-deploy-*` users are being retired in favour of GitHub Actions OIDC — see below. They are removed once OIDC is live (issue #171).
+The Concourse `ci-deploy-{beta,prod}-policy.json` files and their IAM users were removed
+when Concourse was retired (issue #171). This policy covers **beta** only; for prod CLI
+break-glass, use SSO in the prod account (`825347768149`).
 
 ## GitHub Actions OIDC (deploy auth) — replaces the static-key CI users
 
@@ -23,7 +27,7 @@ The GitHub Actions deploy jobs (`.github/workflows/validator-ci.yml`) authentica
 These files are the reviewable record; they are **bootstrap tier** — applied once per account
 from a privileged SSO session, NOT part of the CDK app and NOT run by the pipeline (the role is
 what the pipeline assumes, so the pipeline can't create it; a deploy identity must not manage
-itself — same tier as `cdk bootstrap` and the `ci-deploy-*`/`deploy-user` policies here).
+itself — same tier as `cdk bootstrap` and the `deploy-user` policy here).
 
 - `github-oidc-trust-beta.json` / `github-oidc-trust-prod.json` — role trust policies
 - `github-oidc-perms-beta.json` / `github-oidc-perms-prod.json` — role permission policies
@@ -51,9 +55,9 @@ gh variable set AWS_DEPLOY_ROLE_ARN --repo vfilby/liftmark --env production \
 Also restrict each GitHub Environment (Settings → Environments → beta / production) with a
 **deployment branch policy** of `main`, so only `main` can claim the environment `sub`.
 
-Once OIDC is confirmed working (test via `gh workflow run Validator --ref main`), delete the
-`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment secrets and the `liftmark-ci-deploy-*`
-IAM users + policies.
+**Done (issue #171, Phase A/B):** OIDC is live and validated in prod; the
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment secrets and the
+`liftmark-ci-deploy-*` IAM users were deleted, and the Concourse pipeline was retired.
 
 ## `../deploy-policy.json` privilege-escalation hardening (L11)
 
@@ -80,37 +84,11 @@ aws iam put-user-policy \
   --policy-document file://deploy-user-policy.json
 ```
 
-For the CI user (one-time setup per env):
+(GitHub Actions deploys do not use this user — they assume the OIDC role described above.)
 
-```bash
-# beta
-aws --profile liftmark-beta iam create-user --user-name liftmark-ci-deploy-beta
-aws --profile liftmark-beta iam put-user-policy \
-  --user-name liftmark-ci-deploy-beta \
-  --policy-name CdkAssumeBootstrapRolesBeta \
-  --policy-document file://ci-deploy-beta-policy.json
-aws --profile liftmark-beta iam create-access-key --user-name liftmark-ci-deploy-beta
+### Prod prerequisites
 
-# prod
-aws --profile liftmark-prod iam create-user --user-name liftmark-ci-deploy-prod
-aws --profile liftmark-prod iam put-user-policy \
-  --user-name liftmark-ci-deploy-prod \
-  --policy-name CdkAssumeBootstrapRolesProd \
-  --policy-document file://ci-deploy-prod-policy.json
-aws --profile liftmark-prod iam create-access-key --user-name liftmark-ci-deploy-prod
-```
-
-The `create-access-key` output is the only time the secret is visible — copy `AccessKeyId` + `SecretAccessKey` straight into Concourse:
-
-```bash
-fly -t home set-pipeline -p liftmark-validator -c liftmark-validator.yml \
-  -v aws_access_key_id=<beta-key>      -v aws_secret_access_key=<beta-secret> \
-  -v aws_access_key_id_prod=<prod-key> -v aws_secret_access_key_prod=<prod-secret>
-```
-
-### Prod prerequisites (before clicking the deploy gate)
-
-- CDK bootstrap is run in account `825347768149` for both `us-west-2` and `us-east-1` with `--qualifier lmwf --toolkit-stack-name LmwfCdkToolkit` (otherwise the assume-role targets in `ci-deploy-prod-policy.json` won't exist).
+- CDK bootstrap is run in account `825347768149` for both `us-west-2` and `us-east-1` with `--qualifier lmwf --toolkit-stack-name LmwfCdkToolkit` (otherwise the `cdk-lmwf-*` assume-role targets won't exist).
 - The `liftmark.app` hosted zone gets created by `LmwfProdEdgeStack` — after the first deploy, the registrar's nameservers need to be updated to the new HZ's NS records (`HostedZoneNameServers` output).
 
 ## Prerequisites
@@ -118,10 +96,11 @@ fly -t home set-pipeline -p liftmark-validator -c liftmark-validator.yml \
 - Both regions must be CDK-bootstrapped with the `lmwf` qualifier and the `LmwfCdkToolkit` stack name. If you haven't already:
 
   ```bash
-  cdk bootstrap aws://341556346945/us-west-2 \
+  # <account> = 323146837100 (beta) or 825347768149 (prod)
+  cdk bootstrap aws://<account>/us-west-2 \
     --qualifier lmwf --toolkit-stack-name LmwfCdkToolkit
 
-  cdk bootstrap aws://341556346945/us-east-1 \
+  cdk bootstrap aws://<account>/us-east-1 \
     --qualifier lmwf --toolkit-stack-name LmwfCdkToolkit
   ```
 
@@ -139,7 +118,7 @@ fly -t home set-pipeline -p liftmark-validator -c liftmark-validator.yml \
 
   # subsequent updates
   aws iam create-policy-version \
-    --policy-arn arn:aws:iam::341556346945:policy/LmwfCdkDeployPolicy \
+    --policy-arn arn:aws:iam::<account>:policy/LmwfCdkDeployPolicy \
     --policy-document file://../deploy-policy.json \
     --set-as-default
   ```

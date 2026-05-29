@@ -149,7 +149,7 @@ Deploys go through AWS CDK, which authenticates via [aws-vault](https://github.c
 
 ### Identity model
 
-- **IAM user:** `liftmark-deploy` (account `341556346945`, region `us-west-2`)
+- **IAM user:** `liftmark-deploy` (account `323146837100`, region `us-west-2`)
 - **Attached policy:** the minimal inline policy at `cdk/iam/deploy-user-policy.json` — `sts:AssumeRole` on the four `cdk-hnb659fds-*` bootstrap roles, gated on `aws:MultiFactorAuthPresent`. Nothing else.
 - **Bootstrap roles** hold the actual CloudFormation / Lambda / S3 / IAM permissions. CDK assumes them automatically during deploy.
 
@@ -204,7 +204,7 @@ end
    [profile liftmark-validator-deploy]
    region = us-west-2
    output = json
-   mfa_serial = arn:aws:iam::341556346945:mfa/liftmark-validator-deploy
+   mfa_serial = arn:aws:iam::323146837100:mfa/liftmark-validator-deploy
    ```
 6. Verify: `aws-vault exec liftmark-validator-deploy -- aws sts get-caller-identity`.
 
