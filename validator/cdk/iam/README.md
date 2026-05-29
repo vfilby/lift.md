@@ -8,6 +8,53 @@ Two inline policies for two IAM users:
 
 Both grant `sts:AssumeRole` on the LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in both `us-west-2` (Lambda + API Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert + WAF). All real permissions live in the bootstrap roles themselves, scoped by `../deploy-policy.json`, which CDK maintains.
 
+> The `ci-deploy-*` users are being retired in favour of GitHub Actions OIDC — see below. They are removed once OIDC is live (issue #171).
+
+## GitHub Actions OIDC (deploy auth) — replaces the static-key CI users
+
+The GitHub Actions deploy jobs (`.github/workflows/validator-ci.yml`) authenticate to AWS via **OIDC**, not long-lived access keys (security finding **M4**, issue #171). Per stage account there is:
+
+- a GitHub OIDC identity provider (`token.actions.githubusercontent.com`), and
+- a role `GitHubActionsDeploy` whose trust is scoped to a single GitHub Environment `sub`
+  (`repo:vfilby/liftmark:environment:beta` / `…:environment:production`) and whose only
+  permissions are to `sts:AssumeRole` the `cdk-lmwf-*` bootstrap roles (plus the e2e secret
+  read in beta).
+
+These files are the reviewable record; they are **bootstrap tier** — applied once per account
+from a privileged SSO session, NOT part of the CDK app and NOT run by the pipeline (the role is
+what the pipeline assumes, so the pipeline can't create it; a deploy identity must not manage
+itself — same tier as `cdk bootstrap` and the `ci-deploy-*`/`deploy-user` policies here).
+
+- `github-oidc-trust-beta.json` / `github-oidc-trust-prod.json` — role trust policies
+- `github-oidc-perms-beta.json` / `github-oidc-perms-prod.json` — role permission policies
+- `setup-oidc.sh` — applies the above for one stage (SSO login → provider → role → policy)
+
+### Apply
+
+```bash
+# from validator/cdk/iam/ — uses your SSO profile (default liftmark-beta / liftmark-prod;
+# override with PROFILE=...). Re-runnable: updates the role in place if it already exists.
+./setup-oidc.sh beta
+./setup-oidc.sh prod
+```
+
+The script prints the role ARN and the `gh variable set` command to publish it to the
+matching GitHub Environment, e.g.:
+
+```bash
+gh variable set AWS_DEPLOY_ROLE_ARN --repo vfilby/liftmark --env beta \
+  --body "arn:aws:iam::323146837100:role/GitHubActionsDeploy"
+gh variable set AWS_DEPLOY_ROLE_ARN --repo vfilby/liftmark --env production \
+  --body "arn:aws:iam::825347768149:role/GitHubActionsDeploy"
+```
+
+Also restrict each GitHub Environment (Settings → Environments → beta / production) with a
+**deployment branch policy** of `main`, so only `main` can claim the environment `sub`.
+
+Once OIDC is confirmed working (test via `gh workflow run Validator --ref main`), delete the
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment secrets and the `liftmark-ci-deploy-*`
+IAM users + policies.
+
 ## `../deploy-policy.json` privilege-escalation hardening (L11)
 
 The scoped CFN execution policy is the blast radius once `cdk-lmwf-deploy-role` is assumed. Three guardrails close the classic "create a role, attach AdministratorAccess, PassRole it to a Lambda" escalation primitive:
