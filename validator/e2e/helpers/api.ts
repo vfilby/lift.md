@@ -195,25 +195,24 @@ export async function seedOutboxItem(opts: {
 }
 
 /**
- * Inject the seeded user's tokens into localStorage on the active page
- * so the dashboard treats it as a returning logged-in session — no UI
- * login required. The page must already be on the same origin as the
- * validator (i.e. baseURL).
+ * Establish a logged-in dashboard session for the seeded user.
+ *
+ * The dashboard no longer stores tokens in localStorage — the access JWT
+ * lives in memory and the refresh token is an httpOnly cookie the API sets
+ * on login (see website/src/scripts/api.js). There is therefore no token to
+ * inject; we drive the real login form once. The httpOnly refresh cookie it
+ * sets is what lets subsequent navigations re-mint the access JWT via the
+ * page's ensureSession() bootstrap.
  */
 export async function setBrowserSession(
   page: import('@playwright/test').Page,
   user: SeededUser,
 ): Promise<void> {
-  // Must be on the target origin before localStorage writes apply to it.
-  await page.goto('/');
-  await page.evaluate(
-    ({ jwt, userId, email }) => {
-      localStorage.setItem('lmwf_access_jwt', jwt);
-      localStorage.setItem(
-        'lmwf_user',
-        JSON.stringify({ user_id: userId, email, display_name: email }),
-      );
-    },
-    { jwt: user.sessionJwt, userId: user.userId, email: user.email },
-  );
+  await page.goto('/account/login');
+  await page.locator('#email').fill(user.email);
+  await page.locator('#password').fill(user.password);
+  await Promise.all([
+    page.waitForURL('**/account/'),
+    page.locator('#submit-btn').click(),
+  ]);
 }
