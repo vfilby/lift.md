@@ -47,14 +47,56 @@ export interface ListInboxOptions {
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
+/**
+ * Thrown when a pagination cursor is malformed, wrong-shape, or belongs to
+ * a different user. Routes catch this and return a clean 400 instead of the
+ * unhandled 500 a raw JSON.parse / DynamoDB ValidationException would yield.
+ */
+export class InvalidCursorError extends Error {
+  constructor(message = 'Invalid pagination cursor') {
+    super(message);
+    this.name = 'InvalidCursorError';
+  }
+}
+
 function encodeCursor(key: Record<string, unknown>): string {
   return Buffer.from(JSON.stringify(key), 'utf8').toString('base64');
 }
 
-function decodeCursor(cursor: string): Record<string, unknown> {
-  return JSON.parse(
-    Buffer.from(cursor, 'base64').toString('utf8'),
-  ) as Record<string, unknown>;
+/**
+ * Decode a paging cursor back into a DynamoDB ExclusiveStartKey, validating
+ * it before it is trusted. The cursor is attacker-controllable (a query
+ * param), so we: (1) guard base64-decode + JSON.parse against malformed
+ * input, (2) require the exact key shape we encode (`{user_id, inbox_id}`,
+ * both strings), and (3) assert the embedded user_id matches the
+ * authenticated caller. The DynamoDB key condition already pins reads to the
+ * caller's partition, so (3) is defense-in-depth — but it also turns a forged
+ * cross-tenant cursor into a clean 400 rather than a DynamoDB
+ * ValidationException 500.
+ */
+function decodeCursor(
+  cursor: string,
+  expectedUserId: string,
+): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, 'base64').toString('utf8'));
+  } catch {
+    throw new InvalidCursorError();
+  }
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    typeof (parsed as Record<string, unknown>).user_id !== 'string' ||
+    typeof (parsed as Record<string, unknown>).inbox_id !== 'string'
+  ) {
+    throw new InvalidCursorError();
+  }
+  const key = parsed as { user_id: string; inbox_id: string };
+  if (key.user_id !== expectedUserId) {
+    throw new InvalidCursorError();
+  }
+  return { user_id: key.user_id, inbox_id: key.inbox_id };
 }
 
 export async function createInboxItem(
@@ -102,7 +144,7 @@ export async function getInboxItemsByUser(
   }
 
   if (opts.sinceCursor) {
-    params.ExclusiveStartKey = decodeCursor(opts.sinceCursor);
+    params.ExclusiveStartKey = decodeCursor(opts.sinceCursor, user_id);
   }
 
   const result = await ddb.send(new QueryCommand(params));

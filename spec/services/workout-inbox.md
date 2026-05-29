@@ -82,14 +82,16 @@ degrade to `null` rather than failing the request.
 | POST   | `/v1/workouts`                | `workouts:write`| Push a new workout (LMWF body). Returns inbox item summary + warnings.                      |
 | GET    | `/v1/workouts`                | `workouts:read` | List items (latest first). iOS sends no `status` filter so it sees every live row; an optional `?status=` filter still works for the web portal. Returns summary only. |
 | GET    | `/v1/workouts/:inbox_id`      | `workouts:read` | Fetch one item including `workout` (full parsed plan) and `lmwf_text`.                      |
-| POST   | `/v1/workouts/:inbox_id/ack`  | `workouts:read` | **Orphaned/legacy.** Marks item `ingested`. No client calls it anymore (iOS and the web portal both stopped — GH #164); kept only so old rows/clients don't 404. Idempotent. |
-| DELETE | `/v1/workouts/:inbox_id`      | `workouts:read` | Hard-delete the row. The **only** way an item leaves the inbox. Called by iOS on Discard and after Promote/Start. |
+| POST   | `/v1/workouts/:inbox_id/ack`  | `workouts:write`| **Orphaned/legacy.** Marks item `ingested`. No client calls it anymore (iOS and the web portal both stopped — GH #164); kept only so old rows/clients don't 404. Idempotent. |
+| DELETE | `/v1/workouts/:inbox_id`      | `workouts:write`| Hard-delete the row. The **only** way an item leaves the inbox. Called by iOS on Discard and after Promote/Start. |
 
-Both `ack` and `DELETE` require the row to belong to the authenticated user (404 otherwise — no leak about whether the row exists).
+Both `ack` and `DELETE` are state-changing and require `workouts:write` (a read-only PAT must not be able to flip ingestion state or delete rows — least-privilege for tokens handed to third-party agents). They also require the row to belong to the authenticated user (404 otherwise — no leak about whether the row exists).
 
 ### Auth model
 
 Resource endpoints (`/v1/workouts/*`) accept session JWT **OR** PAT — see `validator/src/middleware/auth.ts`. Pushes from the web portal use the session; pushes from Claude Code use a PAT.
+
+**PAT scope allowlist.** `POST /v1/tokens` validates requested scopes against a server-side allowlist (`ALLOWED_SCOPES` in `validator/src/routes/tokens.ts`) — currently exactly the scopes the API enforces: `workouts:read`, `workouts:write`. Unknown scopes are rejected with `400`, and the array is length-capped. This keeps any future privileged scope deny-by-default for self-service token creation (a user cannot pre-mint a token carrying a scope the server hasn't yet wired up).
 
 ### Web portal inbox table
 

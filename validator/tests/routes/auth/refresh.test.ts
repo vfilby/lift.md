@@ -197,8 +197,18 @@ live('refresh-token routes', () => {
   });
 
   it('refresh: missing/malformed body → 400 or 401', async () => {
+    // No body AND no cookie → no token to present at all → 401. (An empty
+    // body is now valid, since the token may ride in the cookie instead.)
     const noBody = await app.request('/v1/auth/refresh', { method: 'POST' });
-    expect(noBody.status).toBe(400);
+    expect(noBody.status).toBe(401);
+
+    // A non-empty but malformed JSON body still 400s.
+    const malformed = await app.request('/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{ not json',
+    });
+    expect(malformed.status).toBe(400);
 
     const wrongShape = await app.request('/v1/auth/refresh', {
       method: 'POST',
@@ -396,6 +406,96 @@ live('refresh-token routes', () => {
 
     const res2 = await app.request('/v1/auth/logout-all', { method: 'POST' });
     expect(res2.status).toBe(401);
+  });
+
+  // ── M2: httpOnly refresh cookie ──
+
+  // Extract the lmwf_refresh value from a Set-Cookie header.
+  function cookieValue(setCookie: string | null): string | undefined {
+    const m = (setCookie ?? '').match(/lmwf_refresh=([^;]*)/);
+    return m ? m[1] : undefined;
+  }
+
+  it('refresh sets a rotated httpOnly lmwf_refresh cookie', async () => {
+    const login = await signupAndLogin();
+    const res = await refresh(login.refresh_token);
+    expect(res.status).toBe(200);
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/HttpOnly/i);
+    expect(setCookie).toMatch(/Secure/i);
+    expect(setCookie).toMatch(/SameSite=Strict/i);
+    expect(setCookie).toMatch(/Path=\/v1\/auth/i);
+    const body = (await res.json()) as RefreshBody;
+    // The cookie carries the NEW (rotated) token, not the old one.
+    expect(cookieValue(setCookie)).toBe(body.refresh_token);
+    expect(cookieValue(setCookie)).not.toBe(login.refresh_token);
+  });
+
+  it('refresh accepts the token from the cookie when the body is absent', async () => {
+    const login = await signupAndLogin();
+    // No body at all — token rides only in the cookie.
+    const res = await app.request('/v1/auth/refresh', {
+      method: 'POST',
+      headers: { cookie: `lmwf_refresh=${login.refresh_token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as RefreshBody;
+    expect(body.refresh_token).toMatch(/^lm_refresh_[A-Za-z0-9_-]{32}$/);
+    expect(body.refresh_token).not.toBe(login.refresh_token);
+  });
+
+  it('refresh prefers the body token when both body and cookie are present', async () => {
+    const a = await signupAndLogin();
+    const b = await signupAndLogin();
+
+    // Body has A's token, cookie has B's. Body must win, so A rotates and
+    // B's token is left untouched.
+    const res = await app.request('/v1/auth/refresh', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `lmwf_refresh=${b.refresh_token}`,
+      },
+      body: JSON.stringify({ refresh_token: a.refresh_token }),
+    });
+    expect(res.status).toBe(200);
+
+    // A's token was the one consumed → reusing it now is reuse/revoked.
+    expect((await refresh(a.refresh_token)).status).toBe(401);
+    // B's token was NOT touched → still usable.
+    expect((await refresh(b.refresh_token)).status).toBe(200);
+  });
+
+  it('logout clears the lmwf_refresh cookie (Max-Age=0)', async () => {
+    const login = await signupAndLogin();
+    const res = await app.request('/v1/auth/logout', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${login.access_jwt}`,
+        cookie: `lmwf_refresh=${login.refresh_token}`,
+      },
+      body: JSON.stringify({ refresh_token: login.refresh_token }),
+    });
+    expect(res.status).toBe(204);
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/lmwf_refresh=/);
+    expect(setCookie).toMatch(/Max-Age=0/i);
+  });
+
+  it('logout-all clears the lmwf_refresh cookie', async () => {
+    const login = await signupAndLogin();
+    const res = await app.request('/v1/auth/logout-all', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${login.access_jwt}`,
+        cookie: `lmwf_refresh=${login.refresh_token}`,
+      },
+    });
+    expect(res.status).toBe(204);
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/lmwf_refresh=/);
+    expect(setCookie).toMatch(/Max-Age=0/i);
   });
 
   it('identity deletion cascades to refresh tokens for that identity only', async () => {

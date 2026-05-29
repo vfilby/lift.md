@@ -6,7 +6,19 @@ Two inline policies for two IAM users:
 - **`ci-deploy-beta-policy.json`** — CI user `liftmark-ci-deploy-beta` in account `323146837100`, no MFA (machine creds can't satisfy MFA). Used by Concourse to deploy `LmwfBetaEdgeStack` + `LmwfBetaValidatorStack`.
 - **`ci-deploy-prod-policy.json`** — CI user `liftmark-ci-deploy-prod` in account `825347768149`, same structure as the beta CI policy. Used by Concourse to deploy `LmwfProdEdgeStack` + `LmwfProdValidatorStack` when the manual gate is clicked.
 
-Both grant `sts:AssumeRole` on the LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in both `us-west-2` (Lambda + API Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert). All real permissions live in the bootstrap roles themselves, scoped by `../deploy-policy.json`, which CDK maintains.
+Both grant `sts:AssumeRole` on the LiftMark-namespaced CDK bootstrap roles (`cdk-lmwf-*`) in both `us-west-2` (Lambda + API Gateway origin + S3 + CloudFront) and `us-east-1` (CloudFront cert + WAF). All real permissions live in the bootstrap roles themselves, scoped by `../deploy-policy.json`, which CDK maintains.
+
+## `../deploy-policy.json` privilege-escalation hardening (L11)
+
+The scoped CFN execution policy is the blast radius once `cdk-lmwf-deploy-role` is assumed. Three guardrails close the classic "create a role, attach AdministratorAccess, PassRole it to a Lambda" escalation primitive:
+
+- **`iam:PassRole` is constrained to `lambda.amazonaws.com`** (`Condition: iam:PassedToService`). The deploy role can only hand the roles it creates to Lambda — not to EC2/CodeBuild/etc.
+- **`iam:AttachRolePolicy` is allowlisted** (`Condition: iam:PolicyARN`) to exactly the managed policies CDK actually attaches: `AWSLambdaBasicExecutionRole` (the only AWS-managed policy the synth attaches today) plus `LmwfCdkDeployPolicy` itself. Arbitrary policies — including `AdministratorAccess` — can no longer be attached. **If a future stack legitimately needs another managed policy, add its ARN to this allowlist or the deploy fails closed.**
+- **`iam:PassRole` / `AttachRolePolicy` are split into their own statements** so the conditions apply only to those actions (a `Condition` on the combined statement would have wrongly gated `CreateRole`/`PutRolePolicy` too).
+
+Not added in code, but recommended: a **permissions boundary on `CreateRole`** (`Condition: StringEquals iam:PermissionsBoundary = <boundary-arn>`). This requires (a) creating a boundary managed policy and (b) configuring CDK to attach it (`@aws-cdk/core:permissionsBoundary` context / `PermissionsBoundary` aspect) so synthesized roles carry it — otherwise every `cdk deploy` fails. Left as a follow-up because it is a coordinated change across bootstrap + app config, not a code-only tweak.
+
+The `CloudFrontDistribution` statement keeps `Resource: "*"`: `cloudfront:CreateDistribution` (and the OAC/Function/Invalidation actions) do not support resource-level ARNs — the distribution ARN does not exist until creation — so `*` is genuinely required by the CloudFront API. The actions are account-scoped and the policy is only reachable post-assume-role, so this is acceptable.
 
 ## Applying
 
@@ -66,7 +78,9 @@ fly -t home set-pipeline -p liftmark-validator -c liftmark-validator.yml \
     --qualifier lmwf --toolkit-stack-name LmwfCdkToolkit
   ```
 
-  Pass `--cloudformation-execution-policies arn:aws:iam::341556346945:policy/LmwfCdkDeployPolicy` to either bootstrap call if you want the scoped execution policy (`../deploy-policy.json`) applied to the CFN deploy role. Omitting that flag uses CDK's default `AdministratorAccess` for the deploy role, which is acceptable for a single-project account.
+  **ALWAYS pass `--cloudformation-execution-policies arn:aws:iam::<account>:policy/LmwfCdkDeployPolicy`** to both bootstrap calls so the scoped execution policy (`../deploy-policy.json`) is applied to the CFN deploy role. Omitting the flag falls back to CDK's default `AdministratorAccess` on the deploy role — meaning anyone who can assume `cdk-lmwf-deploy-role` (humans via MFA, CI via the static key) gets full admin in the account. (L11)
+
+  > ⚠️ **Meatspace residual:** the deploy role's `--cloudformation-execution-policies` can only be set at bootstrap time — it cannot be retrofitted from this repo. If a prior bootstrap was run without the flag, the deploy role is still `AdministratorAccess` today regardless of the hardened `deploy-policy.json`. **On the next bootstrap (or a one-off `cdk bootstrap` re-run) of each account, pass the scoped policy flag** to remediate. Verify the current state with `aws cloudformation describe-stacks --stack-name LmwfCdkToolkit` → `CloudFormationExecutionPolicies` output.
 
   To create or refresh the managed policy:
 

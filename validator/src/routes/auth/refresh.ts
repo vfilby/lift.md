@@ -15,13 +15,32 @@
  * design notes. The handler here only sequences the repo calls; the
  * invariants (absolute expiry, family cascade, never-leak-old-token)
  * are enforced jointly by the repo and the handler.
+ *
+ * ── httpOnly refresh-cookie contract (M2) ──
+ *
+ * The web client never touches the refresh token in JS; the browser stores
+ * it as an httpOnly cookie set by the server. iOS keeps using the JSON
+ * `refresh_token` bearer. Both channels carry the SAME token value.
+ *
+ *   - Cookie name/attrs: `lmwf_refresh=<token>; HttpOnly; Secure;
+ *     SameSite=Strict; Path=/v1/auth; Max-Age=<remaining lifetime secs>`.
+ *     SameSite=Strict is the CSRF mitigation on these mutating endpoints.
+ *   - login (password.ts) and refresh SET the cookie (refresh rotates it,
+ *     Max-Age tracks the inherited absolute expiry — rotation never extends
+ *     it).
+ *   - refresh accepts the token from the JSON body OR the cookie; if BOTH
+ *     are present the body wins (keeps explicit iOS calls deterministic).
+ *     An empty/absent body is valid when the cookie carries the token.
+ *   - logout and logout-all CLEAR the cookie (Max-Age=0).
  */
 import { Hono } from 'hono';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { signJwt } from '../../infra/jwt.js';
 import { audit } from '../../infra/audit.js';
 import {
   getRefreshTokenByHash,
   hashRefreshToken,
+  refreshLifetimeSeconds,
   revokeFamilyByRoot,
   revokeRefreshToken,
   revokeAllForUser,
@@ -33,6 +52,7 @@ import {
   type SessionVariables,
 } from '../../middleware/session.js';
 import { requireFreshAuth } from '../../middleware/fresh.js';
+import { bumpTokensValidAfter } from '../../repositories/users.js';
 
 interface RefreshBody {
   refresh_token?: unknown;
@@ -43,6 +63,25 @@ interface LogoutBody {
 }
 
 const REFRESH_PREFIX = 'lm_refresh_';
+
+// httpOnly refresh cookie — mirrors the constants in password.ts. Scoped to
+// /v1/auth, SameSite=Strict (CSRF mitigation on these mutating endpoints).
+const REFRESH_COOKIE = 'lmwf_refresh';
+const REFRESH_COOKIE_PATH = '/v1/auth';
+
+/**
+ * Expire the refresh cookie. deleteCookie emits Max-Age=0 with the same
+ * attributes the browser needs to match the original (Path/Secure/SameSite),
+ * so the stored cookie is dropped.
+ */
+function clearRefreshCookie(c: Parameters<typeof deleteCookie>[0]): void {
+  deleteCookie(c, REFRESH_COOKIE, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Strict',
+    path: REFRESH_COOKIE_PATH,
+  });
+}
 
 export const refreshRouter = new Hono();
 
@@ -59,14 +98,26 @@ refreshRouter.post('/refresh', async (c) => {
     );
   }
 
-  let body: RefreshBody;
-  try {
-    body = await c.req.json<RefreshBody>();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
+  // Body is optional now: a browser client may present the token via the
+  // httpOnly cookie instead and send an empty/absent body. iOS keeps
+  // sending it in the JSON body. A malformed-but-present body still 400s.
+  let body: RefreshBody = {};
+  const rawBody = await c.req.text();
+  if (rawBody.length > 0) {
+    try {
+      body = JSON.parse(rawBody) as RefreshBody;
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
   }
 
-  const plaintext = body.refresh_token;
+  // Accept the refresh token from EITHER the JSON body (iOS bearer flow,
+  // back-compat) OR the lmwf_refresh cookie (browser flow). If both are
+  // present the body wins, keeping explicit iOS calls deterministic.
+  const bodyToken =
+    typeof body.refresh_token === 'string' ? body.refresh_token : undefined;
+  const cookieToken = getCookie(c, REFRESH_COOKIE);
+  const plaintext = bodyToken ?? cookieToken;
   if (typeof plaintext !== 'string' || !plaintext.startsWith(REFRESH_PREFIX)) {
     return c.json({ error: 'Invalid refresh token' }, 401);
   }
@@ -200,6 +251,17 @@ refreshRouter.post('/refresh', async (c) => {
     parent_token_hash: row.token_hash,
   });
 
+  // Rotate the httpOnly cookie too (M2). Max-Age tracks the inherited
+  // absolute expiry so the cookie dies with the family — rotation never
+  // extends it. iOS ignores the cookie and uses the JSON token below.
+  setCookie(c, REFRESH_COOKIE, new_refresh_token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Strict',
+    path: REFRESH_COOKIE_PATH,
+    maxAge: refreshLifetimeSeconds(newRow.expires_at),
+  });
+
   // Response intentionally omits the user object — caller can hit
   // a future /v1/me route if it needs to refresh user metadata.
   // The old refresh token is gone from server state at this point;
@@ -210,17 +272,28 @@ refreshRouter.post('/refresh', async (c) => {
 refreshRouter.post('/logout', sessionMiddleware, async (c) => {
   const ctx = c as typeof c & { var: SessionVariables };
 
-  let body: LogoutBody;
-  try {
-    body = await c.req.json<LogoutBody>();
-  } catch {
-    // Malformed body — still succeed silently. Logout should be the
-    // most forgiving endpoint; a confused client should still end up
-    // logged out without leaking server-side state.
-    return c.body(null, 204);
+  // Always clear the browser cookie, regardless of what happens below —
+  // logout's contract is "this client ends up logged out". We clear it up
+  // front so every early-return path also drops it.
+  clearRefreshCookie(c);
+
+  let body: LogoutBody = {};
+  const rawBody = await c.req.text();
+  if (rawBody.length > 0) {
+    try {
+      body = JSON.parse(rawBody) as LogoutBody;
+    } catch {
+      // Malformed body — still succeed silently. Logout should be the
+      // most forgiving endpoint; a confused client should still end up
+      // logged out without leaking server-side state.
+      return c.body(null, 204);
+    }
   }
 
-  const plaintext = body.refresh_token;
+  // Token from body (iOS) or cookie (browser); body wins if both present.
+  const bodyToken =
+    typeof body.refresh_token === 'string' ? body.refresh_token : undefined;
+  const plaintext = bodyToken ?? getCookie(c, REFRESH_COOKIE);
   if (typeof plaintext !== 'string' || !plaintext.startsWith(REFRESH_PREFIX)) {
     return c.body(null, 204);
   }
@@ -247,10 +320,23 @@ refreshRouter.post('/logout', sessionMiddleware, async (c) => {
 
 refreshRouter.post('/logout-all', sessionMiddleware, requireFreshAuth, async (c) => {
   const ctx = c as typeof c & { var: SessionVariables };
+  // requireFreshAuth gates this on a `fresh` access token (password
+  // login), so a victim holding only a rotated token must re-login first.
+  // That freshness dead-end is the intended L7 behavior: once H1 makes
+  // password reset revoke all tokens, a recovering user re-logs in
+  // (minting a fresh token) and logout-all is available again. No change
+  // to the gate is needed — re-login restores it.
   const revoked = await revokeAllForUser(
     ctx.var.session.user_id,
     'logout_all',
   );
+  // Bump the account access-token cutoff so the ≤1h access JWTs already in
+  // flight on other devices are rejected at the next request — "log out
+  // everywhere" should kill access tokens too, not just refresh tokens.
+  await bumpTokensValidAfter(ctx.var.session.user_id);
+  // Clear this browser's cookie too — its underlying token was just
+  // revoked along with all the others.
+  clearRefreshCookie(c);
   audit({
     event: 'logout_all',
     user_id: ctx.var.session.user_id,

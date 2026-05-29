@@ -61,8 +61,10 @@ import AccountLayout from '../../layouts/AccountLayout.astro';
           auth: false,
           body: { email, password },
         });
-        if (status === 200 && body && body.access_jwt && body.refresh_token) {
-          setSession(body.access_jwt, body.refresh_token, body.user);
+        if (status === 200 && body && body.access_jwt) {
+          // The refresh token arrives as an httpOnly cookie set by the
+          // server; body.refresh_token (for iOS bearer clients) is ignored.
+          setSession(body.access_jwt, body.user);
           window.location.replace('/account/');
           return;
         }

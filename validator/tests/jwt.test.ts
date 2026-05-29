@@ -56,6 +56,47 @@ describe('jwt helpers', () => {
     expect(() => verifyJwt(badToken)).toThrow();
   });
 
+  it('isTokenStaleForPassword: rejects tokens issued before the password change', async () => {
+    const { isTokenStaleForPassword } = await import('../src/infra/jwt.js');
+    const changedAt = '2026-05-28T12:00:05.000Z';
+    const changedSec = Math.floor(Date.parse(changedAt) / 1000);
+
+    // Issued a full second before the change → stale.
+    expect(isTokenStaleForPassword(changedSec - 1, changedAt)).toBe(true);
+    // Issued in the same second → NOT stale (no false-reject on first use).
+    expect(isTokenStaleForPassword(changedSec, changedAt)).toBe(false);
+    // Issued after the change → fresh.
+    expect(isTokenStaleForPassword(changedSec + 1, changedAt)).toBe(false);
+  });
+
+  it('isTokenStaleForPassword: never stale when no password timestamp or bad iat', async () => {
+    const { isTokenStaleForPassword } = await import('../src/infra/jwt.js');
+    expect(isTokenStaleForPassword(1_000_000, undefined)).toBe(false);
+    expect(isTokenStaleForPassword(undefined, '2026-05-28T12:00:00Z')).toBe(
+      false,
+    );
+    expect(isTokenStaleForPassword(1_000_000, 'not-a-date')).toBe(false);
+  });
+
+  it('tokenIssuedBefore: same whole-second semantics, generic cutoff', async () => {
+    const { tokenIssuedBefore, isTokenStaleForPassword } = await import(
+      '../src/infra/jwt.js'
+    );
+    const cutoff = '2026-05-28T12:00:05.000Z';
+    const cutoffSec = Math.floor(Date.parse(cutoff) / 1000);
+    expect(tokenIssuedBefore(cutoffSec - 1, cutoff)).toBe(true);
+    expect(tokenIssuedBefore(cutoffSec, cutoff)).toBe(false);
+    expect(tokenIssuedBefore(cutoffSec + 1, cutoff)).toBe(false);
+    // Absent / unparseable cutoff and bad iat never invalidate (legacy rows).
+    expect(tokenIssuedBefore(1_000_000, undefined)).toBe(false);
+    expect(tokenIssuedBefore(undefined, cutoff)).toBe(false);
+    expect(tokenIssuedBefore(1_000_000, 'not-a-date')).toBe(false);
+    // isTokenStaleForPassword is the password-scoped alias of the same logic.
+    expect(isTokenStaleForPassword(cutoffSec - 1, cutoff)).toBe(
+      tokenIssuedBefore(cutoffSec - 1, cutoff),
+    );
+  });
+
   it('throws on signJwt when JWT_SECRET is unset', async () => {
     const saved = process.env.JWT_SECRET;
     delete process.env.JWT_SECRET;

@@ -154,6 +154,55 @@ liveDdb('session middleware', () => {
     expect(res.status).toBe(200);
   });
 
+  it('rejects access tokens minted before the account tokens_valid_after cutoff', async () => {
+    const { app, createUser, signJwt } = await buildApp();
+    const { bumpTokensValidAfter } = await import(
+      '../../src/repositories/users.js'
+    );
+    const user = await createUser({
+      display_name: 'Cutoff',
+      primary_email: `cutoff-${Date.now()}-${Math.random()}@example.com`,
+    });
+    // Token minted "now"; cutoff set 5s in the future → token.iat predates it.
+    const token = signJwt(
+      { sub: user.user_id, identity_id: 'x', type: 'access', authn_age: 'fresh' },
+      '1h',
+    );
+    await bumpTokensValidAfter(
+      user.user_id,
+      new Date(Date.now() + 5000).toISOString(),
+    );
+    const res = await app.request('/protected', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows access tokens minted at/after the tokens_valid_after cutoff', async () => {
+    const { app, createUser, signJwt } = await buildApp();
+    const { bumpTokensValidAfter } = await import(
+      '../../src/repositories/users.js'
+    );
+    const user = await createUser({
+      display_name: 'Cutoff OK',
+      primary_email: `cutoffok-${Date.now()}-${Math.random()}@example.com`,
+    });
+    // Cutoff set in the past → a freshly-minted token is still valid (this is
+    // what a re-login after logout-all/reset produces).
+    await bumpTokensValidAfter(
+      user.user_id,
+      new Date(Date.now() - 5000).toISOString(),
+    );
+    const token = signJwt(
+      { sub: user.user_id, identity_id: 'x', type: 'access', authn_age: 'fresh' },
+      '1h',
+    );
+    const res = await app.request('/protected', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+  });
+
   it('rejects valid-looking tokens whose user has been deleted', async () => {
     const { app, signJwt } = await buildApp();
     const token = signJwt(

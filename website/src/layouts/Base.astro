@@ -18,17 +18,13 @@ const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${tit
     {description && <meta name="description" content={description} />}
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a1a1a'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='central' font-family='ui-monospace,monospace' font-weight='700' font-size='24' fill='%23fdfdfc'%3ELM%3C/text%3E%3C/svg%3E" />
     <link rel="alternate" type="text/markdown" href="/spec.md" title="LMWF spec (markdown)" />
-    <script is:inline>
-      // Pre-paint: apply stored color-scheme before first render to avoid FOUC.
-      (function () {
-        try {
-          var stored = localStorage.getItem('color-scheme');
-          if (stored === 'light' || stored === 'dark') {
-            document.documentElement.setAttribute('data-color-scheme', stored);
-            document.documentElement.style.colorScheme = stored;
-          }
-        } catch (_) { /* storage unavailable */ }
-      })();
+    <!--
+      Pre-paint color-scheme: imported as an external module (not `is:inline`)
+      so a strict `script-src 'self'` CSP from CloudFront accepts it without an
+      inline hash. Astro bundles it to a deferred /_astro/*.js module.
+    -->
+    <script>
+      import '../scripts/color-scheme-prepaint.js';
     </script>
   </head>
   <body>
@@ -343,59 +339,12 @@ const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${tit
       }
     </style>
 
-    <script is:inline>
-      (function () {
-        var icons = {
-          light: ['☼', 'Light mode (click for dark)'],
-          dark:  ['☾', 'Dark mode (click for auto)'],
-          auto:  ['◑', 'Auto / system (click for light)'],
-        };
-        var cycle = ['auto', 'light', 'dark'];
-
-        function applyScheme(scheme) {
-          var root = document.documentElement;
-          var btn = document.getElementById('color-toggle');
-          if (scheme === 'light' || scheme === 'dark') {
-            root.setAttribute('data-color-scheme', scheme);
-            root.style.colorScheme = scheme;
-          } else {
-            root.removeAttribute('data-color-scheme');
-            root.style.colorScheme = 'light dark';
-          }
-          if (btn) {
-            var entry = icons[scheme] || icons.auto;
-            btn.textContent = entry[0];
-            btn.title = entry[1];
-            btn.setAttribute('aria-label', entry[1]);
-          }
-        }
-
-        function currentScheme() {
-          try {
-            var v = localStorage.getItem('color-scheme');
-            if (v === 'light' || v === 'dark') return v;
-          } catch (_) {}
-          return 'auto';
-        }
-
-        function init() {
-          var scheme = currentScheme();
-          applyScheme(scheme);
-          var btn = document.getElementById('color-toggle');
-          if (!btn || btn.dataset.bound === '1') return;
-          btn.dataset.bound = '1';
-          btn.addEventListener('click', function () {
-            var next = cycle[(cycle.indexOf(currentScheme()) + 1) % cycle.length];
-            try {
-              if (next === 'auto') localStorage.removeItem('color-scheme');
-              else localStorage.setItem('color-scheme', next);
-            } catch (_) {}
-            applyScheme(next);
-          });
-        }
-
-        init();
-      })();
+    <!--
+      Color-scheme toggle: external module (not `is:inline`) for CSP
+      `script-src 'self'` compatibility. Astro bundles it to /_astro/*.js.
+    -->
+    <script>
+      import '../scripts/color-scheme-toggle.js';
     </script>
   </body>
 </html>

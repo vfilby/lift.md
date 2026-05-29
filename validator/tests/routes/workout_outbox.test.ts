@@ -266,6 +266,59 @@ live('Workout outbox routes (/v1/workouts/outbox)', () => {
     expect(getRes.status).toBe(404);
   });
 
+  it('read-only PAT cannot delete (403) — destructive action requires workouts:write', async () => {
+    // Owner (full scopes) creates an item.
+    const owner = await mintUserAndPat('ro-del-owner');
+    const postRes = await app.request('/v1/workouts/outbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${owner.plaintext}` },
+      body: JSON.stringify({ client_session_id: `s-${Date.now()}-${Math.random()}`, export: makeEnvelope() }),
+    });
+    const { outbox_id } = (await postRes.json()) as { outbox_id: string };
+
+    // A read-only PAT for the SAME user must not be able to delete it.
+    const readOnly = await createToken({
+      user_id: owner.user_id,
+      name: 'ro-del',
+      scopes: ['workouts:read'],
+      mode: 'test',
+    });
+    const del = await app.request(`/v1/workouts/outbox/${outbox_id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${readOnly.plaintext}` },
+    });
+    expect(del.status).toBe(403);
+
+    // Row survives.
+    const get = await app.request(`/v1/workouts/outbox/${outbox_id}`, {
+      headers: { authorization: `Bearer ${owner.plaintext}` },
+    });
+    expect(get.status).toBe(200);
+  });
+
+  it("user A cannot delete user B's outbox item (404), B's item survives", async () => {
+    const userA = await mintUserAndPat('idor-del-a');
+    const userB = await mintUserAndPat('idor-del-b');
+    const postRes = await app.request('/v1/workouts/outbox', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${userB.plaintext}` },
+      body: JSON.stringify({ client_session_id: `s-${Date.now()}-${Math.random()}`, export: makeEnvelope() }),
+    });
+    const { outbox_id } = (await postRes.json()) as { outbox_id: string };
+
+    const del = await app.request(`/v1/workouts/outbox/${outbox_id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${userA.plaintext}` },
+    });
+    expect(del.status).toBe(404);
+
+    // B can still read it.
+    const get = await app.request(`/v1/workouts/outbox/${outbox_id}`, {
+      headers: { authorization: `Bearer ${userB.plaintext}` },
+    });
+    expect(get.status).toBe(200);
+  });
+
   it('write-scope is enforced separately from read-scope on POST', async () => {
     const { plaintext } = await mintUserAndPat('read-only', ['workouts:read']);
 
