@@ -156,21 +156,7 @@
     {
       "Sid": "S3CDKAssets",
       "Effect": "Allow",
-      "Action": [
-        "s3:CreateBucket",
-        "s3:GetBucketLocation",
-        "s3:ListBucket",
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject",
-        "s3:GetBucketPolicy",
-        "s3:PutBucketPolicy",
-        "s3:PutBucketVersioning",
-        "s3:PutEncryptionConfiguration",
-        "s3:PutLifecycleConfiguration",
-        "s3:PutBucketPublicAccessBlock",
-        "s3:GetEncryptionConfiguration"
-      ],
+      "Action": "s3:*",
       "Resource": [
         "arn:aws:s3:::cdk-lmwf-*",
         "arn:aws:s3:::cdk-lmwf-*/*"
@@ -179,27 +165,7 @@
     {
       "Sid": "S3SiteBucket",
       "Effect": "Allow",
-      "Action": [
-        "s3:CreateBucket",
-        "s3:DeleteBucket",
-        "s3:GetBucketLocation",
-        "s3:ListBucket",
-        "s3:GetBucketPolicy",
-        "s3:PutBucketPolicy",
-        "s3:DeleteBucketPolicy",
-        "s3:PutBucketVersioning",
-        "s3:GetBucketVersioning",
-        "s3:PutEncryptionConfiguration",
-        "s3:GetEncryptionConfiguration",
-        "s3:PutBucketPublicAccessBlock",
-        "s3:GetBucketPublicAccessBlock",
-        "s3:PutBucketTagging",
-        "s3:GetBucketTagging",
-        "s3:PutLifecycleConfiguration",
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
+      "Action": "s3:*",
       "Resource": [
         "arn:aws:s3:::liftmark-workoutformat-*",
         "arn:aws:s3:::liftmark-workoutformat-*/*"

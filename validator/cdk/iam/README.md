@@ -71,6 +71,8 @@ Not added in code, but recommended: a **permissions boundary on `CreateRole`** (
 
 The `CloudFrontDistribution` statement keeps `Resource: "*"`: `cloudfront:CreateDistribution` (and the OAC/Function/Invalidation actions) do not support resource-level ARNs — the distribution ARN does not exist until creation — so `*` is genuinely required by the CloudFront API. The actions are account-scoped and the policy is only reachable post-assume-role, so this is acceptable.
 
+The two S3 statements use `Action: "s3:*"` **scoped to specific bucket ARNs** (`cdk-lmwf-*` assets and `liftmark-workoutformat-*` site) rather than an explicit action list. This is a deliberate trade: enumerating every S3 action pushed the policy past IAM's 6,144-char managed-policy limit (whitespace excluded), so `LmwfCdkDeployPolicy` could not be created at all. `s3:*` bounded by resource grants the deploy role nothing beyond full control of buckets it already owns end-to-end, and it does not touch the IAM/`PassRole`/`AttachRolePolicy` guardrails above (the actual escalation surface). Keep new statements terse — the policy must stay under 6,144 non-whitespace characters or `aws iam create-policy` fails with `LimitExceeded`.
+
 ## Applying
 
 AWS Console → IAM → Users → `liftmark-deploy` → Permissions → Create inline policy → paste the JSON → name it `CdkAssumeBootstrapRoles`.
