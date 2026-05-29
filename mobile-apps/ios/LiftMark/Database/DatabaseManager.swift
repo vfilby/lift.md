@@ -70,6 +70,13 @@ final class DatabaseManager: @unchecked Sendable {
         }
         let dbQueue = try DatabaseQueue(path: dbPath, configuration: configuration)
 
+        // Defense-in-depth for the on-device workout DB (see SECURITY_ASSESSMENT L12).
+        // The genuinely sensitive secrets live in the Keychain; this hardens the
+        // SQLite file (workout history) at rest and keeps it out of unencrypted
+        // desktop / iCloud backups. Best-effort: failures are logged, not fatal —
+        // the app must still open even if the filesystem rejects an attribute.
+        Self.protectDatabaseFiles(at: URL(fileURLWithPath: dbPath), containerDirectory: sqliteDir)
+
         try dbQueue.write { db in
             try db.execute(sql: "PRAGMA foreign_keys = ON")
         }
@@ -86,6 +93,68 @@ final class DatabaseManager: @unchecked Sendable {
         try Self.runMigrations(on: dbQueue)
         self.dbQueue = dbQueue
         return dbQueue
+    }
+
+    // MARK: - At-rest protection
+
+    /// Hardens the SQLite database files at rest (SECURITY_ASSESSMENT L12):
+    ///
+    /// 1. Sets an explicit `NSFileProtection` class so the file is encrypted
+    ///    on disk. `.completeUntilFirstUserAuthentication` is the safe default:
+    ///    it keeps the DB readable for background tasks (push/CloudKit sync)
+    ///    after the first unlock following a reboot, unlike `.complete` which
+    ///    would lock us out while the device is locked.
+    /// 2. Marks the file (and its `-wal`/`-shm` sidecars and containing
+    ///    directory) as excluded from backup, so workout history is never
+    ///    copied into unencrypted iTunes/Finder desktop backups.
+    ///
+    /// Best-effort and idempotent — applied on every open. Failures are logged
+    /// but never thrown: an attribute we can't set must not stop the app from
+    /// launching.
+    private static func protectDatabaseFiles(at dbURL: URL, containerDirectory: URL) {
+        let fileManager = FileManager.default
+
+        // GRDB writes alongside the main DB file in WAL mode; protect all three.
+        // The sidecars share the DB filename with a `-wal` / `-shm` suffix
+        // (e.g. `liftmark.db-wal`), so append to the path rather than the URL.
+        let directory = dbURL.deletingLastPathComponent()
+        let dbFileName = dbURL.lastPathComponent
+        let dbFileURLs = [
+            dbURL,
+            directory.appendingPathComponent(dbFileName + "-wal"),
+            directory.appendingPathComponent(dbFileName + "-shm"),
+        ]
+
+        for url in dbFileURLs where fileManager.fileExists(atPath: url.path) {
+            // (1) File-protection class.
+            do {
+                try fileManager.setAttributes(
+                    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                    ofItemAtPath: url.path
+                )
+            } catch {
+                Logger.shared.error(.database, "Failed to set file protection on \(url.lastPathComponent)", error: error)
+            }
+
+            // (2) Exclude from backup.
+            excludeFromBackup(url)
+        }
+
+        // Also exclude the containing SQLite directory so the whole DB store
+        // (including any future sidecars) stays out of backups.
+        excludeFromBackup(containerDirectory)
+    }
+
+    /// Sets `isExcludedFromBackup = true` on a file/directory URL. Best-effort.
+    private static func excludeFromBackup(_ url: URL) {
+        var url = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+            try url.setResourceValues(values)
+        } catch {
+            Logger.shared.error(.database, "Failed to exclude \(url.lastPathComponent) from backup", error: error)
+        }
     }
 
     /// Close the database connection.
