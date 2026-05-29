@@ -55,7 +55,8 @@ export class LmwfEdgeStack extends cdk.Stack {
       name: `${namePrefix}-cloudfront`,
       scope: 'CLOUDFRONT',
       defaultAction: { allow: {} },
-      description: `LMWF ${envConfig.name} CloudFront WAF — managed rules + rate limits`,
+      // WAFv2 description is regex-constrained (no em-dash / non-ASCII punctuation).
+      description: `LMWF ${envConfig.name} CloudFront WAF - managed rules and rate limits`,
       visibilityConfig: {
         cloudWatchMetricsEnabled: true,
         metricName: `${namePrefix}-cloudfront-acl`,
