@@ -18,6 +18,7 @@ concurrency:
 permissions:
   contents: read
   deployments: write
+  id-token: write   # OIDC: assume the per-env AWS deploy role (no static keys)
 
 jobs:
   # ── Stage 0: changes ───────────────────────────────────────────────────
@@ -292,11 +293,13 @@ jobs:
         with:
           name: website-bundle
           path: website/dist
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: CDK deploy (beta)
         working-directory: validator/cdk
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           BUILD_COMMIT="${{ github.sha }}"
@@ -360,11 +363,13 @@ jobs:
       - name: Install Playwright browser
         working-directory: validator/e2e
         run: npx playwright install --with-deps chromium
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: Fetch E2E test secret from beta Secrets Manager
         id: get-secret
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           SECRET=$(aws secretsmanager get-secret-value \
@@ -445,11 +450,13 @@ jobs:
         with:
           name: website-bundle
           path: website/dist
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: CDK deploy (prod)
         working-directory: validator/cdk
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           BUILD_COMMIT="${{ github.sha }}"
