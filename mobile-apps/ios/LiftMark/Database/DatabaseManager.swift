@@ -97,51 +97,41 @@ final class DatabaseManager: @unchecked Sendable {
 
     // MARK: - At-rest protection
 
-    /// Hardens the SQLite database files at rest (SECURITY_ASSESSMENT L12):
+    /// Hardens the SQLite database store at rest (SECURITY_ASSESSMENT L12).
     ///
-    /// 1. Sets an explicit `NSFileProtection` class so the file is encrypted
-    ///    on disk. `.completeUntilFirstUserAuthentication` is the safe default:
-    ///    it keeps the DB readable for background tasks (push/CloudKit sync)
-    ///    after the first unlock following a reboot, unlike `.complete` which
-    ///    would lock us out while the device is locked.
-    /// 2. Marks the file (and its `-wal`/`-shm` sidecars and containing
-    ///    directory) as excluded from backup, so workout history is never
-    ///    copied into unencrypted iTunes/Finder desktop backups.
+    /// Operates on the *containing directory* only, never the open DB files:
+    ///
+    /// 1. Sets an explicit `NSFileProtection` class on the directory so files
+    ///    created in it inherit encryption at rest.
+    ///    `.completeUntilFirstUserAuthentication` is the safe default — it keeps
+    ///    the DB readable for background tasks (push/CloudKit sync) after the
+    ///    first unlock following a reboot, unlike `.complete`. (Files with no
+    ///    explicit class already default to this, so this is belt-and-braces.)
+    /// 2. Marks the directory as excluded from backup, which covers the whole
+    ///    store — `liftmark.db` and its `-wal`/`-shm` sidecars — so workout
+    ///    history is never copied into unencrypted iTunes/Finder backups.
+    ///
+    /// Deliberately NOT touching the live db / `-wal` / `-shm` files: mutating
+    /// their attributes while GRDB holds them open in WAL mode perturbs
+    /// checkpoint state (it regressed DatabaseBackupServiceTests). Hardening the
+    /// directory subtree achieves the same guarantees without reaching into the
+    /// open SQLite files.
     ///
     /// Best-effort and idempotent — applied on every open. Failures are logged
     /// but never thrown: an attribute we can't set must not stop the app from
     /// launching.
     private static func protectDatabaseFiles(at dbURL: URL, containerDirectory: URL) {
-        let fileManager = FileManager.default
-
-        // GRDB writes alongside the main DB file in WAL mode; protect all three.
-        // The sidecars share the DB filename with a `-wal` / `-shm` suffix
-        // (e.g. `liftmark.db-wal`), so append to the path rather than the URL.
-        let directory = dbURL.deletingLastPathComponent()
-        let dbFileName = dbURL.lastPathComponent
-        let dbFileURLs = [
-            dbURL,
-            directory.appendingPathComponent(dbFileName + "-wal"),
-            directory.appendingPathComponent(dbFileName + "-shm"),
-        ]
-
-        for url in dbFileURLs where fileManager.fileExists(atPath: url.path) {
-            // (1) File-protection class.
-            do {
-                try fileManager.setAttributes(
-                    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                    ofItemAtPath: url.path
-                )
-            } catch {
-                Logger.shared.error(.database, "Failed to set file protection on \(url.lastPathComponent)", error: error)
-            }
-
-            // (2) Exclude from backup.
-            excludeFromBackup(url)
+        // (1) File-protection class on the directory (inherited by its files).
+        do {
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: containerDirectory.path
+            )
+        } catch {
+            Logger.shared.error(.database, "Failed to set file protection on SQLite directory", error: error)
         }
 
-        // Also exclude the containing SQLite directory so the whole DB store
-        // (including any future sidecars) stays out of backups.
+        // (2) Exclude the whole store directory (db + -wal + -shm) from backup.
         excludeFromBackup(containerDirectory)
     }
 
