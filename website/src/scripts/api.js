@@ -12,9 +12,16 @@
 //     website deliberately ignores it.
 //
 //   - access JWT: short-lived (~1h), sent as `Authorization: Bearer <jwt>` on
-//     every API call. Held ONLY in a module-scope in-memory variable (never
-//     localStorage). Because it lives in memory it is gone after a reload —
-//     pages bootstrap a fresh one from the refresh cookie via ensureSession().
+//     every API call. Held in sessionStorage (per-tab, cleared when the tab
+//     closes) with an in-memory cache. sessionStorage — not a bare module
+//     variable — because the /account portal is a multi-page app: a bare
+//     variable is lost on every full-page navigation, which would force a
+//     refresh-token rotation on each page load and race the server's
+//     reuse-detection (concurrent rotations / multi-tab → spurious logout).
+//     sessionStorage survives same-tab navigation, so we only refresh when the
+//     token actually expires. It is XSS-readable, but it is the SHORT-LIVED
+//     token, not the 1-year refresh token (which stays httpOnly), and the
+//     CloudFront CSP is the XSS backstop.
 //
 //   - USER_KEY: non-sensitive display data (name/email/tier). Kept in
 //     localStorage purely so the dashboard can paint a name before the first
@@ -25,12 +32,21 @@
 // reads the cookie, rotates it, and returns a new access JWT.
 
 export const USER_KEY = 'lmwf_user';
+// Access JWT lives in sessionStorage (NOT localStorage): short-lived, per-tab.
+const ACCESS_KEY = 'lmwf_access_jwt';
 
-// Short-lived access JWT — in memory only, never persisted.
+// In-memory cache mirrored to sessionStorage so reads are cheap and a tab that
+// blocks storage still works within its lifetime.
 let accessJwt = null;
 
-export function getJwt() {
+function readStoredJwt() {
+  if (accessJwt) return accessJwt;
+  try { accessJwt = sessionStorage.getItem(ACCESS_KEY); } catch {}
   return accessJwt;
+}
+
+export function getJwt() {
+  return readStoredJwt();
 }
 
 export function getUser() {
@@ -40,10 +56,14 @@ export function getUser() {
   } catch { return null; }
 }
 
-// Store the access JWT in memory. The refresh token is intentionally NOT a
-// parameter — it lives only in the httpOnly cookie the server set.
+// Store the access JWT (sessionStorage + cache). The refresh token is
+// intentionally NOT a parameter — it lives only in the httpOnly cookie.
 export function setSession(accessJwtValue, user) {
   accessJwt = accessJwtValue || null;
+  try {
+    if (accessJwt) sessionStorage.setItem(ACCESS_KEY, accessJwt);
+    else sessionStorage.removeItem(ACCESS_KEY);
+  } catch {}
   try {
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch {}
@@ -51,13 +71,13 @@ export function setSession(accessJwtValue, user) {
 
 export function clearSession() {
   accessJwt = null;
-  try {
-    localStorage.removeItem(USER_KEY);
-  } catch {}
+  try { sessionStorage.removeItem(ACCESS_KEY); } catch {}
+  try { localStorage.removeItem(USER_KEY); } catch {}
 }
 
 function sessionHeader() {
-  return accessJwt ? { Authorization: `Bearer ${accessJwt}` } : {};
+  const jwt = readStoredJwt();
+  return jwt ? { Authorization: `Bearer ${jwt}` } : {};
 }
 
 // Internal: mint a fresh access JWT from the httpOnly refresh cookie.
@@ -98,7 +118,7 @@ async function tryRefreshTokens() {
 // cookie if needed (e.g. on first page load after a reload, when the in-memory
 // JWT is gone). Returns true if a session is available, false otherwise.
 export async function ensureSession() {
-  if (accessJwt) return true;
+  if (readStoredJwt()) return true;
   return tryRefreshTokens();
 }
 
