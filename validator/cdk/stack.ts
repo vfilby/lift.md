@@ -415,17 +415,18 @@ function handler(event) {
     // HSTS, anti-clickjacking, nosniff, and Referrer-Policy controls the site
     // and authenticated /account portal were missing entirely.
     //
-    // CSP: `default-src 'self'` with no `'unsafe-inline'`. The website ships
-    // two inline <script> blocks (Base.astro); the website agent adds the
-    // matching CSP hashes via Astro's build so they load under `script-src
-    // 'self' <hash>`. We deliberately keep `'self'`-only here rather than
-    // weakening to `'unsafe-inline'` — coordinate hashes, do not relax this.
+    // CSP: `script-src 'self'` (no `'unsafe-inline'`) is the real XSS control —
+    // all site scripts are external ES modules, so no script hashes are needed.
+    // `style-src` DOES allow `'unsafe-inline'`: the site applies runtime inline
+    // styles (theme/color-scheme toggle sets element.style, Astro scoped
+    // <style>), which can't be practically hashed; inline *style* injection is
+    // far lower-risk than script injection, so this is the standard tradeoff.
     // `img-src 'self' data:` permits inlined icons/SVGs; everything else is
     // locked to same-origin.
     const csp = [
       "default-src 'self'",
       "script-src 'self'",
-      "style-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
       "connect-src 'self'",
       "img-src 'self' data:",
       "font-src 'self'",
