@@ -70,6 +70,13 @@ final class DatabaseManager: @unchecked Sendable {
         }
         let dbQueue = try DatabaseQueue(path: dbPath, configuration: configuration)
 
+        // Defense-in-depth for the on-device workout DB (see SECURITY_ASSESSMENT L12).
+        // The genuinely sensitive secrets live in the Keychain; this hardens the
+        // SQLite file (workout history) at rest and keeps it out of unencrypted
+        // desktop / iCloud backups. Best-effort: failures are logged, not fatal —
+        // the app must still open even if the filesystem rejects an attribute.
+        Self.protectDatabaseFiles(at: URL(fileURLWithPath: dbPath), containerDirectory: sqliteDir)
+
         try dbQueue.write { db in
             try db.execute(sql: "PRAGMA foreign_keys = ON")
         }
@@ -86,6 +93,58 @@ final class DatabaseManager: @unchecked Sendable {
         try Self.runMigrations(on: dbQueue)
         self.dbQueue = dbQueue
         return dbQueue
+    }
+
+    // MARK: - At-rest protection
+
+    /// Hardens the SQLite database store at rest (SECURITY_ASSESSMENT L12).
+    ///
+    /// Operates on the *containing directory* only, never the open DB files:
+    ///
+    /// 1. Sets an explicit `NSFileProtection` class on the directory so files
+    ///    created in it inherit encryption at rest.
+    ///    `.completeUntilFirstUserAuthentication` is the safe default — it keeps
+    ///    the DB readable for background tasks (push/CloudKit sync) after the
+    ///    first unlock following a reboot, unlike `.complete`. (Files with no
+    ///    explicit class already default to this, so this is belt-and-braces.)
+    /// 2. Marks the directory as excluded from backup, which covers the whole
+    ///    store — `liftmark.db` and its `-wal`/`-shm` sidecars — so workout
+    ///    history is never copied into unencrypted iTunes/Finder backups.
+    ///
+    /// Deliberately NOT touching the live db / `-wal` / `-shm` files: mutating
+    /// their attributes while GRDB holds them open in WAL mode perturbs
+    /// checkpoint state (it regressed DatabaseBackupServiceTests). Hardening the
+    /// directory subtree achieves the same guarantees without reaching into the
+    /// open SQLite files.
+    ///
+    /// Best-effort and idempotent — applied on every open. Failures are logged
+    /// but never thrown: an attribute we can't set must not stop the app from
+    /// launching.
+    private static func protectDatabaseFiles(at dbURL: URL, containerDirectory: URL) {
+        // (1) File-protection class on the directory (inherited by its files).
+        do {
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: containerDirectory.path
+            )
+        } catch {
+            Logger.shared.error(.database, "Failed to set file protection on SQLite directory", error: error)
+        }
+
+        // (2) Exclude the whole store directory (db + -wal + -shm) from backup.
+        excludeFromBackup(containerDirectory)
+    }
+
+    /// Sets `isExcludedFromBackup = true` on a file/directory URL. Best-effort.
+    private static func excludeFromBackup(_ url: URL) {
+        var url = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+            try url.setResourceValues(values)
+        } catch {
+            Logger.shared.error(.database, "Failed to exclude \(url.lastPathComponent) from backup", error: error)
+        }
     }
 
     /// Close the database connection.

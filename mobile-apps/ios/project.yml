@@ -100,20 +100,12 @@ targets:
         outputFiles:
           - $(SRCROOT)/LiftMark/App/BuildInfo.swift
       - name: Generate SentryConfig
+        # Delegates to scripts/gen-sentry-config.sh (single source of truth,
+        # also invoked before `xcodegen generate` in CI/Makefile so the
+        # gitignored file exists for source globbing). SENTRY_DSN_REST is
+        # exposed here as a build setting from Config/Sentry.xcconfig.
         script: |
-          # SENTRY_DSN_REST comes from Config/Sentry.xcconfig (scheme-less to avoid
-          # xcconfig's // comment handling). Empty is fine — CrashReporter no-ops.
-          if [ -n "${SENTRY_DSN_REST}" ]; then
-            DSN="https://${SENTRY_DSN_REST}"
-          else
-            DSN=""
-          fi
-          cat > "${SRCROOT}/LiftMark/App/SentryConfig.swift" << SWIFT
-          // Auto-generated at build time — do not edit. Source: Config/Sentry.xcconfig
-          enum SentryConfig {
-              static let dsn = "${DSN}"
-          }
-          SWIFT
+          "${SRCROOT}/scripts/gen-sentry-config.sh"
         outputFiles:
           - $(SRCROOT)/LiftMark/App/SentryConfig.swift
     dependencies:

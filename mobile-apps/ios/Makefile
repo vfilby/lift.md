@@ -16,6 +16,7 @@ resolve:
 	swift package resolve
 
 generate: Config/Sentry.xcconfig
+	./scripts/gen-sentry-config.sh
 	xcodegen generate
 
 # Auto-copy the example xcconfig on first generate so fresh checkouts work.

@@ -51,6 +51,11 @@ jobs:
           SENTRY_DSN_REST =
           EOF
 
+      - name: Generate SentryConfig (pre-xcodegen)
+        # Gitignored; must exist before xcodegen globs sources (the Xcode build
+        # phase refreshes it during the build). Empty DSN is fine for this job.
+        run: ./scripts/gen-sentry-config.sh
+
       - name: Generate Xcode project
         run: xcodegen generate
 
@@ -139,6 +144,12 @@ jobs:
           cat > Config/Sentry.xcconfig <<EOF
           SENTRY_DSN_REST = ${DSN_REST}
           EOF
+
+      - name: Generate SentryConfig (pre-xcodegen)
+        # Must exist before xcodegen globs sources. Generate it with the real
+        # DSN now (read from the xcconfig written above); the Xcode build phase
+        # also refreshes it during the build.
+        run: ./scripts/gen-sentry-config.sh
 
       - name: Generate Xcode project
         run: xcodegen generate
