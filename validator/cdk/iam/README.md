@@ -104,26 +104,21 @@ aws iam put-user-policy \
     --qualifier lmwf --toolkit-stack-name LmwfCdkToolkit
   ```
 
-  **ALWAYS pass `--cloudformation-execution-policies arn:aws:iam::<account>:policy/LmwfCdkDeployPolicy`** to both bootstrap calls so the scoped execution policy (`../deploy-policy.json`) is applied to the CFN deploy role. Omitting the flag falls back to CDK's default `AdministratorAccess` on the deploy role — meaning anyone who can assume `cdk-lmwf-deploy-role` (humans via MFA, CI via the static key) gets full admin in the account. (L11)
+  **ALWAYS pass `--cloudformation-execution-policies arn:aws:iam::<account>:policy/LmwfCdkDeployPolicy`** to both bootstrap calls so the scoped execution policy (`../deploy-policy.json`) is applied to the CFN deploy role. Omitting the flag falls back to CDK's default `AdministratorAccess` on the deploy role — meaning anyone who can assume `cdk-lmwf-deploy-role` gets full admin in the account. (L11)
 
-  > ⚠️ **Meatspace residual:** the deploy role's `--cloudformation-execution-policies` can only be set at bootstrap time — it cannot be retrofitted from this repo. If a prior bootstrap was run without the flag, the deploy role is still `AdministratorAccess` today regardless of the hardened `deploy-policy.json`. **On the next bootstrap (or a one-off `cdk bootstrap` re-run) of each account, pass the scoped policy flag** to remediate. Verify the current state with `aws cloudformation describe-stacks --stack-name LmwfCdkToolkit` → `CloudFormationExecutionPolicies` output.
+### Refresh the managed policy + verify bootstrap scoping (M4 Phase C)
 
-  To create or refresh the managed policy:
+`refresh-deploy-policy.sh` creates/refreshes the `LmwfCdkDeployPolicy` managed policy from `../deploy-policy.json` and checks that the bootstrap actually wired it as the CFN execution policy in both regions. **Re-run it whenever `deploy-policy.json` changes** so what's on AWS matches the repo.
 
-  ```bash
-  # first time
-  aws iam create-policy \
-    --policy-name LmwfCdkDeployPolicy \
-    --policy-document file://../deploy-policy.json
+```bash
+# from validator/cdk/iam/ — privileged SSO session; PROFILE=... to override
+./refresh-deploy-policy.sh beta
+./refresh-deploy-policy.sh prod
+```
 
-  # subsequent updates
-  aws iam create-policy-version \
-    --policy-arn arn:aws:iam::<account>:policy/LmwfCdkDeployPolicy \
-    --policy-document file://../deploy-policy.json \
-    --set-as-default
-  ```
+If an account/region reports **NOT scoped**, the deploy role is still `AdministratorAccess` (the `--cloudformation-execution-policies` flag can only be set at bootstrap time — it can't be retrofitted). The script prints the exact `cdk bootstrap … --cloudformation-execution-policies …` re-run to fix it; run that, then re-run the script to confirm.
 
-- Bootstrap roles trust the account root (default for `cdk bootstrap` without `--trust` overrides).
+- Bootstrap roles trust the account root (default for `cdk bootstrap` without `--trust` overrides). Tightening this to the OIDC deploy role is optional follow-up hardening (issue #171).
 - User must have MFA configured and be accessed via aws-vault (or another MFA-prompting flow).
 
 ## Why two regions?
