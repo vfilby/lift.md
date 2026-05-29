@@ -28,8 +28,8 @@
         "cloudformation:DeleteChangeSet"
       ],
       "Resource": [
-        "arn:aws:cloudformation:*:*:stack/LmwfValidatorStack/*",
-        "arn:aws:cloudformation:*:*:stack/LmwfEdgeStack/*",
+        "arn:aws:cloudformation:*:*:stack/Lmwf*ValidatorStack/*",
+        "arn:aws:cloudformation:*:*:stack/Lmwf*EdgeStack/*",
         "arn:aws:cloudformation:*:*:stack/LmwfCdkToolkit/*"
       ]
     },
@@ -53,8 +53,8 @@
         "lambda:ListTags"
       ],
       "Resource": [
-        "arn:aws:lambda:*:*:function:LmwfValidatorStack-*",
-        "arn:aws:lambda:*:*:function:LmwfEdgeStack-*"
+        "arn:aws:lambda:*:*:function:Lmwf*ValidatorStack-*",
+        "arn:aws:lambda:*:*:function:Lmwf*EdgeStack-*"
       ]
     },
     {
@@ -88,8 +88,8 @@
         "iam:UntagRole"
       ],
       "Resource": [
-        "arn:aws:iam::*:role/LmwfValidatorStack-*",
-        "arn:aws:iam::*:role/LmwfEdgeStack-*",
+        "arn:aws:iam::*:role/Lmwf*ValidatorStack-*",
+        "arn:aws:iam::*:role/Lmwf*EdgeStack-*",
         "arn:aws:iam::*:role/cdk-lmwf-*"
       ]
     },
@@ -98,8 +98,8 @@
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": [
-        "arn:aws:iam::*:role/LmwfValidatorStack-*",
-        "arn:aws:iam::*:role/LmwfEdgeStack-*",
+        "arn:aws:iam::*:role/Lmwf*ValidatorStack-*",
+        "arn:aws:iam::*:role/Lmwf*EdgeStack-*",
         "arn:aws:iam::*:role/cdk-lmwf-*"
       ],
       "Condition": {
@@ -113,8 +113,8 @@
       "Effect": "Allow",
       "Action": "iam:AttachRolePolicy",
       "Resource": [
-        "arn:aws:iam::*:role/LmwfValidatorStack-*",
-        "arn:aws:iam::*:role/LmwfEdgeStack-*",
+        "arn:aws:iam::*:role/Lmwf*ValidatorStack-*",
+        "arn:aws:iam::*:role/Lmwf*EdgeStack-*",
         "arn:aws:iam::*:role/cdk-lmwf-*"
       ],
       "Condition": {
@@ -138,8 +138,8 @@
         "logs:TagResource"
       ],
       "Resource": [
-        "arn:aws:logs:*:*:log-group:/aws/lambda/LmwfValidatorStack-*",
-        "arn:aws:logs:*:*:log-group:/aws/lambda/LmwfEdgeStack-*"
+        "arn:aws:logs:*:*:log-group:/aws/lambda/Lmwf*ValidatorStack-*",
+        "arn:aws:logs:*:*:log-group:/aws/lambda/Lmwf*EdgeStack-*"
       ]
     },
     {
@@ -151,7 +151,7 @@
         "cloudwatch:DescribeAlarms",
         "cloudwatch:TagResource"
       ],
-      "Resource": "arn:aws:cloudwatch:*:*:alarm:LmwfValidatorStack-*"
+      "Resource": "arn:aws:cloudwatch:*:*:alarm:Lmwf*ValidatorStack-*"
     },
     {
       "Sid": "S3CDKAssets",
