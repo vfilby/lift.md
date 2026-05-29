@@ -286,6 +286,12 @@
       ]
     },
     {
+      "Sid": "SecretsManagerRead",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:*:*:secret:lmwf-*"
+    },
+    {
       "Sid": "STSCallerIdentity",
       "Effect": "Allow",
       "Action": "sts:GetCallerIdentity",
