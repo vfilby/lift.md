@@ -82,6 +82,7 @@ for region in "${REGIONS[@]}"; do
     echo "  [$region] ✗ NOT scoped (CloudFormationExecutionPolicies='${VAL:-<empty = AdministratorAccess>}')"
     echo "            deploy role is still AdministratorAccess — re-bootstrap to fix:"
     echo "            npx cdk bootstrap aws://${ACCT}/${region} \\"
+    echo "              --profile ${PROFILE} \\"
     echo "              --qualifier ${QUALIFIER} --toolkit-stack-name ${TOOLKIT} \\"
     echo "              --cloudformation-execution-policies ${POLICY_ARN}"
     NEEDS_FIX=1
