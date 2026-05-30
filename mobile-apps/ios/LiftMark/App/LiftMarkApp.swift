@@ -165,10 +165,16 @@ struct LiftMarkApp: App {
                         Task {
                             await CKSyncEngineManager.shared.start()
                         }
+                        // Wait for launch session restoration to settle before
+                        // the first authed calls, so an expired access token is
+                        // refreshed first rather than tripping a premature 401
+                        // / refresh-token race. See spec/services/authentication.md.
                         Task { @MainActor in
+                            await authStore.restoreSession()
                             await inboxPoller.pollIfAuthenticated()
                         }
                         Task { @MainActor in
+                            await authStore.restoreSession()
                             await outboxPusher.flushIfAuthenticated()
                         }
                     }
@@ -181,9 +187,11 @@ struct LiftMarkApp: App {
                                 await CKSyncEngineManager.shared.start()
                             }
                             Task { @MainActor in
+                                await authStore.restoreSession()
                                 await inboxPoller.pollIfAuthenticated()
                             }
                             Task { @MainActor in
+                                await authStore.restoreSession()
                                 await outboxPusher.flushIfAuthenticated()
                             }
                         }
