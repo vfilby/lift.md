@@ -72,7 +72,8 @@ account credential and must keep `.password` without a paired `.username`.)
 ### Location
 
 Served at the apex by the validator CDK stack, which uploads the Astro build
-output (`website/dist`) to the prod S3 bucket via a `BucketDeployment`. Astro
+output (`website/dist`) to the prod S3 bucket via a **single**
+`BucketDeployment` (the whole site, including the `.well-known/` subtree). Astro
 copies `website/public/**` verbatim into `website/dist/**`, so the source file
 lives at:
 
@@ -120,10 +121,25 @@ Two stack behaviours would otherwise break this and are explicitly handled in
 
 2. **Content-Type.** S3/`BucketDeployment` infers content type from the file
    extension; an extensionless object defaults to `application/octet-stream`.
-   A dedicated `BucketDeployment` scoped to `.well-known/*` uploads that subtree
-   with an explicit `contentType: 'application/json'`. The main site
-   `BucketDeployment` excludes `.well-known/*` so the two deployments don't
-   fight over the same keys (each prunes only its own keyspace).
+   A small CloudFront **viewer-response** Function (`AasaContentTypeFn`),
+   associated with the default behaviour, overrides the response
+   `content-type` to `application/json` for the exact URI
+   `/.well-known/apple-app-site-association`. This is CloudFront-native — it
+   needs no Lambda layer and no extra IAM.
+
+   A **second `BucketDeployment`** is deliberately **NOT** used for this. Each
+   `BucketDeployment` provisions its own AWS-CLI Lambda layer, and publishing
+   that layer requires `lambda:PublishLayerVersion`, which the scoped
+   `cdk-lmwf-cfn-exec-role` is not permitted to call. A second deployment for
+   `.well-known/*` (the original PR #183 approach) therefore fails the deploy
+   with a 403 on `lambda:PublishLayerVersion`. The single site
+   `BucketDeployment` uploads the whole site (no `.well-known` exclude), and
+   the viewer-response function handles the Content-Type.
+
+   Note: Apple's `webcredentials` fetch does not strictly require
+   `application/json` (octet-stream also works for password autofill), so the
+   viewer-response override is a correctness nicety rather than a hard
+   requirement — but it is cheap and CloudFront-native, so it is kept.
 
 The default CloudFront behaviour serves S3, so `/.well-known/*` is **not**
 routed to the `/validate`, `/v1/*`, or `/version` API origins.
@@ -155,7 +171,9 @@ Recommended sequence:
   byte-for-byte identical to the source, and it is valid JSON
   (`jq . website/dist/.well-known/apple-app-site-association`).
 - The CDK stack synthesises (`cd validator/cdk && npx cdk synth`) with the
-  rewrite-function exception and the scoped `.well-known` `BucketDeployment`.
+  viewer-request rewrite-function `.well-known` short-circuit and the
+  viewer-response `AasaContentTypeFn`, served from the single site
+  `BucketDeployment` (no second `.well-known` deployment / AwsCliLayer).
 - `cd mobile-apps/ios && make generate && make build` regenerates the project
   with the entitlement and compiles cleanly.
 - Post-deploy, on device: invoke the sign-in form; iCloud Keychain / the
