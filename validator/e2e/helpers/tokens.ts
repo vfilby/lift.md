@@ -34,6 +34,9 @@ interface MailpitListResponse {
   messages: MailpitMessageSummary[];
 }
 
+// Match group 1 = the token; the full match (group 0) = the whole link,
+// which the host-assertion helper below parses to verify the link points
+// at the env-correct host (beta vs prod).
 const VERIFY_LINK_RE =
   /https?:\/\/[^\s<>'"]+\/v1\/auth\/password\/verify\?token=([^\s<>'")]+)/;
 const RESET_LINK_RE =
@@ -109,6 +112,55 @@ export async function getLatestToken(
   return getMode() === 'local'
     ? fetchLatestMailpitToken(email, type, timeoutMs)
     : mintRemoteToken(email, type);
+}
+
+/**
+ * Local-only: return the FULL verify/reset link from the latest Mailpit
+ * email to `email`. Used by the "email link host == env appBaseUrl"
+ * topology assertion — a misconfigured LMWF_ENV on the Lambda builds links
+ * pointing at the wrong host (the #137 reset-misrouting class). The link
+ * body is only readable where Mailpit is the transport, i.e. local mode,
+ * which still gates prod via the e2e-local required check.
+ *
+ * Throws if called outside local mode — callers must guard on getMode().
+ */
+export async function getLatestEmailLink(
+  email: string,
+  type: TokenType,
+  timeoutMs = 5_000,
+): Promise<string> {
+  if (getMode() !== 'local') {
+    throw new Error(
+      'getLatestEmailLink is local-only (Mailpit transport). Guard callers on getMode() === "local".',
+    );
+  }
+  const re = type === 'email_verify' ? VERIFY_LINK_RE : RESET_LINK_RE;
+  const mailpit = getMailpitUrl();
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const listRes = await fetch(
+      `${mailpit}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
+    );
+    if (!listRes.ok) {
+      await sleep(200);
+      continue;
+    }
+    const list = (await listRes.json()) as MailpitListResponse;
+    for (const summary of list.messages) {
+      const detailRes = await fetch(`${mailpit}/api/v1/message/${summary.ID}`);
+      if (!detailRes.ok) continue;
+      const detail = (await detailRes.json()) as MailpitMessageDetail;
+      const body = `${detail.Text}\n${detail.HTML}`;
+      const match = re.exec(body);
+      if (match?.[0]) return match[0];
+    }
+    await sleep(200);
+  }
+
+  throw new Error(
+    `Timed out after ${timeoutMs}ms waiting for ${type} email link to ${email} in Mailpit at ${mailpit}.`,
+  );
 }
 
 function sleep(ms: number): Promise<void> {

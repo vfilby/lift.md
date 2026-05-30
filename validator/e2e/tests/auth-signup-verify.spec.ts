@@ -1,7 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { deleteTestUser } from '../helpers/api.js';
-import { signupTestEmail, uniqueEmail } from '../helpers/env.js';
-import { getLatestToken } from '../helpers/tokens.js';
+import {
+  expectedEmailLinkHost,
+  getMode,
+  signupTestEmail,
+  uniqueEmail,
+} from '../helpers/env.js';
+import { getLatestEmailLink, getLatestToken } from '../helpers/tokens.js';
 
 test('full signup → email verify flow', async ({ page, request }) => {
   const email = signupTestEmail();
@@ -19,6 +24,15 @@ test('full signup → email verify flow', async ({ page, request }) => {
   await page.locator('#password').fill(password);
   await page.locator('#password_confirm').fill(password);
 
+  // The signup POST returning 201 is itself a topology assertion (test (d)
+  // in spec/services/validator-e2e.md): the email send is the LAST step
+  // before the 201 and the handler ROLLS BACK + returns 503 if the send
+  // throws (password.ts:282-325). So in remote/beta mode a 201 for the
+  // SES-verified address proves SES credentials resolve on the deployed
+  // stack — it cannot be reached if SES rejects with placeholder creds (the
+  // #137 SES-placeholder class). No separate signup POST is needed; this is
+  // the existing real send, now asserted. (Beta SES only — the prod-side
+  // SES-creds check remains a separate concern; see spec.)
   await Promise.all([
     page.waitForResponse(
       (r) => r.url().endsWith('/v1/auth/password/signup') && r.status() === 201,
@@ -29,6 +43,17 @@ test('full signup → email verify flow', async ({ page, request }) => {
   // Form swaps to the "Check your email" state.
   await expect(page.locator('#success-state')).toBeVisible();
   await expect(page.locator('#sent-email')).toHaveText(email);
+
+  // Topology assertion (b): the verification link host must match the env's
+  // appBaseUrl. A misconfigured LMWF_ENV on the Lambda builds links for the
+  // wrong host (the #137 reset-link-misrouting class). Only assertable where
+  // we can read the email body = local/Mailpit mode (which still gates prod
+  // via e2e-local). Remote mode mints the token directly, so there is no
+  // email body to read — skip cleanly there.
+  if (getMode() === 'local') {
+    const link = await getLatestEmailLink(email, 'email_verify');
+    expect(new URL(link).host).toBe(expectedEmailLinkHost());
+  }
 
   // Pull the token (Mailpit local / mint-token remote) and verify it via
   // the same JSON endpoint the email link's GET redirector hits. Goes
