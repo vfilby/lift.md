@@ -125,6 +125,12 @@ jobs:
         with:
           name: website-bundle
           path: website/dist
+          # The site ships /.well-known/apple-app-site-association (AASA) for
+          # iOS webcredentials. `.well-known` is a hidden directory, and
+          # upload-artifact excludes hidden files by default (v4+), which
+          # silently dropped the AASA from the bundle so it never reached S3
+          # and CloudFront served 403. Keep hidden files so deploy uploads it.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
