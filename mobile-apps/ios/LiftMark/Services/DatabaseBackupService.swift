@@ -33,8 +33,17 @@ enum DatabaseBackupService {
 
     // MARK: - Export
 
-    /// Export a copy of the current database file to the cache directory.
-    /// Returns the URL of the exported backup.
+    /// Export a clean, fully-consistent copy of the current database to the cache
+    /// directory. Returns the URL of the exported backup.
+    ///
+    /// The copy is produced with `VACUUM INTO` via the live GRDB connection
+    /// (`DatabaseManager.vacuumInto`), NOT a raw `FileManager.copyItem` of the
+    /// main DB file. GRDB runs SQLite in WAL mode, so committed data — and on a
+    /// freshly-migrated DB, whole tables — can still reside in the `liftmark.db-wal`
+    /// sidecar until a checkpoint folds them into the main file. A plain file copy
+    /// of only `liftmark.db` could therefore omit recent writes or entire tables.
+    /// `VACUUM INTO` emits a single, self-contained, sidecar-free file reflecting
+    /// the complete current state regardless of WAL position. See spec/services/backup.md.
     static func exportDatabase() throws -> URL {
         let dbPath = try getDatabasePath()
 
@@ -53,10 +62,10 @@ enum DatabaseBackupService {
         }
         let exportURL = cacheDir.appendingPathComponent(exportFileName)
 
-        // Remove existing file if present
+        // VACUUM INTO requires the destination not already exist; clear any stale file.
         try? FileManager.default.removeItem(at: exportURL)
 
-        try FileManager.default.copyItem(at: dbPath, to: exportURL)
+        try DatabaseManager.shared.vacuumInto(exportURL)
 
         return exportURL
     }

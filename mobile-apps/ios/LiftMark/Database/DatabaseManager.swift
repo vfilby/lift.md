@@ -147,6 +147,33 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    /// Write a clean, fully-consistent, self-contained copy of the live database
+    /// to `destinationURL` using SQLite's `VACUUM INTO`.
+    ///
+    /// GRDB runs the database in WAL mode, so committed data (including, on a
+    /// freshly-migrated DB, whole `CREATE TABLE` statements) can still live in the
+    /// `-wal` sidecar until a checkpoint folds it into the main file. A plain
+    /// `FileManager.copyItem` of only `liftmark.db` therefore risks producing a
+    /// backup that is missing recent writes — or entire tables. `VACUUM INTO`
+    /// instead has the *live* connection emit a brand-new database file that
+    /// reflects the complete, current logical state regardless of WAL position,
+    /// and — unlike `Database.backup(to:)` — yields a single file with **no**
+    /// `-wal`/`-shm` sidecars, which is exactly what a shareable export needs.
+    ///
+    /// `VACUUM` cannot run inside a transaction, so this uses
+    /// `writeWithoutTransaction`. The destination path must not already exist;
+    /// callers are responsible for removing any stale file first. The live DB's
+    /// WAL mode is left untouched.
+    func vacuumInto(_ destinationURL: URL) throws {
+        let dbQueue = try database()
+        try dbQueue.writeWithoutTransaction { db in
+            // Single-quote-escape the path for safe interpolation into the SQL
+            // string literal (VACUUM INTO takes a literal, not a bound parameter).
+            let escapedPath = destinationURL.path.replacingOccurrences(of: "'", with: "''")
+            try db.execute(sql: "VACUUM INTO '\(escapedPath)'")
+        }
+    }
+
     /// Close the database connection.
     ///
     /// Deterministically tears down the underlying SQLite connection (and its
