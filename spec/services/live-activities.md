@@ -84,6 +84,21 @@ Shows complete details for the current set so users can perform it without openi
 - **Dynamic Island compact**: Dumbbell icon (leading), percentage complete (trailing)
 - **Dynamic Island minimal**: Dumbbell icon
 
+#### 2a. Cursor Advance on Skip / Completion
+
+The "current exercise" passed to `updateWorkoutLiveActivity()` is derived as the first exercise in the session containing a set whose status is still `pending`. Skipping a set (marking it `skipped`) does not count as pending, so skipping the last pending set(s) of an exercise advances the cursor to the next exercise that still has pending sets.
+
+- When the user skips the last pending set of an exercise, the running Live Activity **must** advance to display the next exercise with pending sets (its first pending set's weight × reps). It must not remain stuck on the just-skipped exercise.
+- This advance must be applied even if a previous update fired within the throttle window: when the resolved current exercise differs from a "no pending sets remain" terminal state, the update is significant and must not be silently dropped (see Update Throttling).
+
+#### 2b. No Pending Sets Remaining (Finishing State)
+
+When **no** exercise in the session has any pending set (every set is `completed` or `skipped`) and there is no active rest timer, the current exercise resolves to `nil`. In this case the workout is effectively done but the user has not yet tapped Finish, so the Live Activity **must not** be left displaying the stale prior exercise. Instead it transitions to a **finishing state**:
+
+- Title "Workout Complete", subtitle "Great job!", progress `1.0` — visually identical to the completion message shown by `endWorkoutLiveActivity()` so that skip-to-finish and explicit-finish look consistent.
+- The activity is **kept alive** (not dismissed). `updateWorkoutLiveActivity()` only updates content; the activity is dismissed only when the workout is formally ended/cancelled/paused via `endWorkoutLiveActivity()`.
+- This transition is **not** subject to the update throttle — it must always be applied so the cursor never gets stuck on a skipped exercise.
+
 #### 2. Rest Timer State
 
 Shows a countdown timer and previews the next set so users know what's coming:
@@ -107,6 +122,14 @@ The rest timer uses `timerEndDate` with SwiftUI's `Text(date, style: .timer)`. C
 - `timerEndDate <= now` → red (expired, counting up)
 
 Note: The system `.timer` style automatically counts down to the target date, then counts up past it.
+
+### Update Throttling
+
+`updateWorkoutLiveActivity()` throttles ordinary content refreshes to at most one per second to avoid excessive Live Activity churn during rapid set logging. However, two transitions are considered significant and must bypass the throttle so they are never dropped:
+
+- A transition **into** the finishing state (no pending sets remain) — see "No Pending Sets Remaining".
+
+All other updates (active set → active set, rest timer ticks) remain throttled.
 
 ### Progress Bar
 
@@ -182,6 +205,11 @@ All operations silently catch and discard errors. Live Activities are an optiona
 - Rest timer state must include: "Rest" as exercise name, timer end date, next exercise name with its set details, and progress.
 - When there is no next exercise (last exercise in workout), `nextExerciseName` and `nextSetDetail` must be nil.
 - Widget UI must show green timer color when time remains and red when timer has expired.
+
+### Cursor Advance on Skip
+- Skipping the last pending set of an exercise resolves the current exercise to the next exercise with pending sets; the resolved active-set state must name that next exercise, not the skipped one.
+- When all sets are completed/skipped (no pending sets remain), the resolved state must be the finishing state ("Workout Complete" / "Great job!" / progress 1.0), not the stale prior exercise and not a no-op that leaves the activity unchanged.
+- The finishing-state transition bypasses the update throttle.
 
 ### Race Condition Prevention
 - The end-then-start sequence in `startWorkoutLiveActivity()` must be serialized — the new activity must not be requested until the previous one is confirmed ended.
