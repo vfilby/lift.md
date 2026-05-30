@@ -98,6 +98,153 @@ E2E asserts that those modules, the static website, and the deploy
 topology compose into a working product from the browser's point of
 view.
 
+## Prod-gate coverage model
+
+### What actually gates prod
+
+The validator deploy pipeline (`.github/workflows/validator-ci.yml`) is a
+linear chain, each stage a required predecessor of the next:
+
+```
+validate (Vitest: typecheck + npm test)
+  → build
+  → e2e-local   (Playwright vs local DDB+Mailpit stack)   ← gates prod
+  → deploy-beta
+  → smoke-beta
+  → e2e-beta    (Playwright vs https://beta.liftmark.app)  ← gates prod
+  → deploy-prod
+```
+
+`deploy-prod` needs `smoke-beta` AND `e2e-beta`; `deploy-beta` needs
+`e2e-local`; `e2e-local`/`e2e-beta` both need `build`, which needs
+`validate`. **Therefore Vitest, e2e-local, AND e2e-beta all hard-gate
+prod.** A contract pinned by any one of them cannot regress into a prod
+deploy. This is the load-bearing fact behind the division of labour below.
+
+### Division of labour: Vitest owns logic, e2e owns topology
+
+The Vitest route tests + `flow.test.ts` run the *exact same handler code*
+that runs on Lambda — same conditional-expression semantics, in-process.
+They are the authoritative owners of every **pure-handler contract** (auth
+decisions, IDOR/tenancy isolation, scope enforcement, token rotation/reuse,
+anti-enumeration, single-use reset, dedup, tier gates). e2e does **not**
+re-assert these: duplicating a conditional that already runs identically
+in-process buys zero topology signal and adds cost + flake.
+
+e2e exists to catch the **topology delta** — the bytes/wiring that only
+differ once the handler sits behind API Gateway + CloudFront + Lambda +
+real SES: response *headers* (Set-Cookie attributes), *link hosts* built
+from the deployed env, the *authorizer/scope middleware actually being
+wired* in front of the route, and *real SES credentials resolving*. None of
+those are visible to an in-process `app.request()`.
+
+### Vitest-owned contracts (NOT duplicated in e2e)
+
+| Contract | Owning Vitest test (file:line) |
+|----------|-------------------------------|
+| Cross-user IDOR — delete | `tests/routes/workouts.test.ts:722` ("user A cannot delete user B's inbox item (404)"); outbox: `tests/routes/workout_outbox.test.ts:299` |
+| Cross-user IDOR — read/ack/list | `tests/routes/workouts.test.ts:673`, `:693`, `:748`; forged cursor `:654` |
+| PAT scope 403 (write/ack/delete need `workouts:write`) | `tests/routes/workouts.test.ts:498`, `:517`, `:553`; outbox `:269`, `:322` |
+| Missing/garbage bearer → 401 | `tests/routes/workouts.test.ts:486`, `:953` |
+| Refresh rotation + reuse-revoke | `tests/routes/auth/refresh.test.ts:132`; concurrent rotation `:283`; absolute-expiry `:168` |
+| Anti-enumeration uniform 401 (bad pw / unknown email / unverified) | `tests/routes/auth/password.test.ts:231`, `:570` |
+| Reset single-use (stale-iat replay rejected) | `tests/routes/auth/password.test.ts:646` |
+| Reset revokes every refresh token (H1) + `tokens_valid_after` cutoff | `tests/routes/auth/password.test.ts:597`; logout-all rotated-token reject `tests/routes/auth/refresh.test.ts:370` |
+| Signup rolls back user+identity on email-send failure → 503, retry works | `tests/routes/auth/password.test.ts:247` |
+| Outbox dedup on `client_session_id` | `tests/routes/workout_outbox.test.ts:132` |
+| Tier gates (free 402 / trial 2-token 429 / pro unlimited) | `tests/routes/tokens.test.ts:170`, `:183`, `:199` |
+| httpOnly refresh cookie SET by handler | `tests/routes/auth/password.test.ts:692`; refresh rotation cookie `tests/routes/auth/refresh.test.ts:419` |
+| Protocol composes end-to-end (each step consumes prior step's token/id) | `tests/flow.test.ts` (Layer 1, see below) |
+
+### e2e topology-delta tests (the four that earn an e2e slot)
+
+| # | Topology delta it guards | Why Vitest can't see it | Where it lives | Mode |
+|---|--------------------------|-------------------------|----------------|------|
+| a | `lmwf_refresh` Set-Cookie carries `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/v1/auth` **over the wire** | In-process pins the `setCookie()` *call*; APIGW (multiValueHeaders) / CloudFront can strip/fold/rewrite the actual header bytes | `e2e/tests/auth-session.spec.ts` | both (esp. e2e-beta) |
+| b | Verify/reset **email link host** == env `appBaseUrl` (beta→`beta.liftmark.app`) | The host comes from the Lambda's `LMWF_ENV`; a misconfigured env builds wrong-host links. Only readable where the email body is — Mailpit = local mode | `auth-signup-verify.spec.ts` (verify) + `auth-forgot-reset.spec.ts` (reset) | **local only** (guarded on `getMode()`) |
+| c | A minted PAT authenticates a live `GET /v1/workouts`, then 401s after revoke | Proves the deployed APIGW authorizer + scope middleware are actually wired in front of the route and honour revocation over the wire — not just the in-process middleware logic | `e2e/tests/pat-live-auth.spec.ts` | both (esp. e2e-beta) |
+| d | Real-SES signup → 201 (SES credentials resolve on the deployed stack) | The signup handler's email send is the last step before 201 and rolls back to 503 if it throws (`password.ts:282-325`); a 201 for the SES-verified address therefore proves SES creds resolve — invisible in-process where SMTP is Mailpit | `auth-signup-verify.spec.ts` (the existing signup POST, now explicitly asserted) | real send only in remote/beta |
+
+### #137 incident-class → owning assertion
+
+Issue #137 named three concrete failure classes. Each now has an owning
+test that gates prod:
+
+| #137 failure class | Owning assertion |
+|--------------------|------------------|
+| **SES placeholder credentials** (signup silently fails / 500s because the Lambda carried placeholder SES creds) | e2e test **(d)**: real `POST /v1/auth/password/signup` → 201 in remote/beta mode (`auth-signup-verify.spec.ts`). A 201 is only reachable if the real SES send succeeded (handler returns 503 on send failure, `password.ts:282-325`). Logic of the rollback itself is Vitest-pinned at `password.test.ts:247`. **Caveat below: this proves BETA SES, not PROD SES.** |
+| **Reset-link misrouting** (reset email pointed at the wrong host) | e2e test **(b)**: link-host assertion in `auth-forgot-reset.spec.ts` (and the verify variant in `auth-signup-verify.spec.ts`), asserting `new URL(link).host === expectedEmailLinkHost()` and the reset link's path is `/account/reset`. Local-mode (Mailpit) — gates prod via e2e-local. |
+| **Orphan signup rows** (user/identity rows left behind when the verification email failed to send) | Vitest `tests/routes/auth/password.test.ts:247` ("signup rolls back user + identity if email send fails (retry works)"): asserts 503 on send failure AND that a retry from the same address signs up cleanly (proves no orphan row blocking the dupe-check). Pure-handler logic — correctly owned by Vitest, not duplicated in e2e. |
+
+#### Beta-vs-prod SES caveat (honest scope of (d))
+
+e2e-beta runs against `beta.liftmark.app`, so test (d) proves **beta** SES
+credentials resolve — NOT prod. The prod stack uses a separate SES identity
+and IAM role; a prod-only SES-credential regression (the original #137
+shape, if it recurred on the prod stack) would NOT be caught by (d). Closing
+the prod variant requires a prod-safe smoke send (no test-secret backdoor on
+prod), tracked under **#137 Layer 2** (`smoke-flow-live.sh`, deferred — see
+the three-layer table above). Test (d) deliberately does not claim to close
+the prod variant.
+
+### Email-verification race — structurally prevented (no test)
+
+There is no signup→verify race to test: the signup handler is strictly
+sequential. `createUser` is awaited, then `createIdentity` is awaited, then
+the verification email (carrying a token whose `sub` is the just-created
+`identity_id`) is sent — all before the 201 returns (`password.ts:257-334`).
+Verify then re-fetches the identity by id (`verifyToken` →
+`getIdentityById`, `password.ts:351`). There is no window in which a verify
+token references an identity that does not yet exist. This is an
+architectural invariant, not a tested behaviour — documented here so a
+future refactor that parallelises the writes knows it is load-bearing.
+
+### Stripe / billing — KNOWN-UNTESTED, mandatory-on-arrival
+
+No billing route exists in the validator today (only a DDB GSI for
+subscription lookup). The following tests are **mandatory the moment a
+`POST /v1/billing/webhook` (or equivalent) route lands** — a billing route
+MUST NOT ship without them, each tied to its incident class:
+
+| Required test (on arrival) | Incident class it guards | Owner |
+|----------------------------|--------------------------|-------|
+| Webhook signature verification: a body with a missing/invalid Stripe-Signature → 400, and a tampered body under a valid signature → 400 | Forged/replayed billing events granting entitlements | Vitest (pure-handler) |
+| Entitlement-for-unknown-user: a webhook referencing a `customer`/`user_id` with no matching user → handled without 500 and without creating a phantom entitlement | Webhook race / orphaned entitlement granting access to a non-existent user | Vitest (pure-handler) |
+| Live webhook POST reaches the deployed route + the signing secret resolves on the deployed stack (201/2xx for a correctly-signed test event) | Topology: the webhook route + Stripe signing-secret env are actually wired on Lambda (the billing analogue of the #137 SES-creds class) | e2e topology-delta |
+
+Add a `flow.test.ts` Layer-1 step for the webhook at the same time (the spec
+already flags this at the bottom of the Layer 1 endpoint table).
+
+### Sharding decision: DO NOT SHARD
+
+The e2e suite runs as a single Playwright job per mode (`fullyParallel`,
+4 workers, chromium only). **Do not shard it across multiple CI jobs.**
+
+Reasoning:
+- The per-job fixed cost (`npm ci` + `playwright install --with-deps
+  chromium` + OIDC role assumption + Lambda warm-up against beta) dominates
+  the wall time of a small suite. Sharding multiplies that fixed cost by the
+  shard count while only dividing the already-small test execution time.
+- Sharding fans out N required checks on the PR (each shard is its own
+  required status), increasing merge-coordination overhead for no bake-time
+  value at the current size.
+- The e2e-beta shards would all contend on one beta Lambda — sharding
+  doesn't even buy real parallelism there; it just adds cold-start contention
+  and flake surface.
+
+**Trigger to revisit (measured, not guessed):** only when the *measured*
+e2e-local wall time exceeds **~300s** OR the suite grows past **~50 tests**.
+At that point, raise workers 4→6 FIRST (free, no fixed-cost multiplication);
+shard 2-way only if that is insufficient. The 300s/50-test figures are
+estimates to be replaced by a real measurement.
+
+> Measured e2e-local wall time (this branch, single local run, chromium,
+> Playwright auto-scaled to 6 workers on the dev machine): **13 tests, 2.0s**
+> Playwright execution (`13 passed (2.0s)`). Even including the full
+> `e2e-local.sh` setup (docker up + DDB bootstrap + astro build + validator
+> boot) the run is a few seconds, far under the 300s trigger. Sharding would
+> be pure overhead.
+
 ## Surface
 
 The suite covers every user-facing page served by the website + every
@@ -107,12 +254,14 @@ backend endpoint the website reaches from the browser.
 |-------------------------------|--------------------------------|---------------------|
 | `/` (LMWF spec landing)       | `home.spec.ts`                 | Title renders, example markdown blocks visible, navigation links resolve. |
 | `/spec`                       | `spec-page.spec.ts`            | Spec content renders, anchor links resolve, no console errors. |
-| `/account/signup`             | `auth-signup-verify.spec.ts`   | Submit → 204 → verify link works → email shown as verified. |
+| `/account/signup`             | `auth-signup-verify.spec.ts`   | Submit → 201 → verify link works → email shown as verified. Topology (b): verify-email link host == env appBaseUrl (local). Topology (d): real-SES signup 201 in remote mode. |
 | `/account/login`              | `auth-login-logout.spec.ts`    | Bad creds error, good creds → `/account`. Sign out clears session. |
+| (login response headers)      | `auth-session.spec.ts`         | Topology (a): `lmwf_refresh` Set-Cookie carries HttpOnly + Secure + SameSite=Strict + Path=/v1/auth over the wire. |
 | `/account/forgot`             | `auth-forgot-reset.spec.ts`    | Submit always 204 (anti-enumeration). |
-| `/account/reset?token=…`      | `auth-forgot-reset.spec.ts`    | Reset → new password works on login, old password fails. |
+| `/account/reset?token=…`      | `auth-forgot-reset.spec.ts`    | Reset → new password works on login, old password fails. Topology (b): reset link host == env appBaseUrl + path `/account/reset` (local). |
 | `/account/email-verified`     | `auth-signup-verify.spec.ts`   | Lands here after verify link click. |
 | `/account` (dashboard)        | `account-pats.spec.ts`         | Create PAT, copy reveals once, list shows it, revoke removes it. |
+| (PAT live API auth)           | `pat-live-auth.spec.ts`        | Topology (c): minted PAT authenticates `GET /v1/workouts`, then 401s after revoke (deployed authorizer + scope middleware wired). |
 | `/account/outbox`             | `account-outbox.spec.ts`       | Seeded workout appears in list. |
 | `/account/outbox/view?id=…`   | `account-outbox.spec.ts`       | Detail page renders LMWF, validates against `/validate`. |
 

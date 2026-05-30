@@ -91,6 +91,26 @@ export async function createPat(opts: {
   return (await res.json()) as { token_id: string; plaintext: string };
 }
 
+/**
+ * Revoke a PAT via the session-authed `DELETE /v1/tokens/:token_id`
+ * (idempotent 204). Mirrors the per-row revoke the dashboard drives, but
+ * at the API layer so a topology test can assert the deployed authorizer
+ * stops honouring the token immediately after.
+ */
+export async function revokePat(opts: {
+  sessionJwt: string;
+  tokenId: string;
+}): Promise<void> {
+  const res = await fetch(`${getBaseUrl()}/v1/tokens/${opts.tokenId}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${opts.sessionJwt}` },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`PAT revoke failed (${res.status}): ${text}`);
+  }
+}
+
 export async function signupAndVerify(opts: {
   email: string;
   password?: string;
@@ -128,16 +148,36 @@ export async function signupAndVerify(opts: {
   return { email: opts.email, password, displayName, userId: user_id };
 }
 
+/**
+ * Drive the real `POST /v1/auth/password/login` and return the parsed
+ * response — both the JSON body fields AND the raw `Set-Cookie` header so
+ * cookie-attribute (topology) tests can inspect it.
+ *
+ * NOTE: this endpoint returns `access_jwt` (NOT `session_jwt`). The earlier
+ * version of this helper destructured `session_jwt`, which is always
+ * `undefined` on this route — that field only exists on the test-only
+ * `/v1/__test__/seed-user` backdoor (see seedUser). We expose the access
+ * JWT to callers as `accessJwt`, with a `sessionJwt` alias so call sites
+ * can read whichever name reads best in context.
+ */
 export async function login(opts: {
   email: string;
-  password: string;
-}): Promise<{ session_jwt: string; refresh_token: string }> {
+  password?: string;
+}): Promise<{
+  accessJwt: string;
+  sessionJwt: string;
+  refreshToken: string;
+  setCookie: string | null;
+}> {
   const res = await fetch(`${getBaseUrl()}/v1/auth/password/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       email: opts.email,
-      password: opts.password,
+      // Default to the shared test password (mirrors seedUser /
+      // signupAndVerify) so callers can `login({ email })` after a
+      // default-password seedUser without restating the literal.
+      password: opts.password ?? STRONG_PASSWORD,
       device_label: 'e2e',
     }),
   });
@@ -145,9 +185,16 @@ export async function login(opts: {
     const text = await res.text().catch(() => '');
     throw new Error(`login failed (${res.status}): ${text}`);
   }
-  return (await res.json()) as {
-    session_jwt: string;
+  const setCookie = res.headers.get('set-cookie');
+  const json = (await res.json()) as {
+    access_jwt: string;
     refresh_token: string;
+  };
+  return {
+    accessJwt: json.access_jwt,
+    sessionJwt: json.access_jwt,
+    refreshToken: json.refresh_token,
+    setCookie,
   };
 }
 
