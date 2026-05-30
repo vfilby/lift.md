@@ -395,6 +395,30 @@ function handler(event) {
       comment: 'Rewrite /foo and /foo/ to /foo/index.html (skips /.well-known/*)',
     });
 
+    // The apple-app-site-association (AASA) file is extensionless by Apple's
+    // spec, so S3/BucketDeployment stores it as application/octet-stream. A
+    // CloudFront viewer-RESPONSE function overrides the Content-Type to
+    // application/json for that one path on the way back to the client. This
+    // is CloudFront-native — no Lambda layer, no extra IAM — which is why it
+    // replaces the second BucketDeployment that PR #183 used (and that broke
+    // the deploy via lambda:PublishLayerVersion). A separate function is
+    // required because a single CloudFront Function cannot be associated with
+    // both the viewer-request and viewer-response events.
+    const aasaContentTypeFunction = new cloudfront.Function(this, 'AasaContentTypeFn', {
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var response = event.response;
+  // Only the AASA path; everything else keeps its origin Content-Type.
+  if (request.uri === '/.well-known/apple-app-site-association') {
+    response.headers['content-type'] = { value: 'application/json' };
+  }
+  return response;
+}
+      `),
+      comment: 'Set content-type: application/json for the AASA file',
+    });
+
     const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket);
     const apiOrigin = new origins.HttpOrigin(apiHostname, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
@@ -484,10 +508,17 @@ function handler(event) {
             : cloudfront.CachePolicy.CACHING_OPTIMIZED,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         compress: true,
-        functionAssociations: [{
-          eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-          function: urlRewriteFunction,
-        }],
+        functionAssociations: [
+          {
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+            function: urlRewriteFunction,
+          },
+          {
+            // Sets content-type: application/json on the AASA response.
+            eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
+            function: aasaContentTypeFunction,
+          },
+        ],
       },
       additionalBehaviors: {
         '/validate': {
@@ -532,42 +563,25 @@ function handler(event) {
     // whole reason we're not doing this with a separate `aws s3 sync` step.
     const siteDistPath = path.join(__dirname, '..', '..', 'website', 'dist');
 
+    // Single deployment for the entire site, INCLUDING
+    // /.well-known/apple-app-site-association. A second BucketDeployment is
+    // deliberately avoided: each BucketDeployment provisions its own AWS-CLI
+    // Lambda layer, and publishing that layer requires
+    // lambda:PublishLayerVersion — which the scoped cdk-lmwf-cfn-exec-role is
+    // NOT permitted to call. Adding a second deployment for /.well-known/* is
+    // exactly what regressed the beta deploy (PR #183: WellKnownContents/
+    // AwsCliLayer → CREATE_FAILED, 403 PublishLayerVersion). The AASA file's
+    // Content-Type is set instead by the viewer-response CloudFront Function
+    // below (aasaContentTypeFunction) — CloudFront-native, no Lambda layer,
+    // no extra IAM.
     new s3deploy.BucketDeployment(this, 'SiteContents', {
-      // Everything except /.well-known/* — that subtree is uploaded by a
-      // separate deployment below so it can carry an explicit Content-Type.
-      // `exclude` keeps prune scoped to this keyspace, so the two deployments
-      // don't delete each other's objects.
-      sources: [
-        s3deploy.Source.asset(siteDistPath, { exclude: ['.well-known/**'] }),
-      ],
+      sources: [s3deploy.Source.asset(siteDistPath)],
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ['/*'],
       prune: true,
-      exclude: ['.well-known/*'],
       // Default Lambda is 128 MiB / 900 s. Site is ~250 KiB today; bump
       // memory only if/when assets grow enough to OOM the copy Lambda.
-      memoryLimit: 256,
-    });
-
-    // The apple-app-site-association (AASA) file is extensionless by Apple's
-    // spec, so S3 would default it to application/octet-stream. Upload the
-    // /.well-known/* subtree with an explicit application/json Content-Type so
-    // iCloud Keychain / password-manager webcredentials checks see the right
-    // type. `include`/`exclude` restrict this deployment (and its prune) to
-    // /.well-known/*, mirroring the main deployment's exclude above.
-    new s3deploy.BucketDeployment(this, 'WellKnownContents', {
-      sources: [
-        s3deploy.Source.asset(siteDistPath, {
-          exclude: ['**', '!.well-known', '!.well-known/**'],
-        }),
-      ],
-      destinationBucket: siteBucket,
-      distribution,
-      distributionPaths: ['/.well-known/*'],
-      prune: true,
-      include: ['.well-known/*'],
-      contentType: 'application/json',
       memoryLimit: 256,
     });
 
