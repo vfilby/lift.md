@@ -375,6 +375,12 @@ export class LmwfValidatorStack extends cdk.Stack {
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
+  // Serve well-known assets (e.g. apple-app-site-association) verbatim. They
+  // are extensionless by spec, so the pretty-URL rewrite below would otherwise
+  // turn them into /.well-known/<name>/index.html and 404.
+  if (uri.indexOf('/.well-known/') === 0) {
+    return request;
+  }
   if (uri.endsWith('/')) {
     request.uri = uri + 'index.html';
   } else {
@@ -386,7 +392,7 @@ function handler(event) {
   return request;
 }
       `),
-      comment: 'Rewrite /foo and /foo/ to /foo/index.html',
+      comment: 'Rewrite /foo and /foo/ to /foo/index.html (skips /.well-known/*)',
     });
 
     const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket);
@@ -524,14 +530,44 @@ function handler(event) {
     // Keeping the site upload inside CDK means both GHA and Concourse
     // pipelines do the exact same deploy (just `cdk deploy`), which is the
     // whole reason we're not doing this with a separate `aws s3 sync` step.
+    const siteDistPath = path.join(__dirname, '..', '..', 'website', 'dist');
+
     new s3deploy.BucketDeployment(this, 'SiteContents', {
-      sources: [s3deploy.Source.asset(path.join(__dirname, '..', '..', 'website', 'dist'))],
+      // Everything except /.well-known/* — that subtree is uploaded by a
+      // separate deployment below so it can carry an explicit Content-Type.
+      // `exclude` keeps prune scoped to this keyspace, so the two deployments
+      // don't delete each other's objects.
+      sources: [
+        s3deploy.Source.asset(siteDistPath, { exclude: ['.well-known/**'] }),
+      ],
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ['/*'],
       prune: true,
+      exclude: ['.well-known/*'],
       // Default Lambda is 128 MiB / 900 s. Site is ~250 KiB today; bump
       // memory only if/when assets grow enough to OOM the copy Lambda.
+      memoryLimit: 256,
+    });
+
+    // The apple-app-site-association (AASA) file is extensionless by Apple's
+    // spec, so S3 would default it to application/octet-stream. Upload the
+    // /.well-known/* subtree with an explicit application/json Content-Type so
+    // iCloud Keychain / password-manager webcredentials checks see the right
+    // type. `include`/`exclude` restrict this deployment (and its prune) to
+    // /.well-known/*, mirroring the main deployment's exclude above.
+    new s3deploy.BucketDeployment(this, 'WellKnownContents', {
+      sources: [
+        s3deploy.Source.asset(siteDistPath, {
+          exclude: ['**', '!.well-known', '!.well-known/**'],
+        }),
+      ],
+      destinationBucket: siteBucket,
+      distribution,
+      distributionPaths: ['/.well-known/*'],
+      prune: true,
+      include: ['.well-known/*'],
+      contentType: 'application/json',
       memoryLimit: 256,
     });
 

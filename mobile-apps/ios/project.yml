@@ -118,6 +118,8 @@ targets:
     entitlements:
       path: LiftMark/LiftMark.entitlements
       properties:
+        com.apple.developer.associated-domains:
+          - webcredentials:liftmark.app
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access:
           - health-records

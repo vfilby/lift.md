@@ -19,6 +19,28 @@ final class LiveActivityService: @unchecked Sendable {
     private var lastUpdateTime: Date?
     private static let updateThrottleInterval: TimeInterval = 1.0
 
+    /// Default title/subtitle shown when a workout is complete. Shared by the
+    /// in-place finishing state (skip-to-finish) and the dismissal message in
+    /// `endWorkoutActivity` so both paths read identically.
+    static let completeTitle = "Workout Complete"
+    static let completeSubtitle = "Great job!"
+
+    #if os(iOS)
+    /// Content state shown when no exercise has pending sets remaining — every
+    /// set is completed or skipped. Visually matches the completion message but
+    /// keeps the activity alive (it is dismissed only by `endWorkoutActivity`).
+    @available(iOS 16.2, *)
+    static var finishingState: WorkoutActivityAttributes.ContentState {
+        WorkoutActivityAttributes.ContentState(
+            isRestTimer: false,
+            exerciseName: completeTitle,
+            setInfo: "",
+            weightReps: completeSubtitle,
+            progress: 1.0
+        )
+    }
+    #endif
+
     private init() {}
 
     // MARK: - Availability
@@ -101,26 +123,29 @@ final class LiveActivityService: @unchecked Sendable {
         if #available(iOS 16.2, *) {
             guard let activity = currentActivity else { return }
 
-            // Throttle updates to avoid excessive Live Activity refreshes
-            if let lastUpdate = lastUpdateTime, Date().timeIntervalSince(lastUpdate) < Self.updateThrottleInterval {
+            // A nil exercise with no active rest timer means every set is now
+            // completed or skipped — the workout is effectively done. This
+            // transition into the finishing state (e.g. after skipping the last
+            // pending set) must NOT be dropped by the throttle, or the activity
+            // would stay stuck on the just-skipped exercise (#144).
+            let isFinishingTransition = (restTimer == nil || restTimer?.remainingSeconds == 0) && exercise == nil
+
+            // Throttle ordinary content refreshes; always let the finishing
+            // transition through.
+            if !isFinishingTransition,
+               let lastUpdate = lastUpdateTime,
+               Date().timeIntervalSince(lastUpdate) < Self.updateThrottleInterval {
                 return
             }
             lastUpdateTime = Date()
 
-            let state: WorkoutActivityAttributes.ContentState
-
-            if let restTimer, restTimer.remainingSeconds > 0 {
-                state = buildRestState(
-                    session: session,
-                    remainingSeconds: restTimer.remainingSeconds,
-                    nextExercise: restTimer.nextExercise,
-                    progress: progress
-                )
-            } else if let exercise {
-                state = buildActiveSetState(session: session, exercise: exercise, setIndex: setIndex, progress: progress)
-            } else {
-                return
-            }
+            let state = resolveContentState(
+                session: session,
+                exercise: exercise,
+                setIndex: setIndex,
+                progress: progress,
+                restTimer: restTimer
+            )
 
             let content = ActivityContent(state: state, staleDate: nil)
             Task {
@@ -129,6 +154,36 @@ final class LiveActivityService: @unchecked Sendable {
         }
         #endif
     }
+
+    #if os(iOS)
+    /// Pure resolution of which content state to display for the given inputs.
+    /// Extracted so the cursor-advance / finishing-state logic (#144) is
+    /// testable without a live `Activity` instance.
+    @available(iOS 16.2, *)
+    func resolveContentState(
+        session: WorkoutSession,
+        exercise: SessionExercise?,
+        setIndex: Int,
+        progress: (completed: Int, total: Int),
+        restTimer: (remainingSeconds: Int, nextExercise: SessionExercise?)? = nil
+    ) -> WorkoutActivityAttributes.ContentState {
+        if let restTimer, restTimer.remainingSeconds > 0 {
+            return buildRestState(
+                session: session,
+                remainingSeconds: restTimer.remainingSeconds,
+                nextExercise: restTimer.nextExercise,
+                progress: progress
+            )
+        } else if let exercise {
+            return buildActiveSetState(session: session, exercise: exercise, setIndex: setIndex, progress: progress)
+        } else {
+            // No exercise has pending sets remaining: show the finishing
+            // state (kept alive — the activity is only dismissed by
+            // endWorkoutActivity when the user formally finishes).
+            return Self.finishingState
+        }
+    }
+    #endif
 
     // MARK: - End
 
@@ -143,9 +198,9 @@ final class LiveActivityService: @unchecked Sendable {
 
             let finalState = WorkoutActivityAttributes.ContentState(
                 isRestTimer: false,
-                exerciseName: message ?? "Workout Complete",
+                exerciseName: message ?? Self.completeTitle,
                 setInfo: "",
-                weightReps: subtitle ?? "Great job!",
+                weightReps: subtitle ?? Self.completeSubtitle,
                 progress: 1.0
             )
 
