@@ -89,6 +89,28 @@ final class AuthenticationStore {
     var currentUser: AuthenticatedUser?
     var lastError: AuthError?
 
+    /// True while launch-time session restoration is in flight. The root view
+    /// shows a neutral loading state (rather than flashing the login screen)
+    /// until this clears, and launch-time authed work is gated on `isReady`.
+    /// See `spec/services/authentication.md` (Launch rehydration contract).
+    private(set) var isRestoring: Bool = false
+
+    /// Inverse of `isRestoring`: restoration has settled and `currentUser` /
+    /// `sessionExpired` reflect the durable session state.
+    var isReady: Bool { !isRestoring }
+
+    /// Single-flight handle for the refresh round-trip. Because the validator
+    /// *rotates* refresh tokens, two concurrent refreshes would race — the
+    /// second presents an already-consumed token and gets 401, falsely
+    /// expiring the session. Both the launch restoration and on-demand
+    /// `refreshIfNeeded()` funnel through this so at most one refresh is ever
+    /// in flight against a given stored refresh token.
+    private var inFlightRefresh: Task<String, Error>?
+
+    /// Single-flight handle for the launch restoration. Idempotent: repeated
+    /// or concurrent `restoreSession()` calls await the same work.
+    private var restoreTask: Task<Void, Never>?
+
     /// Set `true` when the refresh chain dies (refresh token rejected with
     /// 401 in `refreshIfNeeded`). Distinguishes a *silently expired* session
     /// from a *user-initiated* logout: the expired-session path drops the dead
@@ -111,6 +133,22 @@ final class AuthenticationStore {
         rehydrateFromKeychain()
     }
 
+    // MARK: - Launch restoration
+
+    /// Awaits launch-time session restoration. Idempotent and single-flight:
+    /// the work is kicked off synchronously in `init` (so it's already running
+    /// by the time the first view appears), and callers `await` the same task.
+    ///
+    /// The contract (see `spec/services/authentication.md`): the store never
+    /// concludes "logged out" off an expired *access* token alone. If a refresh
+    /// token exists and the access token is stale, it performs an **awaited**
+    /// refresh first. Only a missing refresh token or a 401-rejected refresh
+    /// forces re-login; a transient network failure leaves the user
+    /// authenticated-but-offline.
+    func restoreSession() async {
+        await restoreTask?.value
+    }
+
     // MARK: - Login / Logout
 
     @discardableResult
@@ -119,6 +157,13 @@ final class AuthenticationStore {
         password: String,
         deviceLabel: String = AuthenticationStore.defaultDeviceLabel
     ) async throws -> AuthenticatedUser {
+        // A fresh credential supersedes any launch restoration still in flight.
+        // Cancel it so a late refresh can't clobber the new tokens or flip
+        // sessionExpired after we've signed in.
+        restoreTask?.cancel()
+        restoreTask = nil
+        isRestoring = false
+
         let req = LoginRequest(email: email, password: password, deviceLabel: deviceLabel)
         do {
             let response: LoginResponse = try await api.send(
@@ -148,6 +193,11 @@ final class AuthenticationStore {
     }
 
     func logout() async {
+        // Deliberate sign-out supersedes any in-flight launch restoration.
+        restoreTask?.cancel()
+        restoreTask = nil
+        isRestoring = false
+
         let refresh = tokenStore.loadRefreshToken()
         let access = tokenStore.loadAccessToken()
 
@@ -237,6 +287,34 @@ final class AuthenticationStore {
             return access
         }
 
+        // Access token missing or stale → refresh. The local exp check above
+        // already short-circuited the fresh-token case.
+        return try await forceRefresh()
+    }
+
+    /// Performs `/v1/auth/refresh`, coalescing concurrent callers onto a single
+    /// round-trip. The refresh token rotates server-side, so a second caller
+    /// presenting the same stored token would get a 401 and falsely expire the
+    /// session — hence the single-flight `inFlightRefresh` handle. Skips the
+    /// local `exp` check, so `withAuthorizedRequest` can force a refresh after a
+    /// server-side 401 even though its just-minted token still looks valid.
+    @discardableResult
+    private func forceRefresh() async throws -> String {
+        if let inFlight = inFlightRefresh {
+            return try await inFlight.value
+        }
+        let task = Task<String, Error> { [weak self] in
+            guard let self else { throw AuthError.unknown("Store deallocated") }
+            return try await self.performRefresh()
+        }
+        inFlightRefresh = task
+        defer { inFlightRefresh = nil }
+        return try await task.value
+    }
+
+    /// The actual `/v1/auth/refresh` round-trip. Always funneled through
+    /// `inFlightRefresh` so it can't run concurrently with itself.
+    private func performRefresh() async throws -> String {
         guard let refresh = tokenStore.loadRefreshToken() else {
             throw AuthError.unknown("No refresh token")
         }
@@ -250,6 +328,9 @@ final class AuthenticationStore {
             )
             tokenStore.saveAccessToken(response.accessJwt)
             tokenStore.saveRefreshToken(response.refreshToken)
+            // A successful refresh proves the session is alive: clear any stale
+            // expired flag so the UI leaves the re-auth state.
+            sessionExpired = false
             return response.accessJwt
         } catch let error as APIError {
             if case .unauthorized = error {
@@ -266,6 +347,9 @@ final class AuthenticationStore {
                     "auth refresh failed (401) — session expired, prompting re-auth; outbox preserved"
                 )
             }
+            // Transient/5xx: leave the session intact. The caller (launch
+            // restore or withAuthorizedRequest) decides whether to retry; we
+            // never clear tokens here for a non-401 failure.
             throw error
         }
     }
@@ -279,32 +363,21 @@ final class AuthenticationStore {
         do {
             return try await block(token)
         } catch APIError.unauthorized {
-            // Force-refresh by re-using the refresh token. If we still
-            // have one, refreshIfNeeded will hit /v1/auth/refresh because
-            // we don't have a known-good access token here — but the local
-            // exp check would pass on our just-minted token. Bypass by
-            // calling the refresh endpoint directly via the same path.
-            guard let refresh = tokenStore.loadRefreshToken() else {
+            // The access token was revoked server-side between our refresh and
+            // this call. Force a fresh refresh (the local exp check would pass
+            // on our just-minted token, so bypass it) and retry the block once.
+            // `forceRefresh` coalesces through the same single-flight handle as
+            // `refreshIfNeeded`, so it can't double-spend the rotating refresh
+            // token against a concurrent caller. A 401 here means the refresh
+            // chain is dead → expired session (not a logout): `forceRefresh`
+            // already called `markSessionExpired`, preserving device queues
+            // (GH #143).
+            guard tokenStore.loadRefreshToken() != nil else {
                 markSessionExpired()
                 throw APIError.unauthorized
             }
-            do {
-                let response: RefreshResponse = try await api.send(
-                    path: "/v1/auth/refresh",
-                    method: "POST",
-                    body: RefreshRequest(refreshToken: refresh),
-                    accessToken: nil
-                )
-                tokenStore.saveAccessToken(response.accessJwt)
-                tokenStore.saveRefreshToken(response.refreshToken)
-                return try await block(response.accessJwt)
-            } catch APIError.unauthorized {
-                // Refresh chain is dead even on the forced retry. Same handling
-                // as `refreshIfNeeded`: expired session, not a logout. Preserve
-                // device-local queues (GH #143).
-                markSessionExpired()
-                throw APIError.unauthorized
-            }
+            let fresh = try await forceRefresh()
+            return try await block(fresh)
         }
     }
 
@@ -318,9 +391,25 @@ final class AuthenticationStore {
 
     // MARK: - Private
 
+    /// Synchronous half of launch restoration, run from `init`. Reconstitutes
+    /// the in-memory user from the (possibly expired) access-token claims so the
+    /// UI doesn't flash logged-out, and — when a refresh is needed — sets
+    /// `isRestoring` and kicks off the *awaited* refresh as a single-flight
+    /// `restoreTask`. The async resolution lives in `performRestore()`.
     private func rehydrateFromKeychain() {
-        guard let access = tokenStore.loadAccessToken(),
-              let payload = JWTDecoder.decode(access) else {
+        let access = tokenStore.loadAccessToken()
+        let payload = access.flatMap(JWTDecoder.decode)
+        let hasRefreshToken = tokenStore.loadRefreshToken() != nil
+
+        // No access token at all. If we also have no refresh token, we're
+        // genuinely logged out and restoration is already complete. If only the
+        // access token is missing (e.g. a partial/legacy keychain state) but a
+        // refresh token survives, attempt to restore from it rather than
+        // forcing re-login.
+        guard let payload else {
+            if hasRefreshToken {
+                beginRestore()
+            }
             return
         }
 
@@ -337,10 +426,42 @@ final class AuthenticationStore {
             trialEndsAt: nil
         )
 
-        if payload.exp <= Date().timeIntervalSince1970 + refreshBufferSeconds {
-            Task { [weak self] in
-                _ = try? await self?.refreshIfNeeded()
-            }
+        // Access token still fresh → nothing to await; we're done.
+        guard payload.exp <= Date().timeIntervalSince1970 + refreshBufferSeconds else {
+            return
+        }
+
+        // Access token is stale. We must NOT conclude anything about auth state
+        // until an awaited refresh resolves. Without a refresh token there's
+        // nothing to await — the stale access token is all we have, so stay
+        // authenticated-but-offline rather than forcing re-login.
+        if hasRefreshToken {
+            beginRestore()
+        }
+    }
+
+    /// Enter the restoring state and start the single-flight restore task.
+    private func beginRestore() {
+        isRestoring = true
+        restoreTask = Task { [weak self] in
+            await self?.performRestore()
+        }
+    }
+
+    /// Awaited launch refresh. Outcomes (see spec):
+    /// - success → authenticated with fresh tokens (handled in `refreshIfNeeded`)
+    /// - 401 → `markSessionExpired()` already ran in `refreshIfNeeded`; logged out
+    /// - transient (network/5xx) → leave the session intact (offline); the
+    ///   reconstituted-from-claims user stays signed in and we retry later.
+    private func performRestore() async {
+        defer { isRestoring = false }
+        do {
+            _ = try await refreshIfNeeded()
+        } catch {
+            // Swallow: refreshIfNeeded has already applied the only state
+            // change that matters here (markSessionExpired on 401). A transient
+            // failure is intentionally a no-op — we stay authenticated-offline.
+            Logger.shared.warn(.network, "Launch session restore did not complete: \(error)")
         }
     }
 
