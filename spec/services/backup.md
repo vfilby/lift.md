@@ -26,8 +26,11 @@ Validate that a file is a legitimate SQLite database suitable for import.
 
 ### Export
 
-- Copies the current database file to the **cache directory**.
+- Writes a clean, fully-consistent copy of the current database to the **cache directory**.
 - Backup filename format: `liftmark_backup_{timestamp}.db`
+- **WAL-safe consistent copy (required):** the export MUST be produced through the live database connection, NOT by a raw `FileManager.copyItem` of the `liftmark.db` file. The database runs in WAL mode, so committed data — and, on a freshly-migrated database, whole `CREATE TABLE` commits — can still live in the `liftmark.db-wal` sidecar until a checkpoint folds it into the main file. Copying only the main file can therefore yield a backup that is **missing recent writes or entire tables**, depending on WAL/checkpoint timing (the source of historical flakiness in `DatabaseBackupServiceTests`).
+  - **Mechanism:** `VACUUM INTO '<export-path>'`, executed on the live GRDB connection (`DatabaseManager.vacuumInto(_:)`, via `writeWithoutTransaction` since `VACUUM` cannot run inside a transaction). This emits a brand-new database file reflecting the complete current logical state regardless of WAL position. The output is a **single, self-contained file with no `-wal`/`-shm` sidecars** — ideal for sharing/import. The destination path must not pre-exist; any stale file is removed first. The live database's WAL mode is left untouched.
+  - A checkpoint-then-copy (`PRAGMA wal_checkpoint(TRUNCATE)` immediately before a file copy taken with no concurrent writer) is an acceptable fallback that achieves the same correctness, but `VACUUM INTO` is preferred because it is atomic and sidecar-free.
 - **Scope:** cache-dir export is for **user-initiated exports only** (share sheet, manual backup to Files/iCloud Drive). iOS may evict the cache directory under storage pressure, so this path is **not** suitable for safety backups that must persist until the next launch. The pre-upgrade backup written by the GRDB migration bridge lives in Application Support instead — see "Pre-upgrade backup" below.
 - **Known issue:** the cache-dir location has a second drawback even for user-initiated flows — cache can evict mid-share-sheet. Flagged for follow-up; not in scope for the GRDB migration work.
 
