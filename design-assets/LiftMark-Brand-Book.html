@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiftMark — Brand Book</title>
+<style>
+@font-face{font-family:"Space Grotesk";src:url("assets/fonts/SpaceGrotesk-Bold.woff2") format("woff2");font-weight:700;font-display:swap;}
+@font-face{font-family:"Space Grotesk";src:url("assets/fonts/SpaceGrotesk-Medium.woff2") format("woff2");font-weight:500;font-display:swap;}
+@font-face{font-family:"Inter";src:url("assets/fonts/Inter-Regular.woff2") format("woff2");font-weight:400;font-display:swap;}
+@font-face{font-family:"Inter";src:url("assets/fonts/Inter-SemiBold.woff2") format("woff2");font-weight:600;font-display:swap;}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-Medium.woff2") format("woff2");font-weight:500;font-display:swap;}
+
+:root{
+ --blue:#2D5BFF;--blue6:#1E45E6;--orange:#FF6A1A;--ink:#0E1116;
+ --n50:#F6F7F9;--n100:#EDEFF3;--n200:#DDE1E8;--n300:#C2C8D2;--n400:#9AA2B0;--n500:#6B7382;--n600:#4B515E;--n700:#333845;--n800:#1C2028;
+ /* Energy gradient — the original magenta-routed blue→orange. Thin DECORATIVE rules only (never a fill behind text). */
+ --energy:linear-gradient(135deg,#2D5BFF 0%,#5236E8 45%,#E0357A 62%,#FF7A1A 100%);
+ --grad-orange:linear-gradient(90deg,#ED5305 0%,#FF8A3D 100%);
+ --tile:linear-gradient(135deg,#356CFF 0%,#1F46CE 100%);
+ --display:"Space Grotesk",sans-serif;--body:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;}
+body{font-family:var(--body);color:var(--ink);background:var(--n50);line-height:1.6;-webkit-font-smoothing:antialiased;}
+.page{max-width:920px;margin:0 auto;background:#fff;}
+section{padding:64px 72px;border-bottom:1px solid var(--n100);}
+h1,h2,h3,h4{font-family:var(--display);font-weight:700;line-height:1.12;letter-spacing:-0.02em;color:var(--ink);}
+h2{font-size:2.0rem;margin-bottom:6px;}
+h3{font-size:1.3rem;font-weight:500;margin:36px 0 14px;}
+h4{font-size:1.0rem;font-weight:500;margin:22px 0 10px;}
+p{margin-bottom:14px;max-width:62ch;color:var(--n800);}
+.lead{font-size:1.15rem;color:var(--n600);max-width:60ch;}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--blue6);margin-bottom:14px;}
+.muted{color:var(--n500);}
+a{color:var(--blue6);}
+code,.mono{font-family:var(--mono);}
+.small{font-size:.8rem;}
+.grid{display:flex;flex-wrap:wrap;gap:16px;}
+.card{border:1px solid var(--n200);border-radius:16px;padding:22px;background:#fff;}
+.note{border-left:3px solid var(--blue);background:var(--n50);padding:16px 18px;border-radius:0 12px 12px 0;margin:18px 0;font-size:.95rem;}
+.note.warn{border-color:var(--orange);}
+.kbd{font-family:var(--mono);font-size:.8rem;background:var(--n100);border:1px solid var(--n200);border-radius:6px;padding:2px 7px;}
+
+/* ---------- COVER ---------- */
+.cover{background:var(--ink);color:#fff;padding:0;border:0;}
+.cover .inner{padding:96px 72px 80px;background:radial-gradient(120% 90% at 50% 0%, rgba(45,91,255,.28), rgba(14,17,22,0) 60%);}
+.cover h1{color:#fff;font-size:3.4rem;letter-spacing:-0.03em;}
+.cover .bar{height:14px;background:var(--energy);}
+.cover .lock img{height:96px;}
+.cover .tag{font-family:var(--mono);color:#9AA4B2;font-size:1.05rem;margin-top:18px;}
+.cover .meta{margin-top:54px;font-family:var(--mono);font-size:.8rem;color:#5E6675;letter-spacing:.04em;}
+
+/* ---------- TOC ---------- */
+.toc{column-count:2;column-gap:48px;font-size:.95rem;}
+.toc li{list-style:none;padding:7px 0;border-bottom:1px solid var(--n100);display:flex;justify-content:space-between;}
+.toc .n{font-family:var(--mono);color:var(--blue6);margin-right:14px;}
+
+/* ---------- LOGO ---------- */
+.logo-hero{background:var(--n50);border-radius:20px;padding:48px;display:flex;align-items:center;justify-content:center;}
+.logo-hero img{height:84px;}
+.logo-hero.dark{background:var(--ink);}
+.spec{display:flex;gap:16px;flex-wrap:wrap;}
+.spec .card{flex:1 1 200px;text-align:center;}
+.spec img{height:56px;margin:8px 0 14px;}
+.spec .lbl{font-family:var(--mono);font-size:.74rem;color:var(--n500);}
+.clearspace{position:relative;background:var(--n50);border-radius:16px;padding:40px;display:flex;justify-content:center;}
+.clearspace .box{position:relative;padding:48px;outline:2px dashed var(--blue);border-radius:8px;}
+.clearspace .box::before{content:"X";position:absolute;left:10px;top:6px;font-family:var(--mono);color:var(--blue);font-size:.8rem;}
+.clearspace img{height:64px;display:block;}
+.donts{display:flex;flex-wrap:wrap;gap:16px;}
+.dont{flex:1 1 240px;border:1px solid var(--n200);border-radius:14px;overflow:hidden;}
+.dont .vis{height:120px;display:flex;align-items:center;justify-content:center;background:var(--n50);}
+.dont .vis img{height:48px;}
+.dont .cap{padding:12px 14px;font-size:.85rem;}
+.dont .cap b{color:#C0392B;}
+
+/* ---------- COLOR ---------- */
+.swatches{display:flex;flex-wrap:wrap;gap:14px;}
+.sw{flex:1 1 150px;border-radius:14px;overflow:hidden;border:1px solid var(--n200);}
+.sw .chip{height:84px;}
+.sw .info{padding:10px 12px;font-size:.78rem;}
+.sw .info .name{font-weight:600;}
+.sw .info .hex{font-family:var(--mono);color:var(--n500);text-transform:uppercase;}
+.scale{display:flex;border-radius:12px;overflow:hidden;border:1px solid var(--n200);margin:10px 0 4px;}
+.scale .step{flex:1;height:64px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-family:var(--mono);font-size:.62rem;}
+.gradbox{height:120px;border-radius:16px;}
+.compare{display:flex;gap:16px;flex-wrap:wrap;}
+.compare>div{flex:1 1 240px;}
+.compare .g{height:90px;border-radius:12px;position:relative;}
+.crbadge{display:inline-block;font-family:var(--mono);font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--n100);color:var(--n700);margin-left:6px;}
+.crbar{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--n100);font-size:.9rem;}
+.crbar .sample{width:120px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.85rem;flex:none;}
+
+/* ---------- TYPE ---------- */
+.specimen{font-family:var(--display);line-height:1;letter-spacing:-0.02em;color:var(--ink);}
+.tscale .row{display:flex;align-items:baseline;gap:20px;border-bottom:1px solid var(--n100);padding:14px 0;}
+.tscale .meta{font-family:var(--mono);font-size:.72rem;color:var(--n500);width:160px;flex:none;}
+.aabig{font-family:var(--display);font-size:5rem;line-height:.9;}
+
+/* ---------- ICONS ---------- */
+.iconrow{display:flex;flex-wrap:wrap;gap:18px;}
+.iconrow .ic{width:84px;text-align:center;}
+.iconrow svg{width:34px;height:34px;}
+.iconrow .lbl{font-size:.72rem;color:var(--n500);margin-top:8px;}
+
+/* ---------- UI ---------- */
+.btn{font-family:var(--body);font-weight:600;border:0;border-radius:12px;padding:12px 22px;font-size:.95rem;cursor:pointer;}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-energy{background:var(--energy);color:#fff;}
+.btn-orange{background:var(--orange);color:var(--ink);}
+.btn-ghost{background:transparent;color:var(--blue6);border:1.5px solid var(--n200);}
+.codeblock{background:var(--ink);color:#E6E9EE;border-radius:14px;padding:22px 24px;font-family:var(--mono);font-size:.86rem;line-height:1.7;overflow:auto;}
+.codeblock .h{color:#9AA4B2;}
+.codeblock .at{color:#FF8A3D;}
+.codeblock .set{color:#8AA3FF;}
+.tokens-list{font-family:var(--mono);font-size:.8rem;background:var(--n50);border-radius:12px;padding:18px 20px;}
+.tokens-list div{padding:3px 0;color:var(--n700);}
+
+footer{padding:48px 72px;background:var(--ink);color:#9AA4B2;font-size:.85rem;}
+footer .bar{height:10px;background:var(--energy);margin:-48px -72px 32px;}
+footer a{color:#8AA3FF;}
+
+@media print{
+ @page{size:A4;margin:0;}
+ body{background:#fff;}
+ .page{max-width:none;}
+ section{padding:40px 48px;border-bottom:0;break-inside:avoid;}
+ section.brk{break-before:page;}
+ .card,.dont,.sw,.crbar,.tscale .row{break-inside:avoid;}
+ .cover{break-after:page;}
+}
+@media(max-width:720px){section{padding:40px 26px;}.cover .inner{padding:60px 26px;}.toc{column-count:1;}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ========================= COVER ========================= -->
+<section class="cover">
+ <div class="bar"></div>
+ <div class="inner">
+  <div class="lock"><img src="assets/logos/lockup-liftmark-white.svg" alt="LiftMark"></div>
+  <p class="tag"># Brand Book — v2.1 · gradient LM mark</p>
+  <h1 style="margin-top:36px;">Your workouts,<br>kept in plain text.</h1>
+  <p class="meta">LIFTMARK.APP · lift.md · LMWF OPEN FORMAT · MAY 2026</p>
+ </div>
+</section>
+
+<!-- ========================= CONTENTS ========================= -->
+<section>
+ <p class="eyebrow">Contents</p>
+ <h2>What's inside</h2>
+ <ul class="toc" style="margin-top:24px;">
+  <li><span><span class="n">01</span>Brand at a glance</span></li>
+  <li><span><span class="n">02</span>Voice &amp; tone</span></li>
+  <li><span><span class="n">03</span>Logo system</span></li>
+  <li><span><span class="n">03b</span>Names &amp; sub-brands</span></li>
+  <li><span><span class="n">04</span>Clear space &amp; sizing</span></li>
+  <li><span><span class="n">05</span>Logo misuse</span></li>
+  <li><span><span class="n">06</span>Color — brand &amp; gradient</span></li>
+  <li><span><span class="n">07</span>Color — full scales</span></li>
+  <li><span><span class="n">08</span>Color — themes &amp; access.</span></li>
+  <li><span><span class="n">09</span>Typography</span></li>
+  <li><span><span class="n">10</span>Iconography</span></li>
+  <li><span><span class="n">11</span>UI &amp; components</span></li>
+  <li><span><span class="n">12</span>The format as brand</span></li>
+  <li><span><span class="n">13</span>Social &amp; app icon</span></li>
+  <li><span><span class="n">14</span>Developer tokens</span></li>
+ </ul>
+</section>
+
+<!-- ========================= 01 BRAND ========================= -->
+<section class="brk">
+ <p class="eyebrow">01 — Brand at a glance</p>
+ <h2>LiftMark</h2>
+ <p class="lead">LiftMark turns strength training into something you can read, write, and own — plain-text workouts in a simple markdown format, tracked in a fast native app, generatable by any LLM.</p>
+
+ <h3>The two things we are</h3>
+ <div class="grid">
+  <div class="card" style="flex:1 1 260px;">
+   <h4 style="margin-top:0;">LiftMark Format — the format</h4>
+   <p class="small">An open specification (CC BY-SA 4.0) for writing workouts in markdown. Human-writable, machine-parseable, app-independent. This is the commons. (Formerly “LMWF”.)</p>
+  </div>
+  <div class="card" style="flex:1 1 260px;">
+   <h4 style="margin-top:0;">LiftMark — the app</h4>
+   <p class="small">The iOS app that reads LMWF: import, track sets in real time, see history, sync to Health, generate workouts with AI. This is the product.</p>
+  </div>
+ </div>
+
+ <h3>Positioning</h3>
+ <p>For lifters who'd rather train than fight their tracking app. LiftMark is the workout tracker built on open, portable plain text — so your programs are never locked in, and your AI of choice can write them for you.</p>
+
+ <h3>Personality</h3>
+ <p>Technical but athletic. Precise, unfussy, and quietly confident — the feel of a good command line meets the energy of a working gym. We sound like a strong training partner who happens to be an engineer: direct, encouraging, never preachy.</p>
+
+ <div class="grid" style="margin-top:18px;">
+  <div class="card" style="flex:1 1 150px;"><h4 style="margin-top:0;">Open</h4><p class="small muted">No lock-in. The format belongs to everyone.</p></div>
+  <div class="card" style="flex:1 1 150px;"><h4 style="margin-top:0;">Fast</h4><p class="small muted">Plain text in, structured training out.</p></div>
+  <div class="card" style="flex:1 1 150px;"><h4 style="margin-top:0;">Strong</h4><p class="small muted">Built for the set in front of you.</p></div>
+ </div>
+
+ <h3>Tagline</h3>
+ <p style="font-family:var(--display);font-size:1.6rem;font-weight:700;letter-spacing:-0.02em;">Your workouts, kept in plain text.</p>
+ <p class="small muted">Alternates: “Write it, then lift it.” · “Workouts that are just text.” · “Your program, your file.”</p>
+
+ <h3>Naming</h3>
+ <p>The formal name is <b>LiftMark</b> — “mark” doing double duty for <em>markdown</em> and for a personal <em>mark</em> you hit. The open format is <b>LiftMark Format</b> (formerly “LMWF”). <b>lift.md</b> is a fun consumer-facing styling and the ideal domain (the name is literally a markdown file) — use it for the wordmark and social wherever a <code>lift.md</code> domain is secured. Both share one identity — the LM mark below works for either. Spoken, it’s “LiftMark.”</p>
+</section>
+
+<!-- ========================= 02 VOICE ========================= -->
+<section class="brk">
+ <p class="eyebrow">02 — Voice &amp; tone</p>
+ <h2>How LiftMark talks</h2>
+ <p class="lead">Warm, clear, and actually helpful — like a friend who knows their way around the gym. We explain things simply, cheer you on, and skip the hype.</p>
+
+ <div class="grid" style="margin-top:24px;">
+  <div class="card" style="flex:1 1 280px;">
+   <h4 style="margin-top:0;color:var(--blue6);">We are</h4>
+   <p class="small">Friendly · clear · encouraging · helpful · down-to-earth.</p>
+  </div>
+  <div class="card" style="flex:1 1 280px;">
+   <h4 style="margin-top:0;color:#C0392B;">We are not</h4>
+   <p class="small">Hype-y · salesy · jargon-heavy · cold · preachy.</p>
+  </div>
+ </div>
+
+ <h3>In practice</h3>
+ <div class="grid">
+  <div class="card" style="flex:1 1 280px;">
+   <p class="small muted" style="margin-bottom:4px;">Instead of</p>
+   <p class="small">“🔥 CRUSH your goals with the ULTIMATE AI-powered fitness revolution!!”</p>
+   <p class="small muted" style="margin:12px 0 4px;">Say</p>
+   <p class="small" style="margin:0;">“Paste in a workout and start lifting — we’ll keep track for you.”</p>
+  </div>
+  <div class="card" style="flex:1 1 280px;">
+   <p class="small muted" style="margin-bottom:4px;">Instead of</p>
+   <p class="small">“Our proprietary engine leverages synergistic data pipelines.”</p>
+   <p class="small muted" style="margin:12px 0 4px;">Say</p>
+   <p class="small" style="margin:0;">“Your workouts are just text — easy to read, and yours to keep.”</p>
+  </div>
+ </div>
+
+ <div class="note">When in doubt, write like you’re helping a friend get started: clear, kind, and no longer than it needs to be.</div>
+</section>
+
+<!-- ========================= 03 LOGO ========================= -->
+<section class="brk">
+ <p class="eyebrow">03 — Logo system</p>
+ <h2>The LM mark</h2>
+ <p class="lead">The mark is the <b>LM</b> monogram in Space Grotesk Bold on a <b>blue-gradient tile</b>, with a short <b>orange bar</b> beneath — a markdown rule (<code>---</code>) that also reads as a loaded barbell. It evolves the original LM-and-dumbbell logo: same letters, modern and flat-but-for-the-gradient, no brown.</p>
+
+ <h3>Primary lockup</h3>
+ <div class="logo-hero"><img src="assets/logos/lockup-liftmark-ink.svg" alt="LiftMark lockup" style="height:74px;"></div>
+ <p class="small muted">Mark + wordmark on light backgrounds.</p>
+
+ <div class="grid" style="margin-top:14px;">
+  <div style="flex:1 1 280px;"><div class="logo-hero dark"><img src="assets/logos/lockup-liftmark-white.svg" alt="" style="height:62px;"></div><p class="small muted">Reversed — white wordmark on ink &amp; photos.</p></div>
+  <div style="flex:1 1 280px;"><div class="logo-hero dark"><img src="assets/logos/lockup-liftmd-white.svg" alt="" style="height:62px;"></div><p class="small muted">Styled as <code>lift.md</code> — same mark, domain wordmark.</p></div>
+ </div>
+
+ <h3>Components</h3>
+ <div class="spec">
+  <div class="card"><img src="assets/logos/icon-blue.svg" alt="LM icon"><div class="lbl">LM ICON — app tile</div></div>
+  <div class="card"><img src="assets/logos/wm-liftmark-ink.svg" alt="wordmark" style="height:30px;"><div class="lbl">WORDMARK — Space Grotesk Bold</div></div>
+  <div class="card"><img src="assets/logos/mark-lm-ink.svg" alt="glyph" style="height:46px;"><div class="lbl">GLYPH — monogram alone</div></div>
+ </div>
+
+ <h3>Tile variants</h3>
+ <div class="spec">
+  <div class="card"><img src="assets/logos/icon-blue.svg" alt="" style="height:64px;"><div class="lbl">BLUE — primary</div></div>
+  <div class="card"><img src="assets/logos/icon-ink.svg" alt="" style="height:64px;"><div class="lbl">INK — mono / dark</div></div>
+  <div class="card"><img src="assets/logos/icon-light.svg" alt="" style="height:64px;"><div class="lbl">LIGHT — editorial</div></div>
+ </div>
+
+ <div class="note">Two gradients, used with restraint: a <b>subtle blue</b> on the tile (for depth) and a warm <b>orange-depth</b> on the bar. Both stay inside a single hue, so nothing ever muddies into brown — the mistake the old blue→orange blend made. No dumbbell; “lift” in the name and the energy carry the fitness.</div>
+</section>
+
+<!-- ========================= 03b NAMES & SUB-BRANDS ========================= -->
+<section class="brk">
+ <p class="eyebrow">03b — Names &amp; sub-brands</p>
+ <h2>One mark, two names, one family</h2>
+ <p class="lead">The same LM mark and type system carry every name. A light <b>JetBrains&nbsp;Mono</b> descriptor after a thin divider sets the sub-brand — so the format reads as part of the family, not a separate logo.</p>
+
+ <div class="grid" style="margin-top:20px;flex-direction:column;gap:18px;">
+  <div style="display:flex;align-items:center;gap:20px;"><img src="assets/logos/lockup-liftmark-ink.svg" style="height:54px;" alt=""><span class="small muted">the app</span></div>
+  <div style="display:flex;align-items:center;gap:20px;"><img src="assets/logos/lockup-liftmark-format-ink.svg" style="height:54px;" alt=""><span class="small muted">the open format (was “LMWF”)</span></div>
+  <div style="display:flex;align-items:center;gap:20px;"><img src="assets/logos/lockup-liftmd-ink.svg" style="height:54px;" alt=""><span class="small muted">consumer styling / domain</span></div>
+  <div style="display:flex;align-items:center;gap:20px;"><img src="assets/logos/lockup-liftmd-format-ink.svg" style="height:54px;" alt=""><span class="small muted">the format, styled as the domain</span></div>
+ </div>
+
+ <div class="note">Spoken, it’s always “LiftMark.” Use <b>LiftMark</b> for the app, <b>LiftMark Format</b> for the spec, and the <code>lift.md</code> styling wherever the domain lives. Set the descriptor in JetBrains Mono — never re-typeset it in the display face.</div>
+</section>
+
+<!-- ========================= 04 CLEAR SPACE ========================= -->
+<section class="brk">
+ <p class="eyebrow">04 — Clear space &amp; minimum sizes</p>
+ <h2>Give it room</h2>
+ <p>Keep clear space around the logo equal to the height of the “L” in the wordmark (or one-quarter of the icon’s height). Nothing — type, edges, other logos — enters this zone.</p>
+ <div class="clearspace"><div class="box"><img src="assets/logos/lockup-liftmark-ink.svg" alt=""></div></div>
+
+ <h3>Minimum sizes</h3>
+ <div class="grid">
+  <div class="card" style="flex:1 1 200px;"><b>Lockup</b><p class="small muted" style="margin:6px 0 0;">≥ 120 px / 32 mm wide (digital / print).</p></div>
+  <div class="card" style="flex:1 1 200px;"><b>LM icon</b><p class="small muted" style="margin:6px 0 0;">≥ 24 px. Holds down to a favicon.</p></div>
+  <div class="card" style="flex:1 1 200px;"><b>Glyph</b><p class="small muted" style="margin:6px 0 0;">Monogram alone for watch faces &amp; badges.</p></div>
+ </div>
+</section>
+
+<!-- ========================= 05 MISUSE ========================= -->
+<section class="brk">
+ <p class="eyebrow">05 — Logo misuse</p>
+ <h2>Don’t do this</h2>
+ <div class="donts">
+  <div class="dont"><div class="vis" style="background:#7a5b3a;"><img src="assets/logos/lockup-liftmark-white.svg" alt=""></div><div class="cap"><b>Don’t</b> place on muddy / low-contrast colors.</div></div>
+  <div class="dont"><div class="vis"><img src="assets/logos/icon-ink.svg" style="height:48px;transform:rotate(-12deg);" alt=""></div><div class="cap"><b>Don’t</b> rotate, skew, or tilt the mark.</div></div>
+  <div class="dont"><div class="vis"><img src="assets/logos/icon-ink.svg" style="height:34px;width:72px;" alt=""></div><div class="cap"><b>Don’t</b> stretch or distort proportions.</div></div>
+  <div class="dont"><div class="vis"><img src="assets/logos/wm-liftmark-ink.svg" style="height:22px;filter:hue-rotate(120deg);" alt=""></div><div class="cap"><b>Don’t</b> recolor outside the palette.</div></div>
+  <div class="dont"><div class="vis"><img src="assets/logos/wm-liftmark-ink.svg" style="height:22px;font-family:serif;" alt=""></div><div class="cap"><b>Don’t</b> re-typeset the wordmark in another font.</div></div>
+  <div class="dont"><div class="vis"><img src="assets/logos/icon-ink.svg" style="height:46px;box-shadow:0 8px 14px rgba(0,0,0,.5);" alt=""></div><div class="cap"><b>Don’t</b> add a drop shadow, bevel, or 3-D effect.</div></div>
+ </div>
+</section>
+
+<!-- ========================= 06 COLOR BRAND ========================= -->
+<section class="brk">
+ <p class="eyebrow">06 — Color: brand</p>
+ <h2>Two colors, two gradients</h2>
+ <p class="lead">Blue carries trust and structure; orange carries energy and effort — discipline and output. Gradient is welcome, with one rule: <b>never blend the two hues together</b>. Each gradient lives inside a single colour, so nothing ever muddies into brown.</p>
+
+ <div class="swatches" style="margin-top:20px;">
+  <div class="sw"><div class="chip" style="background:#2D5BFF;"></div><div class="info"><div class="name">LiftMark Blue</div><div class="hex">#2D5BFF</div></div></div>
+  <div class="sw"><div class="chip" style="background:#FF6A1A;"></div><div class="info"><div class="name">LiftMark Orange</div><div class="hex">#FF6A1A</div></div></div>
+  <div class="sw"><div class="chip" style="background:#0E1116;"></div><div class="info"><div class="name">Ink</div><div class="hex">#0E1116</div></div></div>
+  <div class="sw"><div class="chip" style="background:#F6F7F9;border-bottom:1px solid var(--n200);"></div><div class="info"><div class="name">Paper</div><div class="hex">#F6F7F9</div></div></div>
+ </div>
+
+ <h3>The brand gradients</h3>
+ <div class="grid">
+  <div style="flex:1 1 200px;"><div class="g" style="height:84px;border-radius:12px;background:linear-gradient(135deg,#356CFF,#1F46CE);"></div><p class="small" style="font-weight:600;margin-top:8px;">Blue tile — <span class="mono">#356CFF → #1F46CE</span></p><p class="small muted" style="margin:0;">Depth on the app tile &amp; large surfaces.</p></div>
+  <div style="flex:1 1 200px;"><div class="g" style="height:84px;border-radius:12px;background:linear-gradient(90deg,#ED5305,#FF8A3D);"></div><p class="small" style="font-weight:600;margin-top:8px;">Orange depth — <span class="mono">#ED5305 → #FF8A3D</span></p><p class="small muted" style="margin:0;">The logo bar, in-app accents, progress.</p></div>
+  <div style="flex:1 1 200px;"><div class="g" style="height:84px;border-radius:12px;background:linear-gradient(135deg,#2D5BFF 0%,#5236E8 45%,#E0357A 62%,#FF7A1A 100%);"></div><p class="small" style="font-weight:600;margin-top:8px;">Energy — <span class="mono">blue → magenta → orange</span></p><p class="small muted" style="margin:0;">Thin decorative rules only (cover/footer/OG).</p></div>
+ </div>
+ <p class="small muted" style="margin-top:8px;">The <b>Energy</b> gradient is the one place blue and orange may travel together — routed through magenta so it never browns. Reserve it for thin decorative bars; never put it behind text or use it as a tile/fill.</p>
+
+ <h3>The one rule</h3>
+ <div class="note warn">
+  <b>Never fade blue into orange — in a fill.</b> A direct two-stop blue→orange blend runs through a muddy, brownish middle. So keep every <em>surface</em> gradient inside one hue (blue→blue, orange→orange), and let the two hues meet as hard, separate shapes — like the orange bar on the blue tile. The single exception is the thin <b>Energy</b> rule above: routed through magenta, it carries both colours without browning, and only ever as a decorative line.
+ </div>
+ <div class="compare">
+  <div><div class="g" style="background:linear-gradient(135deg,#2D5BFF,#FF6A1A);"></div><p class="small" style="color:#C0392B;font-weight:600;">✗ Blue→orange blend (muddy brown core)</p></div>
+  <div><div class="g" style="background:linear-gradient(135deg,#356CFF,#1F46CE);position:relative;overflow:hidden;"><span style="position:absolute;left:32%;bottom:24%;width:36%;height:13%;background:linear-gradient(90deg,#ED5305,#FF8A3D);border-radius:99px;"></span></div><p class="small" style="color:var(--blue6);font-weight:600;">✓ Blue gradient + orange-depth bar</p></div>
+ </div>
+</section>
+
+<!-- ========================= 07 SCALES ========================= -->
+<section class="brk">
+ <p class="eyebrow">07 — Color: full scales</p>
+ <h2>Tints &amp; shades</h2>
+ <p>Each ramp runs 50→900. 500 is the brand value. Use lighter steps for surfaces and states, darker for text and pressed states.</p>
+
+ <h4>Blue</h4>
+ <div class="scale">
+  <div class="step" style="background:#EEF2FF;color:#18296E;">50</div><div class="step" style="background:#DBE3FF;color:#18296E;">100</div><div class="step" style="background:#B7C7FF;color:#18296E;">200</div><div class="step" style="background:#8AA3FF;color:#18296E;">300</div><div class="step" style="background:#5677FF;color:#fff;">400</div><div class="step" style="background:#2D5BFF;color:#fff;">500</div><div class="step" style="background:#1E45E6;color:#fff;">600</div><div class="step" style="background:#1834B4;color:#fff;">700</div><div class="step" style="background:#182E8C;color:#fff;">800</div><div class="step" style="background:#18296E;color:#fff;">900</div>
+ </div>
+ <h4>Orange</h4>
+ <div class="scale">
+  <div class="step" style="background:#FFF2EA;color:#7E2F12;">50</div><div class="step" style="background:#FFE0CC;color:#7E2F12;">100</div><div class="step" style="background:#FFBF99;color:#7E2F12;">200</div><div class="step" style="background:#FF9D63;color:#7E2F12;">300</div><div class="step" style="background:#FF8038;color:#7E2F12;">400</div><div class="step" style="background:#FF6A1A;color:#fff;">500</div><div class="step" style="background:#ED5305;color:#fff;">600</div><div class="step" style="background:#C44208;color:#fff;">700</div><div class="step" style="background:#9C360F;color:#fff;">800</div><div class="step" style="background:#7E2F12;color:#fff;">900</div>
+ </div>
+ <h4>Neutral / Slate</h4>
+ <div class="scale">
+  <div class="step" style="background:#FFFFFF;color:#333;border-right:1px solid #eee;">0</div><div class="step" style="background:#F6F7F9;color:#333;">50</div><div class="step" style="background:#EDEFF3;color:#333;">100</div><div class="step" style="background:#DDE1E8;color:#333;">200</div><div class="step" style="background:#C2C8D2;color:#333;">300</div><div class="step" style="background:#9AA2B0;color:#fff;">400</div><div class="step" style="background:#6B7382;color:#fff;">500</div><div class="step" style="background:#4B515E;color:#fff;">600</div><div class="step" style="background:#333845;color:#fff;">700</div><div class="step" style="background:#1C2028;color:#fff;">800</div><div class="step" style="background:#0E1116;color:#fff;">900</div>
+ </div>
+
+ <h4>Semantic</h4>
+ <div class="swatches">
+  <div class="sw"><div class="chip" style="background:#18A957;height:54px;"></div><div class="info"><div class="name">Success</div><div class="hex">#18A957</div></div></div>
+  <div class="sw"><div class="chip" style="background:#F5A524;height:54px;"></div><div class="info"><div class="name">Warning</div><div class="hex">#F5A524</div></div></div>
+  <div class="sw"><div class="chip" style="background:#E5484D;height:54px;"></div><div class="info"><div class="name">Danger</div><div class="hex">#E5484D</div></div></div>
+  <div class="sw"><div class="chip" style="background:#2D5BFF;height:54px;"></div><div class="info"><div class="name">Info</div><div class="hex">#2D5BFF</div></div></div>
+ </div>
+</section>
+
+<!-- ========================= 08 THEMES & A11Y ========================= -->
+<section class="brk">
+ <p class="eyebrow">08 — Themes &amp; accessibility</p>
+ <h2>Light, dark, and legible</h2>
+ <p>LiftMark ships light and dark (auto by default). Use the semantic roles — not raw hex — so surfaces flip cleanly. Tokens are in <code>liftmark-tokens.css</code> and <code>LiftMarkColors.swift</code>.</p>
+
+ <div class="grid" style="margin-top:16px;">
+  <div class="card" style="flex:1 1 240px;background:#fff;">
+   <div class="small mono muted">LIGHT</div>
+   <div style="margin-top:8px;font-size:.85rem;"><span style="color:#0E1116;">text #0E1116</span> · <span style="color:#6B7382;">muted #6B7382</span> · <span style="color:#1E45E6;">link #1E45E6</span></div>
+   <div style="margin-top:10px;height:30px;border-radius:8px;background:#F6F7F9;border:1px solid #DDE1E8;"></div>
+  </div>
+  <div class="card" style="flex:1 1 240px;background:#0E1116;border-color:#333845;">
+   <div class="small mono" style="color:#9AA2B0;">DARK</div>
+   <div style="margin-top:8px;font-size:.85rem;"><span style="color:#F6F7F9;">text #F6F7F9</span> · <span style="color:#9AA2B0;">muted #9AA2B0</span> · <span style="color:#8AA3FF;">link #8AA3FF</span></div>
+   <div style="margin-top:10px;height:30px;border-radius:8px;background:#1C2028;border:1px solid #333845;"></div>
+  </div>
+ </div>
+
+ <h3>Contrast — measured (WCAG 2.1)</h3>
+ <div class="crbar"><div class="sample" style="background:#fff;color:#0E1116;border:1px solid #eee;">Ink / White</div><span>18.9 : 1 <span class="crbadge">AAA</span></span><span class="small muted">Body text. Default everywhere.</span></div>
+ <div class="crbar"><div class="sample" style="background:#2D5BFF;color:#fff;">White / Blue</div><span>5.2 : 1 <span class="crbadge">AA</span></span><span class="small muted">Primary buttons, white label OK.</span></div>
+ <div class="crbar"><div class="sample" style="background:#fff;color:#1E45E6;border:1px solid #eee;">Blue&nbsp;600 / White</div><span>6.9 : 1 <span class="crbadge">AA</span></span><span class="small muted">Use Blue 600 for text links on light.</span></div>
+ <div class="crbar"><div class="sample" style="background:#FF6A1A;color:#0E1116;">Ink / Orange</div><span>6.5 : 1 <span class="crbadge">AA</span></span><span class="small muted">Orange buttons need <b>dark</b> labels.</span></div>
+ <div class="crbar"><div class="sample" style="background:#fff;color:#FF6A1A;border:1px solid #eee;">Orange / White</div><span>2.9 : 1 <span class="crbadge" style="background:#FDE2E2;color:#C0392B;">FAIL</span></span><span class="small muted">Orange text/UI on white is decorative only.</span></div>
+ <div class="note warn" style="margin-top:14px;">Rule of thumb: <b>orange is a highlighter, blue is the pen.</b> Orange never carries body text or essential UI on a light surface — use ink or blue and let orange accent.</div>
+</section>
+
+<!-- ========================= 09 TYPE ========================= -->
+<section class="brk">
+ <p class="eyebrow">09 — Typography</p>
+ <h2>Three typefaces</h2>
+ <p>All open-source (OFL) — fitting for an open project, and free to embed anywhere.</p>
+
+ <div class="grid" style="margin-top:18px;">
+  <div class="card" style="flex:1 1 200px;"><div class="aabig" style="font-weight:700;">Aa</div><h4 style="margin:14px 0 2px;">Space Grotesk</h4><p class="small muted" style="margin:0;">Display &amp; headings. Geometric, a little technical. Weights 500 / 700.</p></div>
+  <div class="card" style="flex:1 1 200px;"><div class="aabig" style="font-family:var(--body);font-weight:600;">Aa</div><h4 style="margin:14px 0 2px;">Inter</h4><p class="small muted" style="margin:0;">Body &amp; UI. Quiet, dependable at small sizes. 400 / 500 / 600.</p></div>
+  <div class="card" style="flex:1 1 200px;"><div class="aabig" style="font-family:var(--mono);font-weight:500;">Aa</div><h4 style="margin:14px 0 2px;">JetBrains Mono</h4><p class="small muted" style="margin:0;">Code &amp; LMWF. The voice of the format itself. 500.</p></div>
+ </div>
+
+ <h3>Type scale</h3>
+ <div class="tscale">
+  <div class="row"><span class="meta">Display · 700 · 49px</span><span class="specimen" style="font-size:2.6rem;">Track your lifts</span></div>
+  <div class="row"><span class="meta">H1 · 700 · 39px</span><span class="specimen" style="font-size:2.1rem;">Track your lifts</span></div>
+  <div class="row"><span class="meta">H2 · 700 · 31px</span><span class="specimen" style="font-size:1.7rem;">Track your lifts</span></div>
+  <div class="row"><span class="meta">H3 · 500 · 25px</span><span class="specimen" style="font-weight:500;font-size:1.35rem;">Track your lifts</span></div>
+  <div class="row"><span class="meta">Body · Inter 400 · 16px</span><span style="font-family:var(--body);font-size:1rem;">Paste a workout and start lifting.</span></div>
+  <div class="row"><span class="meta">Mono · JB Mono · 14px</span><span class="mono" style="font-size:.875rem;">- 225 x 5 @rest: 180s</span></div>
+ </div>
+ <div class="note">Headings set tight: <span class="kbd">letter-spacing: -0.02em</span>, line-height 1.1–1.2. Body breathes at 1.6. Don’t set body copy in Space Grotesk, and don’t set headings in mono.</div>
+</section>
+
+<!-- ========================= 10 ICONS ========================= -->
+<section class="brk">
+ <p class="eyebrow">10 — Iconography</p>
+ <h2>Icon style</h2>
+ <p>Line icons on a 24×24 grid, 2 px stroke, rounded caps and joins. Match SF Symbols’ weight so they sit naturally in iOS. Ink or muted slate by default; brand color only to signal state or action.</p>
+ <div class="iconrow" style="margin-top:18px;color:var(--ink);">
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2M20 12h2"/><rect x="4" y="8" width="3" height="8" rx="1"/><rect x="17" y="8" width="3" height="8" rx="1"/><path d="M7 12h10"/></svg><div class="lbl">workout</div></div>
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M12 2h0M9 2h6M19 5l1.5-1.5"/></svg><div class="lbl">rest timer</div></div>
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V10M9 20V4M15 20v-8M21 20v-5"/></svg><div class="lbl">history</div></div>
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg><div class="lbl">import</div></div>
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><div class="lbl">set done</div></div>
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h12M3 6h18M3 18h8"/><circle cx="19" cy="16" r="3"/></svg><div class="lbl">tags</div></div>
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><div class="lbl">search</div></div>
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 8l3-3 3 3M3 5h6"/><path d="M21 16l-3 3-3-3M18 5v14"/></svg><div class="lbl">sync</div></div>
+ </div>
+ <p class="small muted" style="margin-top:18px;">Avoid filled, multicolor, or skeuomorphic icons. One concept per icon; if it needs a label to read, simplify the icon.</p>
+</section>
+
+<!-- ========================= 11 UI ========================= -->
+<section class="brk">
+ <p class="eyebrow">11 — UI &amp; components</p>
+ <h2>Putting it together</h2>
+
+ <h3>Buttons</h3>
+ <div class="grid" style="align-items:center;">
+  <button class="btn btn-primary">Start workout</button>
+  <button class="btn btn-orange">Generate with AI</button>
+  <button class="btn btn-ghost">Cancel</button>
+ </div>
+ <p class="small muted" style="margin-top:10px;">Primary = solid blue, white label. Orange is the hero/accent action and always takes <b>ink</b> labels. Ghost for secondary. No gradient fills.</p>
+
+ <h3>Radius &amp; spacing</h3>
+ <div class="grid">
+  <div class="card" style="flex:1 1 200px;"><b>Radius</b><p class="small muted" style="margin:6px 0 0;">sm 8 · md 12 · lg 16 · xl 24 · pill 999. App tile = 22.46% of edge.</p></div>
+  <div class="card" style="flex:1 1 200px;"><b>Spacing</b><p class="small muted" style="margin:6px 0 0;">8-pt base: 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64.</p></div>
+  <div class="card" style="flex:1 1 200px;"><b>Elevation</b><p class="small muted" style="margin:6px 0 0;">Soft, low shadows. Cards rest on Paper, not float.</p></div>
+ </div>
+
+ <h3>Card example</h3>
+ <div class="card" style="max-width:360px;box-shadow:var(--lm-shadow-2,0 4px 12px rgba(14,17,22,.1));">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+   <h4 style="margin:0;">Push Day A</h4>
+   <span class="mono small" style="background:#EEF2FF;color:#1E45E6;padding:2px 8px;border-radius:999px;">push</span>
+  </div>
+  <p class="small muted" style="margin:8px 0 14px;">5 exercises · ~48 min</p>
+  <button class="btn btn-primary" style="width:100%;">Start workout</button>
+ </div>
+</section>
+
+<!-- ========================= 12 FORMAT AS BRAND ========================= -->
+<section class="brk">
+ <p class="eyebrow">12 — The format as brand</p>
+ <h2>Markdown is the look</h2>
+ <p>The LMWF syntax is a brand asset. When we show a workout, we style it consistently: ink background, mono type, headings muted, <span style="color:#FF8A3D;font-family:var(--mono);">@modifiers</span> in orange, set lines in light blue.</p>
+ <div class="codeblock">
+<span class="h"># Push Day</span>
+<span class="at">@tags:</span> strength, push
+<span class="at">@units:</span> lbs
+
+<span class="h">## Bench Press</span>
+<span class="set">- 135 x 5 <span class="at">@rest:</span> 120s</span>
+<span class="set">- 185 x 5 <span class="at">@rest:</span> 180s</span>
+<span class="set">- 225 x 5 <span class="at">@rest:</span> 180s</span>  Aim for RPE 7
+ </div>
+ <p class="small muted" style="margin-top:10px;">Use the <span class="kbd">#</span> heading mark as a recurring graphic motif — in taglines (“# Workouts in plain text.”), section titles, and social. It signals “this is plain text” at a glance.</p>
+</section>
+
+<!-- ========================= 13 SOCIAL ========================= -->
+<section class="brk">
+ <p class="eyebrow">13 — Social &amp; app icon</p>
+ <h2>Out in the world</h2>
+ <h3>Open Graph / share card</h3>
+ <img src="assets/social/og-liftmark.svg" alt="LiftMark OG card" style="width:100%;border-radius:16px;border:1px solid var(--n200);">
+ <p class="small muted" style="margin-top:8px;">1200×630. Ink field, centered lockup, a real LiftMark Format snippet, orange-depth foot bar. <code>og-liftmark</code> and <code>og-liftmd</code> templates in <code>assets/social/</code>.</p>
+
+ <h3>App icon</h3>
+ <div class="grid" style="align-items:flex-end;">
+  <img src="assets/logos/icon-ink.svg" style="height:96px;" alt="">
+  <img src="assets/logos/icon-ink.svg" style="height:64px;" alt="">
+  <img src="assets/logos/icon-blue.svg" style="height:40px;" alt="">
+  <img src="assets/logos/icon-light.svg" style="height:40px;" alt="">
+ </div>
+ <p class="small muted" style="margin-top:10px;">Blue-gradient tile, white LM, orange-depth bar. Ink and light tiles are alternates. PNG exports (1024/512/180/120) and the square App Store icon live in <code>assets/icons/</code> (<code>lm-*</code>).</p>
+</section>
+
+<!-- ========================= 14 TOKENS ========================= -->
+<section class="brk">
+ <p class="eyebrow">14 — Developer tokens</p>
+ <h2>Build from the source</h2>
+ <p>Everything in this book is shipped as code. Pull these into the Astro site and the iOS app so design and product never drift.</p>
+ <div class="tokens-list">
+  <div>assets/tokens/<b>liftmark-tokens.css</b>&nbsp; — CSS custom properties, light + dark</div>
+  <div>assets/tokens/<b>liftmark-tokens.json</b> — framework-agnostic design tokens</div>
+  <div>assets/tokens/<b>LiftMarkColors.swift</b> — SwiftUI Color tokens (light + dark)</div>
+  <div>assets/fonts/ — Space Grotesk · Inter · JetBrains Mono (woff2 + ttf)</div>
+  <div>assets/logos/ — LM icon · wordmarks · lockups · glyph (SVG)</div>
+  <div>assets/icons/ — app icons, favicons &amp; square App Store icon (PNG, <code>lm-*</code>)</div>
+  <div>assets/social/ — OG templates: og-liftmark, og-liftmd (SVG + PNG)</div>
+ </div>
+ <div class="note">Quick start (web): <span class="kbd">@import "assets/tokens/liftmark-tokens.css";</span> then use <span class="kbd">var(--lm-accent)</span>, <span class="kbd">var(--lm-text)</span>, <span class="kbd">var(--lm-orange)</span>. iOS: drop in <span class="kbd">LiftMarkColors.swift</span> and use <span class="kbd">Color.lmAccent</span> / <span class="kbd">Color.lmOrange</span>. Gradients: keep each inside one hue (blue→blue, orange→orange) — never blend blue into orange.</div>
+</section>
+
+<footer>
+ <div class="bar"></div>
+ <p style="color:#fff;font-family:var(--display);font-size:1.2rem;">LiftMark Brand Book · v2.1</p>
+ <p style="margin-top:8px;">App code: MPL-2.0 · LiftMark Format spec: CC BY-SA 4.0 · Fonts: SIL OFL.<br>
+ <a href="https://liftmark.app">liftmark.app</a> · <a href="https://github.com/vfilby/liftmark">github.com/vfilby/liftmark</a></p>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://design-tokens.org",
+  "brand": {
+    "blue":       { "value": "#2D5BFF", "comment": "LiftMark Blue — primary" },
+    "bluePress":  { "value": "#1E45E6", "comment": "links/text on light (AA)" },
+    "orange":     { "value": "#FF6A1A", "comment": "energy accent" },
+    "ink":        { "value": "#0E1116" }
+  },
+  "gradient": {
+    "energy": { "value": "linear-gradient(135deg,#2D5BFF 0%,#5236E8 45%,#E0357A 62%,#FF7A1A 100%)" },
+    "split":  { "value": "linear-gradient(120deg,#2D5BFF 0%,#2D5BFF 50%,#FF6A1A 50%,#FF8A2A 100%)" }
+  },
+  "color": {
+    "blue":   { "50":"#EEF2FF","100":"#DBE3FF","200":"#B7C7FF","300":"#8AA3FF","400":"#5677FF","500":"#2D5BFF","600":"#1E45E6","700":"#1834B4","800":"#182E8C","900":"#18296E" },
+    "orange": { "50":"#FFF2EA","100":"#FFE0CC","200":"#FFBF99","300":"#FF9D63","400":"#FF8038","500":"#FF6A1A","600":"#ED5305","700":"#C44208","800":"#9C360F","900":"#7E2F12" },
+    "neutral":{ "0":"#FFFFFF","50":"#F6F7F9","100":"#EDEFF3","200":"#DDE1E8","300":"#C2C8D2","400":"#9AA2B0","500":"#6B7382","600":"#4B515E","700":"#333845","800":"#1C2028","900":"#0E1116" }
+  },
+  "semantic": {
+    "success": { "value": "#18A957" },
+    "warning": { "value": "#F5A524" },
+    "danger":  { "value": "#E5484D" },
+    "info":    { "value": "#2D5BFF" }
+  },
+  "theme": {
+    "light": { "bg":"#FFFFFF","bgSubtle":"#F6F7F9","surface":"#FFFFFF","border":"#DDE1E8","text":"#0E1116","textMuted":"#6B7382","link":"#1E45E6","accent":"#2D5BFF","codeBg":"#F6F7F9","codeText":"#1C2028" },
+    "dark":  { "bg":"#0E1116","bgSubtle":"#1C2028","surface":"#1C2028","border":"#333845","text":"#F6F7F9","textMuted":"#9AA2B0","link":"#8AA3FF","accent":"#5677FF","codeBg":"#161A21","codeText":"#DDE1E8" }
+  },
+  "font": {
+    "display": { "value": "Space Grotesk" },
+    "body":    { "value": "Inter" },
+    "mono":    { "value": "JetBrains Mono" }
+  },
+  "fontSize": {
+    "display":"3.05rem","h1":"2.44rem","h2":"1.95rem","h3":"1.56rem","h4":"1.25rem",
+    "bodyLg":"1.125rem","body":"1rem","sm":"0.875rem","caption":"0.75rem"
+  },
+  "lineHeight": { "tight":1.15,"snug":1.3,"body":1.6 },
+  "fontWeight": { "regular":400,"medium":500,"semibold":600,"bold":700 },
+  "space": { "1":2,"2":4,"3":8,"4":12,"5":16,"6":24,"7":32,"8":48,"9":64 },
+  "radius": { "sm":8,"md":12,"lg":16,"xl":24,"pill":999,"tilePct":22.46 }
+}
