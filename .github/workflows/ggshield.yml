@@ -1,0 +1,41 @@
+# Self-run GitGuardian secret scan via ggshield.
+#
+# Why this exists alongside / instead of the managed "GitGuardian Security
+# Checks" GitHub App: the managed App reads its ignore list from the
+# GitGuardian dashboard and does NOT honor the repo's .gitguardian.yaml.
+# ggshield DOES honor .gitguardian.yaml (secret.ignored-matches / ignored-paths),
+# so our allowlist lives in git (config-as-code) and false positives like the
+# e2e test-fixture passphrase are silenced in-repo — no per-incident dashboard
+# clicks. Intended to be the REQUIRED secret-scanning check (the managed App
+# check can then be demoted to non-required/informational).
+#
+# Prerequisite: repo secret GITGUARDIAN_API_KEY (a GitGuardian API key with the
+# `scan` scope). Without it this job fails on auth.
+name: GitGuardian (ggshield)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ggshield:
+    name: ggshield
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so the PR/push commit range can be scanned.
+          fetch-depth: 0
+      - name: ggshield secret scan
+        uses: GitGuardian/ggshield-action@v1
+        env:
+          GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
+          GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
