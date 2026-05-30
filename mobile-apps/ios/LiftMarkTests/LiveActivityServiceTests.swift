@@ -183,6 +183,101 @@ final class LiveActivityServiceTests: XCTestCase {
         XCTAssertEqual(detail, "BW \u{00D7} 60s")
     }
 
+    // MARK: - resolveContentState: cursor advance on skip (#144)
+
+    /// Mirrors ActiveWorkoutViewModel.updateLiveActivity's derivation of the
+    /// current exercise/set so the tests exercise the same handoff that the app
+    /// uses after a skip.
+    private func currentCursor(in session: WorkoutSession) -> (exercise: SessionExercise?, setIndex: Int) {
+        let current = session.exercises.first { ex in ex.sets.contains { $0.status == .pending } }
+        let idx = current?.sets.firstIndex { $0.status == .pending } ?? 0
+        return (current, idx)
+    }
+
+    func testResolveAdvancesToNextExerciseWhenCurrentSkipped() throws {
+        guard #available(iOS 16.2, *) else { throw XCTSkip("Requires iOS 16.2") }
+        // ex1's only set is skipped → cursor advances to ex2.
+        let ex1 = makeExercise(name: "Bench Press", sets: [
+            makeSet(targetWeight: 185, targetWeightUnit: .lbs, targetReps: 5, status: .skipped)
+        ])
+        let ex2 = makeExercise(name: "Squat", sets: [
+            makeSet(targetWeight: 225, targetWeightUnit: .lbs, targetReps: 5, status: .pending)
+        ])
+        let session = makeSession(exercises: [ex1, ex2])
+
+        let cursor = currentCursor(in: session)
+        XCTAssertEqual(cursor.exercise?.exerciseName, "Squat")
+
+        let state = service.resolveContentState(
+            session: session,
+            exercise: cursor.exercise,
+            setIndex: cursor.setIndex,
+            progress: (completed: 0, total: 2)
+        )
+        XCTAssertFalse(state.isRestTimer)
+        XCTAssertEqual(state.exerciseName, "Squat")
+        XCTAssertEqual(state.weightReps, "225 lbs \u{00D7} 5")
+    }
+
+    func testResolveAdvancesPastSkippedLastSetWithinExercise() throws {
+        guard #available(iOS 16.2, *) else { throw XCTSkip("Requires iOS 16.2") }
+        // First set completed, last set skipped on ex1 → advance to ex2.
+        let ex1 = makeExercise(name: "Bench Press", sets: [
+            makeSet(targetWeight: 135, targetWeightUnit: .lbs, targetReps: 5, status: .completed),
+            makeSet(targetWeight: 155, targetWeightUnit: .lbs, targetReps: 5, status: .skipped)
+        ])
+        let ex2 = makeExercise(name: "Squat", sets: [
+            makeSet(targetWeight: 225, targetWeightUnit: .lbs, targetReps: 5, status: .pending)
+        ])
+        let session = makeSession(exercises: [ex1, ex2])
+
+        let cursor = currentCursor(in: session)
+        let state = service.resolveContentState(
+            session: session,
+            exercise: cursor.exercise,
+            setIndex: cursor.setIndex,
+            progress: (completed: 1, total: 3)
+        )
+        XCTAssertEqual(state.exerciseName, "Squat")
+    }
+
+    func testResolveShowsFinishingStateWhenLastExerciseSkipped() throws {
+        guard #available(iOS 16.2, *) else { throw XCTSkip("Requires iOS 16.2") }
+        // Every set across the session is completed or skipped → finishing state.
+        let ex1 = makeExercise(name: "Bench Press", sets: [
+            makeSet(status: .completed)
+        ], status: .completed)
+        let ex2 = makeExercise(name: "Squat", sets: [
+            makeSet(status: .skipped)
+        ], status: .skipped)
+        let session = makeSession(exercises: [ex1, ex2])
+
+        let cursor = currentCursor(in: session)
+        XCTAssertNil(cursor.exercise, "No pending sets should resolve current exercise to nil")
+
+        let state = service.resolveContentState(
+            session: session,
+            exercise: cursor.exercise,
+            setIndex: cursor.setIndex,
+            progress: (completed: 1, total: 2)
+        )
+        XCTAssertEqual(state.exerciseName, LiveActivityService.completeTitle)
+        XCTAssertEqual(state.weightReps, LiveActivityService.completeSubtitle)
+        XCTAssertEqual(state.progress, 1.0)
+        XCTAssertFalse(state.isRestTimer)
+    }
+
+    func testResolveFinishingStateMatchesEndCompletionMessage() throws {
+        guard #available(iOS 16.2, *) else { throw XCTSkip("Requires iOS 16.2") }
+        // The in-place finishing state must read identically to the explicit
+        // end-of-workout completion message so skip-to-finish and tap-Finish
+        // look the same.
+        let finishing = LiveActivityService.finishingState
+        XCTAssertEqual(finishing.exerciseName, "Workout Complete")
+        XCTAssertEqual(finishing.weightReps, "Great job!")
+        XCTAssertEqual(finishing.progress, 1.0)
+    }
+
     // MARK: - Cleanup (Graceful in Test Environment)
 
     func testCleanupOrphanedActivitiesDoesNotCrash() {
