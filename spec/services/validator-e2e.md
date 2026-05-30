@@ -1,5 +1,89 @@
 # Validator E2E Test Suite
 
+## Three-layer testing strategy (issue #137)
+
+The validator's regression safety net is organised in three deliberately
+distinct layers, each catching a different class of breakage. They are
+additive, not redundant — a bug that slips one layer is the reason the
+next layer exists.
+
+| Layer | What it exercises | Transport | Where it lives | Status |
+|-------|-------------------|-----------|----------------|--------|
+| **1 — HTTP flow integration** | The full client journey through the real Hono app + DynamoDB Local + Mailpit, asserting the *protocol contract* composes end-to-end (each step consumes the exact token/id the previous step emitted). | In-process `app.request()` against DDB Local + Mailpit. | `validator/tests/flow.test.ts` | **Implemented** |
+| **2 — Live smoke flow** | The same journey against a deployed beta stack over real HTTP (`smoke-flow-live.sh`), proving the deploy topology (Lambda + API GW + DDB + SES) wires up. | Real HTTPS against `beta.liftmark.app`. | `validator/scripts/smoke-flow-live.sh` (planned) | Deferred |
+| **3 — iOS vs. beta** | The iOS client driving the live beta backend, proving the Swift client and the server agree on the wire format. | iOS UI/integration test against beta. | iOS test target (planned) | Deferred |
+
+### Layer 1 — HTTP flow integration (`flow.test.ts`)
+
+Layer 1 is a single Vitest suite that walks the entire happy path in
+order, against the real Hono app and a live DynamoDB Local + Mailpit
+stack (`make dev-up`):
+
+```
+signup → fetch verification email (Mailpit) → verify → login →
+list tokens → mint PAT → push workout (PAT) → list inbox →
+fetch inbox detail → ack inbox → push completed session (PAT) →
+list outbox → fetch outbox detail → delete outbox → revoke PAT →
+password reset (Mailpit) → re-login with new password
+```
+
+It is distinct from the per-route tests under `validator/tests/routes/`:
+those prove each endpoint's contract *in isolation*, frequently
+short-circuiting auth by minting a session JWT or PAT directly against
+the repository layer. Layer 1 instead proves those contracts *compose* —
+the access JWT returned by `/login` is the bearer `/v1/tokens` accepts;
+the PAT plaintext returned by `/v1/tokens` is the bearer `/v1/workouts`
+accepts; the `inbox_id`/`outbox_id` echoed back is the id the detail,
+ack, and delete routes resolve. A field rename or status-code drift that
+breaks the chain trips Layer 1 even when every isolated route test stays
+green. That is the protocol-level breakage Layer 1 is meant to catch
+before the deploy queue.
+
+Endpoints exercised (the real, verified contract):
+
+| Step | Method + path | Auth | Key assertion |
+|------|---------------|------|---------------|
+| signup | `POST /v1/auth/password/signup` | none | 201, `{ user_id, email }` |
+| verify | `POST /v1/auth/password/verify` | verify JWT (from Mailpit) | 200, `{ verified: true, user_id }` |
+| login | `POST /v1/auth/password/login` | none | 200, `{ access_jwt, refresh_token, user }` |
+| list tokens | `GET /v1/tokens` | session JWT | 200, `{ tier, tokens[] }` |
+| mint PAT | `POST /v1/tokens` | session JWT | 201, `plaintext` shown once |
+| push workout | `POST /v1/workouts` | PAT | 201, `{ inbox_id, status: pending, summary }` |
+| list inbox | `GET /v1/workouts` | PAT | item present, `source_token_id` matches PAT |
+| inbox detail | `GET /v1/workouts/:id` | PAT | full parsed `workout` payload |
+| ack inbox | `POST /v1/workouts/:id/ack` | PAT | 204, status → `ingested` |
+| push session | `POST /v1/workouts/outbox` | PAT | 201, `{ outbox_id, session_name, dedup_hit: false }` |
+| list outbox | `GET /v1/workouts/outbox` | PAT | row present with correct payload |
+| outbox detail | `GET /v1/workouts/outbox/:id` | PAT | full session `payload` round-trips |
+| delete outbox | `DELETE /v1/workouts/outbox/:id` | PAT | 204, subsequent GET 404 |
+| revoke PAT | `DELETE /v1/tokens/:id` | session JWT | 204, `revoked_at` set |
+| reset request | `POST /v1/auth/password/reset-request` | none | 204 (anti-enumeration) |
+| reset | `POST /v1/auth/password/reset` | reset JWT (from Mailpit) | 200, old pw fails, new pw logs in |
+
+Stripe/billing webhook is **not** in Layer 1: no webhook route exists in
+the validator today (only a DDB GSI for subscription lookup). When a
+`POST /v1/billing/webhook` route lands, add a Layer 1 step for it.
+
+Running Layer 1:
+
+```bash
+cd validator
+make dev-up                                   # DDB Local + Mailpit
+DDB_ENDPOINT=http://localhost:8000 \
+  SMTP_HOST=localhost SMTP_PORT=1025 SMTP_FROM=noreply@local.test \
+  npx vitest run tests/flow.test.ts
+```
+
+The suite is gated on `DDB_ENDPOINT` + `SMTP_HOST` (the same `describe.skip`
+pattern as every other live-integration test). Under plain `npm test` —
+including the CI `validate (test)` job, which exports neither var — the
+suite self-skips. It therefore adds **no** new CI job and **no** new
+service dependency: it runs under the existing `npm test` whenever a
+developer has the local stack up, and is a no-op everywhere else. It uses
+a unique email per run and cleans up the outbox row + PAT it creates, so
+it is robust against the sequential / shared-state Vitest config
+(`fileParallelism: false`).
+
 ## Purpose
 
 Browser-driven end-to-end tests covering all user-facing UI of the
