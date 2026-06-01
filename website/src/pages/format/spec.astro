@@ -1,11 +1,11 @@
 ---
-import Base from '../layouts/Base.astro';
+import Base from '../../layouts/Base.astro';
 import { marked } from 'marked';
 // Single source of truth: the spec lives outside this site, in the
 // liftmark-workout-format/ package. We import it as a raw string at build
 // time and render it to HTML with marked. Do NOT copy the spec into this
 // tree.
-import specSource from '../../../liftmark-workout-format/LIFTMARK_WORKOUT_FORMAT_SPEC.md?raw';
+import specSource from '../../../../liftmark-workout-format/LIFTMARK_WORKOUT_FORMAT_SPEC.md?raw';
 
 marked.setOptions({
   gfm: true,
@@ -17,7 +17,8 @@ const html = marked.parse(specSource) as string;
 
 <Base
   title="Specification"
-  description="The LiftMark Workout Format (LMWF) specification: full format definition, modifiers, validation rules, and examples."
+  description="The lift.md format specification: full format definition, modifiers, validation rules, and examples."
+  ogImage="/brand/social/og-liftmd.png"
 >
   <p class="muted spec-meta">
     Rendered from the canonical

@@ -1,9 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('LMWF landing page', () => {
-  test('renders title, both example blocks, and links to /spec', async ({
-    page,
-  }) => {
+test.describe('Marketing landing page', () => {
+  test('renders the brand hero and the CTA to /format', async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on('pageerror', (err) => consoleErrors.push(String(err)));
     page.on('console', (msg) => {
@@ -12,14 +10,25 @@ test.describe('LMWF landing page', () => {
 
     await page.goto('/');
 
+    // Brand hero headline.
     await expect(
-      page.getByRole('heading', { level: 1, name: /LiftMark Workout Format/i }),
+      page.getByRole('heading', {
+        level: 1,
+        name: /own your training/i,
+      }),
     ).toBeVisible();
 
-    // Both the minimal and rich example markdown blocks should be on the page.
-    const codeBlocks = page.locator('pre code');
-    await expect(codeBlocks.first()).toContainText('# Bench Day');
-    await expect(codeBlocks.nth(1)).toContainText('# Push Day');
+    // CTA that routes to the format hub (the format content moved off home).
+    await expect(
+      page.getByRole('link', { name: /explore the format/i }),
+    ).toBeVisible();
+
+    // The marketing landing must NOT carry the format examples anymore —
+    // those live on /format.
+    await expect(page.locator('pre code')).toHaveCount(0);
+
+    // No format/validator widget on home.
+    await expect(page.locator('#validator-form')).toHaveCount(0);
 
     // No JS errors on first paint.
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);

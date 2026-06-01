@@ -1,0 +1,107 @@
+/* ===================================================================
+   LiftMark website — global stylesheet
+   Brand tokens + self-hosted fonts + a bridge that maps the older
+   `--color-*` variables (used by the /account portal and form widgets)
+   onto the brand `--lm-*` tokens, so re-skinning the whole site is a
+   single source of truth.
+   =================================================================== */
+
+/* Brand design tokens — vendored mirror of design-assets/assets/tokens/.
+   Provides every --lm-* scale, gradient, font stack, spacing, radius. */
+@import './liftmark-tokens.css';
+
+/* ── Self-hosted fonts (OFL) ──
+   Same-origin woff2 only, so the strict `script-src 'self'` /
+   `font-src 'self'` CSP from CloudFront accepts them with no exceptions. */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/SpaceGrotesk-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/SpaceGrotesk-Bold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Inter-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/Inter-SemiBold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+}
+
+/* ── Theme switching ──
+   liftmark-tokens.css flips its semantic surface roles on
+   `[data-theme="dark"]` and on `prefers-color-scheme: dark` (unless
+   `[data-theme="light"]`). The site's color-scheme toggle keeps
+   `data-theme` in sync with the legacy `data-color-scheme` attribute, so
+   both the brand tokens and the bridge below resolve to the same theme. */
+
+/* ── Legacy bridge ──
+   The /account portal, AccountLayout, and the validator form were written
+   against a `--color-*` palette. Alias those names to the brand tokens so
+   every existing component inherits the brand without a per-file rewrite.
+   The accent is now LiftMark Blue (was a hand-coded orange). */
+:root {
+  --color-bg: var(--lm-bg);
+  --color-bg-subtle: var(--lm-bg-subtle);
+  --color-fg: var(--lm-text);
+  --color-muted: var(--lm-text-muted);
+  --color-border: var(--lm-border);
+  --color-accent: var(--lm-accent);
+  --color-accent-hover: var(--lm-blue-press);
+  --color-accent-fg: var(--lm-text-onbrand);
+
+  --color-ok-bg: var(--lm-blue-50);
+  --color-ok-fg: #065f46;
+  --color-ok-border: #6ee7b7;
+  --color-err-bg: #fef2f2;
+  --color-err-fg: #991b1b;
+  --color-err-border: #fca5a5;
+
+  --font-sans: var(--lm-font-body);
+  --font-mono: var(--lm-font-mono);
+  --font-display: var(--lm-font-display);
+
+  --max-width: 44rem;
+}
+
+/* Success/error surfaces keep readable contrast on the dark theme. */
+:root[data-theme='dark'],
+:root[data-color-scheme='dark'] {
+  --color-ok-bg: #052e1f;
+  --color-ok-fg: #a7f3d0;
+  --color-ok-border: #065f46;
+  --color-err-bg: #2c0a0a;
+  --color-err-fg: #fca5a5;
+  --color-err-border: #7f1d1d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-color-scheme='light']) {
+    --color-ok-bg: #052e1f;
+    --color-ok-fg: #a7f3d0;
+    --color-ok-border: #065f46;
+    --color-err-bg: #2c0a0a;
+    --color-err-fg: #fca5a5;
+    --color-err-border: #7f1d1d;
+  }
+}

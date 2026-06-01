@@ -1,11 +1,34 @@
 ---
+import '../styles/global.css';
+
 export interface Props {
   title: string;
   description?: string;
+  /** OG/Twitter share image, absolute path under /brand/social/. */
+  ogImage?: string;
+  /** Hide the global site chrome (header/footer) — used by auth pages. */
+  bare?: boolean;
+  /** Home page: the nav logo is driven by the hero→nav morph (hero-morph.js). */
+  home?: boolean;
 }
 
-const { title, description } = Astro.props;
-const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${title} — LMWF`;
+const {
+  title,
+  description,
+  ogImage = '/brand/social/og-liftmd.png',
+  bare = false,
+  home = false,
+} = Astro.props;
+
+const TAGLINE = 'Your workouts, kept in plain text.';
+const fullTitle =
+  title === 'lift.md' ? `lift.md — ${TAGLINE}` : `${title} — lift.md`;
+const metaDescription =
+  description ??
+  'lift.md turns strength training into plain-text workouts you can read, write, and own — tracked in a fast native iOS app, generatable by any LLM.';
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImageUrl = new URL(ogImage, Astro.site).href;
 ---
 
 <!doctype html>
@@ -15,9 +38,28 @@ const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${tit
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="generator" content={Astro.generator} />
     <title>{fullTitle}</title>
-    {description && <meta name="description" content={description} />}
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231a1a1a'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='central' font-family='ui-monospace,monospace' font-weight='700' font-size='24' fill='%23fdfdfc'%3ELM%3C/text%3E%3C/svg%3E" />
-    <link rel="alternate" type="text/markdown" href="/spec.md" title="LMWF spec (markdown)" />
+    <meta name="description" content={metaDescription} />
+    <link rel="canonical" href={canonical} />
+
+    <!-- ?v=3 busts the v3.0 brand refresh past Safari's aggressive favicon cache. -->
+    <link rel="icon" type="image/png" sizes="16x16" href="/brand/icons/lm-favicon-16.png?v=3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/icons/lm-favicon-32.png?v=3" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/brand/icons/lm-favicon-48.png?v=3" />
+    <link rel="apple-touch-icon" href="/brand/icons/lm-icon-180.png?v=3" />
+    <link rel="alternate" type="text/markdown" href="/spec.md" title="lift.md format spec (markdown)" />
+
+    <!-- Open Graph / Twitter -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="lift.md" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={metaDescription} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={metaDescription} />
+    <meta name="twitter:image" content={ogImageUrl} />
+
     <!--
       Pre-paint color-scheme: imported as an external module (not `is:inline`)
       so a strict `script-src 'self'` CSP from CloudFront accepts it without an
@@ -27,119 +69,73 @@ const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${tit
       import '../scripts/color-scheme-prepaint.js';
     </script>
   </head>
-  <body>
-    <header class="site-header">
-      <div class="container header-inner">
-        <a href="/" class="wordmark">LMWF</a>
-        <nav aria-label="Primary">
-          <a href="/spec">Spec</a>
-          <a href="https://github.com/vfilby/liftmark" rel="external noopener">GitHub</a>
-          <button
-            type="button"
-            class="color-toggle"
-            id="color-toggle"
-            aria-label="Toggle color scheme"
-            title="Auto (system)"
-          >◑</button>
-        </nav>
-      </div>
-    </header>
+  <body data-home={home ? '' : undefined}>
+    {!bare && (
+      <header class="site-header">
+        <div class="energy-rule" aria-hidden="true"></div>
+        <div class="container header-inner">
+          <a href="/" class="brand-lockup" aria-label="lift.md home">
+            <span class="brand-full-wrap">
+              <img class="logo logo-ink" src="/brand/logos/lockup-liftmd-ink.svg" alt="lift.md" width="689" height="260" />
+              <img class="logo logo-white" src="/brand/logos/lockup-liftmd-white.svg" alt="lift.md" width="689" height="260" />
+            </span>
+            <img class="logo brand-icon" src="/brand/logos/icon-blue.svg" alt="lift.md" width="1024" height="1024" />
+          </a>
+          <nav aria-label="Primary">
+            <a href="/format">Format</a>
+            <a href="https://github.com/vfilby/liftmark" rel="external noopener">GitHub</a>
+            <button
+              type="button"
+              class="color-toggle"
+              id="color-toggle"
+              aria-label="Toggle color scheme"
+              title="Auto (system)"
+            >◑</button>
+          </nav>
+        </div>
+      </header>
+    )}
 
     <main class="container">
       <slot />
     </main>
 
-    <footer class="site-footer">
-      <div class="container footer-inner">
-        <p>
-          <a href="https://github.com/vfilby/liftmark" rel="external noopener">Repository</a>
-          <span aria-hidden="true"> · </span>
-          <a href="/spec">Spec</a>
-          <span aria-hidden="true"> · </span>
-          <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="external noopener license">Spec: CC BY-SA 4.0</a>
-        </p>
-        <p class="muted">
-          The LiftMark Workout Format is an open specification. The LiftMark iOS app uses it, but it is not tied to any app.
-        </p>
-      </div>
-    </footer>
+    {!bare && (
+      <footer class="site-footer">
+        <div class="energy-rule" aria-hidden="true"></div>
+        <div class="container footer-inner">
+          <p class="footer-tagline">{TAGLINE}</p>
+          <p>
+            <a href="/format">lift.md format</a>
+            <span aria-hidden="true"> · </span>
+            <a href="https://github.com/vfilby/liftmark" rel="external noopener">GitHub</a>
+            <span aria-hidden="true"> · </span>
+            <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="external noopener license">Format: CC BY-SA 4.0</a>
+          </p>
+          <p class="muted">
+            lift.md format is an open specification. The LiftMark iOS app uses it, but the format is not tied to any app.
+          </p>
+        </div>
+      </footer>
+    )}
 
     <style is:global>
-      :root {
-        color-scheme: light dark;
-        --color-bg: #fdfdfc;
-        --color-bg-subtle: #f5f4f2;
-        --color-fg: #1a1a1a;
-        --color-muted: #5a5a57;
-        --color-border: #e4e3df;
-        --color-accent: #c2410c;
-        --color-accent-hover: #9a330a;
-        --color-accent-fg: #ffffff;
-        --color-ok-bg: #ecfdf5;
-        --color-ok-fg: #065f46;
-        --color-ok-border: #6ee7b7;
-        --color-err-bg: #fef2f2;
-        --color-err-fg: #991b1b;
-        --color-err-border: #fca5a5;
-        --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
-        --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-        --max-width: 44rem;
-      }
+      *, *::before, *::after { box-sizing: border-box; }
 
-      @media (prefers-color-scheme: dark) {
-        :root:not([data-color-scheme="light"]) {
-          --color-bg: #0f0f0e;
-          --color-bg-subtle: #1c1c1a;
-          --color-fg: #e8e7e3;
-          --color-muted: #a5a39e;
-          --color-border: #2e2d29;
-          --color-accent: #f97316;
-          --color-accent-hover: #fb923c;
-          --color-accent-fg: #0f0f0e;
-          --color-ok-bg: #052e1f;
-          --color-ok-fg: #a7f3d0;
-          --color-ok-border: #065f46;
-          --color-err-bg: #2c0a0a;
-          --color-err-fg: #fca5a5;
-          --color-err-border: #7f1d1d;
-        }
-      }
-
-      :root[data-color-scheme="dark"] {
-        --color-bg: #0f0f0e;
-        --color-bg-subtle: #1c1c1a;
-        --color-fg: #e8e7e3;
-        --color-muted: #a5a39e;
-        --color-border: #2e2d29;
-        --color-accent: #f97316;
-        --color-accent-hover: #fb923c;
-        --color-accent-fg: #0f0f0e;
-        --color-ok-bg: #052e1f;
-        --color-ok-fg: #a7f3d0;
-        --color-ok-border: #065f46;
-        --color-err-bg: #2c0a0a;
-        --color-err-fg: #fca5a5;
-        --color-err-border: #7f1d1d;
-      }
-
-      *, *::before, *::after {
-        box-sizing: border-box;
-      }
-
-      html {
-        -webkit-text-size-adjust: 100%;
-      }
+      html { -webkit-text-size-adjust: 100%; }
 
       body {
         margin: 0;
         font-family: var(--font-sans);
         font-size: 16px;
-        line-height: 1.65;
+        line-height: var(--lm-lh-body);
         color: var(--color-fg);
         background: var(--color-bg);
         display: flex;
         flex-direction: column;
         min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }
 
       .container {
@@ -161,136 +157,139 @@ const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${tit
         text-decoration-thickness: 1px;
         text-underline-offset: 2px;
       }
-
-      a:hover {
-        color: var(--color-accent-hover);
-      }
+      a:hover { color: var(--color-accent-hover); }
 
       h1, h2, h3, h4 {
-        line-height: 1.25;
-        font-weight: 600;
+        font-family: var(--font-display);
+        line-height: var(--lm-lh-tight);
+        font-weight: var(--lm-fw-bold);
+        letter-spacing: var(--lm-tracking-tight);
         margin-top: 2rem;
         margin-bottom: 0.75rem;
       }
-
-      h1 {
-        font-size: 2rem;
-        margin-top: 1rem;
-      }
-
+      h1 { font-size: var(--lm-fs-h1); margin-top: 1rem; }
       h2 {
-        font-size: 1.4rem;
+        font-size: var(--lm-fs-h3);
         border-bottom: 1px solid var(--color-border);
         padding-bottom: 0.35rem;
       }
+      h3 { font-size: var(--lm-fs-h4); }
 
-      h3 {
-        font-size: 1.15rem;
-      }
-
-      p {
-        margin: 0 0 1rem;
-      }
+      p { margin: 0 0 1rem; }
 
       code {
         font-family: var(--font-mono);
         font-size: 0.92em;
-        background: var(--color-bg-subtle);
+        background: var(--lm-code-bg);
+        color: var(--lm-code-text);
         padding: 0.1em 0.35em;
-        border-radius: 3px;
+        border-radius: 4px;
       }
 
       pre {
         font-family: var(--font-mono);
         font-size: 0.88rem;
         line-height: 1.55;
-        background: var(--color-bg-subtle);
+        background: var(--lm-code-bg);
+        color: var(--lm-code-text);
         border: 1px solid var(--color-border);
-        border-radius: 6px;
+        border-radius: var(--lm-radius-md);
         padding: 0.9rem 1rem;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
         word-break: break-word;
       }
-
-      pre code {
-        background: transparent;
-        padding: 0;
-        border-radius: 0;
-      }
+      pre code { background: transparent; color: inherit; padding: 0; border-radius: 0; }
 
       blockquote {
-        border-left: 3px solid var(--color-border);
+        border-left: 3px solid var(--color-accent);
         margin: 1rem 0;
         padding: 0.1rem 1rem;
         color: var(--color-muted);
       }
 
-      hr {
-        border: 0;
-        border-top: 1px solid var(--color-border);
-        margin: 2rem 0;
-      }
+      hr { border: 0; border-top: 1px solid var(--color-border); margin: 2rem 0; }
 
-      table {
-        border-collapse: collapse;
+      table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.95rem; }
+      th, td { border: 1px solid var(--color-border); padding: 0.5rem 0.75rem; text-align: left; }
+      th { background: var(--color-bg-subtle); }
+
+      ul, ol { padding-left: 1.4rem; }
+
+      .muted { color: var(--color-muted); font-size: 0.9rem; }
+
+      /* ── Thin "energy" decorative rule (the one allowed blue→orange) ── */
+      .energy-rule {
+        height: 3px;
         width: 100%;
-        margin: 1rem 0;
-        font-size: 0.95rem;
+        background: var(--lm-gradient-energy);
       }
 
-      th, td {
-        border: 1px solid var(--color-border);
-        padding: 0.5rem 0.75rem;
-        text-align: left;
-      }
-
-      th {
-        background: var(--color-bg-subtle);
-      }
-
-      ul, ol {
-        padding-left: 1.4rem;
-      }
-
-      .muted {
-        color: var(--color-muted);
-        font-size: 0.9rem;
-      }
-
+      /* ── Header ── */
+      /* Sticky so the nav stays visible while scrolling; it collapses from the
+         full lockup to just the icon tile once the page is scrolled. */
       .site-header {
-        border-bottom: 1px solid var(--color-border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
         background: var(--color-bg);
+        border-bottom: 1px solid var(--color-border);
+        transition: box-shadow 0.2s ease;
       }
+      :root.nav-scrolled .site-header { box-shadow: var(--lm-shadow-1); }
 
       .header-inner {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding-top: 1rem;
-        padding-bottom: 1rem;
+        padding-top: 1.1rem;
+        padding-bottom: 1.1rem;
+        transition: padding 0.2s ease;
+      }
+      :root.nav-scrolled .header-inner { padding-top: 0.55rem; padding-bottom: 0.55rem; }
+
+      .brand-lockup { display: inline-flex; align-items: center; text-decoration: none; }
+      .brand-lockup .logo { width: auto; }
+
+      /* Default (top of page): the full lockup, large + readable. */
+      .brand-full-wrap { display: inline-flex; align-items: center; }
+      .brand-full-wrap .logo { height: 46px; }
+      .brand-lockup .logo-ink { display: block; }
+      .brand-lockup .logo-white { display: none; }
+      .brand-lockup .brand-icon { height: 40px; border-radius: 22%; display: none; }
+
+      /* Light/dark swap for the full-lockup wordmark. */
+      :root[data-theme='dark'] .brand-lockup .logo-ink,
+      :root[data-color-scheme='dark'] .brand-lockup .logo-ink { display: none; }
+      :root[data-theme='dark'] .brand-lockup .logo-white,
+      :root[data-color-scheme='dark'] .brand-lockup .logo-white { display: block; }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']):not([data-color-scheme='light']) .brand-lockup .logo-ink { display: none; }
+        :root:not([data-theme='light']):not([data-color-scheme='light']) .brand-lockup .logo-white { display: block; }
       }
 
-      .wordmark {
-        font-family: var(--font-mono);
-        font-weight: 700;
-        font-size: 1.05rem;
-        letter-spacing: 0.02em;
-        color: var(--color-fg);
-        text-decoration: none;
-      }
+      /* Scrolled: hide the entire lockup group via the wrapper — a parent
+         display:none beats any child display rule, so the theme swap above
+         can't keep a variant visible — and show the icon tile instead. */
+      :root.nav-scrolled .brand-full-wrap { display: none; }
+      :root.nav-scrolled .brand-lockup .brand-icon { display: block; }
 
+      /* Home: the nav logo is the *destination* of the hero→nav morph.
+         The full lockup never shows in the nav here; the icon tile is always
+         present but its opacity is driven by scroll progress (hero-morph.js),
+         so it fades in exactly as the big hero logo shrinks away. */
+      body[data-home] .brand-full-wrap { display: none; }
+      body[data-home] .brand-lockup .brand-icon { display: block; opacity: 0; }
+
+      .site-header nav { display: flex; align-items: center; }
       .site-header nav a {
         margin-left: 1.25rem;
         color: var(--color-fg);
         text-decoration: none;
         font-size: 0.95rem;
+        font-weight: var(--lm-fw-medium);
       }
-
-      .site-header nav a:hover {
-        color: var(--color-accent);
-        text-decoration: underline;
-      }
+      .site-header nav a:hover { color: var(--color-accent); text-decoration: underline; }
 
       .color-toggle {
         margin-left: 1.25rem;
@@ -302,40 +301,60 @@ const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${tit
         width: 1.9rem;
         height: 1.9rem;
         padding: 0;
-        border-radius: 999px;
+        border-radius: var(--lm-radius-pill);
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-family: var(--font-sans);
       }
+      .color-toggle:hover { color: var(--color-accent); border-color: var(--color-accent); }
+      .color-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-      .color-toggle:hover {
-        color: var(--color-accent);
-        border-color: var(--color-accent);
-      }
-
-      .color-toggle:focus-visible {
-        outline: 2px solid var(--color-accent);
-        outline-offset: 2px;
-      }
-
+      /* ── Footer ── */
       .site-footer {
-        border-top: 1px solid var(--color-border);
         background: var(--color-bg-subtle);
-        padding: 1.5rem 0;
+        border-top: 1px solid var(--color-border);
         font-size: 0.9rem;
       }
-
-      .footer-inner p {
-        margin: 0.25rem 0;
+      .site-footer .energy-rule { margin-bottom: 1.5rem; }
+      .site-footer .footer-inner { padding-bottom: 1.5rem; }
+      .footer-inner p { margin: 0.25rem 0; }
+      .footer-tagline {
+        font-family: var(--font-display);
+        font-weight: var(--lm-fw-medium);
+        font-size: 1.05rem;
+        color: var(--color-fg);
       }
 
+      /* ── Shared brand button + pill (used by marketing + format CTAs) ── */
+      .lm-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: var(--font-sans);
+        font-size: 0.98rem;
+        font-weight: var(--lm-fw-semibold);
+        padding: 0.7rem 1.4rem;
+        border-radius: var(--lm-radius-pill);
+        border: 1px solid transparent;
+        text-decoration: none;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .lm-btn-primary { background: var(--color-accent); color: var(--lm-text-onbrand); border-color: var(--color-accent); }
+      .lm-btn-primary:hover { background: var(--color-accent-hover); color: var(--lm-text-onbrand); border-color: var(--color-accent-hover); }
+      .lm-btn-secondary { background: transparent; color: var(--color-fg); border-color: var(--color-border); }
+      .lm-btn-secondary:hover { color: var(--color-accent); border-color: var(--color-accent); }
+      .lm-btn[aria-disabled='true'] { opacity: 0.55; pointer-events: none; }
+
       @media (max-width: 480px) {
-        h1 { font-size: 1.6rem; }
-        h2 { font-size: 1.2rem; }
+        h1 { font-size: var(--lm-fs-h2); }
+        h2 { font-size: var(--lm-fs-h4); }
         .site-header nav a { margin-left: 0.9rem; }
         .color-toggle { margin-left: 0.9rem; }
+        .brand-full-wrap .logo { height: 38px; }
+        :root.nav-scrolled .brand-lockup .brand-icon { height: 34px; }
       }
     </style>
 
@@ -345,6 +364,18 @@ const fullTitle = title === 'LMWF' ? 'LMWF — LiftMark Workout Format' : `${tit
     -->
     <script>
       import '../scripts/color-scheme-toggle.js';
+    </script>
+    <!-- Sticky-nav scroll state: external module for CSP `script-src 'self'`. -->
+    <script>
+      import '../scripts/nav-scroll.js';
+    </script>
+    <!-- Home hero→nav logo morph: external module for CSP `script-src 'self'`. -->
+    <script>
+      import '../scripts/hero-morph.js';
+    </script>
+    <!-- Copy-to-clipboard buttons ([data-copy]): external module for CSP. -->
+    <script>
+      import '../scripts/copy-buttons.js';
     </script>
   </body>
 </html>

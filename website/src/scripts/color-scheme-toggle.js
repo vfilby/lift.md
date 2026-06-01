@@ -15,9 +15,12 @@
     var btn = document.getElementById('color-toggle');
     if (scheme === 'light' || scheme === 'dark') {
       root.setAttribute('data-color-scheme', scheme);
+      // Mirror onto data-theme so the brand tokens flip with the toggle.
+      root.setAttribute('data-theme', scheme);
       root.style.colorScheme = scheme;
     } else {
       root.removeAttribute('data-color-scheme');
+      root.removeAttribute('data-theme');
       root.style.colorScheme = 'light dark';
     }
     if (btn) {
