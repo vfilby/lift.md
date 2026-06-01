@@ -13,7 +13,8 @@ extension VerticalAlignment {
 /// Individual set row in the active workout view.
 /// Handles display for pending, current, completed, and skipped states.
 struct SetRowView: View {
-    @Environment(SettingsStore.self) private var settingsStore
+    // Non-private so the weight helpers in SetRowView+Weight.swift can read it.
+    @Environment(SettingsStore.self) var settingsStore
 
     let set: SessionSet
     let setNumber: Int
@@ -34,7 +35,8 @@ struct SetRowView: View {
     /// User tapped "add weight" on a set that started without a weight
     /// (reps-only / bodyweight). Reveals the weight field inline so a weight
     /// can be logged without editing the exercise definition (GH #194).
-    @State private var isAddingWeight = false
+    /// Non-private so the weight helpers in SetRowView+Weight.swift can set it.
+    @State var isAddingWeight = false
     /// Additional drop entries (groupIndex > 0). Each pair is (weight, reps) text.
     @State private var dropEntries: [(weight: String, reps: String)] = []
 
@@ -882,50 +884,6 @@ struct SetRowView: View {
         guard breakdown.isAchievable || !breakdown.plates.isEmpty else { return nil }
 
         return PlateCalculator.formatCompletePlateSetup(breakdown)
-    }
-
-    /// Whether this set already carries a weight (target or actual).
-    /// `self.` qualifies `set` so the body isn't parsed as a `set` accessor.
-    private var hasWeight: Bool {
-        self.set.entries.first?.target?.weight != nil
-            || self.set.entries.first?.actual?.weight != nil
-    }
-
-    /// Whether the weight field should be shown: the set has a weight, or the
-    /// user tapped "add weight" on a reps-only/bodyweight set (GH #194).
-    private var showsWeightField: Bool { hasWeight || isAddingWeight }
-
-    /// The unit to log against. Falls back to the user's default so a weight
-    /// added to a previously unitless (reps-only) set is stored sensibly.
-    private var effectiveWeightUnit: WeightUnit {
-        self.set.entries.first?.target?.weight?.unit
-            ?? self.set.entries.first?.actual?.weight?.unit
-            ?? settingsStore.settings?.defaultWeightUnit
-            ?? .lbs
-    }
-
-    private var weightUnitLabel: String {
-        " (\(effectiveWeightUnit.rawValue))"
-    }
-
-    /// Compact "add weight" control shown on reps-only/bodyweight sets that
-    /// reveals the weight field when tapped (GH #194).
-    private var addWeightButton: some View {
-        Button {
-            isAddingWeight = true
-        } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "plus.circle")
-                    .font(.caption)
-                Text("Weight")
-                    .font(.caption2)
-            }
-            .foregroundStyle(LiftMarkTheme.primary)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("set-add-weight-button")
-        .accessibilityLabel("Add weight")
-        .accessibilityHint("Reveals a weight field for this set")
     }
 
     private var valuesChangedFromTarget: Bool {
