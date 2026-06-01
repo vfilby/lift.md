@@ -148,6 +148,10 @@ Primary workout execution screen. Displays all exercises and sets for the active
 - **Segmented picker** (`edit-exercise-mode-picker`) toggles between Form and Markdown tabs
 - Switching tabs syncs data: Form→Markdown regenerates LMWF, Markdown→Form parses the text
 - **Save** (`edit-exercise-save`) → updates exercise name/notes/equipment + applies set changes (add/update/delete)
+- **Set completeness (TC-E14)**: a set with a weight but no reps **and** no time is incomplete — the LMWF spec and validator reject it (`liftmark-workout-format/examples/errors/tc-weight-no-reps.md`), so the Edit Exercise sheet must too. **Both** tabs enforce this:
+  - **Markdown tab** already rejects it via `MarkdownParser.parseWorkout` (the parse fails and the error is shown).
+  - **Form tab** must apply the same rule: on Save, if any set has a positive weight but neither reps nor time, the save is blocked and an inline error is shown (`edit-exercise-form-error`) naming the offending set, e.g. *Set 2 — Incomplete set: "26 lbs". Weight with unit requires reps (x 5) or time (x 60s)*. A weighted carry must be entered as weight + time (`26 lbs x 30s`), not weight alone.
+  - A bodyweight/reps-only set (no weight) is unaffected; weight is optional, reps/time are what a weight requires.
 - **Cancel** (`edit-exercise-cancel`) → dismisses without saving
 
 | Element | testID | Type |
@@ -159,6 +163,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 | Form container | `edit-exercise-form` | Form |
 | Markdown editor | `edit-exercise-markdown` | TextEditor |
 | Markdown view | `edit-exercise-markdown-view` | View |
+| Form validation error | `edit-exercise-form-error` | Text |
 | Add Set button | `edit-exercise-add-set` | Button |
 | Save button | `edit-exercise-save` | Button |
 | Cancel button | `edit-exercise-cancel` | Button |
