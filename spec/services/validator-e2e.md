@@ -252,8 +252,9 @@ backend endpoint the website reaches from the browser.
 
 | Page                          | E2E spec                       | Critical assertions |
 |-------------------------------|--------------------------------|---------------------|
-| `/` (LMWF spec landing)       | `home.spec.ts`                 | Title renders, example markdown blocks visible, navigation links resolve. |
-| `/spec`                       | `spec-page.spec.ts`            | Spec content renders, anchor links resolve, no console errors. |
+| `/` (marketing landing)       | `home.spec.ts`                 | Brand hero + tagline H1, CTA to `/format`, NO format/validator content, no console errors. |
+| `/format` (format hub)        | `format-hub.spec.ts`           | Pitch + both example blocks, live validator widget validates against `/validate`, link to `/format/spec`, no console errors. |
+| `/format/spec`                | `spec-page.spec.ts`            | Spec content renders; `/spec.md` (root) resolves; old `/spec` redirects here. |
 | `/account/signup`             | `auth-signup-verify.spec.ts`   | Submit → 201 → verify link works → email shown as verified. Topology (b): verify-email link host == env appBaseUrl (local). Topology (d): real-SES signup 201 in remote mode. |
 | `/account/login`              | `auth-login-logout.spec.ts`    | Bad creds error, good creds → `/account`. Sign out clears session. |
 | (login response headers)      | `auth-session.spec.ts`         | Topology (a): `lmwf_refresh` Set-Cookie carries HttpOnly + Secure + SameSite=Strict + Path=/v1/auth over the wire. |

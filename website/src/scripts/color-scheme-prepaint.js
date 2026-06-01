@@ -9,6 +9,9 @@
     var stored = localStorage.getItem('color-scheme');
     if (stored === 'light' || stored === 'dark') {
       document.documentElement.setAttribute('data-color-scheme', stored);
+      // Keep data-theme in sync so the brand tokens (liftmark-tokens.css,
+      // which key dark mode off [data-theme]) flip with the toggle.
+      document.documentElement.setAttribute('data-theme', stored);
       document.documentElement.style.colorScheme = stored;
     }
   } catch (_) { /* storage unavailable */ }

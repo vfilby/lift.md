@@ -9,7 +9,9 @@
   const statusEl = document.getElementById('validator-status');
   const resultEl = document.getElementById('validator-result');
   if (!form) return;
-  const ENDPOINT = 'https://workoutformat.liftmark.app/validate';
+  // Same-origin: CloudFront routes /validate to the API origin, and the
+  // strict `connect-src 'self'` CSP only permits same-origin fetches.
+  const ENDPOINT = '/validate';
 
   function escapeHtml(s) {
     return String(s)

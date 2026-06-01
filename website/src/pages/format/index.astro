@@ -1,0 +1,303 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const minimalExample = `# Bench Day
+@units: lbs
+
+## Bench Press
+- 135 x 5
+- 185 x 5
+- 225 x 5
+`;
+
+const richExample = `# Push Day
+@tags: strength, push
+@units: lbs
+
+Focus on bar path on bench. Keep rest strict — don't pad between sets. Stop if bar speed dies on the top set.
+
+## Warmup
+
+### Band Pull-Aparts
+- x 20
+
+### Light Bench Press
+- 45 x 10
+- 95 x 5
+
+## Bench Press
+
+Build to a top set, then back off. Stop the top set if bar speed dies — no grinders.
+
+- 135 x 5 @rest: 120s
+- 185 x 5 @rest: 180s
+- 225 x 5 @rest: 180s Aim for RPE 7
+- 245 x 3 Target RPE 8, leave 2 in the tank
+
+## Overhead Press
+
+Strict press, no leg drive. If the last set feels easy, add 5 lbs next session.
+
+- 95 x 8 @rest: 90s
+- 115 x 8 @rest: 90s
+- 135 x 6
+
+## Arms Superset
+
+### Cable Triceps Pushdown
+- 50 x 12
+- 50 x 12
+- 50 x 10
+
+### Dumbbell Curl
+- 30 x 10
+- 30 x 10
+- 30 x 8
+
+## Cooldown
+
+### Chest Stretch
+- 60s
+
+### Foam Rolling
+- 2m
+`;
+
+// "The format as brand" (brand book §12): show lift.md format with
+// consistent token coloring — headings muted, @modifiers orange, set lines
+// light blue — on an ink surface. Highlighting happens at build time so no
+// client JS is needed (keeps the strict `script-src 'self'` CSP clean).
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function highlightLmwf(src: string): string {
+  return src
+    .split('\n')
+    .map((line) => {
+      if (/^#{1,6}\s/.test(line)) {
+        return `<span class="lmwf-h">${escapeHtml(line)}</span>`;
+      }
+      // Color @key: modifiers wherever they appear (metadata + inline @rest:).
+      const atColored = escapeHtml(line).replace(
+        /@[\w-]+:/g,
+        '<span class="lmwf-at">$&</span>',
+      );
+      if (/^\s*-\s/.test(line)) {
+        return `<span class="lmwf-set">${atColored}</span>`;
+      }
+      return atColored;
+    })
+    .join('\n');
+}
+const minimalHtml = highlightLmwf(minimalExample);
+const richHtml = highlightLmwf(richExample);
+---
+
+<Base
+  title="Format"
+  description="The lift.md format — a markdown-based format for strength training workouts. Human-writable, machine-parseable, open spec."
+  ogImage="/brand/social/og-liftmd.png"
+>
+  <div class="format-lockup">
+    <img class="logo logo-ink" src="/brand/logos/lockup-liftmd-format-ink.svg" alt="lift.md format" width="1018" height="260" />
+    <img class="logo logo-white" src="/brand/logos/lockup-liftmd-format-white.svg" alt="lift.md format" width="1018" height="260" />
+  </div>
+
+  <h1>lift.md format</h1>
+
+  <p>
+    lift.md format is a small, markdown-based format for strength training
+    workouts (formerly "LMWF"). It is designed to be readable and editable by
+    humans, and trivially parseable by tools — including LLMs asked to generate
+    or modify workouts. The format is an open specification licensed under
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="external noopener license">CC BY-SA 4.0</a>,
+    independent of any particular app.
+  </p>
+
+  <p>
+    At its simplest, a workout is a header, an exercise, and a list of sets:
+  </p>
+
+  <pre class="lmwf-code"><code set:html={minimalHtml} /></pre>
+
+  <p>
+    That's a valid lift.md format document. Most real programs need more —
+    warmup and cooldown blocks, programming guidance, per-set rest targets,
+    time-based sets, tags, and supersets. All of it stays in plain markdown:
+  </p>
+
+  <pre class="lmwf-code"><code set:html={richHtml} /></pre>
+
+  <p>
+    A lift.md format document describes a workout <em>plan</em> — what you
+    intend to do, not a record of what happened. A few things to notice:
+    <code>@tags</code> and <code>@units</code> are workout-level metadata;
+    prose between a header and its sets is preserved as a note, and is the
+    right place for programming intent, cues, and stop conditions (see the
+    notes under <em>Push Day</em>, <em>Bench Press</em>, and
+    <em>Overhead Press</em>); <code>@rest</code> is the main per-set
+    modifier, and any trailing text after the set and its modifiers becomes
+    a freeform note on that set — the preferred way to express descriptive
+    targets like RPE or tempo; sets without a weight (<code>- x 20</code>)
+    are bodyweight; sets expressed as a duration (<code>- 60s</code>,
+    <code>- 2m</code>) are time-based; and <em>Arms Superset</em>
+    demonstrates the superset convention — a parent header with its
+    exercises nested one level deeper.
+  </p>
+
+  <p>
+    See the <a href="/format/spec">full spec</a> for the complete set of
+    modifiers, metadata fields, validation rules, and edge cases.
+  </p>
+
+  <h2 id="try-it">Try it</h2>
+
+  <p>
+    Edit or paste a lift.md format workout below and click Validate. The
+    request is sent to the live validator API at <code>POST /validate</code>.
+  </p>
+
+  <form id="validator-form" novalidate>
+    <label for="markdown" class="visually-hidden">lift.md format markdown</label>
+    <textarea
+      id="markdown"
+      name="markdown"
+      rows="20"
+      wrap="soft"
+      spellcheck="false"
+      autocomplete="off"
+      autocapitalize="off"
+    >{richExample}</textarea>
+
+    <div class="validator-actions">
+      <button type="submit" id="validate-btn" class="lm-btn lm-btn-primary">Validate</button>
+      <span id="validator-status" class="muted" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <div id="validator-result" role="status" aria-live="polite"></div>
+
+  <h2>Links</h2>
+
+  <ul>
+    <li><a href="/format/spec">Full specification</a> (also available as <a href="/spec.md">raw markdown</a>)</li>
+    <li><a href="https://github.com/vfilby/liftmark" rel="external noopener">GitHub repository</a></li>
+    <li>
+      Validator API: <code>POST https://liftmark.app/validate</code>
+      with JSON body <code>&#123;"markdown": "..."&#125;</code>
+    </li>
+    <li><a href="/llms.txt">llms.txt</a> — machine-readable index for LLMs</li>
+  </ul>
+
+  <style>
+    .format-lockup { margin-top: 0.5rem; }
+    .format-lockup .logo { height: 40px; width: auto; }
+    .format-lockup .logo-ink { display: block; }
+    .format-lockup .logo-white { display: none; }
+    :root[data-theme='dark'] .format-lockup .logo-ink,
+    :root[data-color-scheme='dark'] .format-lockup .logo-ink { display: none; }
+    :root[data-theme='dark'] .format-lockup .logo-white,
+    :root[data-color-scheme='dark'] .format-lockup .logo-white { display: block; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme='light']):not([data-color-scheme='light']) .format-lockup .logo-ink { display: none; }
+      :root:not([data-theme='light']):not([data-color-scheme='light']) .format-lockup .logo-white { display: block; }
+    }
+    /* The lockup already carries the wordmark; keep the H1 for SEO/structure
+       but visually hide it so the page doesn't read the name twice. */
+    h1 {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0);
+      white-space: nowrap; border: 0;
+    }
+
+    /* "The format as brand" — colored lift.md format on an ink surface,
+       consistent in both light and dark themes (brand book §12).
+       The token spans are injected via set:html, so they never receive
+       Astro's scope attribute — the selectors must be :global to match. */
+    :global(.lmwf-code) {
+      background: var(--lm-ink);
+      color: #e6e9ee;
+      border: 1px solid var(--lm-n-800);
+      border-radius: var(--lm-radius-lg);
+      padding: 1.2rem 1.4rem;
+      line-height: 1.7;
+    }
+    :global(.lmwf-code code) { color: inherit; }
+    :global(.lmwf-h) { color: #9aa4b2; }
+    :global(.lmwf-at) { color: #ff8a3d; }
+    :global(.lmwf-set) { color: #8aa3ff; }
+
+    textarea {
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      padding: 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--lm-radius-md);
+      background: var(--lm-code-bg);
+      color: var(--lm-code-text);
+      resize: vertical;
+      min-height: 12rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    textarea:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+    .validator-actions {
+      margin-top: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    #validate-btn:disabled { opacity: 0.6; cursor: progress; }
+
+    #validator-result { margin-top: 1rem; }
+
+    .result {
+      border-radius: var(--lm-radius-md);
+      border: 1px solid;
+      padding: 0.85rem 1rem;
+    }
+    .result.ok {
+      background: var(--color-ok-bg);
+      color: var(--color-ok-fg);
+      border-color: var(--color-ok-border);
+    }
+    .result.err {
+      background: var(--color-err-bg);
+      color: var(--color-err-fg);
+      border-color: var(--color-err-border);
+    }
+    .result h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+    .result ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+    .result dl {
+      margin: 0.25rem 0 0;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.15rem 0.75rem;
+      font-size: 0.95rem;
+    }
+    .result dt { font-weight: 600; }
+    .result dd { margin: 0; }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0);
+      white-space: nowrap; border: 0;
+    }
+  </style>
+
+  <!--
+    Format-hub validator demo: external module (not `is:inline`) for CSP
+    `script-src 'self'` compatibility. Astro bundles it to /_astro/*.js.
+  -->
+  <script>
+    import '../../scripts/validator-form.js';
+  </script>
+</Base>
