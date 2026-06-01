@@ -1,9 +1,24 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   createInboxItem,
+  findPendingByContentHash,
   getInboxItemsByUser,
+  inboxContentHash,
   markIngested,
 } from '../../src/repositories/workout_inbox.js';
+
+describe('inboxContentHash', () => {
+  it('is stable and ignores surrounding whitespace', () => {
+    const a = inboxContentHash('# Push\n## Bench\n- 135 x 5');
+    const b = inboxContentHash('\n  # Push\n## Bench\n- 135 x 5  \n');
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('differs for different content', () => {
+    expect(inboxContentHash('a')).not.toBe(inboxContentHash('b'));
+  });
+});
 
 const liveDdb = process.env.DDB_ENDPOINT ? describe : describe.skip;
 
@@ -28,6 +43,39 @@ liveDdb('workout_inbox repository', () => {
     // ULIDs are 26 chars of Crockford base32 — lexicographic = chronological.
     expect(item.inbox_id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(item.ingested_at).toBeUndefined();
+    // Content hash is stamped for push-time dedup (GH #193).
+    expect(item.content_hash).toBe(inboxContentHash(item.lmwf_text));
+  });
+
+  it('findPendingByContentHash matches a pending item, scoped per-user and to pending', async () => {
+    const user_id = `user-${Date.now()}-${Math.random()}`;
+    const lmwf = '# Push Day\n## Bench Press\n- 135 x 5';
+    const hash = inboxContentHash(lmwf);
+
+    const item = await createInboxItem({
+      user_id,
+      source_token_id: 'tok',
+      lmwf_text: lmwf,
+      status: 'pending',
+    });
+
+    // Same content, same user → found.
+    const found = await findPendingByContentHash(user_id, hash);
+    expect(found?.inbox_id).toBe(item.inbox_id);
+
+    // Different content → not found.
+    expect(
+      await findPendingByContentHash(user_id, inboxContentHash('other')),
+    ).toBeNull();
+
+    // Another user with the same content → not found (per-user scope).
+    expect(
+      await findPendingByContentHash(`other-${user_id}`, hash),
+    ).toBeNull();
+
+    // Once ingested, it no longer matches (pending-only scope).
+    await markIngested(user_id, item.inbox_id);
+    expect(await findPendingByContentHash(user_id, hash)).toBeNull();
   });
 
   it('lists items newest-first for a user', async () => {
