@@ -13,7 +13,8 @@ extension VerticalAlignment {
 /// Individual set row in the active workout view.
 /// Handles display for pending, current, completed, and skipped states.
 struct SetRowView: View {
-    @Environment(SettingsStore.self) private var settingsStore
+    // Non-private so the weight helpers in SetRowView+Weight.swift can read it.
+    @Environment(SettingsStore.self) var settingsStore
 
     let set: SessionSet
     let setNumber: Int
@@ -31,6 +32,11 @@ struct SetRowView: View {
     @State private var repsText: String = ""
     @State private var timeText: String = ""
     @State private var isEditing = false
+    /// User tapped "add weight" on a set that started without a weight
+    /// (reps-only / bodyweight). Reveals the weight field inline so a weight
+    /// can be logged without editing the exercise definition (GH #194).
+    /// Non-private so the weight helpers in SetRowView+Weight.swift can set it.
+    @State var isAddingWeight = false
     /// Additional drop entries (groupIndex > 0). Each pair is (weight, reps) text.
     @State private var dropEntries: [(weight: String, reps: String)] = []
 
@@ -208,8 +214,9 @@ struct SetRowView: View {
                         .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                 }
 
-                // Weight input — only for weighted exercises (not bodyweight/timed)
-                if set.entries.first?.target?.weight != nil {
+                // Weight input — shown for weighted exercises, or when the user
+                // taps "add weight" on a reps-only/bodyweight set (GH #194).
+                if showsWeightField {
                     VStack(alignment: .center, spacing: 2) {
                         Text("Weight\(weightUnitLabel)")
                             .font(.caption2)
@@ -253,6 +260,10 @@ struct SetRowView: View {
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                     }
+                } else {
+                    // Reps-only / bodyweight set: offer to add a weight inline.
+                    addWeightButton
+                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                 }
 
                 // Time input — for all timed exercises (including weighted-timed)
@@ -528,7 +539,7 @@ struct SetRowView: View {
     @ViewBuilder
     private var inlineEditContent: some View {
         HStack(alignment: .textFieldCenter, spacing: LiftMarkTheme.spacingSM) {
-            if set.entries.first?.actual?.weight != nil || set.entries.first?.target?.weight != nil {
+            if showsWeightField {
                 VStack(alignment: .center, spacing: 2) {
                     Text("Weight\(weightUnitLabel)")
                         .font(.caption2)
@@ -551,6 +562,11 @@ struct SetRowView: View {
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                 }
+            } else {
+                // Reps-only / bodyweight set logged without a weight: let the
+                // user add one while editing (GH #194).
+                addWeightButton
+                    .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
             }
 
             // Reps field — only for non-timed sets
@@ -870,15 +886,6 @@ struct SetRowView: View {
         return PlateCalculator.formatCompletePlateSetup(breakdown)
     }
 
-    private var weightUnitLabel: String {
-        let target = set.entries.first?.target
-        let actual = set.entries.first?.actual
-        if let unit = target?.weight?.unit ?? actual?.weight?.unit {
-            return " (\(unit.rawValue))"
-        }
-        return ""
-    }
-
     private var valuesChangedFromTarget: Bool {
         let target = set.entries.first?.target
         if let tw = target?.weight?.value {
@@ -908,7 +915,7 @@ struct SetRowView: View {
     /// (stored as its lbs value: 2.5 = fine, 5 = coarse) maps to a unit-appropriate
     /// value: lbs uses the tier directly; kg uses 1.25 (fine) or 2.5 (coarse).
     private var weightStepIncrement: Double {
-        let unit = set.entries.first?.target?.weight?.unit ?? set.entries.first?.actual?.weight?.unit
+        let unit = effectiveWeightUnit
         let tier = settingsStore.settings?.defaultWeightStepLbs ?? 2.5
         if unit == .kg {
             return tier >= 5.0 ? 2.5 : 1.25

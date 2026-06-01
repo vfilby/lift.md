@@ -221,6 +221,38 @@ final class SessionRepositoryTests: XCTestCase {
         XCTAssertNotNil(updatedSet?.completedAt)
     }
 
+    /// GH #194: a set logged as reps-only (no target weight) can have a weight
+    /// added inline during the workout. The added weight must persist with the
+    /// chosen unit, even though the set started unitless.
+    func testAddWeightToRepsOnlySetPersists() throws {
+        let plan = makePlan(exercises: [
+            makePlannedExercise(name: "Kettlebell Around the World", sets: [makePlannedSet(reps: 8)])
+        ])
+        try planRepo.create(plan)
+        let (session, _) = try repo.createFromPlan(plan)
+        let set = session.exercises[0].sets[0]
+        // Precondition: the set starts reps-only — no weight at all.
+        XCTAssertNil(set.targetWeight)
+        XCTAssertNil(set.entries.first?.target?.weight)
+
+        try repo.updateSessionSet(
+            set.id,
+            actualWeight: 12,
+            actualWeightUnit: .kg,
+            actualReps: 8,
+            actualTime: nil,
+            actualRpe: nil,
+            status: .completed
+        )
+
+        let fetched = try repo.getById(session.id)
+        let updatedSet = fetched?.exercises[0].sets[0]
+        XCTAssertEqual(updatedSet?.actualWeight, 12)
+        XCTAssertEqual(updatedSet?.actualWeightUnit, .kg)
+        XCTAssertEqual(updatedSet?.actualReps, 8)
+        XCTAssertEqual(updatedSet?.status, .completed)
+    }
+
     func testUpdateSessionSetTargets() throws {
         let plan = makePlan(exercises: [
             makePlannedExercise(name: "Bench", sets: [makePlannedSet(weight: 225, reps: 5)])

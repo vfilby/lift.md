@@ -165,6 +165,7 @@
 		B7FFCD8C43EF830EDB879E0E /* OutboxPendingQueueRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0A969D1C2B1A381AFA580D /* OutboxPendingQueueRepository.swift */; };
 		B80B632C58FCF969672CD7A9 /* LiftMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2A9274874F0DB09EC0507F /* LiftMarkTests.swift */; };
 		B85DE5789943AAD087F8090A /* FileImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BBB53853F20402D24BEFB4 /* FileImportServiceTests.swift */; };
+		B8D182C16725D8FF02E9CEBD /* SetRowView+Weight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 028C434BF4EEA2EE413DB0A3 /* SetRowView+Weight.swift */; };
 		B904699BA329321042BAADA6 /* WorkoutExportIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790A5CDE07EFFF281DAC47FA /* WorkoutExportIntegrationTests.swift */; };
 		BB9409DBF9E147D486C2A9F4 /* SettingsGymSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2461031C021EB0B3B5E5300B /* SettingsGymSection.swift */; };
 		BBD197B5D1741C0149632CF3 /* FeatureFlag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4376CAE24293E2D766590CC3 /* FeatureFlag.swift */; };
@@ -264,6 +265,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		028C434BF4EEA2EE413DB0A3 /* SetRowView+Weight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SetRowView+Weight.swift"; sourceTree = "<group>"; };
 		02B901D64AB8243A498892E4 /* ExercisePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerView.swift; sourceTree = "<group>"; };
 		0470585628866D2538B4ED7A /* MigratorBridgeFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratorBridgeFailure.swift; sourceTree = "<group>"; };
 		0476CDBBFF3F062C1380241E /* AddExerciseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddExerciseSheet.swift; sourceTree = "<group>"; };
@@ -857,6 +859,7 @@
 				B6A81B15C6333E3651B09FEC /* OnboardingView.swift */,
 				C826AE567713686B32DDE784 /* RestTimerView.swift */,
 				F367406D6EAEEB16A1D945D6 /* SetRowView.swift */,
+				028C434BF4EEA2EE413DB0A3 /* SetRowView+Weight.swift */,
 				8AD29EB730B2F397E5B80216 /* ShareSheet.swift */,
 			);
 			path = Shared;
@@ -1247,6 +1250,7 @@
 				D1F4C2096E3E879F3919EE3D /* SessionRepository.swift in Sources */,
 				1330EAEB43A76F37FAD353AA /* SessionStore.swift in Sources */,
 				7D298DEAA05518F3DC66D53A /* SetEntry.swift in Sources */,
+				B8D182C16725D8FF02E9CEBD /* SetRowView+Weight.swift in Sources */,
 				F88CB52BE0BA57049864D90C /* SetRowView.swift in Sources */,
 				8BBF02B47D7FB9A7B6A3D233 /* Settings.swift in Sources */,
 				9FF69F8BFA2C5BCE2AD2C516 /* SettingsAISection.swift in Sources */,

@@ -31,6 +31,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 | Exercise timer start | `exercise-timer-start-button` | Button |
 | Exercise timer done | `exercise-timer-done-button` | Button |
 | YouTube link | `youtube-link-{exerciseName}` | Link |
+| Add weight button (reps-only set) | `set-add-weight-button` | Button |
 
 ## User Interactions
 
@@ -45,6 +46,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 ### Set Completion
 - **Tap current set** → no-op (already expanded)
 - **Edit weight/reps fields** → updates edit values; weight propagates to remaining pending sets in same exercise
+- **Inline weight on reps-only sets (GH #194)**: a set logged as reps-only / bodyweight (no target weight) shows a compact **"add weight"** affordance (`set-add-weight-button`) in place of the weight field. Tapping it reveals the weight stepper/field inline so a weight can be logged without editing the exercise definition. The entered weight is saved against the user's default weight unit (`UserSettings.defaultWeightUnit`) since the set started unitless. Leaving the field blank logs no weight (the set stays reps-only) — adding weight is opt-in per set. The same affordance appears in the inline edit form for an already-logged reps-only set.
 - **Complete button visibility**: The checkmark complete button is hidden when `targetTime != nil` (timed sets). Timed sets are completed exclusively via the ExerciseTimerView Done button. The Skip button remains visible for all set types.
 - **Tap "Complete"** → records actual values from input fields, advances to next set
   - **Critical**: The actual values saved MUST be whatever the user has entered in the input fields at the time of tapping "Complete". If the user edited weight from 225 to 230, save 230. If the user edited reps from 5 to 6, save 6. The input fields are the source of truth, not the original target values.
