@@ -152,7 +152,9 @@ Response on success (HTTP 201):
 }
 ```
 
-After a successful push, surface the inbox_id + summary line to the user (e.g. "Queued — Push Day, 5 exercises, 14 sets. Open the LiftMark app to start it."). Do **not** push without validating first — `/v1/workouts` re-validates server-side and returns 422 on parse errors, but pre-validating with `validate.sh` is faster and gives you a chance to fix issues before involving the user's account.
+The push is **idempotent on content**: if an identical workout (byte-for-byte, modulo surrounding whitespace) is already sitting unread in the inbox, the server returns **HTTP 200** with the existing item and a `"deduplicated": true` field instead of creating a second copy. Same shape as above, plus `"deduplicated": true`. This only matches *pending* items — re-pushing a workout the user already imported or discarded creates a fresh one — and is content-keyed, so an edited re-push (e.g. one more set) is a distinct item. A 200 here is **success, not an error**; surface it as "already in your inbox" rather than re-queuing.
+
+After a successful push, surface the inbox_id + summary line to the user — "Queued — Push Day, 5 exercises, 14 sets. Open the LiftMark app to start it." for a 201, or "Already in your inbox — Push Day …" for a deduplicated 200. Do **not** push without validating first — `/v1/workouts` re-validates server-side and returns 422 on parse errors, but pre-validating with `validate.sh` is faster and gives you a chance to fix issues before involving the user's account.
 
 ### Token handling
 
