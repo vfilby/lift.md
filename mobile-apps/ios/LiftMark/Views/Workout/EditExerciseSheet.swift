@@ -21,6 +21,18 @@ struct EditableSetRow: Identifiable {
     var weightUnit: WeightUnit?
     var status: SetStatus
 
+    /// TC-E14: a set with a positive weight but neither reps nor time is
+    /// incomplete. The LMWF spec and the validator reject this (a weight needs
+    /// reps `x 5` or time `x 60s`), and the Markdown tab already does via the
+    /// parser — so the Form tab must reject it too. Bodyweight/reps-only sets
+    /// (no weight) are unaffected; weight is the optional part.
+    var isWeightOnly: Bool {
+        let weight = Double(weightText) ?? 0
+        let reps = Int(repsText) ?? 0
+        let time = Int(timeText) ?? 0
+        return weight > 0 && reps <= 0 && time <= 0
+    }
+
     static func from(_ set: SessionSet) -> EditableSetRow {
         let target = set.entries.first?.target
         return EditableSetRow(
@@ -52,7 +64,7 @@ struct EditExerciseSheet: View {
     @State private var editableSets: [EditableSetRow]
     @State private var editMode: Int = 0
     @State private var markdownText: String = ""
-    @State private var markdownError: String?
+    @State private var validationError: String?
     @Environment(\.dismiss) private var dismiss
 
     init(exercise: SessionExercise, onSave: @escaping (String, String?, String?, [EditExerciseSetChange]) -> Void) {
@@ -101,7 +113,7 @@ struct EditExerciseSheet: View {
             .onChange(of: editMode) { _, newValue in
                 if newValue == 1 {
                     markdownText = generateMarkdownFromForm()
-                    markdownError = nil
+                    validationError = nil
                 } else {
                     parseMarkdownIntoForm()
                 }
@@ -111,6 +123,15 @@ struct EditExerciseSheet: View {
 
     private var formView: some View {
         Form {
+            if let error = validationError {
+                Section {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(LiftMarkTheme.destructive)
+                        .accessibilityIdentifier("edit-exercise-form-error")
+                }
+            }
+
             Section("Exercise") {
                 TextField("Name", text: $name)
                     .accessibilityIdentifier("edit-exercise-name")
@@ -211,7 +232,7 @@ struct EditExerciseSheet: View {
 
     private var markdownView: some View {
         VStack(spacing: LiftMarkTheme.spacingSM) {
-            if let error = markdownError {
+            if let error = validationError {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(LiftMarkTheme.destructive)
@@ -268,10 +289,10 @@ struct EditExerciseSheet: View {
             let wrappedMarkdown = "# Workout\n\(markdownText)"
             let result = MarkdownParser.parseWorkout(wrappedMarkdown)
             guard let plan = result.data, let parsedExercise = plan.exercises.first else {
-                markdownError = result.errors.first ?? "Failed to parse markdown"
+                validationError = result.errors.first ?? "Failed to parse markdown"
                 return
             }
-            markdownError = nil
+            validationError = nil
 
             saveName = parsedExercise.exerciseName
             saveEquipment = parsedExercise.equipmentType ?? ""
@@ -285,6 +306,17 @@ struct EditExerciseSheet: View {
             notes = saveNotes
             editableSets = newSets
         }
+
+        // TC-E14: reject weight-only sets (weight but no reps and no time) so
+        // the Form tab matches the Markdown tab / validator / spec. The
+        // Markdown path is already parser-validated above, but checking
+        // uniformly here keeps the rule in one place.
+        if let badIndex = saveSets.firstIndex(where: { $0.isWeightOnly }) {
+            let content = formatSetLine(saveSets[badIndex])
+            validationError = "Set \(badIndex + 1) — Incomplete set: \"\(content)\". Weight with unit requires reps (x 5) or time (x 60s)"
+            return
+        }
+        validationError = nil
 
         var changes: [EditExerciseSetChange] = []
         let originalSetIds = Set(exercise.sets.map { $0.id })
@@ -393,10 +425,10 @@ struct EditExerciseSheet: View {
         let wrappedMarkdown = "# Workout\n\(markdownText)"
         let result = MarkdownParser.parseWorkout(wrappedMarkdown)
         guard let plan = result.data, let parsedExercise = plan.exercises.first else {
-            markdownError = result.errors.first ?? "Failed to parse markdown"
+            validationError = result.errors.first ?? "Failed to parse markdown"
             return
         }
-        markdownError = nil
+        validationError = nil
         name = parsedExercise.exerciseName
         equipmentType = parsedExercise.equipmentType ?? ""
         notes = parsedExercise.notes ?? ""
