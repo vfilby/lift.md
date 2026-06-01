@@ -79,7 +79,7 @@ degrade to `null` rather than failing the request.
 
 | Method | Path                          | Scope           | Description                                                                                 |
 |--------|-------------------------------|-----------------|---------------------------------------------------------------------------------------------|
-| POST   | `/v1/workouts`                | `workouts:write`| Push a new workout (LMWF body). Returns inbox item summary + warnings.                      |
+| POST   | `/v1/workouts`                | `workouts:write`| Push a new workout (LMWF body). Returns inbox item summary + warnings (**201**). If it dedups onto an existing pending item with identical content, returns that item with `"deduplicated": true` (**200**) — see *Conflict + dedup rules*. |
 | GET    | `/v1/workouts`                | `workouts:read` | List items (latest first). iOS sends no `status` filter so it sees every live row; an optional `?status=` filter still works for the web portal. Returns summary only. |
 | GET    | `/v1/workouts/:inbox_id`      | `workouts:read` | Fetch one item including `workout` (full parsed plan) and `lmwf_text`.                      |
 | POST   | `/v1/workouts/:inbox_id/ack`  | `workouts:write`| **Orphaned/legacy.** Marks item `ingested`. No client calls it anymore (iOS and the web portal both stopped — GH #164); kept only so old rows/clients don't 404. Idempotent. |
@@ -177,7 +177,11 @@ Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) �
 
 ### Conflict + dedup rules
 
-- Re-polling the same `inbox_id` is a no-op (the row is already cached, so it's skipped). Promotion creates a fresh `WorkoutPlan` UUID each time — so accidentally pushing the same workout twice yields two inbox items that promote to two distinct plans (or the user discards the duplicate).
+- **Push-time idempotency (GH #193).** `POST /v1/workouts` dedups on content: the server stores a `content_hash` (sha256 of the trimmed `lmwf_text`) on each item, and before creating a new row it looks for an existing **pending** item for the same user with the same hash. If one exists, the push returns that item unchanged — same `inbox_id`, `created_at`, and a `"deduplicated": true` flag — with HTTP **200** instead of **201**, and no new row is created. This collapses a double-fired or replayed push (the GH #193 root cause: identical pushes seconds apart) onto a single inbox item. Scope and edges:
+  - **Pending-only.** Dedup matches only un-acted items. Once an item is ingested or discarded (its row is gone), a deliberate re-push produces a fresh item — re-importing a previously-handled plan is intentional.
+  - **Content-keyed, not name-keyed.** An *edited* re-push (e.g. the same plan with one more set) has a different hash and is correctly kept as a distinct item.
+  - **Accepted race.** Two byte-identical pushes that land truly concurrently (both read before either writes) can still both create a row. This is a narrow window; the observed real-world failure (pushes seconds apart) is fully closed by the read-before-write check. Hardening to a conditional write on a deterministic key is out of scope.
+- Re-polling the same `inbox_id` is a no-op (the row is already cached, so it's skipped). Promotion creates a fresh `WorkoutPlan` UUID each time — so a deliberately re-pushed (post-ingest) or edited workout that lands as a second inbox item promotes to a distinct plan (or the user discards the duplicate).
 - Promotion is one-shot: once a `WorkoutPlan` is created from an inbox item, the inbox row is deleted. There is no "re-import from inbox history" — the server-side row is also deleted.
 - A signed-out user's inbox table is wiped on logout (treating inbox as session-scoped device state). This is now lossless: because the poll no longer acks, the server still holds every un-acted item, so signing back in repopulates the inbox from the next poll (GH #164).
 - A `DELETE` that fails (offline) leaves the row server-side; the local row is already gone, so the item reappears on the next poll. The user can re-discard. Accepted edge — the alternative (durably queueing the delete) is out of scope.
