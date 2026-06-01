@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { seedUser } from '../helpers/api.js';
-import { uniqueEmail } from '../helpers/env.js';
-import { getLatestToken } from '../helpers/tokens.js';
+import { expectedEmailLinkHost, getMode, uniqueEmail } from '../helpers/env.js';
+import { getLatestEmailLink, getLatestToken } from '../helpers/tokens.js';
 
 test('forgot → reset → login with new password', async ({ page, request }) => {
   const email = uniqueEmail('reset');
@@ -14,6 +14,21 @@ test('forgot → reset → login with new password', async ({ page, request }) =
   await page.locator('#email').fill(email);
   await page.locator('#submit-btn').click();
   await expect(page.locator('#forgot-msg .inline-msg.ok')).toBeVisible();
+
+  // Topology assertion (b): the reset link host must match the env's
+  // appBaseUrl. This is the exact #137 reset-misrouting class — a Lambda
+  // with the wrong LMWF_ENV emails a link pointing at the wrong host, so
+  // the user lands on the wrong environment's reset page. Only assertable
+  // where the email body is readable = local/Mailpit mode (gates prod via
+  // e2e-local). Remote mode mints the token directly with no email to read.
+  if (getMode() === 'local') {
+    const link = await getLatestEmailLink(email, 'password_reset');
+    const url = new URL(link);
+    expect(url.host).toBe(expectedEmailLinkHost());
+    // The reset link must target the website page, not the POST-only API
+    // route (a GET on /v1/auth/password/reset would 405).
+    expect(url.pathname).toBe('/account/reset');
+  }
 
   // Pull the reset token and land on /account/reset?token=...
   const token = await getLatestToken(email, 'password_reset');

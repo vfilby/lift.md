@@ -1,0 +1,19 @@
+# GitGuardian / ggshield configuration.
+#
+# Allowlist the single well-known passphrase used as a TEST FIXTURE throughout
+# the validator e2e suite (the XKCD passphrase that is the default password for
+# the /v1/__test__/seed-user backdoor and is typed into the signup/reset forms
+# by the Playwright specs). It is not a real credential, is identical wherever
+# it appears, and grants access to nothing outside the ephemeral local/beta
+# test stacks. Matched by ggshield's reported Secret SHA so the plaintext never
+# appears here and the allowlist is scoped to exactly this one value — real
+# secrets accidentally committed under validator/e2e/** are still detected.
+#
+# Honored by the self-run `ggshield` CI check (.github/workflows/ggshield.yml).
+# The managed "GitGuardian Security Checks" GitHub App does NOT read this file.
+version: 2
+
+secret:
+  ignored_matches:
+    - name: "e2e test fixture password (XKCD passphrase) — not a real credential"
+      match: b928881af8666174d09a3c22cf5fb5b43e39a3192e24015d0026ec5ccf9d898c

@@ -39,6 +39,25 @@ export function getMailpitUrl(): string {
 }
 
 /**
+ * Host that transactional-email links MUST point at, derived the same way
+ * the server derives it (password.ts:appBaseUrl → LMWF_ENV). Used by the
+ * "email link host == env appBaseUrl" topology assertion to catch a
+ * misconfigured Lambda env building links for the wrong environment (the
+ * #137 reset-link-misrouting class).
+ *
+ * The e2e process doesn't share the server's LMWF_ENV directly, so this is
+ * configurable via LMWF_E2E_EXPECTED_EMAIL_HOST. The default matches the
+ * local stack, which `scripts/e2e-local.sh` boots with LMWF_ENV=beta →
+ * links resolve to beta.liftmark.app.
+ */
+export function expectedEmailLinkHost(): string {
+  const explicit = process.env.LMWF_E2E_EXPECTED_EMAIL_HOST;
+  if (explicit) return explicit;
+  // The local stack runs with LMWF_ENV=beta (see scripts/e2e-local.sh).
+  return 'beta.liftmark.app';
+}
+
+/**
  * Each test run uses a unique email prefix so reruns + parallel workers
  * don't collide on the (provider, provider_sub) uniqueness check in
  * createIdentity.
