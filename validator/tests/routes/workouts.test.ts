@@ -144,6 +144,143 @@ live('Workout inbox routes (/v1/workouts)', () => {
     expect(single.workout.exercises[0].sets[2].targetReps).toBe(5);
   });
 
+  it('POST identical content twice dedups onto one pending item (GH #193)', async () => {
+    const { plaintext } = await mintUserAndPat('push-dedup');
+
+    const first = await app.request('/v1/workouts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${plaintext}`,
+      },
+      body: JSON.stringify({ lmwf: VALID_LMWF }),
+    });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { inbox_id: string };
+
+    // A double-fired / replayed identical push must collapse onto the same
+    // item: 200 (not 201), deduplicated flag, same inbox_id, and the list
+    // still holds exactly one row.
+    const second = await app.request('/v1/workouts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${plaintext}`,
+      },
+      body: JSON.stringify({ lmwf: VALID_LMWF }),
+    });
+    expect(second.status).toBe(200);
+    const secondBody = (await second.json()) as {
+      inbox_id: string;
+      deduplicated?: boolean;
+      summary: { workoutName: string };
+    };
+    expect(secondBody.deduplicated).toBe(true);
+    expect(secondBody.inbox_id).toBe(firstBody.inbox_id);
+    expect(secondBody.summary.workoutName).toBe('Push Day');
+
+    const list = (await (
+      await app.request('/v1/workouts', {
+        headers: { authorization: `Bearer ${plaintext}` },
+      })
+    ).json()) as { items: unknown[] };
+    expect(list.items).toHaveLength(1);
+  });
+
+  it('POST edited content creates a distinct item (dedup is content-keyed, not name-keyed)', async () => {
+    const { plaintext } = await mintUserAndPat('push-edited');
+
+    await app.request('/v1/workouts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${plaintext}`,
+      },
+      body: JSON.stringify({ lmwf: VALID_LMWF }),
+    });
+
+    // Same workout name, one extra set → different content hash → new item.
+    const edited = `${VALID_LMWF}- 245 x 3\n`;
+    const res = await app.request('/v1/workouts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${plaintext}`,
+      },
+      body: JSON.stringify({ lmwf: edited }),
+    });
+    expect(res.status).toBe(201);
+
+    const list = (await (
+      await app.request('/v1/workouts', {
+        headers: { authorization: `Bearer ${plaintext}` },
+      })
+    ).json()) as { items: unknown[] };
+    expect(list.items).toHaveLength(2);
+  });
+
+  it('re-push after the item is acted on (ingested) creates a fresh item', async () => {
+    const { plaintext } = await mintUserAndPat('push-reingest');
+
+    const created = (await (
+      await app.request('/v1/workouts', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${plaintext}`,
+        },
+        body: JSON.stringify({ lmwf: VALID_LMWF }),
+      })
+    ).json()) as { inbox_id: string };
+
+    // Ack (ingest) the item — it's no longer pending.
+    await app.request(`/v1/workouts/${created.inbox_id}/ack`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${plaintext}` },
+    });
+
+    // A deliberate re-push of the same content is now a brand-new item.
+    const res = await app.request('/v1/workouts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${plaintext}`,
+      },
+      body: JSON.stringify({ lmwf: VALID_LMWF }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { inbox_id: string };
+    expect(body.inbox_id).not.toBe(created.inbox_id);
+  });
+
+  it('dedup is per-user: identical content from two users yields two items', async () => {
+    const a = await mintUserAndPat('dedup-user-a');
+    const b = await mintUserAndPat('dedup-user-b');
+
+    const resA = await app.request('/v1/workouts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${a.plaintext}`,
+      },
+      body: JSON.stringify({ lmwf: VALID_LMWF }),
+    });
+    const resB = await app.request('/v1/workouts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${b.plaintext}`,
+      },
+      body: JSON.stringify({ lmwf: VALID_LMWF }),
+    });
+    // Both are first-for-their-user → both 201, distinct rows.
+    expect(resA.status).toBe(201);
+    expect(resB.status).toBe(201);
+    const idA = ((await resA.json()) as { inbox_id: string }).inbox_id;
+    const idB = ((await resB.json()) as { inbox_id: string }).inbox_id;
+    expect(idA).not.toBe(idB);
+  });
+
   it('POST /v1/workouts (text/markdown) creates a pending inbox item', async () => {
     const { plaintext } = await mintUserAndPat('push-md');
 
@@ -585,13 +722,15 @@ live('Workout inbox routes (/v1/workouts)', () => {
   it('pagination: limit=2 over 3 items yields next_cursor and second page returns the rest', async () => {
     const { plaintext } = await mintUserAndPat('pagination');
     for (let i = 0; i < 3; i++) {
+      // Distinct content per push — push-time dedup (GH #193) would otherwise
+      // collapse identical bodies onto a single item.
       const res = await app.request('/v1/workouts', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           authorization: `Bearer ${plaintext}`,
         },
-        body: JSON.stringify({ lmwf: VALID_LMWF }),
+        body: JSON.stringify({ lmwf: `${VALID_LMWF}- ${100 + i} x ${i + 1}\n` }),
       });
       expect(res.status).toBe(201);
       // Spread created_at slightly so the ULID sort is unambiguous.
