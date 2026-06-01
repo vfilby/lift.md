@@ -16,6 +16,7 @@ import {
   QueryCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
+import { createHash } from 'node:crypto';
 import { ulid } from 'ulid';
 import { ddb, tableName } from '../infra/ddb.js';
 
@@ -29,6 +30,14 @@ export interface InboxItem {
   status: InboxStatus;
   created_at: string;
   ingested_at?: string;
+  /**
+   * sha256 hex of the (trimmed) `lmwf_text`. Used for push-time dedup so a
+   * double-fired or replayed push of byte-identical content collapses onto
+   * the existing pending item instead of minting a duplicate (GH #193).
+   * Optional on read so legacy rows written before this field existed still
+   * decode — those simply never match a dedup probe.
+   */
+  content_hash?: string;
 }
 
 export interface CreateInboxItemInput {
@@ -36,6 +45,17 @@ export interface CreateInboxItemInput {
   source_token_id: string;
   lmwf_text: string;
   status: InboxStatus;
+}
+
+/**
+ * Stable dedup fingerprint for an inbox push: sha256 hex of the trimmed
+ * `lmwf_text`. Trimming absorbs insignificant leading/trailing whitespace so
+ * a re-push that differs only by a trailing newline still collapses. Two
+ * genuinely different plans (e.g. an edited version with more sets) hash
+ * differently and are kept as distinct items.
+ */
+export function inboxContentHash(lmwf_text: string): string {
+  return createHash('sha256').update(lmwf_text.trim()).digest('hex');
 }
 
 export interface ListInboxOptions {
@@ -106,6 +126,7 @@ export async function createInboxItem(
     ...input,
     inbox_id: ulid(),
     created_at: new Date().toISOString(),
+    content_hash: inboxContentHash(input.lmwf_text),
   };
 
   await ddb.send(
@@ -117,6 +138,41 @@ export async function createInboxItem(
   );
 
   return item;
+}
+
+/**
+ * Find this user's most recent *pending* inbox item whose content matches the
+ * given hash, or null. Backs push-time dedup (GH #193): a push that is
+ * byte-identical (modulo whitespace) to an item the user hasn't yet acted on
+ * returns the existing item rather than creating a duplicate. Scoped to
+ * `pending` on purpose — once an item is ingested or discarded, a deliberate
+ * re-push should produce a fresh item.
+ *
+ * Reads the caller's partition (newest-first) with a server-side filter on
+ * status + content_hash. The inbox is small and self-draining, so this is a
+ * bounded query; no GSI is required.
+ */
+export async function findPendingByContentHash(
+  user_id: string,
+  content_hash: string,
+): Promise<InboxItem | null> {
+  const result = await ddb.send(
+    new QueryCommand({
+      TableName: tableName('workout_inbox'),
+      KeyConditionExpression: 'user_id = :uid',
+      FilterExpression: '#st = :pending AND content_hash = :h',
+      ExpressionAttributeNames: { '#st': 'status' },
+      ExpressionAttributeValues: {
+        ':uid': user_id,
+        ':pending': 'pending',
+        ':h': content_hash,
+      },
+      // Newest first — ULID SK is lexicographically chronological.
+      ScanIndexForward: false,
+    }),
+  );
+  const items = (result.Items as InboxItem[] | undefined) ?? [];
+  return items[0] ?? null;
 }
 
 export async function getInboxItemsByUser(

@@ -27,8 +27,10 @@ import { requireScope, type AuthVariables } from '../middleware/auth.js';
 import {
   createInboxItem,
   deleteInboxItem,
+  findPendingByContentHash,
   getInboxItem,
   getInboxItemsByUser,
+  inboxContentHash,
   InvalidCursorError,
   markIngested,
   type InboxStatus,
@@ -275,6 +277,40 @@ workoutsRouter.post('/', requireScope('workouts:write'), async (c) => {
   }
 
   const summary = summarize(result);
+
+  // Push-time idempotency (GH #193). A double-fired or replayed push of
+  // byte-identical content would otherwise mint a fresh inbox_id every time,
+  // fanning the user's inbox out into near-duplicate rows. If an *un-acted*
+  // (pending) item with the same content already exists, return it unchanged
+  // instead of creating another. Scoped to pending: once the user has
+  // ingested or discarded an item, a deliberate re-push is a new item.
+  const contentHash = inboxContentHash(markdown);
+  const existing = await findPendingByContentHash(
+    c.var.user.user_id,
+    contentHash,
+  );
+  if (existing) {
+    log({
+      level: 'info',
+      requestId,
+      event: 'workouts_push_deduplicated',
+      status: 200,
+      inboxId: existing.inbox_id,
+      durationMs: Date.now() - startTime,
+    });
+    return c.json(
+      {
+        inbox_id: existing.inbox_id,
+        status: existing.status,
+        created_at: existing.created_at,
+        deduplicated: true,
+        summary,
+        warnings: result.warnings,
+      },
+      200,
+    );
+  }
+
   // Session-authed pushes (web dashboard) record 'session' as their
   // source — distinguishes "pushed via PAT X" from "pushed via the web
   // portal" in the audit trail. PAT pushes record the token's ULID.
