@@ -387,7 +387,9 @@ struct ActiveWorkoutView: View {
         sessionStore.completeSet(
             setId: set.id,
             actualWeight: userWeight ?? actual?.weight?.value ?? target?.weight?.value,
-            actualWeightUnit: actual?.weight?.unit ?? target?.weight?.unit,
+            // Fall back to the user's default unit so a weight added to a
+            // previously reps-only set (GH #194) is logged in their unit.
+            actualWeightUnit: actual?.weight?.unit ?? target?.weight?.unit ?? settingsStore.settings?.defaultWeightUnit,
             actualReps: userReps ?? actual?.reps ?? target?.reps,
             actualTime: elapsedTime ?? actual?.time ?? target?.time,
             actualRpe: actual?.rpe ?? target?.rpe
@@ -469,7 +471,9 @@ struct ActiveWorkoutView: View {
         sessionStore.completeSet(
             setId: set.id,
             actualWeight: weight,
-            actualWeightUnit: setActual?.weight?.unit ?? setTarget?.weight?.unit,
+            // Fall back to the user's default unit so a weight added to a
+            // previously reps-only set (GH #194) is logged in their unit.
+            actualWeightUnit: setActual?.weight?.unit ?? setTarget?.weight?.unit ?? settingsStore.settings?.defaultWeightUnit,
             actualReps: reps,
             actualTime: time ?? setActual?.time ?? setTarget?.time,
             actualRpe: setActual?.rpe ?? setTarget?.rpe
