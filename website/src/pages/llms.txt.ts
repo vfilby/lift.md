@@ -6,13 +6,13 @@ lift.md format (formerly "LMWF") is a markdown-based format for strength trainin
 
 ## Docs
 
-- [Format hub](https://liftmark.app/format): Pitch, examples, live validator, and the full spec.
-- [Full spec](https://liftmark.app/spec.md): Complete lift.md format specification in markdown.
-- [Validator API](https://liftmark.app/validate): POST JSON \`{"markdown": "..."}\` to validate lift.md format content. Returns \`{success, summary, errors, warnings}\`.
+- [Format hub](https://getlift.md/format): Pitch, examples, live validator, and the full spec.
+- [Full spec](https://getlift.md/spec.md): Complete lift.md format specification in markdown.
+- [Validator API](https://getlift.md/validate): POST JSON \`{"markdown": "..."}\` to validate lift.md format content. Returns \`{success, summary, errors, warnings}\`.
 
 ## Optional
 
-- [Claude Code skill installer](https://liftmark.app/install.sh): One-line installer (\`curl -fsSL https://liftmark.app/install.sh | sh\`) for a skill that generates and validates lift.md format workouts.
+- [Claude Code skill installer](https://getlift.md/install.sh): One-line installer (\`curl -fsSL https://getlift.md/install.sh | sh\`) for a skill that generates and validates lift.md format workouts.
 `;
 
 export const GET: APIRoute = () => {
