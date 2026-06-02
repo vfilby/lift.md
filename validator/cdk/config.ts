@@ -91,3 +91,16 @@ export const ENVS: Record<EnvName, EnvConfig> = {
 export function envPrefix(env: EnvConfig): string {
   return `Lmwf${env.name.charAt(0).toUpperCase()}${env.name.slice(1)}`;
 }
+
+/**
+ * Vanity / redirect domains that get their own long-lived Route 53 hosted
+ * zone + wildcard cert in the prod account, managed by the
+ * LmwfDnsFoundationStack. Decoupled from ENVS because these are not validator
+ * environments — they own registrar delegation and must outlive any app-stack
+ * teardown.
+ *
+ * Note: `.md` is Moldova's ccTLD and is not registrable via Route 53; the
+ * domain is registered at an external registrar, and only its NS delegation
+ * points at the zone created here.
+ */
+export const VANITY_DOMAINS = ['getlift.md', 'liftmd.app'] as const;
