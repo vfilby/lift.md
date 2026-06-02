@@ -33,6 +33,14 @@ export interface LmwfDnsFoundationStackProps extends cdk.StackProps {
  * after delegation lands; the zone already exists so it's idempotent.
  */
 export class LmwfDnsFoundationStack extends cdk.Stack {
+  /** Hosted zone per vanity domain, for other stacks to add records to. */
+  public readonly zonesByDomain: Record<string, route53.IHostedZone> = {};
+  /**
+   * Issued wildcard cert per vanity domain (us-east-1, CloudFront-ready).
+   * Only present for domains with `issueCert: true`.
+   */
+  public readonly certsByDomain: Record<string, acm.ICertificate> = {};
+
   constructor(scope: Construct, id: string, props: LmwfDnsFoundationStackProps) {
     super(scope, id, props);
 
@@ -43,12 +51,13 @@ export class LmwfDnsFoundationStack extends cdk.Stack {
         zoneName: domain,
         comment: `LiftMark vanity domain ${domain} — created by CDK`,
       });
+      this.zonesByDomain[domain] = zone;
 
       // Deferred until the domain is registered + delegated (see VanityDomain
       // docs): a DNS-validated cert blocks the whole stack's CREATE until it
       // validates, which an undelegated domain never does.
       if (issueCert) {
-        new acm.Certificate(this, `${cid}Cert`, {
+        this.certsByDomain[domain] = new acm.Certificate(this, `${cid}Cert`, {
           domainName: domain,
           // Wildcard SAN covers future subdomains (www.*, app.*, …) without a
           // cert rotation — mirrors the per-env edge cert.

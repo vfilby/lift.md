@@ -286,11 +286,13 @@ The suite runs in three modes, selected by env var `LMWF_E2E_MODE`:
   suite calls the test-only `/v1/__test__/mint-token` endpoint
   (see below) to obtain verification + reset tokens without inspecting
   email.
-- `remote:prod` — reserved for ad-hoc verification against
-  `https://liftmark.app`. Prod intentionally does NOT set the
-  `E2E_TEST_SECRET` env var, so token-mint is unavailable — only the
-  no-auth-required tests (`home.spec.ts`, `spec-page.spec.ts`) execute.
-  Not wired into any pipeline; runnable locally for incident response.
+- `remote:prod` — reserved for ad-hoc verification against the canonical
+  prod site `https://getlift.md` (and the redirect/legacy hosts —
+  see "Canonical-domain redirect topology" below). Prod intentionally
+  does NOT set the `E2E_TEST_SECRET` env var, so token-mint is
+  unavailable — only the no-auth-required tests (`home.spec.ts`,
+  `spec-page.spec.ts`, and the redirect-topology checks) execute. Not
+  wired into any pipeline; runnable locally for incident response.
 
 ## Test-only token endpoint
 
@@ -364,6 +366,30 @@ website bucket.
 
 This keeps E2E hitting a single origin (no CORS, no proxy config)
 while the production topology stays untouched.
+
+## Canonical-domain redirect topology (`remote:prod` only)
+
+The prod canonical site is `getlift.md`; `liftmark.app` (and its legacy
+`workoutformat.liftmark.app` alias) and `liftmd.app` redirect to it, with
+explicit non-redirect exceptions for the app's API + AASA paths (see
+"Domains & Hosting Topology" in `lmwf-validator.md`). This topology is a
+prod-only deploy concern, so it is verified only in `remote:prod` mode and
+is **not** wired into the pipeline (beta is single-origin and unaffected).
+
+These are HTTP-level checks (status / `Location` / `Content-Type`), run
+with redirect-following disabled so the redirect itself is observable:
+
+| # | Request | Expectation |
+|---|---------|-------------|
+| 1 | `GET https://getlift.md/` | 200, serves the site (canonical home page) |
+| 2 | `GET https://getlift.md/validate` (or `POST`) | reaches the validator API (not a redirect) |
+| 3 | `GET https://liftmark.app/` (a site page) | **302**, `Location: https://getlift.md/` (same path) |
+| 4 | `POST https://liftmark.app/validate` | **200** — served directly, **NOT** redirected (shipped iOS app depends on this) |
+| 5 | `GET https://liftmark.app/.well-known/apple-app-site-association` | **200**, `Content-Type: application/json`, **NOT** redirected (Apple does not follow redirects) |
+| 6 | `GET https://liftmd.app/` (and any path) | **302**, `Location: https://getlift.md/…` |
+
+Redirects are **302** today; when they are promoted to **301**, update
+the expected status in checks 3 and 6 accordingly.
 
 ## Pipeline integration
 
