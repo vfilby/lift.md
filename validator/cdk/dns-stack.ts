@@ -2,10 +2,11 @@ import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import { Construct } from 'constructs';
+import type { VanityDomain } from './config';
 
 export interface LmwfDnsFoundationStackProps extends cdk.StackProps {
-  /** Vanity / redirect domains to create a zone + wildcard cert for. */
-  domains: readonly string[];
+  /** Vanity / redirect domains to create a zone (+ optional wildcard cert) for. */
+  domains: readonly VanityDomain[];
 }
 
 /**
@@ -35,7 +36,7 @@ export class LmwfDnsFoundationStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LmwfDnsFoundationStackProps) {
     super(scope, id, props);
 
-    for (const domain of props.domains) {
+    for (const { domain, issueCert } of props.domains) {
       const cid = domainToConstructId(domain);
 
       const zone = new route53.HostedZone(this, `${cid}Zone`, {
@@ -43,13 +44,18 @@ export class LmwfDnsFoundationStack extends cdk.Stack {
         comment: `LiftMark vanity domain ${domain} — created by CDK`,
       });
 
-      new acm.Certificate(this, `${cid}Cert`, {
-        domainName: domain,
-        // Wildcard SAN covers future subdomains (www.*, app.*, …) without a
-        // cert rotation — mirrors the per-env edge cert.
-        subjectAlternativeNames: [`*.${domain}`],
-        validation: acm.CertificateValidation.fromDns(zone),
-      });
+      // Deferred until the domain is registered + delegated (see VanityDomain
+      // docs): a DNS-validated cert blocks the whole stack's CREATE until it
+      // validates, which an undelegated domain never does.
+      if (issueCert) {
+        new acm.Certificate(this, `${cid}Cert`, {
+          domainName: domain,
+          // Wildcard SAN covers future subdomains (www.*, app.*, …) without a
+          // cert rotation — mirrors the per-env edge cert.
+          subjectAlternativeNames: [`*.${domain}`],
+          validation: acm.CertificateValidation.fromDns(zone),
+        });
+      }
 
       new cdk.CfnOutput(this, `${cid}ZoneId`, {
         value: zone.hostedZoneId,

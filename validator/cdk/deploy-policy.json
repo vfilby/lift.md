@@ -260,30 +260,15 @@
       "Sid": "Route53DNS",
       "Effect": "Allow",
       "Action": [
-        "route53:ChangeResourceRecordSets",
-        "route53:GetHostedZone",
-        "route53:ListResourceRecordSets",
-        "route53:GetChange"
-      ],
-      "Resource": [
-        "arn:aws:route53:::hostedzone/Z082094022DMVFBOHDGOE",
-        "arn:aws:route53:::change/*"
-      ]
-    },
-    {
-      "Sid": "Route53HostedZoneLifecycle",
-      "Effect": "Allow",
-      "Action": [
         "route53:CreateHostedZone",
         "route53:DeleteHostedZone",
         "route53:GetHostedZone",
-        "route53:GetHostedZoneCount",
-        "route53:ListHostedZones",
-        "route53:ListHostedZonesByName",
         "route53:ChangeResourceRecordSets",
         "route53:ListResourceRecordSets",
         "route53:ChangeTagsForResource",
-        "route53:ListTagsForResource"
+        "route53:ListTagsForResource",
+        "route53:ListQueryLoggingConfigs",
+        "route53:GetChange"
       ],
       "Resource": "*"
     },
