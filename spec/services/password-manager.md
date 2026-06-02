@@ -144,6 +144,20 @@ Two stack behaviours would otherwise break this and are explicitly handled in
 The default CloudFront behaviour serves S3, so `/.well-known/*` is **not**
 routed to the `/validate`, `/v1/*`, or `/version` API origins.
 
+### Canonical domain & redirects
+
+The canonical website domain is **`getlift.md`** (see "Domains & Hosting
+Topology" in `lmwf-validator.md`). `liftmark.app` now 302-redirects its **site
+pages** to `getlift.md`, but the AASA is the load-bearing exception: Apple's
+`webcredentials` fetcher does **not** follow redirects, so
+`https://liftmark.app/.well-known/apple-app-site-association` MUST keep returning
+the file directly (HTTP 200, no redirect). The same exclusion applies to the
+app's API paths (`/validate`, `/v1/*`, `/version`). The associated-domains
+entitlement still targets `webcredentials:liftmark.app`, so AASA hosting stays on
+`liftmark.app` even though the marketing site has moved. (`liftmd.app` redirects
+everything, including `/.well-known/*`, because it never hosted the app's
+entitlement.)
+
 ## Deploy / order-of-operations
 
 `website/dist` is **gitignored** and rebuilt fresh (`npm run build`) by the

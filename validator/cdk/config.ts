@@ -15,6 +15,23 @@ export interface EnvConfig {
   region: string;
   /** Apex (or near-apex) domain served by CloudFront for this env. */
   domainName: string;
+  /**
+   * Canonical web domain for the env. When set AND different from
+   * `domainName`, the site is served at this domain and `domainName` (plus any
+   * `redirectWebDomains`) 302-redirect their site pages here — preserving path
+   * + query. API paths (`/validate`, `/v1/*`, `/version`) and the AASA file are
+   * NOT redirected on `domainName`, so the iOS app and installed-app password
+   * autofill keep working. The canonical domain's zone + cert come from the
+   * LmwfDnsFoundationStack (passed in via stack props). Leave undefined to keep
+   * `domainName` as the canonical site (beta).
+   */
+  canonicalWebDomain?: string;
+  /**
+   * Extra domains whose site pages 302-redirect to `canonicalWebDomain`
+   * (full redirect — no API/AASA carve-out). Each needs a zone + cert from the
+   * LmwfDnsFoundationStack. Ignored unless `canonicalWebDomain` is set.
+   */
+  redirectWebDomains?: readonly string[];
   /** Stripe API mode. Used by app code to pick test vs live keys. */
   stripeMode: 'test' | 'live';
   /**
@@ -57,6 +74,12 @@ export function corsAllowedOrigins(env: EnvConfig): string[] {
   if (env.name === 'prod') {
     origins.push(`https://workoutformat.${env.domainName}`);
   }
+  // The canonical site (getlift.md) makes credentialed, same-origin API calls
+  // through its own CloudFront, so its origin must be allowed too. domainName
+  // stays in the list during the transition (it still proxies the API).
+  if (env.canonicalWebDomain && env.canonicalWebDomain !== env.domainName) {
+    origins.push(`https://${env.canonicalWebDomain}`);
+  }
   if (env.allowLocalDevOrigin) {
     origins.push(LOCAL_DEV_ORIGIN);
   }
@@ -81,6 +104,11 @@ export const ENVS: Record<EnvName, EnvConfig> = {
     account: '825347768149',
     region: 'us-west-2',
     domainName: 'liftmark.app',
+    // getlift.md is the canonical brand site; liftmark.app + liftmd.app
+    // redirect to it (liftmark.app keeps serving the API + AASA). Zones/certs
+    // for both come from the LmwfDnsFoundationStack.
+    canonicalWebDomain: 'getlift.md',
+    redirectWebDomains: ['liftmd.app'],
     stripeMode: 'live',
     sesMailFromSubdomain: 'mail',
     dmarcPolicy: 'v=DMARC1; p=none;',
