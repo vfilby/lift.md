@@ -217,12 +217,15 @@ This is the one normal-operation path (alongside the giveup-4xx case) that *does
 An app-level banner is shown at the root (`ContentView`) when there are completed workouts that cannot sync because the device needs sign-in:
 
 ```
-outboxPusher.pendingCount > 0 && (!authStore.isAuthenticated || authStore.sessionExpired)
+outboxPusher.pendingCount > 0
+  && (!authStore.isAuthenticated || authStore.sessionExpired)
+  && sessionStore.activeSession == nil
 ```
 
 - Copy: "N workout(s) waiting to sync — sign in to upload." Tapping it presents `LoginView`.
 - Accessibility identifier `auth-sync-banner` for UI tests.
 - A successful login resets `sessionExpired` and triggers `flushIfAuthenticated()`, which drains the queue and clears the banner.
+- **Suppressed during an active workout** (`sessionStore.activeSession != nil`). The banner is mounted as a top `safeAreaInset` over the whole tab view; the active-workout screen draws its own header (including the Finish button) into that same top region, so a visible banner overlaps and intercepts the Finish tap. A sync nag for *past* completed workouts also shouldn't crowd a live session. The banner returns automatically once the workout ends.
 
 ### Re-authentication state
 

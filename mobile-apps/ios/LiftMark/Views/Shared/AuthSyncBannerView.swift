@@ -7,18 +7,28 @@ import SwiftUI
 ///
 /// Visible when:
 ///   `outboxPusher.pendingCount > 0 && (!authStore.isAuthenticated || authStore.sessionExpired)`
+///   — **and** no workout is currently active.
+///
+/// It is suppressed while a workout session is in progress (GH #194 follow-up):
+/// the banner is mounted as a top `safeAreaInset` over the whole tab view, and
+/// the active-workout screen draws its own header (with the Finish button) into
+/// that same top region — so a visible banner overlaps and intercepts taps on
+/// Finish. A sync nag for *past* workouts also shouldn't crowd a live session.
+/// It returns automatically once the workout ends.
 ///
 /// Tapping it presents `LoginView`. A successful login resets `sessionExpired`
 /// and flushes the outbox, which drains the queue and dismisses the banner.
 struct AuthSyncBannerView: View {
     @Environment(AuthenticationStore.self) private var authStore
     @Environment(OutboxPusherService.self) private var outboxPusher
+    @Environment(SessionStore.self) private var sessionStore
 
     @State private var showingLogin = false
 
     private var shouldShow: Bool {
         outboxPusher.pendingCount > 0
             && (!authStore.isAuthenticated || authStore.sessionExpired)
+            && sessionStore.activeSession == nil
     }
 
     private var message: String {
@@ -72,4 +82,5 @@ struct AuthSyncBannerView: View {
     return AuthSyncBannerView()
         .environment(auth)
         .environment(pusher)
+        .environment(SessionStore())
 }
