@@ -24,7 +24,7 @@ final class MigratorBridgeAlertUITests: XCTestCase {
         app.launch()
 
         let message = app.staticTexts["Free up ~50 MB and relaunch."]
-        XCTAssertTrue(message.waitForExistence(timeout: 5),
+        XCTAssertTrue(message.waitForExistence(timeout: UITestTiming.scaled(5)),
                       "disk-full stall message should render for boot-blocking failure")
 
         // Tab bar must NOT be present — app refuses to proceed.
@@ -47,7 +47,7 @@ final class MigratorBridgeAlertUITests: XCTestCase {
         app.launch()
 
         let title = app.staticTexts["Database Needs Attention"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5),
+        XCTAssertTrue(title.waitForExistence(timeout: UITestTiming.scaled(5)),
                       "integrity-failure stall title should render")
 
         // SwiftUI Label-based buttons expose their label as the element name; prefer

@@ -209,6 +209,13 @@ schemes:
       config: Debug
     test:
       config: Debug
+      # Plumb the UI-test timeout multiplier into the test-runner process.
+      # The runner doesn't inherit host env, so we expand a build setting:
+      # `xcodebuild test ... UITEST_TIMEOUT_SCALE=2.5` flows into the runner's
+      # environment via this $(...) expansion. Unset → empty → code defaults to
+      # 1.0. Set to ~2.5–3 on slow runners (e.g. an Intel CI box).
+      environmentVariables:
+        UITEST_TIMEOUT_SCALE: "$(UITEST_TIMEOUT_SCALE)"
       targets:
         - LiftMarkTests
         - LiftMarkUITests
