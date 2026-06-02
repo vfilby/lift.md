@@ -129,12 +129,17 @@
         "logs:DeleteLogGroup",
         "logs:PutRetentionPolicy",
         "logs:DeleteRetentionPolicy",
-        "logs:DescribeLogGroups",
         "logs:TagResource"
       ],
       "Resource": [
         "arn:aws:logs:*:*:log-group:/aws/lambda/Lmwf*Stack-*"
       ]
+    },
+    {
+      "Sid": "CloudWatchLogsDescribe",
+      "Effect": "Allow",
+      "Action": "logs:DescribeLogGroups",
+      "Resource": "*"
     },
     {
       "Sid": "CloudWatchAlarms",
@@ -161,8 +166,8 @@
       "Effect": "Allow",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::liftmark-workoutformat-*",
-        "arn:aws:s3:::liftmark-workoutformat-*/*"
+        "arn:aws:s3:::liftmark-*-site-*",
+        "arn:aws:s3:::liftmark-*-site-*/*"
       ]
     },
     {

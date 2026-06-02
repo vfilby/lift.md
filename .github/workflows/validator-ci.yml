@@ -492,4 +492,36 @@ jobs:
       - name: Smoke test prod
         run: |
           chmod +x validator/scripts/smoke-test-live.sh
-          validator/scripts/smoke-test-live.sh https://liftmark.app "${{ github.sha }}"
+          # getlift.md is the canonical site and also proxies the API, so the
+          # full smoke (static site + /version + /validate) runs against it.
+          validator/scripts/smoke-test-live.sh https://getlift.md "${{ github.sha }}"
+      - name: Verify canonical redirect topology
+        run: |
+          set -euo pipefail
+          fail() { echo "FAIL: $1" >&2; exit 2; }
+
+          # liftmark.app site page must 302 to getlift.md (preserving path).
+          loc=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://liftmark.app/format)
+          echo "liftmark.app/format -> $loc"
+          [ "$loc" = "302 https://getlift.md/format" ] || fail "liftmark.app/format should 302 to getlift.md/format, got: $loc"
+
+          # liftmark.app must STILL serve the API directly (no redirect).
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+            -d '{"markdown":"# T\n## Squat\n- 100 lbs x 5\n"}' https://liftmark.app/validate)
+          echo "liftmark.app/validate -> $code"
+          [ "$code" = "200" ] || fail "liftmark.app/validate should be 200 (API not redirected), got: $code"
+
+          # AASA must be served directly (Apple does not follow redirects).
+          aasa=$(curl -s -o /dev/null -w '%{http_code} %{content_type} [%{redirect_url}]' https://liftmark.app/.well-known/apple-app-site-association)
+          echo "liftmark.app AASA -> $aasa"
+          case "$aasa" in
+            "200 application/json"*"[]") : ;;
+            *) fail "AASA must be 200/application/json with no redirect, got: $aasa" ;;
+          esac
+
+          # liftmd.app must 302 everything to getlift.md.
+          loc=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://liftmd.app/)
+          echo "liftmd.app/ -> $loc"
+          [ "$loc" = "302 https://getlift.md/" ] || fail "liftmd.app/ should 302 to getlift.md/, got: $loc"
+
+          echo "✓ canonical redirect topology verified"
