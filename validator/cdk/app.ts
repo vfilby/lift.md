@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
-import { ENVS, envPrefix } from './config';
+import { ENVS, VANITY_DOMAINS, envPrefix } from './config';
+import { LmwfDnsFoundationStack } from './dns-stack';
 import { LmwfEdgeStack } from './edge-stack';
 import { LmwfValidatorStack } from './stack';
 
@@ -36,3 +37,13 @@ for (const cfg of Object.values(ENVS)) {
     webAclArn: edge.webAclArn,
   });
 }
+
+// Vanity / redirect domains — long-lived zones + wildcard certs in the prod
+// account, decoupled from any validator env so an app teardown can't orphan
+// registrar delegation. us-east-1 so the certs are CloudFront-ready.
+new LmwfDnsFoundationStack(app, 'LmwfDnsFoundationStack', {
+  description: 'LiftMark vanity-domain hosted zones + wildcard certs (getlift.md, liftmd.app)',
+  env: { account: ENVS.prod.account, region: 'us-east-1' },
+  tags: { ...commonTags, Service: 'lmwf-dns' },
+  domains: VANITY_DOMAINS,
+});

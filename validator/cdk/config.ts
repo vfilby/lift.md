@@ -91,3 +91,35 @@ export const ENVS: Record<EnvName, EnvConfig> = {
 export function envPrefix(env: EnvConfig): string {
   return `Lmwf${env.name.charAt(0).toUpperCase()}${env.name.slice(1)}`;
 }
+
+export interface VanityDomain {
+  /** Apex domain — gets its own hosted zone. */
+  domain: string;
+  /**
+   * Issue the wildcard ACM cert now. Keep `false` until the domain is
+   * registered AND its NS are delegated to this zone: a DNS-validated cert
+   * blocks the *entire stack's* CREATE until it validates, and an
+   * undelegated domain never will — it just times out and rolls back every
+   * other resource (including healthy zones). Defer the cert, ship the zone
+   * to hold stable NS, then flip to `true` once delegation is live.
+   */
+  issueCert: boolean;
+}
+
+/**
+ * Vanity / redirect domains that get their own long-lived Route 53 hosted
+ * zone (+ optional wildcard cert) in the prod account, managed by the
+ * LmwfDnsFoundationStack. Decoupled from ENVS because these are not validator
+ * environments — they own registrar delegation and must outlive any app-stack
+ * teardown.
+ *
+ * Note: `.md` is Moldova's ccTLD and is not registrable via Route 53; the
+ * domain is registered at an external registrar, and only its NS delegation
+ * points at the zone created here.
+ */
+export const VANITY_DOMAINS: readonly VanityDomain[] = [
+  // Registered + delegated to the zone's AWS nameservers (2026-06-02), so the
+  // wildcard cert can now validate via DNS.
+  { domain: 'getlift.md', issueCert: true },
+  { domain: 'liftmd.app', issueCert: true },
+];
