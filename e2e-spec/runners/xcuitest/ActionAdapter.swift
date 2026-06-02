@@ -2,6 +2,27 @@
 import UIKit
 @preconcurrency import Foundation
 
+/// Global multiplier for every UI-test timeout. Set the `UITEST_TIMEOUT_SCALE`
+/// environment variable on slow runners (e.g. an Intel CI box, where simulator
+/// boot, app launch, and animations run 2–3× slower) so the suite absorbs the
+/// extra latency without loosening timeouts on fast dev machines. Default 1.0;
+/// a value like `2.5` multiplies all waits accordingly. Invalid/≤0 values are
+/// ignored. Read once per process.
+enum UITestTiming {
+    static let scale: Double = {
+        guard let raw = ProcessInfo.processInfo.environment["UITEST_TIMEOUT_SCALE"],
+              let value = Double(raw), value > 0 else {
+            NSLog("[UITestTiming] UITEST_TIMEOUT_SCALE unset/invalid; using scale 1.0")
+            return 1.0
+        }
+        NSLog("[UITestTiming] UITEST_TIMEOUT_SCALE=\(value) (all UI-test timeouts ×\(value))")
+        return value
+    }()
+
+    /// Scale a base timeout (seconds) by the configured factor.
+    static func scaled(_ base: TimeInterval) -> TimeInterval { base * scale }
+}
+
 /// Maps YAML E2E actions to XCUITest API calls.
 ///
 /// Each action type from the schema (tap, replaceText, waitFor, etc.) is
@@ -143,13 +164,13 @@ class ActionAdapter {
         if identifier.hasPrefix("tab-") {
             if let label = tabIdToLabel[identifier] {
                 let tabButton = app.tabBars.buttons[label]
-                if tabButton.waitForExistence(timeout: min(timeout, 3)) { return tabButton }
+                if tabButton.waitForExistence(timeout: UITestTiming.scaled(min(timeout, 3))) { return tabButton }
             }
         }
 
         let predicate = NSPredicate(format: "identifier == %@", identifier)
         let el = app.descendants(matching: .any).matching(predicate).firstMatch
-        if el.waitForExistence(timeout: timeout) { return el }
+        if el.waitForExistence(timeout: UITestTiming.scaled(timeout)) { return el }
         return nil
     }
 
@@ -219,7 +240,7 @@ class ActionAdapter {
             XCTFail("Element '\(target)' not found for tap")
         } else if let text = action.text {
             let el = element(byText: text)
-            XCTAssertTrue(el.waitForExistence(timeout: 5), "Text '\(text)' not found for tap")
+            XCTAssertTrue(el.waitForExistence(timeout: UITestTiming.scaled(5)), "Text '\(text)' not found for tap")
             scrollToHittable(el)
             el.tap()
         } else {
@@ -288,13 +309,13 @@ class ActionAdapter {
         }
         // Try exact matches first with native waiter
         let alertButton = app.alerts.buttons[text].firstMatch
-        if alertButton.waitForExistence(timeout: 2) {
+        if alertButton.waitForExistence(timeout: UITestTiming.scaled(2)) {
             alertButton.tap()
             return
         }
 
         let containsPredicate = NSPredicate(format: "label CONTAINS %@", text)
-        let deadline = Date().addingTimeInterval(5)
+        let deadline = Date().addingTimeInterval(UITestTiming.scaled(5))
         while Date() < deadline {
             let staticTextByLabel = app.staticTexts[text].firstMatch
             if staticTextByLabel.exists {
@@ -328,7 +349,7 @@ class ActionAdapter {
         let index = action.index ?? 0
         let elements = app.descendants(matching: .any).matching(identifier: target)
         let el = elements.element(boundBy: index)
-        XCTAssertTrue(el.waitForExistence(timeout: 5), "Element '\(target)' at index \(index) not found")
+        XCTAssertTrue(el.waitForExistence(timeout: UITestTiming.scaled(5)), "Element '\(target)' at index \(index) not found")
         el.tap()
     }
 
@@ -345,7 +366,7 @@ class ActionAdapter {
             return
         }
         let segmentButton = picker.buttons[segment]
-        XCTAssertTrue(segmentButton.waitForExistence(timeout: 3),
+        XCTAssertTrue(segmentButton.waitForExistence(timeout: UITestTiming.scaled(3)),
                        "Segment '\(segment)' not found in '\(target)'")
         segmentButton.tap()
     }
@@ -400,7 +421,7 @@ class ActionAdapter {
             }
         } else if let text = action.text {
             let el = element(byText: text)
-            XCTAssertTrue(el.waitForExistence(timeout: timeout), "Timed out waiting for text '\(text)' to exist")
+            XCTAssertTrue(el.waitForExistence(timeout: UITestTiming.scaled(timeout)), "Timed out waiting for text '\(text)' to exist")
         } else {
             throw ActionError.missingSelector(action.action)
         }
@@ -426,12 +447,12 @@ class ActionAdapter {
         let timeout = TimeInterval(action.timeout ?? 5000) / 1000.0
 
         // Try exact-match first with native waiter (most efficient)
-        if app.staticTexts[text].waitForExistence(timeout: min(timeout, 2)) { return }
+        if app.staticTexts[text].waitForExistence(timeout: UITestTiming.scaled(min(timeout, 2))) { return }
 
         // Poll for text across alert buttons, regular buttons, text fields, and CONTAINS fallback
         let containsPredicate = NSPredicate(format: "label CONTAINS %@", text)
         let valuePredicate = NSPredicate(format: "value CONTAINS %@", text)
-        let deadline = Date().addingTimeInterval(timeout)
+        let deadline = Date().addingTimeInterval(UITestTiming.scaled(timeout))
         while Date() < deadline {
             if app.staticTexts[text].exists { return }
             if app.alerts.buttons[text].exists { return }
@@ -462,7 +483,7 @@ class ActionAdapter {
                 XCTAssertTrue(el.isHittable, "Expected '\(desc)' to be visible (hittable)")
             } else {
                 let el = try resolveElement(action)
-                let exists = el.waitForExistence(timeout: 5)
+                let exists = el.waitForExistence(timeout: UITestTiming.scaled(5))
                 if !exists {
                     XCTFail("Expected '\(desc)' to be visible but not found")
                     return
@@ -482,12 +503,12 @@ class ActionAdapter {
                 }
             } else {
                 let el = try resolveElement(action)
-                XCTAssertTrue(el.waitForExistence(timeout: 5), "Expected '\(desc)' to exist")
+                XCTAssertTrue(el.waitForExistence(timeout: UITestTiming.scaled(5)), "Expected '\(desc)' to exist")
             }
 
         case "toHaveText":
             let el = try resolveElement(action)
-            XCTAssertTrue(el.waitForExistence(timeout: 5))
+            XCTAssertTrue(el.waitForExistence(timeout: UITestTiming.scaled(5)))
             let actual = (el.value as? String) ?? el.label
             XCTAssertEqual(actual, action.value, "Expected text '\(action.value ?? "")' but got '\(actual)'")
 
@@ -558,9 +579,9 @@ class ActionAdapter {
         // snapshots on iOS 26 are expensive enough to cascade into SIGKILL.
         if !args.contains("--show-onboarding") && !onboardingDismissed {
             let acceptButton = app.descendants(matching: .any)["onboarding-accept-button"]
-            if acceptButton.waitForExistence(timeout: 5) {
+            if acceptButton.waitForExistence(timeout: UITestTiming.scaled(5)) {
                 acceptButton.tap()
-                _ = app.descendants(matching: .any)["home-screen"].waitForExistence(timeout: 10)
+                _ = app.descendants(matching: .any)["home-screen"].waitForExistence(timeout: UITestTiming.scaled(10))
             }
             onboardingDismissed = true
         }
@@ -593,9 +614,9 @@ class ActionAdapter {
 
         if !onboardingDismissed {
             let acceptButton = app.descendants(matching: .any)["onboarding-accept-button"]
-            if acceptButton.waitForExistence(timeout: 5) {
+            if acceptButton.waitForExistence(timeout: UITestTiming.scaled(5)) {
                 acceptButton.tap()
-                _ = app.descendants(matching: .any)["home-screen"].waitForExistence(timeout: 10)
+                _ = app.descendants(matching: .any)["home-screen"].waitForExistence(timeout: UITestTiming.scaled(10))
             }
             onboardingDismissed = true
         }
@@ -606,7 +627,7 @@ class ActionAdapter {
             throw ActionError.missingParam("button", "dismissAlert")
         }
         let alertButton = app.alerts.buttons[button]
-        XCTAssertTrue(alertButton.waitForExistence(timeout: 5), "Alert button '\(button)' not found")
+        XCTAssertTrue(alertButton.waitForExistence(timeout: UITestTiming.scaled(5)), "Alert button '\(button)' not found")
         alertButton.tap()
     }
 
@@ -650,15 +671,15 @@ class ActionAdapter {
                 return waitForAnyElement(byId: target, timeout: timeout) != nil
             }
             guard let el = try? resolveElement(action) else { return false }
-            return el.waitForExistence(timeout: timeout)
+            return el.waitForExistence(timeout: UITestTiming.scaled(timeout))
 
         case "waitForText":
             guard let text = action.text else { return false }
             let timeout = TimeInterval(action.timeout ?? 5000) / 1000.0
             // Try exact match first with native waiter
-            if app.staticTexts[text].waitForExistence(timeout: min(timeout, 2)) { return true }
+            if app.staticTexts[text].waitForExistence(timeout: UITestTiming.scaled(min(timeout, 2))) { return true }
             let containsPredicate = NSPredicate(format: "label CONTAINS %@", text)
-            let textDeadline = Date().addingTimeInterval(timeout)
+            let textDeadline = Date().addingTimeInterval(UITestTiming.scaled(timeout))
             while Date() < textDeadline {
                 if app.staticTexts[text].exists { return true }
                 if app.alerts.buttons[text].exists { return true }
@@ -696,9 +717,9 @@ class ActionAdapter {
             guard let el = try? resolveElement(action) else { return false }
             switch assertion {
             case "toBeVisible":
-                return el.waitForExistence(timeout: 5) && el.isHittable
+                return el.waitForExistence(timeout: UITestTiming.scaled(5)) && el.isHittable
             case "toExist":
-                return el.waitForExistence(timeout: 5)
+                return el.waitForExistence(timeout: UITestTiming.scaled(5))
             case "notToExist":
                 return !el.exists
             case "notToBeVisible":
@@ -714,7 +735,7 @@ class ActionAdapter {
                 return true
             }
             guard let el = try? resolveElement(action) else { return false }
-            guard el.waitForExistence(timeout: 5) else { return false }
+            guard el.waitForExistence(timeout: UITestTiming.scaled(5)) else { return false }
             el.tap()
             return true
 
@@ -722,9 +743,9 @@ class ActionAdapter {
             guard let text = action.text else { return false }
             // Try alert button first with short native wait
             let alertBtn = app.alerts.buttons[text]
-            if alertBtn.waitForExistence(timeout: 1) { alertBtn.tap(); return true }
+            if alertBtn.waitForExistence(timeout: UITestTiming.scaled(1)) { alertBtn.tap(); return true }
             let containsPred = NSPredicate(format: "label CONTAINS %@", text)
-            let tapDeadline = Date().addingTimeInterval(3)
+            let tapDeadline = Date().addingTimeInterval(UITestTiming.scaled(3))
             while Date() < tapDeadline {
                 let staticText = app.staticTexts[text]
                 if staticText.exists { staticText.tap(); return true }
@@ -761,7 +782,7 @@ class ActionAdapter {
 
         // Navigate to home, open import, paste content, confirm
         let homeTab = element(byId: "tab-home")
-        XCTAssertTrue(homeTab.waitForExistence(timeout: 5))
+        XCTAssertTrue(homeTab.waitForExistence(timeout: UITestTiming.scaled(5)))
         homeTab.tap()
         Thread.sleep(forTimeInterval: 0.5)
 
@@ -789,11 +810,11 @@ class ActionAdapter {
         importBtn.tap()
 
         let okButton = app.alerts.buttons["OK"]
-        XCTAssertTrue(okButton.waitForExistence(timeout: 10), "OK button not found after import")
+        XCTAssertTrue(okButton.waitForExistence(timeout: UITestTiming.scaled(10)), "OK button not found after import")
         okButton.tap()
 
         let workoutName = element(byText: expectedName)
-        XCTAssertTrue(workoutName.waitForExistence(timeout: 10), "Expected workout '\(expectedName)' not found after import")
+        XCTAssertTrue(workoutName.waitForExistence(timeout: UITestTiming.scaled(10)), "Expected workout '\(expectedName)' not found after import")
     }
 
     private func executeScreenshot(_ action: TestAction) throws {
