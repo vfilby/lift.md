@@ -28,8 +28,7 @@
         "cloudformation:DeleteChangeSet"
       ],
       "Resource": [
-        "arn:aws:cloudformation:*:*:stack/Lmwf*ValidatorStack/*",
-        "arn:aws:cloudformation:*:*:stack/Lmwf*EdgeStack/*",
+        "arn:aws:cloudformation:*:*:stack/Lmwf*Stack/*",
         "arn:aws:cloudformation:*:*:stack/LmwfCdkToolkit/*"
       ]
     },
@@ -53,8 +52,7 @@
         "lambda:ListTags"
       ],
       "Resource": [
-        "arn:aws:lambda:*:*:function:Lmwf*ValidatorStack-*",
-        "arn:aws:lambda:*:*:function:Lmwf*EdgeStack-*"
+        "arn:aws:lambda:*:*:function:Lmwf*Stack-*"
       ]
     },
     {
@@ -88,8 +86,7 @@
         "iam:UntagRole"
       ],
       "Resource": [
-        "arn:aws:iam::*:role/Lmwf*ValidatorStack-*",
-        "arn:aws:iam::*:role/Lmwf*EdgeStack-*",
+        "arn:aws:iam::*:role/Lmwf*Stack-*",
         "arn:aws:iam::*:role/cdk-lmwf-*"
       ]
     },
@@ -98,8 +95,7 @@
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": [
-        "arn:aws:iam::*:role/Lmwf*ValidatorStack-*",
-        "arn:aws:iam::*:role/Lmwf*EdgeStack-*",
+        "arn:aws:iam::*:role/Lmwf*Stack-*",
         "arn:aws:iam::*:role/cdk-lmwf-*"
       ],
       "Condition": {
@@ -113,8 +109,7 @@
       "Effect": "Allow",
       "Action": "iam:AttachRolePolicy",
       "Resource": [
-        "arn:aws:iam::*:role/Lmwf*ValidatorStack-*",
-        "arn:aws:iam::*:role/Lmwf*EdgeStack-*",
+        "arn:aws:iam::*:role/Lmwf*Stack-*",
         "arn:aws:iam::*:role/cdk-lmwf-*"
       ],
       "Condition": {
@@ -138,8 +133,7 @@
         "logs:TagResource"
       ],
       "Resource": [
-        "arn:aws:logs:*:*:log-group:/aws/lambda/Lmwf*ValidatorStack-*",
-        "arn:aws:logs:*:*:log-group:/aws/lambda/Lmwf*EdgeStack-*"
+        "arn:aws:logs:*:*:log-group:/aws/lambda/Lmwf*Stack-*"
       ]
     },
     {
