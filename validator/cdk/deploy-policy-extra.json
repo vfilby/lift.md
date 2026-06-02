@@ -1,0 +1,51 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DynamoDBTables",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:UpdateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:UpdateTimeToLive",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource",
+        "dynamodb:ListTagsOfResource"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:*:*:table/lmwf-*",
+        "arn:aws:dynamodb:*:*:table/lmwf-*/index/*"
+      ]
+    },
+    {
+      "Sid": "SESEmailIdentity",
+      "Effect": "Allow",
+      "Action": [
+        "ses:CreateEmailIdentity",
+        "ses:GetEmailIdentity",
+        "ses:DeleteEmailIdentity",
+        "ses:PutEmailIdentityMailFromAttributes",
+        "ses:PutEmailIdentityDkimAttributes",
+        "ses:PutEmailIdentityDkimSigningAttributes",
+        "ses:TagResource",
+        "ses:UntagResource",
+        "ses:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:ses:*:*:identity/*"
+    },
+    {
+      "Sid": "WAFv2WebAclRead",
+      "Effect": "Allow",
+      "Action": [
+        "wafv2:GetWebACL",
+        "wafv2:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:wafv2:us-east-1:*:global/webacl/lmwf-*"
+    }
+  ]
+}

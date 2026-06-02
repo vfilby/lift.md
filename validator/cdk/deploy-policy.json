@@ -166,8 +166,8 @@
       "Effect": "Allow",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::liftmark-workoutformat-*",
-        "arn:aws:s3:::liftmark-workoutformat-*/*"
+        "arn:aws:s3:::liftmark-*-site-*",
+        "arn:aws:s3:::liftmark-*-site-*/*"
       ]
     },
     {
