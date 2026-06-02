@@ -74,6 +74,44 @@ function createTable(
   return table;
 }
 
+/**
+ * CloudFront Function (viewer-request) body that 302-redirects to
+ * `canonicalHost`, preserving path + query. When `keepWellKnown` is true,
+ * `/.well-known/*` is served from origin instead of redirected — required so
+ * Apple can fetch the AASA file directly (it does not follow redirects).
+ * The redirect is returned at the edge; the origin is never reached.
+ */
+function redirectFnCode(canonicalHost: string, keepWellKnown: boolean): string {
+  const wellKnownGuard = keepWellKnown
+    ? "  if (request.uri.indexOf('/.well-known/') === 0) { return request; }\n"
+    : '';
+  return `
+function handler(event) {
+  var request = event.request;
+${wellKnownGuard}  var qs = '';
+  var keys = Object.keys(request.querystring);
+  if (keys.length > 0) {
+    qs = '?' + keys.map(function (k) {
+      var v = request.querystring[k];
+      return v.value !== '' ? k + '=' + v.value : k;
+    }).join('&');
+  }
+  return {
+    statusCode: 302,
+    statusDescription: 'Found',
+    headers: { 'location': { value: 'https://${canonicalHost}' + request.uri + qs } },
+  };
+}
+`;
+}
+
+/** A vanity domain's zone + cert (from LmwfDnsFoundationStack) for the prod stack. */
+export interface WebDomainRef {
+  domain: string;
+  zone: route53.IHostedZone;
+  certificate: acm.ICertificate;
+}
+
 export interface LmwfValidatorStackProps extends cdk.StackProps {
   envConfig: EnvConfig;
   hostedZone: route53.IHostedZone;
@@ -84,6 +122,15 @@ export interface LmwfValidatorStackProps extends cdk.StackProps {
    * `webAclId`.
    */
   webAclArn: string;
+  /**
+   * When set, the site is served canonically at this domain (its own
+   * CloudFront, same S3 + API origins) and `domainName`'s default behavior
+   * 302-redirects site pages here (API paths + AASA stay). Comes from
+   * EnvConfig.canonicalWebDomain resolved against the DNS foundation stack.
+   */
+  canonicalWeb?: WebDomainRef;
+  /** Domains that 302-redirect entirely to `canonicalWeb` (e.g. liftmd.app). */
+  redirectWeb?: readonly WebDomainRef[];
 }
 
 export class LmwfValidatorStack extends cdk.Stack {
@@ -91,6 +138,7 @@ export class LmwfValidatorStack extends cdk.Stack {
     super(scope, id, props);
 
     const { envConfig, hostedZone, cloudFrontCertificate, webAclArn } = props;
+    const { canonicalWeb, redirectWeb = [] } = props;
     const env = envConfig; // shorthand for the rest of this constructor
     const domainName = env.domainName;
 
@@ -419,6 +467,22 @@ function handler(event) {
       comment: 'Set content-type: application/json for the AASA file',
     });
 
+    // Canonical-domain redirect functions (only when the env canonicalises to a
+    // vanity domain). One keeps /.well-known/* on the source domain (so AASA +
+    // password autofill survive); the other redirects everything.
+    const redirectExceptWellKnownFn = canonicalWeb
+      ? new cloudfront.Function(this, 'RedirectToCanonicalFn', {
+          code: cloudfront.FunctionCode.fromInline(redirectFnCode(canonicalWeb.domain, true)),
+          comment: `302 site pages to https://${canonicalWeb.domain} (serves /.well-known/* locally)`,
+        })
+      : undefined;
+    const redirectAllFn = canonicalWeb
+      ? new cloudfront.Function(this, 'RedirectAllToCanonicalFn', {
+          code: cloudfront.FunctionCode.fromInline(redirectFnCode(canonicalWeb.domain, false)),
+          comment: `302 everything to https://${canonicalWeb.domain}`,
+        })
+      : undefined;
+
     const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket);
     const apiOrigin = new origins.HttpOrigin(apiHostname, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
@@ -486,70 +550,134 @@ function handler(event) {
         ? [domainName, `workoutformat.${domainName}`]
         : [domainName];
 
-    const distribution = new cloudfront.Distribution(this, 'SiteDistribution', {
-      defaultRootObject: 'index.html',
-      domainNames: cfDomainNames,
-      certificate: cloudFrontCertificate,
-      // CLOUDFRONT-scoped WAFv2 web ACL (managed rules + rate limits),
-      // created in the us-east-1 edge stack and resolved here via
-      // crossRegionReferences. (M3)
-      webAclId: webAclArn,
-      priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-      httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
-      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-      comment: `LMWF ${env.name} — ${domainName} (S3 static + /validate origin)`,
-      defaultBehavior: {
-        origin: s3Origin,
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        responseHeadersPolicy,
-        cachePolicy:
-          env.name === 'beta'
-            ? cloudfront.CachePolicy.CACHING_DISABLED
-            : cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
-        compress: true,
-        functionAssociations: [
-          {
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-            function: urlRewriteFunction,
-          },
-          {
-            // Sets content-type: application/json on the AASA response.
-            eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE,
-            function: aasaContentTypeFunction,
-          },
-        ],
-      },
-      additionalBehaviors: {
-        '/validate': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          responseHeadersPolicy,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          compress: false,
-        },
-        '/v1/*': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          responseHeadersPolicy,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          compress: true,
-        },
-        '/version': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          responseHeadersPolicy,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          compress: true,
-        },
-      },
+    // Shared API proxy behaviors — identical on every site distribution so the
+    // website's same-origin /validate + /v1/* calls work wherever it's served.
+    const apiBehavior = (compress: boolean): cloudfront.BehaviorOptions => ({
+      origin: apiOrigin,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      responseHeadersPolicy,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      compress,
     });
+    const apiBehaviors: Record<string, cloudfront.BehaviorOptions> = {
+      '/validate': apiBehavior(false),
+      '/v1/*': apiBehavior(true),
+      '/version': apiBehavior(true),
+    };
+
+    // Builds a full site distribution (S3 static default + API proxy).
+    // `requestFn` is the default behavior's viewer-request function: the
+    // pretty-URL rewriter when this distribution serves the site, or the
+    // redirect-except-/.well-known function when it only redirects.
+    const buildSiteDistribution = (
+      id: string,
+      aliases: string[],
+      certificate: acm.ICertificate,
+      requestFn: cloudfront.IFunction,
+    ): cloudfront.Distribution =>
+      new cloudfront.Distribution(this, id, {
+        defaultRootObject: 'index.html',
+        domainNames: aliases,
+        certificate,
+        // CLOUDFRONT-scoped WAFv2 web ACL (managed rules + rate limits),
+        // created in the us-east-1 edge stack and resolved here via
+        // crossRegionReferences. (M3)
+        webAclId: webAclArn,
+        priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+        httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+        comment: `LMWF ${env.name} — ${aliases[0]} (S3 static + /validate origin)`,
+        defaultBehavior: {
+          origin: s3Origin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          responseHeadersPolicy,
+          cachePolicy:
+            env.name === 'beta'
+              ? cloudfront.CachePolicy.CACHING_DISABLED
+              : cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          compress: true,
+          functionAssociations: [
+            { eventType: cloudfront.FunctionEventType.VIEWER_REQUEST, function: requestFn },
+            // Sets content-type: application/json on the AASA response.
+            { eventType: cloudfront.FunctionEventType.VIEWER_RESPONSE, function: aasaContentTypeFunction },
+          ],
+        },
+        additionalBehaviors: apiBehaviors,
+      });
+
+    // liftmark.app (+ legacy workoutformat.) distribution. Logical id stays
+    // 'SiteDistribution' so this is an in-place update, not a replacement. In
+    // canonical mode its default behavior 302-redirects site pages to the
+    // canonical host (API behaviors + AASA still served locally); otherwise it
+    // serves the site (beta).
+    const distribution = buildSiteDistribution(
+      'SiteDistribution',
+      cfDomainNames,
+      cloudFrontCertificate,
+      redirectExceptWellKnownFn ?? urlRewriteFunction,
+    );
+
+    // Apex + www A/AAAA alias records pointing a zone at a distribution.
+    const aliasZoneToDistribution = (
+      idPrefix: string,
+      zone: route53.IHostedZone,
+      dist: cloudfront.Distribution,
+    ) => {
+      for (const [label, idSuffix] of [['', ''], ['www', 'Www']] as const) {
+        new route53.ARecord(this, `${idPrefix}Alias${idSuffix}`, {
+          zone,
+          recordName: label || undefined,
+          target: route53.RecordTarget.fromAlias(new route53targets.CloudFrontTarget(dist)),
+        });
+        new route53.AaaaRecord(this, `${idPrefix}AliasIpv6${idSuffix}`, {
+          zone,
+          recordName: label || undefined,
+          target: route53.RecordTarget.fromAlias(new route53targets.CloudFrontTarget(dist)),
+        });
+      }
+    };
+
+    // Canonical site (e.g. getlift.md) + full-redirect vanity domains
+    // (e.g. liftmd.app). Prod-only — gated on canonicalWeb being passed in.
+    let canonicalDistribution: cloudfront.Distribution | undefined;
+    if (canonicalWeb && redirectAllFn) {
+      canonicalDistribution = buildSiteDistribution(
+        'CanonicalSiteDistribution',
+        [canonicalWeb.domain, `www.${canonicalWeb.domain}`],
+        canonicalWeb.certificate,
+        urlRewriteFunction,
+      );
+      aliasZoneToDistribution('Canonical', canonicalWeb.zone, canonicalDistribution);
+
+      // Redirect-only vanity domains: a tiny distribution that 302s every path
+      // to the canonical host. The dummy S3 origin is never reached — the
+      // viewer-request function returns the redirect at the edge.
+      for (const r of redirectWeb) {
+        const cid = r.domain.replace(/[^a-z0-9]+/gi, '-');
+        const redirectDist = new cloudfront.Distribution(this, `Redirect-${cid}`, {
+          domainNames: [r.domain, `www.${r.domain}`],
+          certificate: r.certificate,
+          priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+          httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+          minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+          comment: `LMWF ${env.name} — ${r.domain} → https://${canonicalWeb.domain} (302)`,
+          defaultBehavior: {
+            origin: s3Origin,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            responseHeadersPolicy,
+            cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+            allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+            functionAssociations: [
+              { eventType: cloudfront.FunctionEventType.VIEWER_REQUEST, function: redirectAllFn },
+            ],
+          },
+        });
+        aliasZoneToDistribution(`Redirect${cid.replace(/-/g, '')}`, r.zone, redirectDist);
+      }
+    }
 
     // ── Static site upload + CloudFront invalidation ──
     // Built by the website workspace into ../../website/dist before
@@ -577,7 +705,11 @@ function handler(event) {
     new s3deploy.BucketDeployment(this, 'SiteContents', {
       sources: [s3deploy.Source.asset(siteDistPath)],
       destinationBucket: siteBucket,
-      distribution,
+      // Invalidate the live site's distribution. In canonical mode that's the
+      // canonical (getlift.md) distribution; otherwise the env apex. (The
+      // liftmark.app distribution mostly redirects + serves the rarely-changing
+      // AASA, so it doesn't need per-deploy invalidation.)
+      distribution: canonicalDistribution ?? distribution,
       distributionPaths: ['/*'],
       prune: true,
       // Default Lambda is 128 MiB / 900 s. Site is ~250 KiB today; bump

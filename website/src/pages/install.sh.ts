@@ -2,10 +2,10 @@ import type { APIRoute } from 'astro';
 
 const script = `#!/usr/bin/env sh
 # lift.md format generate-workout — Claude Code skill installer.
-# See https://liftmark.app/format for docs.
+# See https://getlift.md/format for docs.
 set -eu
 DIR="\${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/generate-workout"
-BASE="https://liftmark.app/skill"
+BASE="https://getlift.md/skill"
 mkdir -p "$DIR"
 curl -fsSL "$BASE/SKILL.md"    -o "$DIR/SKILL.md"
 curl -fsSL "$BASE/validate.sh" -o "$DIR/validate.sh"

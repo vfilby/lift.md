@@ -2,11 +2,12 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  // Canonical domain. The format hub now lives at liftmark.app/format; the
+  // Canonical domain is now getlift.md; liftmark.app 302-redirects its site
+  // pages to getlift.md. The format hub lives at getlift.md/format; the
   // legacy workoutformat.liftmark.app subdomain still resolves to the same
   // CloudFront distribution (see validator/cdk/stack.ts), so old links keep
-  // working while canonical/OG/sitemap metadata points at the apex.
-  site: 'https://liftmark.app',
+  // working while canonical/OG/sitemap metadata points at getlift.md.
+  site: 'https://getlift.md',
   output: 'static',
   trailingSlash: 'ignore',
   // Old format URLs → new IA. Astro emits these as meta-refresh redirect
