@@ -118,9 +118,8 @@ export interface VanityDomain {
  * points at the zone created here.
  */
 export const VANITY_DOMAINS: readonly VanityDomain[] = [
-  // Pending registration/enablement — zone only for now so we hold stable NS
-  // to hand the .md registrar the moment it's live. Flip to true + redeploy
-  // once delegated.
-  { domain: 'getlift.md', issueCert: false },
+  // Registered + delegated to the zone's AWS nameservers (2026-06-02), so the
+  // wildcard cert can now validate via DNS.
+  { domain: 'getlift.md', issueCert: true },
   { domain: 'liftmd.app', issueCert: true },
 ];
