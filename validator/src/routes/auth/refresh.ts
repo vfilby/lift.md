@@ -64,6 +64,27 @@ interface LogoutBody {
 
 const REFRESH_PREFIX = 'lm_refresh_';
 
+// Idempotent-rotation grace window. When an already-rotated token is
+// re-presented within this many ms of its rotation AND its successor is still
+// the untouched live tip, we treat the call as a benign retry (lost response /
+// concurrent double-spend / app killed mid-refresh during an OS update) and
+// re-issue from the successor instead of nuking the whole family.
+//
+// Kept deliberately short (sub-minute): client hardening persists the new
+// token synchronously, so a legitimate relaunch reads the NEW token and never
+// re-presents the old one. This grace only catches the sub-minute
+// lost-response / kill-during-refresh race; anything later is treated as
+// genuine reuse (theft protection intact). Read per-request via an env
+// override so tests can shrink the window to make the boundary deterministic.
+function refreshGraceMs(): number {
+  const raw = process.env.REFRESH_GRACE_MS;
+  if (raw !== undefined) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return 60_000;
+}
+
 // httpOnly refresh cookie — mirrors the constants in password.ts. Scoped to
 // /v1/auth, SameSite=Strict (CSRF mitigation on these mutating endpoints).
 const REFRESH_COOKIE = 'lmwf_refresh';
@@ -81,6 +102,45 @@ function clearRefreshCookie(c: Parameters<typeof deleteCookie>[0]): void {
     sameSite: 'Strict',
     path: REFRESH_COOKIE_PATH,
   });
+}
+
+/**
+ * Mint the access JWT + set the rotated refresh cookie + return the 200
+ * success body. Shared by the normal rotation path and the idempotent-rotation
+ * grace path so both produce IDENTICAL responses (same signer/claims, same
+ * cookie attributes). `newRow`/`newToken` are the freshly-rotated successor.
+ */
+function rotationSuccessResponse(
+  c: Parameters<typeof setCookie>[0],
+  newRow: { token_hash: string; expires_at: string },
+  newToken: string,
+  claims: { user_id: string; identity_id: string },
+) {
+  const access_jwt = signJwt(
+    {
+      sub: claims.user_id,
+      identity_id: claims.identity_id,
+      type: 'access',
+      // Rotated, not fresh — caller proved possession of a refresh
+      // token but did NOT re-prove a credential. Sensitive routes
+      // (none yet) will require `authn_age === 'fresh'`.
+      authn_age: 'rotated',
+    },
+    '1h',
+  );
+
+  // Rotate the httpOnly cookie too (M2). Max-Age tracks the inherited
+  // absolute expiry so the cookie dies with the family — rotation never
+  // extends it. iOS ignores the cookie and uses the JSON token below.
+  setCookie(c, REFRESH_COOKIE, newToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Strict',
+    path: REFRESH_COOKIE_PATH,
+    maxAge: refreshLifetimeSeconds(newRow.expires_at),
+  });
+
+  return c.json({ access_jwt, refresh_token: newToken }, 200);
 }
 
 export const refreshRouter = new Hono();
@@ -132,11 +192,85 @@ refreshRouter.post('/refresh', async (c) => {
     return c.json({ error: 'Invalid refresh token' }, 401);
   }
 
-  // Reuse detection: a row with BOTH revoked_at AND replaced_by has
-  // already been rotated. Presenting it again means either an attacker
-  // captured the token or the legitimate client is replaying — same
-  // blast radius. Nuke the whole family and surface a security event.
+  // A row with BOTH revoked_at AND replaced_by has already been rotated.
+  // Re-presenting it is EITHER genuine token theft (an attacker replaying a
+  // stale token) OR a benign retry (lost response / concurrent double-spend /
+  // app killed mid-refresh). We distinguish the two with a bounded grace
+  // window + a "successor is still the untouched live tip" check, so benign
+  // retries get a fresh token instead of nuking the whole session.
   if (row.revoked_at && row.replaced_by) {
+    const successor = await getRefreshTokenByHash(row.replaced_by);
+    const withinGrace =
+      Date.now() - Date.parse(row.revoked_at) <= refreshGraceMs();
+    // Benign retry iff the successor exists, is still the live tip (the legit
+    // client never used it: no replaced_by, no revoked_at), AND we're inside
+    // the grace window of the rotation.
+    const isBenignRetry =
+      successor != null &&
+      !successor.replaced_by &&
+      !successor.revoked_at &&
+      withinGrace;
+
+    if (isBenignRetry) {
+      // Re-issue by rotating the SUCCESSOR — mint a fresh pair exactly like
+      // the normal success path. The just-rotated token the client already
+      // holds is the successor; we advance the chain by one so the client
+      // ends up with a brand-new live token.
+      try {
+        const { token: graceRow, plaintext: graceToken } =
+          await rotateRefreshToken(successor.token_hash, {
+            user_id: successor.user_id,
+            identity_id: successor.identity_id,
+            familyRootHash: successor.family_root_hash,
+            expires_at: successor.expires_at,
+            device_label: successor.device_label,
+          });
+        audit(
+          {
+            event: 'refresh_token_grace_reissue',
+            user_id: row.user_id,
+            identity_id: row.identity_id,
+            token_hash: graceRow.token_hash,
+            family_root_hash: row.family_root_hash,
+            parent_token_hash: successor.token_hash,
+            presented_token_hash: row.token_hash,
+          },
+          'warn',
+        );
+        return rotationSuccessResponse(c, graceRow, graceToken, {
+          user_id: successor.user_id,
+          identity_id: successor.identity_id,
+        });
+      } catch (err) {
+        if (err instanceof RotationConflictError) {
+          // A concurrent benign retry already advanced the successor — same
+          // race the normal path hits. Tell the client to retry with the new
+          // token; do NOT nuke the family.
+          audit(
+            {
+              event: 'rotation_conflict',
+              user_id: row.user_id,
+              identity_id: row.identity_id,
+              token_hash: successor.token_hash,
+              family_root_hash: row.family_root_hash,
+            },
+            'warn',
+          );
+          return c.json(
+            {
+              error:
+                'Refresh token already rotated. Retry with the new token.',
+            },
+            401,
+          );
+        }
+        throw err;
+      }
+    }
+
+    // Not a benign retry: successor missing / already advanced / revoked, or
+    // outside the grace window. Treat as genuine reuse — nuke the whole
+    // family and surface a security event.
     const cascaded = await revokeFamilyByRoot(row.family_root_hash);
     audit(
       {
@@ -229,19 +363,6 @@ refreshRouter.post('/refresh', async (c) => {
     throw err;
   }
 
-  const access_jwt = signJwt(
-    {
-      sub: row.user_id,
-      identity_id: row.identity_id,
-      type: 'access',
-      // Rotated, not fresh — caller proved possession of a refresh
-      // token but did NOT re-prove a credential. Sensitive routes
-      // (none yet) will require `authn_age === 'fresh'`.
-      authn_age: 'rotated',
-    },
-    '1h',
-  );
-
   audit({
     event: 'refresh_success',
     user_id: row.user_id,
@@ -251,22 +372,14 @@ refreshRouter.post('/refresh', async (c) => {
     parent_token_hash: row.token_hash,
   });
 
-  // Rotate the httpOnly cookie too (M2). Max-Age tracks the inherited
-  // absolute expiry so the cookie dies with the family — rotation never
-  // extends it. iOS ignores the cookie and uses the JSON token below.
-  setCookie(c, REFRESH_COOKIE, new_refresh_token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Strict',
-    path: REFRESH_COOKIE_PATH,
-    maxAge: refreshLifetimeSeconds(newRow.expires_at),
+  // Response intentionally omits the user object — caller can hit the
+  // /v1/me route if it needs to refresh user metadata. The old refresh
+  // token is gone from server state at this point; returning it here would
+  // defeat the purpose of rotation.
+  return rotationSuccessResponse(c, newRow, new_refresh_token, {
+    user_id: row.user_id,
+    identity_id: row.identity_id,
   });
-
-  // Response intentionally omits the user object — caller can hit
-  // a future /v1/me route if it needs to refresh user metadata.
-  // The old refresh token is gone from server state at this point;
-  // returning it here would defeat the purpose of rotation.
-  return c.json({ access_jwt, refresh_token: new_refresh_token }, 200);
 });
 
 refreshRouter.post('/logout', sessionMiddleware, async (c) => {

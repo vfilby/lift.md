@@ -139,16 +139,148 @@ live('refresh-token routes', () => {
     expect(body.refresh_token).toMatch(/^lm_refresh_[A-Za-z0-9_-]{32}$/);
     expect(body.refresh_token).not.toBe(login.refresh_token);
 
-    // Old refresh used twice → reuse detected → 401.
+    // Advance the chain once more so the original token's successor has
+    // itself been used — this takes us OUT of the idempotent-rotation grace
+    // (the legit client has moved past the successor), so re-presenting the
+    // original old token is genuine reuse rather than a benign retry.
+    const second = await refresh(body.refresh_token);
+    expect(second.status).toBe(200);
+    const secondBody = (await second.json()) as RefreshBody;
+
+    // Old refresh re-presented after the chain moved on → reuse detected → 401.
     const reuse = await refresh(login.refresh_token);
     expect(reuse.status).toBe(401);
     const reuseBody = (await reuse.json()) as { error: string };
     expect(reuseBody.error).toMatch(/reuse detected/i);
 
-    // And reuse detection nukes the whole family — the NEW refresh
-    // (legitimate descendant) must also be invalidated.
-    const cascadedDeny = await refresh(body.refresh_token);
+    // And reuse detection nukes the whole family — the latest legitimate
+    // descendant must also be invalidated.
+    const cascadedDeny = await refresh(secondBody.refresh_token);
     expect(cascadedDeny.status).toBe(401);
+  });
+
+  // ── Idempotent-rotation grace (benign-retry resilience) ──
+  //
+  // The grace window is read per-request from REFRESH_GRACE_MS. These tests
+  // set/clear it around each case so the boundary is deterministic without a
+  // wall-clock sleep: a large window = "within grace", a 0 window = "outside".
+
+  async function familyRows(rootRefreshToken: string) {
+    const { hashRefreshToken, getRefreshTokenByHash } = await import(
+      '../../../src/repositories/refresh_tokens.js'
+    );
+    const { ddb, tableName } = await import('../../../src/infra/ddb.js');
+    const { QueryCommand } = await import('@aws-sdk/lib-dynamodb');
+    const root = await getRefreshTokenByHash(hashRefreshToken(rootRefreshToken));
+    if (!root) return [] as { token_hash: string; revoked_at?: string }[];
+    const family = await ddb.send(
+      new QueryCommand({
+        TableName: tableName('refresh_tokens'),
+        IndexName: 'family-index',
+        KeyConditionExpression: 'family_root_hash = :r',
+        ExpressionAttributeValues: { ':r': root.family_root_hash },
+      }),
+    );
+    return (family.Items as { token_hash: string; revoked_at?: string }[]) ?? [];
+  }
+
+  it('refresh grace: re-presenting a just-rotated token (successor unused, within grace) → 200 new token, family NOT revoked', async () => {
+    const prev = process.env.REFRESH_GRACE_MS;
+    process.env.REFRESH_GRACE_MS = '60000';
+    try {
+      const login = await signupAndLogin();
+
+      // First rotation: old → successor. We do NOT use the successor.
+      const first = await refresh(login.refresh_token);
+      expect(first.status).toBe(200);
+      const firstBody = (await first.json()) as RefreshBody;
+
+      // Re-present the OLD (just-rotated) token → benign retry, not reuse.
+      const retry = await refresh(login.refresh_token);
+      expect(retry.status).toBe(200);
+      const retryBody = (await retry.json()) as RefreshBody;
+      expect(retryBody.refresh_token).toMatch(
+        /^lm_refresh_[A-Za-z0-9_-]{32}$/,
+      );
+      // The grace path advanced the successor, so the token it returns is
+      // distinct from both the old token and the (now-consumed) successor.
+      expect(retryBody.refresh_token).not.toBe(login.refresh_token);
+      expect(retryBody.refresh_token).not.toBe(firstBody.refresh_token);
+
+      // The family was NOT nuked: the token the grace path issued works.
+      const followUp = await refresh(retryBody.refresh_token);
+      expect(followUp.status).toBe(200);
+
+      // No row in the family carries the reuse error path's blanket revoke —
+      // the chain advanced normally rather than being cascade-killed.
+      const rows = await familyRows(login.refresh_token);
+      const live = rows.filter((r) => !r.revoked_at);
+      // Exactly one live tip remains (the latest token from followUp).
+      expect(live.length).toBe(1);
+    } finally {
+      if (prev === undefined) delete process.env.REFRESH_GRACE_MS;
+      else process.env.REFRESH_GRACE_MS = prev;
+    }
+  });
+
+  it('refresh grace: re-presenting a rotated token whose successor was ALREADY used → 401 reuse + family revoked', async () => {
+    const prev = process.env.REFRESH_GRACE_MS;
+    process.env.REFRESH_GRACE_MS = '60000';
+    try {
+      const login = await signupAndLogin();
+
+      // old → A (successor)
+      const r1 = await refresh(login.refresh_token);
+      expect(r1.status).toBe(200);
+      const a = (await r1.json()) as RefreshBody;
+
+      // A → B: now A (the successor of `old`) has been used, so re-presenting
+      // `old` is NOT a benign retry — the legit client moved past A.
+      const r2 = await refresh(a.refresh_token);
+      expect(r2.status).toBe(200);
+      const b = (await r2.json()) as RefreshBody;
+
+      // Re-present the original old token → reuse detected → family nuked.
+      const reuse = await refresh(login.refresh_token);
+      expect(reuse.status).toBe(401);
+      const reuseBody = (await reuse.json()) as { error: string };
+      expect(reuseBody.error).toMatch(/reuse detected/i);
+
+      // Family is nuked — the live tip (B) is now dead too.
+      const afterB = await refresh(b.refresh_token);
+      expect(afterB.status).toBe(401);
+    } finally {
+      if (prev === undefined) delete process.env.REFRESH_GRACE_MS;
+      else process.env.REFRESH_GRACE_MS = prev;
+    }
+  });
+
+  it('refresh grace: re-presenting a rotated token OUTSIDE the grace window → 401 reuse + family revoked', async () => {
+    const prev = process.env.REFRESH_GRACE_MS;
+    // Zero window: any elapsed time since rotation exceeds the grace, so a
+    // re-presentation is treated as genuine reuse.
+    process.env.REFRESH_GRACE_MS = '0';
+    try {
+      const login = await signupAndLogin();
+
+      const r1 = await refresh(login.refresh_token);
+      expect(r1.status).toBe(200);
+      const a = (await r1.json()) as RefreshBody;
+
+      // Re-present old token; successor A is unused & live, but we are past
+      // the (zero) grace window → reuse.
+      const reuse = await refresh(login.refresh_token);
+      expect(reuse.status).toBe(401);
+      const reuseBody = (await reuse.json()) as { error: string };
+      expect(reuseBody.error).toMatch(/reuse detected/i);
+
+      // Family nuked: successor A is dead too.
+      const afterA = await refresh(a.refresh_token);
+      expect(afterA.status).toBe(401);
+    } finally {
+      if (prev === undefined) delete process.env.REFRESH_GRACE_MS;
+      else process.env.REFRESH_GRACE_MS = prev;
+    }
   });
 
   it('refresh: rotated access JWT carries authn_age=rotated', async () => {
@@ -445,25 +577,36 @@ live('refresh-token routes', () => {
   });
 
   it('refresh prefers the body token when both body and cookie are present', async () => {
-    const a = await signupAndLogin();
-    const b = await signupAndLogin();
+    // Zero the rotation grace so re-presenting the consumed token reads as
+    // genuine reuse (401) rather than a benign retry — this test asserts
+    // body-vs-cookie precedence, and the cleanest precedence signal is "the
+    // body token got consumed, the cookie token did not".
+    const prev = process.env.REFRESH_GRACE_MS;
+    process.env.REFRESH_GRACE_MS = '0';
+    try {
+      const a = await signupAndLogin();
+      const b = await signupAndLogin();
 
-    // Body has A's token, cookie has B's. Body must win, so A rotates and
-    // B's token is left untouched.
-    const res = await app.request('/v1/auth/refresh', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        cookie: `lmwf_refresh=${b.refresh_token}`,
-      },
-      body: JSON.stringify({ refresh_token: a.refresh_token }),
-    });
-    expect(res.status).toBe(200);
+      // Body has A's token, cookie has B's. Body must win, so A rotates and
+      // B's token is left untouched.
+      const res = await app.request('/v1/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: `lmwf_refresh=${b.refresh_token}`,
+        },
+        body: JSON.stringify({ refresh_token: a.refresh_token }),
+      });
+      expect(res.status).toBe(200);
 
-    // A's token was the one consumed → reusing it now is reuse/revoked.
-    expect((await refresh(a.refresh_token)).status).toBe(401);
-    // B's token was NOT touched → still usable.
-    expect((await refresh(b.refresh_token)).status).toBe(200);
+      // A's token was the one consumed → reusing it now is reuse/revoked.
+      expect((await refresh(a.refresh_token)).status).toBe(401);
+      // B's token was NOT touched → still usable.
+      expect((await refresh(b.refresh_token)).status).toBe(200);
+    } finally {
+      if (prev === undefined) delete process.env.REFRESH_GRACE_MS;
+      else process.env.REFRESH_GRACE_MS = prev;
+    }
   });
 
   it('logout clears the lmwf_refresh cookie (Max-Age=0)', async () => {
