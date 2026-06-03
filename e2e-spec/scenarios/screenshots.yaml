@@ -163,14 +163,16 @@ tests:
       # first "Show trends" button on the page belongs to it.
       - action: delay
         ms: 1200
-      # Scroll Bench Press's logged sets up so its "Show trends" toggle sits
-      # near the top FIRST — then expand. Swiping before the chart exists keeps
-      # Swift Charts from swallowing the gesture, and the chart renders right
-      # below the toggle so the trend (segmented control, line graph,
-      # Current/Best/Change, Details) fills the frame as the focus.
+      # Scroll just past the date + session-stats header (a controlled ~25% of
+      # the screen, not a full-page swipe that overshoots) so Bench Press's card
+      # heading lands at the top, THEN expand trends. Scrolling before the chart
+      # exists keeps Swift Charts from swallowing the gesture; the whole card —
+      # heading, logged sets, note, chart, Current/Best/Change, Details — then
+      # fits in frame with Overhead Press peeking below.
       - action: scroll
         target: "history-detail-screen"
         direction: "up"
+        amount: 20
       - action: delay
         ms: 500
       - action: tapText
