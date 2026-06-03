@@ -6,8 +6,10 @@ name: "App Store Screenshots"
 # history, and exercise progress charts all show realistic, varied content.
 #
 # Each `screenshot` action writes a PNG attachment into the .xcresult bundle
-# under the supplied name. The Makefile `screenshots` target extracts them
-# into mobile-apps/ios/Screenshots/.
+# under the supplied name. scripts/capture-screenshots.sh (via the Makefile
+# `screenshots` target) runs this scenario twice — once with the simulator in
+# light appearance, once in dark (the app's default `.auto` theme follows the
+# OS) — and extracts the PNGs into mobile-apps/ios/Screenshots/{light,dark}/.
 
 setupOnce:
   - action: launchApp
@@ -71,17 +73,35 @@ tests:
       - action: screenshot
         name: "03-active-workout"
 
-  # Same active workout, scrolled so the Superset card lands in frame.
+  # Same active workout, but expand the Superset card so its interleaved
+  # exercises are the focus. Tapping the card header expands it and surfaces
+  # the live set-entry; completing the first two interleaved sets (Incline
+  # 50x10, Lateral 15x15) advances to Incline set 2 (55x10) and shows the
+  # alternating Incline/Lateral flow with checkmarks — the superset story.
   - name: "capture active workout superset"
     steps:
-      - action: scroll
-        target: "active-workout-scroll"
-        direction: "up"
-      - action: scroll
-        target: "active-workout-scroll"
-        direction: "up"
+      # Expand the superset. Its first pending set (Incline 50x10) becomes the
+      # active entry independent of overall workout order. Bench Press stays the
+      # globally-current exercise, so its own "set-complete-button" is index 0
+      # in the tree and the superset's is index 1 — target index 1.
+      - action: tap
+        target: "superset-card-Superset: Chest & Shoulders"
+      - action: waitFor
+        target: "set-complete-button"
+        timeout: 5000
+      # Complete the superset's first two interleaved sets (Incline 50x10,
+      # Lateral 15x15): green checks, then the active entry advances to
+      # Incline set 2 (55x10) — exactly the superset story (2/26 done).
+      - action: tapIndex
+        target: "set-complete-button"
+        index: 1
       - action: delay
-        ms: 400
+        ms: 700
+      - action: tapIndex
+        target: "set-complete-button"
+        index: 1
+      - action: delay
+        ms: 700
       - action: screenshot
         name: "04-active-superset"
 
@@ -143,6 +163,18 @@ tests:
       # first "Show trends" button on the page belongs to it.
       - action: delay
         ms: 1200
+      # Scroll just past the date + session-stats header (a controlled ~25% of
+      # the screen, not a full-page swipe that overshoots) so Bench Press's card
+      # heading lands at the top, THEN expand trends. Scrolling before the chart
+      # exists keeps Swift Charts from swallowing the gesture; the whole card —
+      # heading, logged sets, note, chart, Current/Best/Change, Details — then
+      # fits in frame with Overhead Press peeking below.
+      - action: scroll
+        target: "history-detail-screen"
+        direction: "up"
+        amount: 20
+      - action: delay
+        ms: 500
       - action: tapText
         text: "Show trends"
       - action: delay

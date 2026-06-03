@@ -539,6 +539,29 @@ class ActionAdapter {
             return
         }
 
+        // Optional `amount` (1-100): perform a precise coordinate drag covering
+        // that percentage of the element's height/width, instead of a full-page
+        // swipe. Useful for framing screenshots where a default swipe overshoots.
+        if let amount = action.amount {
+            let frac = max(0.05, min(1.0, CGFloat(amount) / 100.0)) / 2.0
+            let center = el.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let (sx, sy, ex, ey): (CGFloat, CGFloat, CGFloat, CGFloat)
+            switch direction {
+            // Drag content the opposite way to the scroll direction: scrolling
+            // "up" reveals lower content, so the finger moves from low to high.
+            case "up":    (sx, sy, ex, ey) = (0,  frac, 0, -frac)
+            case "down":  (sx, sy, ex, ey) = (0, -frac, 0,  frac)
+            case "left":  (sx, sy, ex, ey) = ( frac, 0, -frac, 0)
+            case "right": (sx, sy, ex, ey) = (-frac, 0,  frac, 0)
+            default:      XCTFail("Unknown scroll direction: \(direction)"); return
+            }
+            let size = el.frame.size
+            let start = center.withOffset(CGVector(dx: sx * size.width, dy: sy * size.height))
+            let end = center.withOffset(CGVector(dx: ex * size.width, dy: ey * size.height))
+            start.press(forDuration: 0.05, thenDragTo: end)
+            return
+        }
+
         switch direction {
         case "up":    el.swipeUp()
         case "down":  el.swipeDown()

@@ -4,13 +4,14 @@ SCHEME = LiftMark
 PROJECT = LiftMark.xcodeproj
 DESTINATION = 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0'
 
-# App Store screenshot capture. Defaults to the 6.9" Pro Max simulator
-# (1320×2868), which App Store Connect now accepts in lieu of 6.5"/6.7"
-# slots. Override SCREENSHOT_DESTINATION to target a different simulator
-# (e.g. iPhone 14 Plus for legacy 1284×2778 slots).
-SCREENSHOT_DESTINATION = 'platform=iOS Simulator,name=iPhone 17 Pro Max'
-SCREENSHOT_RESULT_BUNDLE = build/Screenshots.xcresult
-SCREENSHOT_OUTPUT_DIR = Screenshots
+# App Store screenshot capture. capture-screenshots.sh drives the screenshot
+# UI scenario on its OWN throwaway iPhone 17 Pro Max simulator (1320×2868,
+# the 6.9" slot App Store Connect accepts in lieu of 6.5"/6.7"), capturing
+# both light and dark appearance into Screenshots/light/ and Screenshots/dark/.
+# Set SCREENSHOT_UDID to reuse a specific simulator (kept, not deleted), and
+# add --keep via SCREENSHOT_ARGS to leave a created sim booted for inspection.
+SCREENSHOT_UDID =
+SCREENSHOT_ARGS =
 
 resolve:
 	swift package resolve
@@ -49,20 +50,10 @@ clean:
 	xcodebuild clean -scheme $(SCHEME)
 	rm -rf .build build
 
-# Capture App Store screenshots. Drives the screenshot UI test scenario,
-# writes a result bundle, then extracts named PNG attachments into
-# $(SCREENSHOT_OUTPUT_DIR)/. Re-run any time after app changes.
+# Capture App Store screenshots in light + dark on an isolated simulator.
+# See scripts/capture-screenshots.sh. Re-run any time after app changes.
 screenshots:
-	@rm -rf $(SCREENSHOT_RESULT_BUNDLE) $(SCREENSHOT_OUTPUT_DIR)
-	@mkdir -p $(SCREENSHOT_OUTPUT_DIR)
-	SIMCTL_CHILD_SCREENSHOTS=1 xcodebuild test -scheme $(SCHEME) -project $(PROJECT) \
-		-only-testing:LiftMarkUITests/LiftMarkUITests/testScreenshots \
-		-destination $(SCREENSHOT_DESTINATION) \
-		-resultBundlePath $(SCREENSHOT_RESULT_BUNDLE)
-	./scripts/extract-screenshots.sh $(SCREENSHOT_RESULT_BUNDLE) $(SCREENSHOT_OUTPUT_DIR)
-	@echo ""
-	@echo "Screenshots written to $(SCREENSHOT_OUTPUT_DIR)/"
-	@ls -1 $(SCREENSHOT_OUTPUT_DIR)/
+	./scripts/capture-screenshots.sh $(if $(SCREENSHOT_UDID),--udid $(SCREENSHOT_UDID)) $(SCREENSHOT_ARGS)
 
 # Manually re-trigger the release pipeline against current main.
 # Pushes to main also trigger it automatically; use this to re-run without an empty commit.
