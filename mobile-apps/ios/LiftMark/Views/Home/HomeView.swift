@@ -38,9 +38,15 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: LiftMarkTheme.spacingMD) {
-                // Brand wordmark — uses the logo (with the custom 'l') rather
-                // than the typeface, which renders a plain 'l'.
-                HStack {
+                // Brand lockup — the app mark beside the wordmark logo (the
+                // wordmark carries the custom 'l' the typeface lacks).
+                HStack(spacing: 10) {
+                    Image("BrandMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 34, height: 34)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .accessibilityHidden(true)
                     Image("BrandWordmark")
                         .resizable()
                         .scaledToFit()
