@@ -25,7 +25,9 @@ final class CrashReporter: @unchecked Sendable {
         "fieldName",
         "fkTable",
         "partialFailureCount",
-        "tag"
+        "tag",
+        "status",
+        "clientSessionId"
     ]
 
     /// Keys permitted on parse-class error events.

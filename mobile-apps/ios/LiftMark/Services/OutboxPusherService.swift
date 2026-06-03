@@ -76,6 +76,14 @@ final class OutboxPusherService {
             )
         } catch {
             Logger.shared.error(.database, "outbox enqueue failed", error: error)
+            CrashReporter.shared.captureError(
+                error,
+                category: .database,
+                metadata: [
+                    "tag": "outbox_enqueue_failed",
+                    "clientSessionId": clientSessionId,
+                ]
+            )
             return
         }
         Task { await flushIfAuthenticated() }
@@ -102,6 +110,11 @@ final class OutboxPusherService {
             items = try queue.eligibleItems()
         } catch {
             Logger.shared.error(.database, "outbox queue read failed", error: error)
+            CrashReporter.shared.captureError(
+                error,
+                category: .database,
+                metadata: ["tag": "outbox_queue_read_failed"]
+            )
             return
         }
 
@@ -267,14 +280,51 @@ final class OutboxPusherService {
             // if we still get 401 here, the user effectively isn't signed in.
             lastError = "Authentication required"
             return .authMissing
+        } catch let APIError.edgeBlocked(status) {
+            // Edge/WAF block (HTML 403, e.g. SizeRestrictions_BODY) — this
+            // never reached our API. It's transient infra, NOT a permanent
+            // client error: a large body blocked by the edge must never be
+            // silently dropped. Preserve+back off and surface to Sentry.
+            scheduleRetry(item: item, error: "Edge blocked (\(status))")
+            let err = NSError(
+                domain: "LiftMark.Outbox",
+                code: status,
+                userInfo: [NSLocalizedDescriptionKey: "Outbox push blocked at edge (\(status)); preserving queue row"]
+            )
+            CrashReporter.shared.captureError(
+                err,
+                category: .network,
+                metadata: [
+                    "tag": "outbox_edge_blocked",
+                    "status": String(status),
+                    "clientSessionId": clientSessionId,
+                ]
+            )
+            return .retryQueued
         } catch let APIError.forbidden(msg) {
-            // 403 — scope/quota. Surfaces to user via lastError; drop row.
+            // 403 — scope/quota. A real API 403 IS terminal: surfaces to user
+            // via lastError, drop row. Also capture to Sentry so the silent
+            // drop is observable (Problem D).
             Logger.shared.error(
                 .network,
                 "outbox push 403 — dropping queue row",
                 metadata: ["clientSessionId": clientSessionId, "message": msg ?? ""]
             )
             lastError = msg ?? "Forbidden"
+            let err = NSError(
+                domain: "LiftMark.Outbox",
+                code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "Outbox push 403 — dropping queue row: \(msg ?? "")"]
+            )
+            CrashReporter.shared.captureError(
+                err,
+                category: .network,
+                metadata: [
+                    "tag": "outbox_push_403",
+                    "status": "403",
+                    "clientSessionId": clientSessionId,
+                ]
+            )
             try? queue.remove(clientSessionId: clientSessionId)
             return .gaveUpClientError
         } catch let APIError.server(status, _) where status == 429 {
@@ -285,7 +335,8 @@ final class OutboxPusherService {
             return .retryQueued
         } catch let APIError.server(status, msg) {
             // Other 4xx — bad payload. Don't retry forever; drop the row and
-            // log as an error so it surfaces in Sentry.
+            // log as an error. Also capture to Sentry so the silent drop is
+            // observable (Problem D).
             Logger.shared.error(
                 .network,
                 "outbox push gave up on 4xx",
@@ -293,6 +344,20 @@ final class OutboxPusherService {
                     "clientSessionId": clientSessionId,
                     "status": String(status),
                     "message": msg ?? "",
+                ]
+            )
+            let err = NSError(
+                domain: "LiftMark.Outbox",
+                code: status,
+                userInfo: [NSLocalizedDescriptionKey: "Outbox push gave up on 4xx (\(status)): \(msg ?? "")"]
+            )
+            CrashReporter.shared.captureError(
+                err,
+                category: .network,
+                metadata: [
+                    "tag": "outbox_push_4xx",
+                    "status": String(status),
+                    "clientSessionId": clientSessionId,
                 ]
             )
             try? queue.remove(clientSessionId: clientSessionId)

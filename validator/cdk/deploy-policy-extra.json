@@ -39,13 +39,24 @@
       "Resource": "arn:aws:ses:*:*:identity/*"
     },
     {
-      "Sid": "WAFv2WebAclRead",
+      "Sid": "WAFv2WebAcl",
       "Effect": "Allow",
       "Action": [
         "wafv2:GetWebACL",
-        "wafv2:ListTagsForResource"
+        "wafv2:CreateWebACL",
+        "wafv2:UpdateWebACL",
+        "wafv2:DeleteWebACL",
+        "wafv2:ListTagsForResource",
+        "wafv2:TagResource",
+        "wafv2:UntagResource",
+        "wafv2:GetLoggingConfiguration",
+        "wafv2:PutLoggingConfiguration",
+        "wafv2:DeleteLoggingConfiguration"
       ],
-      "Resource": "arn:aws:wafv2:us-east-1:*:global/webacl/lmwf-*"
+      "Resource": [
+        "arn:aws:wafv2:us-east-1:*:global/webacl/lmwf-*",
+        "arn:aws:wafv2:us-east-1:*:global/managedruleset/*/*"
+      ]
     }
   ]
 }

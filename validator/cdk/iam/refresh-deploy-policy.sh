@@ -67,15 +67,15 @@ fi
 echo "    $POLICY_ARN is current"
 
 # ── 1b. Supplementary policy (overflow from the 6,144-char managed-policy limit)
-# LmwfCdkDeployPolicy is at the size ceiling, so DynamoDB + SES + WAFv2-read
-# perms live in a second managed policy attached to the CFN exec role. Only the
-# primary-region exec role needs these (it owns the tables, SES identity, and
-# the site CloudFront distributions). Idempotent: refresh version + ensure
-# attached.
+# LmwfCdkDeployPolicy is at the size ceiling, so DynamoDB + SES + WAFv2 perms
+# live in a second managed policy attached to the CFN exec roles. Both region
+# exec roles need it: us-west-2 owns the tables + SES identity; us-east-1 owns
+# the CLOUDFRONT-scoped WAFv2 web ACL (EdgeStack), so it needs the WAFv2 perms
+# to create/update it. Idempotent: refresh version + ensure attached in both
+# regions.
 EXTRA_NAME="LmwfCdkDeployPolicyExtra"
 EXTRA_DOC="$DIR/../deploy-policy-extra.json"
 EXTRA_ARN="arn:aws:iam::${ACCT}:policy/${EXTRA_NAME}"
-EXEC_ROLE="cdk-${QUALIFIER}-cfn-exec-role-${ACCT}-us-west-2"
 if [ -f "$EXTRA_DOC" ]; then
   if aws iam get-policy --policy-arn "$EXTRA_ARN" >/dev/null 2>&1; then
     COUNT="$(aws iam list-policy-versions --policy-arn "$EXTRA_ARN" --query 'length(Versions)' --output text)"
@@ -91,12 +91,15 @@ if [ -f "$EXTRA_DOC" ]; then
     echo "==> creating $EXTRA_NAME"
     aws iam create-policy --policy-name "$EXTRA_NAME" --policy-document "file://$EXTRA_DOC" >/dev/null
   fi
-  if ! aws iam list-attached-role-policies --role-name "$EXEC_ROLE" \
-      --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null | grep -q "$EXTRA_ARN"; then
-    echo "==> attaching $EXTRA_NAME to $EXEC_ROLE"
-    aws iam attach-role-policy --role-name "$EXEC_ROLE" --policy-arn "$EXTRA_ARN"
-  fi
-  echo "    $EXTRA_ARN is current and attached to $EXEC_ROLE"
+  for EXEC_REGION in us-west-2 us-east-1; do
+    EXEC_ROLE="cdk-${QUALIFIER}-cfn-exec-role-${ACCT}-${EXEC_REGION}"
+    if ! aws iam list-attached-role-policies --role-name "$EXEC_ROLE" \
+        --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null | grep -q "$EXTRA_ARN"; then
+      echo "==> attaching $EXTRA_NAME to $EXEC_ROLE"
+      aws iam attach-role-policy --role-name "$EXEC_ROLE" --policy-arn "$EXTRA_ARN"
+    fi
+    echo "    $EXTRA_ARN is current and attached to $EXEC_ROLE"
+  done
 fi
 
 # ── 2. Verify the bootstrap wired it as the CFN execution policy ─────────────

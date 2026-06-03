@@ -268,6 +268,10 @@ final class AuthenticationStore {
                 throw AuthError.unknown(message)
             case .conflict(let message):
                 throw AuthError.unknown(message)
+            case .edgeBlocked:
+                // Blocked at the edge (CloudFront/WAF) — treat as a network
+                // failure so the UI can offer a retry.
+                throw AuthError.network
             case .unauthorized, .forbidden, .notFound, .decoding:
                 throw AuthError.unknown(nil)
             }
@@ -471,7 +475,9 @@ final class AuthenticationStore {
             return .invalidCredentials
         case .forbidden:
             return .emailNotVerified
-        case .transport:
+        case .transport, .edgeBlocked:
+            // .edgeBlocked is an edge/WAF block that never reached the API —
+            // surface it as a network failure so the user can retry.
             return .network
         case .server(_, let message):
             return .unknown(message)

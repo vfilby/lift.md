@@ -57,6 +57,18 @@ export class LmwfEdgeStack extends cdk.Stack {
       defaultAction: { allow: {} },
       // WAFv2 description is regex-constrained (no em-dash / non-ASCII punctuation).
       description: `LMWF ${envConfig.name} CloudFront WAF - managed rules and rate limits`,
+      // CloudFront inspects only the first 16 KB of a request body by default.
+      // Completed-workout outbox pushes (POST /v1/workouts/outbox) routinely
+      // exceed that (a real session is ~19 KB+), so raise the inspection window
+      // to 64 KB. Without this, large bodies sail past the managed rules
+      // uninspected; with it (plus the SizeRestrictions_BODY override below)
+      // they are scanned and allowed instead of blocked. Adds WCU but stays
+      // well within the default 1500 WCU ceiling.
+      associationConfig: {
+        requestBody: {
+          CLOUDFRONT: { defaultSizeInspectionLimit: 'KB_64' },
+        },
+      },
       visibilityConfig: {
         cloudWatchMetricsEnabled: true,
         metricName: `${namePrefix}-cloudfront-acl`,
@@ -122,6 +134,19 @@ export class LmwfEdgeStack extends cdk.Stack {
             managedRuleGroupStatement: {
               vendorName: 'AWS',
               name: 'AWSManagedRulesCommonRuleSet',
+              // SizeRestrictions_BODY blocks any request body > 8 KB. That
+              // silently kills legitimate large outbox pushes at the edge
+              // (CloudFront 403 before the request ever reaches the API), so
+              // a finished workout of any real size never syncs. Demote it to
+              // Count: the outbox route enforces its own 1 MB body cap and the
+              // rate-based rules above still bound abuse. All other CRS rules
+              // (SQLi/XSS/etc.) keep their default Block action.
+              ruleActionOverrides: [
+                {
+                  name: 'SizeRestrictions_BODY',
+                  actionToUse: { count: {} },
+                },
+              ],
             },
           },
           visibilityConfig: {
