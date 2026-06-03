@@ -171,7 +171,7 @@ Row actions (swipe or context menu):
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Discard         | Local row deleted; `DELETE /v1/workouts/:inbox_id` fired. On network failure: row stays gone locally; server row dies on next sync (or is reaped by TTL). |
 | Add to Plans    | Promote: parse `lmwf_text` via `MarkdownParser`, set the plan's `sourceMarkdown = lmwf_text`, insert the `WorkoutPlan`; delete the inbox row; `DELETE` the server row.                                                       |
-| Start Workout   | Promote (as above), then open the newly created plan's detail screen. v1 stops here — the user taps Start on the detail screen. (Future: skip the detail screen and open Active Workout directly.) |
+| Start Workout   | Promote (as above), then immediately start a session from the new plan (`SessionStore.startSession`) and navigate straight to **Active Workout** — the user does not stop at the plan detail screen (GH #210). `startSession` cancels any in-progress session first, so Start replaces a workout already underway. If the session fails to start, fall back to opening the new plan's detail screen so the user still lands somewhere actionable. |
 
 Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) — workout name, tags, default unit, description, and a card per exercise listing each set's target weight/reps/time/RPE plus per-set modifier chips (drop, per-side, rest, tempo). Footer holds the same three actions; selecting one dismisses the sheet and runs the action on the parent (`InboxSectionView` owns the queue/server reconciliation).
 

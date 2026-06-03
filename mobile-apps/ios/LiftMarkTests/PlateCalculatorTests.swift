@@ -303,6 +303,15 @@ struct PlateCalculatorTests {
             #expect(PlateCalculator.formatCompletePlateSetup(breakdown) == "45lb bar + 90lbs per side")
         }
 
+        // GH #211: 112.5 on a 45 lb bar is 33.75 per side (25+5+2.5+1.25). The
+        // per-side total must keep its quarter-plate precision and not collapse
+        // to "33.8" under a blanket single-decimal format.
+        @Test("112.5 lbs — quarter-plate per side keeps full precision")
+        func setup112_5() {
+            let breakdown = PlateCalculator.calculatePlates(totalWeight: 112.5, unit: "lbs")
+            #expect(PlateCalculator.formatCompletePlateSetup(breakdown) == "45lb bar + 33.75lbs per side")
+        }
+
         @Test("kilograms")
         func kilograms() {
             let breakdown = PlateCalculator.calculatePlates(totalWeight: 100, unit: "kg")

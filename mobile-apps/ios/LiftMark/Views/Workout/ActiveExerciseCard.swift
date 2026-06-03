@@ -88,6 +88,21 @@ struct ActiveExerciseCard: View {
         return exercise.sets.firstIndex { $0.id == triggeringSetId }
     }
 
+    /// The active rest timer for this card, if it owns one. Extracted so it can
+    /// render in two places: inline under the triggering set when the card is
+    /// expanded, and under the header when the card is collapsed — otherwise
+    /// completing the last set collapses the card and hides the timer the user
+    /// just started (#212).
+    @ViewBuilder
+    private var restTimer: some View {
+        if let restState = activeRestTimer {
+            RestTimerView(totalSeconds: restState.seconds) {
+                onDismissRest()
+            }
+            .id(restTimerGeneration)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             // Exercise header
@@ -192,13 +207,11 @@ struct ActiveExerciseCard: View {
                     }
 
                     // Inline rest timer — placed directly under the set that
-                    // triggered it (see restTimerSetIndex above).
-                    if let triggerIdx = restTimerSetIndex, setIndex == triggerIdx,
-                       let restState = activeRestTimer {
-                        RestTimerView(totalSeconds: restState.seconds) {
-                            onDismissRest()
-                        }
-                        .id(restTimerGeneration)
+                    // triggered it (see restTimerSetIndex above). Only while the
+                    // card is expanded; the collapsed copy below takes over
+                    // otherwise (#212).
+                    if let triggerIdx = restTimerSetIndex, setIndex == triggerIdx {
+                        restTimer
                     }
 
                     // Rest placeholder between pending sets
@@ -245,6 +258,13 @@ struct ActiveExerciseCard: View {
                 }
             }
 
+            // When the card is collapsed the inline timer above is hidden along
+            // with the sets. Surface the owned rest timer under the header so it
+            // stays visible after the triggering set completes and the card
+            // auto-collapses (#212).
+            if isCollapsed {
+                restTimer
+            }
         }
         .padding()
         .background {

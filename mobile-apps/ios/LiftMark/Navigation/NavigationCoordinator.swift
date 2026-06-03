@@ -19,6 +19,16 @@ class NavigationCoordinator {
         pendingPlanId = id
         selectedTab = .plans
     }
+
+    /// Navigate directly to the active workout screen. Used after the inbox
+    /// "Start" action creates and begins a session, so the user lands in the
+    /// live workout rather than the plan's detail screen (GH #210). Routes
+    /// through the Home tab, which owns the `.activeWorkout` destination.
+    func navigateToActiveWorkout() {
+        homeNavPath = NavigationPath()
+        homeNavPath.append(AppDestination.activeWorkout)
+        selectedTab = .home
+    }
 }
 
 enum AppTab: Hashable {
