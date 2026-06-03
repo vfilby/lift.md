@@ -32,6 +32,69 @@ succeeds and rotates; the second presents a now-consumed token and gets `401`.
 The launch path MUST therefore perform refresh as a **single-flight** operation;
 it must never let a background refresh race the first authed API call.
 
+### Idempotent-rotation grace (benign-retry resilience)
+
+Strict rotation treats *any* presentation of an already-rotated refresh token as
+theft and revokes the entire token family (forcing a full re-login). In practice
+this also nukes the session on **benign retries**: a lost response, a concurrent
+double-spend, or the app being killed mid-refresh (e.g. during an OS update)
+re-presents a just-rotated token within ~1 s, and the user is logged out for no
+security reason. Confirmed in production.
+
+The validator therefore applies a bounded **rotation grace** before treating a
+re-presented, already-rotated token as reuse. When the presented row has BOTH
+`revoked_at` and `replaced_by`, the server treats it as a **benign retry** —
+re-issuing a fresh token pair instead of nuking the family — *iff ALL* of:
+
+1. the successor row (`replaced_by`) still exists, AND
+2. the successor is the **live tip**: it has no `replaced_by` and no
+   `revoked_at` (i.e. the legitimate client never actually used it), AND
+3. the re-presentation is within the grace window of the rotation:
+   `now − revoked_at ≤ REFRESH_GRACE_MS` (default **60 000 ms**).
+
+On a benign retry the server **rotates the successor** (minting a new
+access JWT + refresh token exactly like the normal success path, `authn_age`
+= `rotated`), sets the refresh cookie, audits `refresh_token_grace_reissue`,
+and returns `200`. If that rotation loses a concurrent race
+(`RotationConflictError`) it returns the same `401` "retry with the new token"
+as the normal rotation-conflict path — it does **not** nuke.
+
+If **any** condition fails — successor missing, successor already advanced or
+revoked, or the re-presentation is outside the grace window — the server keeps
+the strict behavior: revoke the whole family, audit
+`refresh_token_reuse_detected`, return `401`. This preserves theft protection
+for genuine old-token replays (an attacker replaying a stale token minutes/days
+later, or after the legit client has moved past the successor).
+
+The grace window is intentionally short (sub-minute). Client hardening persists
+the new token synchronously, so a legitimate relaunch reads the *new* token and
+never re-presents the old one; the grace only catches the sub-minute
+lost-response / kill-during-refresh race. `REFRESH_GRACE_MS` may be overridden
+via the `REFRESH_GRACE_MS` env var (read per-request) for testing.
+
+## `GET /v1/me`
+
+Returns the authenticated caller's own profile. Accepts **either** a session
+JWT **or** a PAT (resource-endpoint convention — same combined auth middleware
+the workout outbox/tokens resource routes use); no scope is required beyond
+authentication, since it is the caller's own data.
+
+`200` JSON:
+
+```json
+{
+  "user_id": "…",
+  "primary_email": "…",
+  "display_name": "…",
+  "tier": "trial",
+  "trial_ends_at": "…"
+}
+```
+
+`401` if unauthenticated. `404` `{ "error": "User not found" }` if the
+authenticated `user_id` has no user row (e.g. a deleted account whose token is
+still cryptographically valid).
+
 ## Keychain storage
 
 Tokens are persisted by `TokenStore` in the iOS Keychain
