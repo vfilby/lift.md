@@ -125,7 +125,7 @@ final class WorkoutGenerationServiceTests: XCTestCase {
     func testBuildPromptContainsLMWFFormatPointerWhenToggled() {
         let params = WorkoutGenerationParams(intent: "Workout")
         let prompt = WorkoutGenerationService.buildWorkoutGenerationPrompt(context: makeContext(), params: params)
-        XCTAssertTrue(prompt.contains("# LMWF FORMAT"))
+        XCTAssertTrue(prompt.contains("# lift.md FORMAT"))
         XCTAssertTrue(prompt.contains(WorkoutGenerationService.lmwfSpecURL))
         XCTAssertTrue(prompt.contains("@rest:"))
     }
@@ -138,7 +138,7 @@ final class WorkoutGenerationServiceTests: XCTestCase {
         let context = makeContext(toggles: toggles)
         let params = WorkoutGenerationParams(intent: "Workout")
         let prompt = WorkoutGenerationService.buildWorkoutGenerationPrompt(context: context, params: params)
-        XCTAssertFalse(prompt.contains("# LMWF FORMAT"))
+        XCTAssertFalse(prompt.contains("# lift.md FORMAT"))
         XCTAssertFalse(prompt.contains(WorkoutGenerationService.lmwfSpecURL))
     }
 
@@ -197,7 +197,7 @@ final class WorkoutGenerationServiceTests: XCTestCase {
         )
         let params = WorkoutGenerationParams(intent: "Workout")
         let prompt = WorkoutGenerationService.buildWorkoutGenerationPrompt(context: context, params: params)
-        XCTAssertFalse(prompt.contains("# LMWF FORMAT"))
+        XCTAssertFalse(prompt.contains("# lift.md FORMAT"))
         XCTAssertFalse(prompt.contains("Recent Training History"))
         XCTAssertFalse(prompt.contains("## Progression"))
         XCTAssertFalse(prompt.contains("Current Gym & Equipment"))
