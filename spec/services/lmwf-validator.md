@@ -159,6 +159,32 @@ and continues to serve everything (site + API) from `beta.liftmark.app`.
 | **`liftmd.app`** | Legacy short domain | **302 → `getlift.md`** (everything) | 302 → `getlift.md` | 302 → `getlift.md` |
 | **`beta.liftmark.app`** | Beta (all-in-one) | Serves | Serves | Serves |
 
+### CloudFront WAF (body-size policy)
+
+The CloudFront-scoped WAFv2 web ACL (`lmwf-<env>-cloudfront`, defined in
+`validator/cdk/edge-stack.ts`) runs AWS managed rule groups (CommonRuleSet,
+KnownBadInputs, IpReputation) plus per-IP rate limits. Two settings exist
+specifically so legitimate large request bodies are **not blocked at the edge**:
+
+- **`SizeRestrictions_BODY` is overridden to `Count`** in the CommonRuleSet.
+  Its default action blocks any body > 8 KB, which silently 403s a completed
+  workout push (`POST /v1/workouts/outbox`) — a real session is ~19 KB+ — at
+  CloudFront, *before* the request reaches API Gateway (so it never appears in
+  the API access log, and the iOS client used to drop it as a "forbidden"
+  error). The route enforces its own 1 MB body cap server-side and the
+  rate-based rules still bound abuse, so demoting this rule to Count is safe.
+- **`associationConfig.requestBody.CLOUDFRONT.defaultSizeInspectionLimit = KB_64`**
+  so the remaining managed rules (SQLi/XSS/etc.) still inspect realistic
+  payloads instead of letting large bodies past uninspected.
+
+The matching client guard (treat an edge/WAF 403 as transient, never drop the
+queued workout) is specified in [workout-outbox.md](workout-outbox.md).
+
+The CFN execution role for the **us-east-1** edge stack therefore needs WAFv2
+write permissions (`wafv2:Get/Create/Update/DeleteWebACL`, tag + logging-config
+actions); these live in `LmwfCdkDeployPolicyExtra` (`deploy-policy-extra.json`),
+attached to **both** region exec roles by `iam/refresh-deploy-policy.sh`.
+
 Redirect semantics:
 
 - Redirects are **302 (temporary)** initially; they are to be promoted to **301

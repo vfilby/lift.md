@@ -5,6 +5,11 @@ import Foundation
 enum APIError: Error {
     case unauthorized
     case forbidden(message: String?)
+    /// A 403 (or similar) produced at the edge — CloudFront/WAF — that never
+    /// reached our API. These carry an HTML body, not our `{"error": "..."}`
+    /// JSON. Transient/infra, NOT a permanent client error, so callers must
+    /// retry rather than treat it as terminal.
+    case edgeBlocked(status: Int)
     case notFound
     case conflict(message: String?)
     case server(status: Int, message: String?)
@@ -202,7 +207,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         case 401:
             throw APIError.unauthorized
         case 403:
-            throw APIError.forbidden(message: Self.errorMessage(from: data))
+            throw Self.forbiddenError(from: data)
         case 404:
             throw APIError.notFound
         case 409:
@@ -246,7 +251,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         case 401:
             throw APIError.unauthorized
         case 403:
-            throw APIError.forbidden(message: Self.errorMessage(from: data))
+            throw Self.forbiddenError(from: data)
         case 404:
             throw APIError.notFound
         case 409:
@@ -259,6 +264,20 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     private static func errorMessage(from data: Data) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         return json["error"] as? String
+    }
+
+    /// Disambiguate a 403 from our API vs. one injected at the edge.
+    ///
+    /// Our API's 403s ALWAYS carry a JSON `{"error": "..."}` body (scope/quota
+    /// rejections). A CloudFront/WAF block returns a 403 with an HTML body and
+    /// never reaches our API — those have no JSON `error` field. The former is a
+    /// permanent client error; the latter is transient infra that must be
+    /// retried, so map them to distinct cases.
+    private static func forbiddenError(from data: Data) -> APIError {
+        if let message = errorMessage(from: data) {
+            return .forbidden(message: message)
+        }
+        return .edgeBlocked(status: 403)
     }
 }
 

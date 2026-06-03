@@ -76,6 +76,14 @@ final class OutboxPusherService {
             )
         } catch {
             Logger.shared.error(.database, "outbox enqueue failed", error: error)
+            CrashReporter.shared.captureError(
+                error,
+                category: .database,
+                metadata: [
+                    "tag": "outbox_enqueue_failed",
+                    "clientSessionId": clientSessionId,
+                ]
+            )
             return
         }
         Task { await flushIfAuthenticated() }
@@ -102,6 +110,11 @@ final class OutboxPusherService {
             items = try queue.eligibleItems()
         } catch {
             Logger.shared.error(.database, "outbox queue read failed", error: error)
+            CrashReporter.shared.captureError(
+                error,
+                category: .database,
+                metadata: ["tag": "outbox_queue_read_failed"]
+            )
             return
         }
 
@@ -262,51 +275,95 @@ final class OutboxPusherService {
             )
             try? queue.remove(clientSessionId: clientSessionId)
             return .pushed
-        } catch APIError.unauthorized {
-            // Treat 401 as auth-missing: tokens refresh in withAuthorizedRequest;
-            // if we still get 401 here, the user effectively isn't signed in.
+        } catch {
+            return classifyPushFailure(error, item: item)
+        }
+    }
+
+    /// Map a thrown push error to a `PushOutcome`. Split out of `pushOne` so each
+    /// method stays focused (and within the function-length lint limit).
+    private func classifyPushFailure(_ error: Error, item: OutboxPendingItem) -> PushOutcome {
+        let clientSessionId = item.clientSessionId
+        guard let apiError = error as? APIError else {
+            // Decoding errors etc. — transient; a response-shape mismatch is more
+            // likely deploy skew than a permanent bad payload on this device.
+            scheduleRetry(item: item, error: error.localizedDescription)
+            return .retryQueued
+        }
+        switch apiError {
+        case .unauthorized:
+            // Tokens refresh in withAuthorizedRequest; a 401 here means the user
+            // effectively isn't signed in.
             lastError = "Authentication required"
             return .authMissing
-        } catch let APIError.forbidden(msg) {
-            // 403 — scope/quota. Surfaces to user via lastError; drop row.
+        case let .edgeBlocked(status):
+            // Edge/WAF block (HTML 403, e.g. SizeRestrictions_BODY) — never
+            // reached our API. Transient infra, NOT a permanent client error: a
+            // large body blocked at the edge must never be silently dropped.
+            scheduleRetry(item: item, error: "Edge blocked (\(status))")
+            captureOutboxFailure(
+                tag: "outbox_edge_blocked", status: status, clientSessionId: clientSessionId,
+                message: "Outbox push blocked at edge (\(status)); preserving queue row"
+            )
+            return .retryQueued
+        case let .forbidden(msg):
+            // A real API 403 IS terminal: surface via lastError + drop. Capture
+            // so the drop is observable (Problem D).
             Logger.shared.error(
                 .network,
                 "outbox push 403 — dropping queue row",
                 metadata: ["clientSessionId": clientSessionId, "message": msg ?? ""]
             )
             lastError = msg ?? "Forbidden"
-            try? queue.remove(clientSessionId: clientSessionId)
-            return .gaveUpClientError
-        } catch let APIError.server(status, _) where status == 429 {
-            scheduleRetry(item: item, error: "Rate limited (\(status))")
-            return .retryQueued
-        } catch let APIError.server(status, msg) where status >= 500 {
-            scheduleRetry(item: item, error: "Server error (\(status)): \(msg ?? "")")
-            return .retryQueued
-        } catch let APIError.server(status, msg) {
-            // Other 4xx — bad payload. Don't retry forever; drop the row and
-            // log as an error so it surfaces in Sentry.
-            Logger.shared.error(
-                .network,
-                "outbox push gave up on 4xx",
-                metadata: [
-                    "clientSessionId": clientSessionId,
-                    "status": String(status),
-                    "message": msg ?? "",
-                ]
+            captureOutboxFailure(
+                tag: "outbox_push_403", status: 403, clientSessionId: clientSessionId,
+                message: "Outbox push 403 — dropping queue row: \(msg ?? "")"
             )
             try? queue.remove(clientSessionId: clientSessionId)
             return .gaveUpClientError
-        } catch let APIError.transport(error) {
-            scheduleRetry(item: item, error: "Transport: \(error.localizedDescription)")
+        case let .server(status, _) where status == 429:
+            scheduleRetry(item: item, error: "Rate limited (\(status))")
             return .retryQueued
-        } catch {
-            // Decoding errors etc. — treat as transient; the server's response
-            // shape mismatching is more likely a deploy skew than a permanent
-            // bad-payload condition on this device.
-            scheduleRetry(item: item, error: error.localizedDescription)
+        case let .server(status, msg) where status >= 500:
+            scheduleRetry(item: item, error: "Server error (\(status)): \(msg ?? "")")
+            return .retryQueued
+        case let .server(status, msg):
+            // Other 4xx — bad payload. Drop the row + capture (Problem D).
+            Logger.shared.error(
+                .network,
+                "outbox push gave up on 4xx",
+                metadata: ["clientSessionId": clientSessionId, "status": String(status), "message": msg ?? ""]
+            )
+            captureOutboxFailure(
+                tag: "outbox_push_4xx", status: status, clientSessionId: clientSessionId,
+                message: "Outbox push gave up on 4xx (\(status)): \(msg ?? "")"
+            )
+            try? queue.remove(clientSessionId: clientSessionId)
+            return .gaveUpClientError
+        case let .transport(err):
+            scheduleRetry(item: item, error: "Transport: \(err.localizedDescription)")
+            return .retryQueued
+        case .notFound, .conflict, .decoding:
+            // Unexpected for this endpoint — treat as transient rather than
+            // silently dropping a completed workout.
+            scheduleRetry(item: item, error: "Unexpected: \(apiError)")
             return .retryQueued
         }
+    }
+
+    /// Emit one Sentry capture for an outbox push failure. The tag/status/
+    /// clientSessionId keys are on the CrashReporter sync metadata allowlist.
+    private func captureOutboxFailure(tag: String, status: Int, clientSessionId: String, message: String) {
+        let err = NSError(
+            domain: "LiftMark.Outbox",
+            code: status,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
+        CrashReporter.shared.captureError(
+            err,
+            category: .network,
+            metadata: ["tag": tag, "status": String(status), "clientSessionId": clientSessionId]
+        )
     }
 
     private func scheduleRetry(item: OutboxPendingItem, error: String) {

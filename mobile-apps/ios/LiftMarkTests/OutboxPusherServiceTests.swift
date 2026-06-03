@@ -12,6 +12,8 @@ final class OutboxPusherServiceTests: XCTestCase {
     private var tokenStore: TokenStore!
     private var mockAPI: MockAPIClient!
     private var queue: OutboxPendingQueueRepository!
+    private var planRepo: WorkoutPlanRepository!
+    private var sessionRepo: SessionRepository!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -25,6 +27,8 @@ final class OutboxPusherServiceTests: XCTestCase {
         tokenStore.clear()
         mockAPI = MockAPIClient()
         queue = OutboxPendingQueueRepository()
+        planRepo = WorkoutPlanRepository()
+        sessionRepo = SessionRepository()
     }
 
     private func ensureAppLogsTableExists() {
@@ -53,6 +57,8 @@ final class OutboxPusherServiceTests: XCTestCase {
         tokenStore = nil
         mockAPI = nil
         queue = nil
+        planRepo = nil
+        sessionRepo = nil
         try await super.tearDown()
     }
 
@@ -61,6 +67,137 @@ final class OutboxPusherServiceTests: XCTestCase {
     private func makeUnauthenticatedStore() -> AuthenticationStore {
         // No tokens → currentUser nil → !isAuthenticated.
         AuthenticationStore(api: mockAPI, tokenStore: tokenStore)
+    }
+
+    /// A store with a live, unexpired access token so `pushOne` actually
+    /// reaches the API call (and we exercise the error-mapping in pushOne's
+    /// catch chain rather than the unauthenticated short-circuit).
+    private func makeAuthenticatedStore() -> AuthenticationStore {
+        tokenStore.saveAccessToken(Self.makeJWT(expSecondsFromNow: 3600))
+        tokenStore.saveRefreshToken("lm_refresh_test")
+        let store = AuthenticationStore(api: mockAPI, tokenStore: tokenStore)
+        XCTAssertTrue(store.isAuthenticated)
+        return store
+    }
+
+    /// Build a minimal completed session so `pushOne` finds a durable row for
+    /// the queued `clientSessionId` (otherwise it drops the row as "session no
+    /// longer exists"). Returns the session id to enqueue.
+    private func makeCompletedSession() throws -> String {
+        let plan = WorkoutPlan(
+            name: "Edge Test",
+            exercises: [PlannedExercise(
+                workoutPlanId: "plan",
+                exerciseName: "Bench",
+                orderIndex: 0,
+                sets: [PlannedSet(
+                    plannedExerciseId: "ex",
+                    orderIndex: 0,
+                    targetWeight: 135,
+                    targetWeightUnit: .lbs,
+                    targetReps: 5
+                )]
+            )]
+        )
+        try planRepo.create(plan)
+        let (session, _) = try sessionRepo.createFromPlan(plan)
+        for exercise in session.exercises {
+            for set in exercise.sets {
+                try sessionRepo.updateSessionSet(
+                    set.id,
+                    actualWeight: set.targetWeight,
+                    actualWeightUnit: .lbs,
+                    actualReps: set.targetReps,
+                    actualTime: nil,
+                    actualRpe: nil,
+                    status: .completed
+                )
+            }
+        }
+        try sessionRepo.complete(session.id)
+        return session.id
+    }
+
+    private static func makeJWT(expSecondsFromNow: TimeInterval, sub: String = "user-test") -> String {
+        let header: [String: Any] = ["alg": "HS256", "typ": "JWT"]
+        let payload: [String: Any] = [
+            "sub": sub,
+            "exp": Date().timeIntervalSince1970 + expSecondsFromNow,
+        ]
+        func b64(_ obj: [String: Any]) -> String {
+            guard let data = try? JSONSerialization.data(withJSONObject: obj) else { return "" }
+            return data.base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+        }
+        return "\(b64(header)).\(b64(payload)).signature-junk"
+    }
+
+    // MARK: - 403 disambiguation: edge block vs. real API forbidden
+
+    /// An edge/WAF 403 (`APIError.edgeBlocked`) is transient infra — the row
+    /// must be PRESERVED and a retry scheduled, never silently dropped.
+    func testEdgeBlocked403PreservesQueueRowAndRetries() async throws {
+        let sessionId = try makeCompletedSession()
+        try queue.enqueue(clientSessionId: sessionId)
+
+        var captures: [(LogCategory, [String: String])] = []
+        CrashReporter.captureErrorRecorder = { _, category, metadata in
+            captures.append((category, metadata))
+        }
+
+        mockAPI.nextError = APIError.edgeBlocked(status: 403)
+
+        let pusher = OutboxPusherService(
+            authStore: makeAuthenticatedStore(),
+            apiClient: mockAPI,
+            queue: queue
+        )
+
+        await pusher.flushIfAuthenticated()
+
+        // Row must survive an edge block — the completed workout is not lost.
+        XCTAssertEqual(try queue.count(), 1, "Edge block must NOT delete the queued completion")
+        XCTAssertEqual(pusher.pendingCount, 1)
+
+        // Captured to Sentry, tagged + carrying status/session, category .network.
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures.first?.0, .network)
+        XCTAssertEqual(captures.first?.1["tag"], "outbox_edge_blocked")
+        XCTAssertEqual(captures.first?.1["status"], "403")
+        XCTAssertEqual(captures.first?.1["clientSessionId"], sessionId)
+    }
+
+    /// A real API 403 (`APIError.forbidden` with a JSON message) IS terminal —
+    /// the row is dropped (and the drop is now also captured to Sentry).
+    func testRealApiForbidden403RemovesQueueRow() async throws {
+        let sessionId = try makeCompletedSession()
+        try queue.enqueue(clientSessionId: sessionId)
+
+        var captures: [(LogCategory, [String: String])] = []
+        CrashReporter.captureErrorRecorder = { _, category, metadata in
+            captures.append((category, metadata))
+        }
+
+        mockAPI.nextError = APIError.forbidden(message: "quota exceeded")
+
+        let pusher = OutboxPusherService(
+            authStore: makeAuthenticatedStore(),
+            apiClient: mockAPI,
+            queue: queue
+        )
+
+        await pusher.flushIfAuthenticated()
+
+        // Real 403 is permanent → row removed.
+        XCTAssertEqual(try queue.count(), 0, "A real API 403 should remove the queue row")
+        XCTAssertEqual(pusher.pendingCount, 0)
+        XCTAssertEqual(pusher.lastError, "quota exceeded")
+
+        // The drop is observable in Sentry (Problem D).
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures.first?.1["tag"], "outbox_push_403")
     }
 
     // MARK: - Auth failure: unauthenticated flush

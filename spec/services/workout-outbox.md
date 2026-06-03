@@ -180,8 +180,9 @@ Mirrors `InboxPollerService` in lifecycle and observability.
   2. Run `WorkoutExportService.exportSingleSessionAsJson` to produce the envelope (in-memory; do not write a file).
   3. `POST /v1/workouts/outbox` with the envelope + `client_session_id`.
   4. On 2xx: delete the queue row.
-  5. On 4xx (other than 429): log, delete the queue row (no point retrying a bad payload), and report via `Logger.shared.error`.
-  6. On 5xx / network / 429: increment `attempt_count`, set `next_attempt_after = now + backoff(attempt_count)`, leave the row in place.
+  5. On a **real API 4xx** (other than 429) — i.e. a 403/4xx whose body carries our JSON `{"error": ...}` shape, or a 401: log, delete the queue row (no point retrying a bad payload), and **capture to Sentry** (`outbox_push_403` / `outbox_push_4xx`) so a terminal drop is never silent.
+  6. On **5xx / network / 429**: increment `attempt_count`, set `next_attempt_after = now + backoff(attempt_count)`, leave the row in place.
+  7. On an **edge / WAF block** (a 403 with no JSON `{"error"}` body — e.g. CloudFront's `SizeRestrictions_BODY` rejecting a large workout before it reaches the API): this is **infrastructure, not a permanent client error**. The client maps it to `APIError.edgeBlocked(status:)`, **preserves the queue row**, schedules a retry like a transient failure, and captures to Sentry (`outbox_edge_blocked`). Dropping here is exactly the silent data-loss this service must prevent — a large completed workout would vanish. The server-side fix is to keep the CloudFront WAF body-inspection limit and `SizeRestrictions_BODY` override wide enough for real workout payloads (see [lmwf-validator.md](lmwf-validator.md)); the client guard is defense-in-depth so a future edge rejection never silently drops a workout.
 - **Backoff**: 30s, 2m, 10m, 30m, 2h (capped). After 10 attempts, log a Sentry breadcrumb (not an error capture per [[reference-sentry-metadata-allowlist]]) and keep retrying — a sustained 5xx for hours means something is wrong on the server, not the client.
 - **No CloudKit ack flow**. The outbox is one-way; once the server accepts the row, the device's job is done.
 
