@@ -56,6 +56,21 @@ Formats the complete setup including bar weight.
 
 **Example:** `"45lb bar + 135lbs per side"`
 
+### Number formatting
+
+All weight values (plate weights, per-side totals, bar weight) are formatted for
+display by rounding to the nearest 0.01 and then rendering with the fewest decimal
+places needed:
+
+- Whole numbers show no decimal: `45` → `"45"`.
+- Half/quarter increments keep their precision: `2.5` → `"2.5"`, `1.25` → `"1.25"`.
+- Per-side totals that land on a quarter-plate boundary must **not** be truncated
+  to a single decimal. A 112.5 lb target on a 45 lb bar is 33.75 lb per side and
+  must read `"45lb bar + 33.75lbs per side"` — never `"33.8"` (GH #211).
+
+The `(+N short)` remainder suffix is the lone exception: it is an approximate
+"can't be made with standard plates" hint and is rendered with one decimal place.
+
 ## Types
 
 ### PlateBreakdown

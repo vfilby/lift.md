@@ -499,7 +499,7 @@ struct WorkoutDetailView: View {
                 let target = set.entries.first?.target
                 var parts: [String] = []
                 if let w = target?.weight?.value {
-                    let wStr = w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : String(format: "%.1f", w)
+                    let wStr = w.formattedWeight
                     parts.append(wStr)
                     if let unit = target?.weight?.unit {
                         parts.append(unit.rawValue)

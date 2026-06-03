@@ -74,6 +74,20 @@ struct SupersetCard: View {
         return owns ? triggeringSetId : nil
     }
 
+    /// The active rest timer for this superset, if it owns one. Extracted so it
+    /// renders inline under the triggering set when expanded, and under the
+    /// header when collapsed — otherwise collapsing the card hides the timer the
+    /// user just started (#212).
+    @ViewBuilder
+    private var restTimer: some View {
+        if let restState = activeRestTimer {
+            RestTimerView(totalSeconds: restState.seconds) {
+                onDismissRest()
+            }
+            .id(restTimerGeneration)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             // Superset header
@@ -189,13 +203,11 @@ struct SupersetCard: View {
                     }
 
                     // Rest timer rendered directly below the set that
-                    // triggered it (see restTimerSetId above).
-                    if let triggerId = restTimerSetId, item.set.id == triggerId,
-                       let restState = activeRestTimer {
-                        RestTimerView(totalSeconds: restState.seconds) {
-                            onDismissRest()
-                        }
-                        .id(restTimerGeneration)
+                    // triggered it (see restTimerSetId above). Only while the
+                    // card is expanded; the collapsed copy below takes over
+                    // otherwise (#212).
+                    if let triggerId = restTimerSetId, item.set.id == triggerId {
+                        restTimer
                     }
                 }
 
@@ -222,6 +234,13 @@ struct SupersetCard: View {
                         }
                     }
                 }
+            }
+
+            // When the superset is collapsed the inline timer above is hidden
+            // with the sets. Surface the owned rest timer under the header so it
+            // stays visible after the triggering set completes (#212).
+            if isCollapsed {
+                restTimer
             }
         }
         .padding()

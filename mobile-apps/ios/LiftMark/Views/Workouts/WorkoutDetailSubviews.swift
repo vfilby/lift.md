@@ -65,7 +65,7 @@ func planSetDetailString(_ set: PlannedSet) -> String {
 }
 
 func planFormatWeight(_ w: Double) -> String {
-    w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : String(format: "%.1f", w)
+    w.formattedWeight
 }
 
 func planFormatTime(_ seconds: Int) -> String {

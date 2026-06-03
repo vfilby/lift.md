@@ -126,6 +126,7 @@
 		852658F6EF836C0E181BB45C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C20C4956D9B988C6978BAD36 /* Assets.xcassets */; };
 		8A5E5266EC0AF8521010B53C /* RestTimerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2122EC8E298186859FF9B07 /* RestTimerState.swift */; };
 		8AECDC5BA4D8D546BB4526A5 /* WorkoutHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A712EAD4AB8A5778820DC93 /* WorkoutHistoryService.swift */; };
+		8B21009E80390A8652181270 /* WeightFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D86A88E0EC70AC06B3C299C4 /* WeightFormatting.swift */; };
 		8B40A2046135F45A0EF769D6 /* tick.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 9998EA6926EF208F23FBFCC9 /* tick.mp3 */; };
 		8BBF02B47D7FB9A7B6A3D233 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDFEA6448A6AD7DBB774E5B /* Settings.swift */; };
 		8BF1135262E63D087DBC56F7 /* FeatureFlagsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5846F00629590F34E8AC51CD /* FeatureFlagsStore.swift */; };
@@ -450,6 +451,7 @@
 		D52CCE91FC19D155114865A3 /* SessionRepository+Assembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionRepository+Assembly.swift"; sourceTree = "<group>"; };
 		D83446B2AFC5D21A415A51FA /* NavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinator.swift; sourceTree = "<group>"; };
 		D844A8C060DBA370C2F04E98 /* V8Seed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V8Seed.swift; sourceTree = "<group>"; };
+		D86A88E0EC70AC06B3C299C4 /* WeightFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightFormatting.swift; sourceTree = "<group>"; };
 		D95FD80E58BB2915C7C4C0B1 /* SupersetCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersetCard.swift; sourceTree = "<group>"; };
 		D9FE10D43C37D15D55CD7E43 /* AnthropicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicService.swift; sourceTree = "<group>"; };
 		DA3A038D0DDA3325870FBB86 /* WorkoutDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutDetailView.swift; sourceTree = "<group>"; };
@@ -541,6 +543,7 @@
 			children = (
 				9E0BE62F2191556A9EF27651 /* DeviceLayout.swift */,
 				2FAEA3C4A0613434170BEB23 /* IDGenerator.swift */,
+				D86A88E0EC70AC06B3C299C4 /* WeightFormatting.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -1276,6 +1279,7 @@
 				73297C88CA6649D0C63AEB78 /* Theme.swift in Sources */,
 				6EFA74E38221E7BD4E9BB291 /* TokenStore.swift in Sources */,
 				154CD240701323B02E9B0788 /* UserSettingsRow.swift in Sources */,
+				8B21009E80390A8652181270 /* WeightFormatting.swift in Sources */,
 				944AB6118AC4A203250FC6EE /* WorkoutActivityAttributes.swift in Sources */,
 				9CAE470F76941D0F5025BEBE /* WorkoutDetailSubviews.swift in Sources */,
 				B65E08E944C710E6569FF173 /* WorkoutDetailView.swift in Sources */,

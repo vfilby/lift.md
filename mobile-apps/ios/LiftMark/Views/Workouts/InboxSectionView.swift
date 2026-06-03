@@ -6,10 +6,11 @@ import SwiftUI
 ///
 /// Renders inbox items pushed from outside the app (e.g., Claude Code via
 /// PAT). The user can Discard, Add to Plans, or Start (= Add to Plans +
-/// open the new plan's detail). Items are not in the user's plan library
-/// until promoted.
+/// start a session from the new plan and open Active Workout). Items are not
+/// in the user's plan library until promoted.
 struct InboxSectionView: View {
     @Environment(WorkoutPlanStore.self) private var planStore
+    @Environment(SessionStore.self) private var sessionStore
     @Environment(NavigationCoordinator.self) private var navCoordinator
     @Environment(AuthenticationStore.self) private var authStore
     @Environment(InboxPollerService.self) private var inboxPoller
@@ -361,8 +362,16 @@ struct InboxSectionView: View {
         await sendServerDelete(inboxId: item.id, action: openDetail ? "start" : "promote")
         reload()
 
+        // "Start" = promote, then immediately begin a session from the new plan
+        // and jump into the live workout. Falls back to the plan detail if the
+        // session can't be created so the user still lands somewhere useful
+        // (GH #210). `startSession` cancels any in-progress session first.
         if openDetail {
-            navCoordinator.navigateToPlan(id: plan.id)
+            if sessionStore.startSession(from: plan) != nil {
+                navCoordinator.navigateToActiveWorkout()
+            } else {
+                navCoordinator.navigateToPlan(id: plan.id)
+            }
         }
     }
 

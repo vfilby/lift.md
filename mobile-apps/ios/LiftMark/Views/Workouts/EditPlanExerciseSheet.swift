@@ -15,7 +15,7 @@ struct EditablePlanSetRow: Identifiable {
             id: set.id,
             weightText: {
                 if let w = target?.weight?.value {
-                    return w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : String(format: "%.1f", w)
+                    return w.formattedWeight
                 }
                 return ""
             }(),
@@ -261,7 +261,7 @@ struct EditPlanExerciseSheet: View {
                 let parsedTarget = parsedSet.entries.first?.target
                 let weightVal = parsedTarget?.weight?.value
                 let weightStr: String = weightVal.map {
-                    $0.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int($0))" : String(format: "%.1f", $0)
+                    $0.formattedWeight
                 } ?? ""
                 newSets.append(EditablePlanSetRow(
                     id: existingId ?? UUID().uuidString,
@@ -377,7 +377,7 @@ struct EditPlanExerciseSheet: View {
                 let target = set.entries.first?.target
                 var parts: [String] = []
                 if let w = target?.weight?.value {
-                    let wStr = w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : String(format: "%.1f", w)
+                    let wStr = w.formattedWeight
                     parts.append(wStr)
                     if let unit = target?.weight?.unit {
                         parts.append(unit.rawValue)
@@ -440,7 +440,7 @@ struct EditPlanExerciseSheet: View {
             let target = set.entries.first?.target
             var parts: [String] = []
             if let w = target?.weight?.value {
-                let wStr = w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : String(format: "%.1f", w)
+                let wStr = w.formattedWeight
                 parts.append(wStr)
                 if let unit = target?.weight?.unit {
                     parts.append(unit.rawValue)
@@ -475,7 +475,7 @@ struct EditPlanExerciseSheet: View {
             let parsedTarget = parsedSet.entries.first?.target
             let weightVal = parsedTarget?.weight?.value
             let weightStr: String = weightVal.map {
-                $0.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int($0))" : String(format: "%.1f", $0)
+                $0.formattedWeight
             } ?? ""
             newSets.append(EditablePlanSetRow(
                 id: existingId ?? UUID().uuidString,

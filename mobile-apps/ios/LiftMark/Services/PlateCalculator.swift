@@ -140,6 +140,6 @@ enum PlateCalculator {
     // MARK: - Private
 
     private static func formatNumber(_ value: Double) -> String {
-        value.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(value))" : String(format: "%.1f", value)
+        value.formattedWeight
     }
 }
