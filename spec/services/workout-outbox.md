@@ -174,6 +174,10 @@ Mirrors `InboxPollerService` in lifecycle and observability.
   - On app foreground transition.
   - On network reachability change from offline → online.
   - On manual "Sync now" tap in Settings.
+- **Automatic vs. forced flush.** `flushIfAuthenticated(force:)` takes a `force` flag (default `false`):
+  - **Automatic flushes** (enqueue, foreground, reachability) leave `force: false` and process only items eligible *now* — i.e. those whose `next_attempt_after` is null or in the past (`OutboxPendingQueueRepository.eligibleItems()`). This honors the retry backoff so a flapping server isn't hammered.
+  - **A manual "Sync now"** passes `force: true` and processes **all** queued items oldest-first regardless of `next_attempt_after` (`OutboxPendingQueueRepository.allItems()`). The backoff timer is an automatic-flush concern; when the user explicitly asks to sync, items parked behind a backoff window must push immediately rather than waiting out the retry timer.
+- **"Sync now" flushes BOTH directions.** The Settings "Sync now" button polls the inbox **and** force-flushes the outbox (`inboxPoller.pollIfAuthenticated()` + `outboxPusher.flushIfAuthenticated(force: true)`, run concurrently). A manual sync that only polled the inbox would silently leave completed workouts unpushed — the symptom this requirement closes.
 - **Single in-flight push gate** (`isFlushing`) — drains the queue serially, oldest first.
 - **Per-item flow**:
   1. Read the `WorkoutSession` from `workout_sessions` + descendants.
@@ -192,7 +196,7 @@ A small status pill in Settings → "Account → Sync to account":
 
 - "All workouts synced" (queue empty).
 - "N workout(s) pending sync. [Sync now]" (queue non-empty).
-- Tapping "Sync now" calls the flush method explicitly.
+- Tapping "Sync now" polls the inbox and **force-flushes the outbox** (`flushIfAuthenticated(force: true)`), bypassing the retry backoff so parked items push immediately. The spinner/disabled state reflects either an in-flight inbox poll or outbox flush.
 
 No outbox-browsing UI — the surface for "my completed workouts" remains the History tab, fed by the local database. The outbox is a side-channel for agents, not a user-facing collection.
 
