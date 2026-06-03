@@ -3,6 +3,7 @@ import type { LambdaEvent } from 'hono/aws-lambda';
 import { randomUUID } from 'node:crypto';
 import { parseWorkout } from './parser/index.js';
 import { authRouter } from './routes/auth/index.js';
+import { meRouter } from './routes/me.js';
 import { tokensRouter } from './routes/tokens.js';
 import { workoutsRouter } from './routes/workouts.js';
 import { testRouter } from './routes/__test__/index.js';
@@ -63,6 +64,7 @@ app.use('*', async (c, next) => {
 });
 
 app.route('/v1/auth', authRouter);
+app.route('/v1/me', meRouter);
 app.route('/v1/tokens', tokensRouter);
 app.route('/v1/workouts', workoutsRouter);
 
