@@ -38,41 +38,58 @@ struct AuthSyncBannerView: View {
     }
 
     var body: some View {
-        if shouldShow {
-            Button {
-                showingLogin = true
-            } label: {
-                HStack(spacing: LiftMarkTheme.spacingSM) {
-                    Image(systemName: "exclamationmark.icloud.fill")
-                        .foregroundStyle(.white)
-                    Text(message)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                    Spacer(minLength: LiftMarkTheme.spacingSM)
-                    Text("Sign in")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                .padding(.horizontal, LiftMarkTheme.spacingMD)
-                .padding(.vertical, LiftMarkTheme.spacingSM + 2)
-                .frame(maxWidth: .infinity)
-                .background(LiftMarkTheme.warning)
-            }
-            .buttonStyle(.plain)
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(message)
-            .accessibilityHint("Opens sign-in to upload your completed workouts")
-            .accessibilityIdentifier("auth-sync-banner")
-            .sheet(isPresented: $showingLogin) {
-                LoginView()
+        // The `.sheet` modifier is hoisted onto a *stably-mounted* container
+        // (this VStack always exists) rather than the conditionally-rendered
+        // banner button. When the sheet hung off the `if shouldShow` branch, the
+        // first "Sign in" tap toggled `showingLogin` *and* the presenting view
+        // lived inside a structurally unstable `if` — SwiftUI tore down and
+        // re-established the branch on the ensuing re-render, dropping the
+        // in-flight sheet presentation. You had to tap a second time for it to
+        // stick. Keeping the presenter mounted for the banner's lifetime makes
+        // the modal appear on the FIRST tap. An empty VStack collapses to zero
+        // height, so the top `safeAreaInset` still reserves no space when the
+        // banner is hidden, and grows to fit it when shown.
+        VStack(spacing: 0) {
+            if shouldShow {
+                bannerButton
             }
         }
+        .sheet(isPresented: $showingLogin) {
+            LoginView()
+        }
+    }
+
+    private var bannerButton: some View {
+        Button {
+            showingLogin = true
+        } label: {
+            HStack(spacing: LiftMarkTheme.spacingSM) {
+                Image(systemName: "exclamationmark.icloud.fill")
+                    .foregroundStyle(.white)
+                Text(message)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                Spacer(minLength: LiftMarkTheme.spacingSM)
+                Text("Sign in")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .padding(.horizontal, LiftMarkTheme.spacingMD)
+            .padding(.vertical, LiftMarkTheme.spacingSM + 2)
+            .frame(maxWidth: .infinity)
+            .background(LiftMarkTheme.warning)
+        }
+        .buttonStyle(.plain)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message)
+        .accessibilityHint("Opens sign-in to upload your completed workouts")
+        .accessibilityIdentifier("auth-sync-banner")
     }
 }
 

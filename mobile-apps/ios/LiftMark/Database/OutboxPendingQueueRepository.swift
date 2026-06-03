@@ -40,6 +40,23 @@ struct OutboxPendingQueueRepository {
         }
     }
 
+    /// All queued items, oldest first, **ignoring `next_attempt_after`**. Used by
+    /// a manual / forced flush ("Sync now"), where the user has explicitly asked
+    /// us to push everything — the retry-backoff timer is an automatic-flush
+    /// concern and must not park items behind a manual sync.
+    func allItems() throws -> [OutboxPendingItem] {
+        let dbQueue = try dbManager.database()
+        return try dbQueue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT client_session_id, enqueued_at, attempt_count,
+                       next_attempt_after, last_error
+                FROM outbox_pending_queue
+                ORDER BY enqueued_at ASC
+                """)
+            return rows.compactMap(Self.assemble)
+        }
+    }
+
     func count() throws -> Int {
         let dbQueue = try dbManager.database()
         return try dbQueue.read { db in

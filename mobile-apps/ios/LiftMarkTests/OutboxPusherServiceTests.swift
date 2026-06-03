@@ -250,6 +250,55 @@ final class OutboxPusherServiceTests: XCTestCase {
         return false
     }
 
+    // MARK: - Forced flush bypasses the retry backoff
+
+    /// A manual "Sync now" (`flushIfAuthenticated(force: true)`) must push an
+    /// item parked behind a future `next_attempt_after`, while the normal
+    /// automatic flush (eligible-only) leaves it untouched.
+    func testForcedFlushPushesItemParkedBehindBackoff() async throws {
+        let sessionId = try makeCompletedSession()
+        try queue.enqueue(clientSessionId: sessionId)
+
+        // Park the item far in the future — the automatic flush, which reads
+        // `eligibleItems()`, must NOT consider it eligible.
+        let future = Date().addingTimeInterval(3600)
+        try queue.recordTransientFailure(
+            clientSessionId: sessionId,
+            nextAttemptAfter: future,
+            lastError: "Server error (503)"
+        )
+
+        // Sanity: eligibleItems() skips it, allItems() includes it.
+        XCTAssertTrue(try queue.eligibleItems().isEmpty, "Future backoff must be skipped by eligibleItems()")
+        XCTAssertEqual(try queue.allItems().count, 1, "allItems() must ignore next_attempt_after")
+
+        let pusher = OutboxPusherService(
+            authStore: makeAuthenticatedStore(),
+            apiClient: mockAPI,
+            queue: queue
+        )
+
+        // 1) Normal (non-forced) flush: nothing is eligible, so the API is never
+        //    hit and the row survives.
+        await pusher.flushIfAuthenticated()
+        XCTAssertTrue(mockAPI.sentPaths.isEmpty, "Eligible-only flush must skip a parked item")
+        XCTAssertEqual(try queue.count(), 1, "Eligible-only flush must leave the parked row in place")
+        XCTAssertEqual(pusher.pendingCount, 1)
+
+        // 2) Forced flush: queue a successful push response, force-flush, and the
+        //    parked row is pushed and removed despite its future backoff.
+        mockAPI.nextDecodableResponse = [
+            "outbox_id": "ob-1",
+            "client_session_id": sessionId,
+            "dedup_hit": false,
+        ]
+        await pusher.flushIfAuthenticated(force: true)
+
+        XCTAssertEqual(mockAPI.sentPaths, ["/v1/workouts/outbox"], "Forced flush must push the parked item")
+        XCTAssertEqual(try queue.count(), 0, "Forced flush must drain the queue past the backoff")
+        XCTAssertEqual(pusher.pendingCount, 0)
+    }
+
     func testFlushWhileSignedOutWithEmptyQueueStaysQuiet() async throws {
         XCTAssertEqual(try queue.count(), 0)
 

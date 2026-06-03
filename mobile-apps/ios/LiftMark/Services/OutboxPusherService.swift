@@ -95,7 +95,12 @@ final class OutboxPusherService {
     /// queue is preserved and the failure is surfaced loudly (device log +
     /// Sentry + observable `lastError`) so a silently-unsynced completed
     /// workout can't go unnoticed (GH #143).
-    func flushIfAuthenticated() async {
+    ///
+    /// - Parameter force: when `true` (a manual "Sync now"), process ALL queued
+    ///   items regardless of their `next_attempt_after` backoff timer. The
+    ///   automatic flush (foreground, enqueue, reachability) leaves `force` at
+    ///   its default `false` and only touches items eligible *now*.
+    func flushIfAuthenticated(force: Bool = false) async {
         guard authStore.isAuthenticated else {
             reportAuthFailure(reason: "not_authenticated")
             return
@@ -107,7 +112,7 @@ final class OutboxPusherService {
 
         let items: [OutboxPendingItem]
         do {
-            items = try queue.eligibleItems()
+            items = force ? try queue.allItems() : try queue.eligibleItems()
         } catch {
             Logger.shared.error(.database, "outbox queue read failed", error: error)
             CrashReporter.shared.captureError(
