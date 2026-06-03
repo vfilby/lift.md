@@ -77,15 +77,32 @@ via the `REFRESH_GRACE_MS` env var (read per-request) for testing.
 Returns the authenticated caller's own profile. Accepts **either** a session
 JWT **or** a PAT (resource-endpoint convention — same combined auth middleware
 the workout outbox/tokens resource routes use); no scope is required beyond
-authentication, since it is the caller's own data.
+authentication.
 
-`200` JSON:
+**PII is shaped by auth modality (least privilege).** A PAT is a credential a
+user may hand to a third-party agent (Claude Code, ChatGPT, scripts), so a
+PAT-authenticated `/v1/me` must **not** expose the account email/name. The
+non-PII subset (`tier`, `trial_ends_at`) is still returned so an agent can gate
+on plan state.
+
+Session JWT (the user inspecting their own account) — `200` JSON, **full**
+profile:
 
 ```json
 {
   "user_id": "…",
+  "tier": "trial",
+  "trial_ends_at": "…",
   "primary_email": "…",
-  "display_name": "…",
+  "display_name": "…"
+}
+```
+
+PAT — `200` JSON, **non-PII subset** (no `primary_email`, no `display_name`):
+
+```json
+{
+  "user_id": "…",
   "tier": "trial",
   "trial_ends_at": "…"
 }

@@ -5,8 +5,8 @@ const live = process.env.DDB_ENDPOINT ? describe : describe.skip;
 
 interface MeBody {
   user_id: string;
-  primary_email: string;
-  display_name: string;
+  primary_email?: string;
+  display_name?: string;
   tier: string;
   trial_ends_at: string;
 }
@@ -64,7 +64,7 @@ live('GET /v1/me', () => {
     expect(typeof body.trial_ends_at).toBe('string');
   });
 
-  it('returns the authenticated user profile (PAT)', async () => {
+  it('returns a non-PII profile for a PAT (no email / display_name)', async () => {
     const user = await createUser({
       display_name: 'PAT Me',
       primary_email: uniqueEmail('me-pat'),
@@ -81,8 +81,14 @@ live('GET /v1/me', () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as MeBody;
+    // Non-PII fields ARE present (enough to gate features).
     expect(body.user_id).toBe(user.user_id);
-    expect(body.display_name).toBe('PAT Me');
+    expect(body.tier).toBe('trial');
+    expect(typeof body.trial_ends_at).toBe('string');
+    // PII is withheld from a PAT — a least-privilege agent token must not be
+    // able to read the account email/name.
+    expect(body.primary_email).toBeUndefined();
+    expect(body.display_name).toBeUndefined();
   });
 
   it('unauthenticated → 401', async () => {
