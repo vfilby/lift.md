@@ -12,10 +12,9 @@ import Base from '../layouts/Base.astro';
       <img class="hero-logo hero-logo-ink" src="/brand/logos/lockup-liftmd-ink.svg" alt="" width="689" height="260" />
       <img class="hero-logo hero-logo-white" src="/brand/logos/lockup-liftmd-white.svg" alt="" width="689" height="260" />
     </div>
-    <h1 class="hero-title">Own your training.</h1>
     <p class="hero-sub">
-      Simple, markdown-based workout plans — write them yourself or let an
-      agent draft them. Bring your own data in, and export it just as easily.
+      Track your workouts with simple, markdown-based workout plans — write them
+      yourself or let an agent draft them.
     </p>
     <div class="hero-cta">
       <a class="lm-btn lm-btn-primary" href="https://testflight.apple.com/join/u8EJFzYu" rel="external noopener">
@@ -24,24 +23,12 @@ import Base from '../layouts/Base.astro';
       <a class="lm-btn lm-btn-secondary" href="/format">Explore the format →</a>
     </div>
     <p class="hero-cta-note">iOS only — public beta on TestFlight, not yet on the App Store.</p>
-
-    <div class="install">
-      <div class="install-body">
-        <code class="install-cmd"><span class="prompt">$</span>curl -fsSL https://getlift.md/install.sh | sh</code>
-        <button
-          type="button"
-          class="install-copy"
-          data-copy="curl -fsSL https://getlift.md/install.sh | sh"
-          aria-label="Copy install command"
-        >Copy</button>
-      </div>
-    </div>
   </section>
 
   <section class="pillars" aria-label="Why lift.md">
     <div class="pillar">
       <h2>Open</h2>
-      <p>No lock-in. Your workouts live in the open <a href="/format">lift.md format</a> — portable plain text you can import, export, and take anywhere.</p>
+      <p>No lock-in. Bring your own data in, and export it just as easily.</p>
     </div>
     <div class="pillar">
       <h2>Agent Friendly</h2>
@@ -85,15 +72,6 @@ import Base from '../layouts/Base.astro';
       :root:not([data-theme='light']):not([data-color-scheme='light']) .hero-logo-ink { display: none; }
       :root:not([data-theme='light']):not([data-color-scheme='light']) .hero-logo-white { display: block; }
     }
-    .hero-title {
-      font-family: var(--font-display);
-      font-weight: var(--lm-fw-bold);
-      font-size: 2.5rem;
-      line-height: var(--lm-lh-tight);
-      letter-spacing: var(--lm-tracking-tight);
-      margin: 0 auto 0.75rem;
-      max-width: 18ch;
-    }
     .hero-sub {
       color: var(--color-muted);
       font-size: var(--lm-fs-body-lg);
@@ -111,48 +89,6 @@ import Base from '../layouts/Base.astro';
       font-size: 0.85rem;
       color: var(--color-muted);
     }
-
-    /* Terminal-style, copyable skill install one-liner. Ink surface, mono. */
-    .install {
-      margin: 2rem auto 0;
-      width: 100%;
-      text-align: left;
-      background: var(--lm-ink);
-      border: 1px solid var(--lm-n-800);
-      border-radius: var(--lm-radius-lg);
-      overflow: hidden;
-      box-shadow: var(--lm-shadow-2);
-    }
-    .install-body {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.85rem 1rem;
-    }
-    .install-cmd {
-      flex: 1;
-      min-width: 0;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      color: #e6e9ee;
-      white-space: nowrap;
-      overflow-x: auto;
-    }
-    .install-cmd .prompt { color: #8aa3ff; user-select: none; margin-right: 0.5rem; }
-    .install-copy {
-      flex: none;
-      font-family: var(--font-sans);
-      font-size: 0.8rem;
-      font-weight: var(--lm-fw-semibold);
-      color: #e6e9ee;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: var(--lm-radius-sm);
-      padding: 0.42rem 0.8rem;
-      cursor: pointer;
-    }
-    .install-copy:hover { background: rgba(255, 255, 255, 0.15); }
-    .install-copy.copied { color: var(--lm-success); border-color: var(--lm-success); }
 
     /* Pillars */
     .pillars {
