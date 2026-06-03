@@ -10,12 +10,9 @@ test.describe('Marketing landing page', () => {
 
     await page.goto('/');
 
-    // Brand hero headline.
+    // Brand hero tagline.
     await expect(
-      page.getByRole('heading', {
-        level: 1,
-        name: /own your training/i,
-      }),
+      page.getByText(/track your workouts with simple, markdown-based workout plans/i),
     ).toBeVisible();
 
     // CTA that routes to the format hub (the format content moved off home).
