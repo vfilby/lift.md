@@ -150,9 +150,9 @@ struct SettingsView: View {
                     SettingsAboutSection()
                 }
                 Section {
-                    Text("LiftMark")
+                    Text("lift.md")
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .font(.footnote)
+                        .font(.lmFootnote)
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                 }
@@ -228,9 +228,9 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("LiftMark")
+                Text("lift.md")
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .font(.footnote)
+                    .font(.lmFootnote)
                     .foregroundStyle(.secondary)
                     .listRowBackground(Color.clear)
             }

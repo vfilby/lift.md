@@ -73,13 +73,13 @@ struct SettingsNavRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: section.icon)
-                .font(.body)
+                .font(.lmBody)
                 .foregroundStyle(section.iconColor)
                 .frame(width: 28, height: 28)
                 .background(section.iconColor.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             Text(section.rawValue)
-                .font(.body)
+                .font(.lmBody)
             Spacer()
         }
         .padding(.horizontal, 12)

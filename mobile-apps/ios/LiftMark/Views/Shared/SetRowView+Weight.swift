@@ -36,9 +36,9 @@ extension SetRowView {
         } label: {
             HStack(spacing: 2) {
                 Image(systemName: "plus.circle")
-                    .font(.caption)
+                    .font(.lmCaption)
                 Text("Weight")
-                    .font(.caption2)
+                    .font(.lmCaption2)
             }
             .foregroundStyle(LiftMarkTheme.primary)
         }

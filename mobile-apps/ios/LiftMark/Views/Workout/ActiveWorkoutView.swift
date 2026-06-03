@@ -323,7 +323,7 @@ struct ActiveWorkoutView: View {
                 .fill(sectionColor(for: name))
                 .frame(height: 1)
             Text(name.uppercased())
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(sectionColor(for: name))
                 .tracking(1)

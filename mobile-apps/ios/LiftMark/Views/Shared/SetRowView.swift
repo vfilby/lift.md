@@ -52,7 +52,7 @@ struct SetRowView: View {
                     // Side label for per-side sets (Left/Right) — between indicator and data
                     if let side = set.side {
                         Text(side.capitalized)
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .fontWeight(.semibold)
                             .foregroundStyle(LiftMarkTheme.primary)
                             .padding(.horizontal, 6)
@@ -141,23 +141,23 @@ struct SetRowView: View {
             case .completed:
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(LiftMarkTheme.success)
-                    .font(.title3)
+                    .font(.lmTitle3)
             case .skipped:
                 Image(systemName: "minus.circle.fill")
                     .foregroundStyle(LiftMarkTheme.warning)
-                    .font(.title3)
+                    .font(.lmTitle3)
             case .failed:
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(LiftMarkTheme.destructive)
-                    .font(.title3)
+                    .font(.lmTitle3)
             case .pending:
                 if isCurrent {
                     Image(systemName: "arrow.right.circle.fill")
                         .foregroundStyle(LiftMarkTheme.primary)
-                        .font(.title3)
+                        .font(.lmTitle3)
                 } else {
                     Text("\(setNumber)")
-                        .font(.caption.bold())
+                        .font(.lmCaption.bold())
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 }
             }
@@ -175,10 +175,10 @@ struct SetRowView: View {
             if let plateMathText = plateMathText {
                 HStack(spacing: 6) {
                     Image(systemName: "scalemass")
-                        .font(.caption)
+                        .font(.lmCaption)
                         .accessibilityHidden(true)
                     Text(plateMathText)
-                        .font(.callout)
+                        .font(.lmCallout)
                 }
                 .foregroundStyle(Color.blue)
                 .padding(.horizontal, 10)
@@ -204,7 +204,7 @@ struct SetRowView: View {
                 // Side label for per-side sets (Left/Right)
                 if let side = set.side {
                     Text(side.capitalized)
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(LiftMarkTheme.primary)
                         .padding(.horizontal, 6)
@@ -219,12 +219,12 @@ struct SetRowView: View {
                 if showsWeightField {
                     VStack(alignment: .center, spacing: 2) {
                         Text("Weight\(weightUnitLabel)")
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         HStack(spacing: 2) {
                             Button { adjustWeight(by: -weightStepIncrement) } label: {
                                 Image(systemName: "minus.circle")
-                                    .font(.body)
+                                    .font(.lmBody)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .buttonStyle(.plain)
@@ -234,7 +234,7 @@ struct SetRowView: View {
                                 #if os(iOS)
                                 .keyboardType(.decimalPad)
                                 #endif
-                                .font(.title3.monospacedDigit())
+                                .font(.lmTitle3.monospacedDigit())
                                 .multilineTextAlignment(.center)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 72)
@@ -244,7 +244,7 @@ struct SetRowView: View {
 
                             Button { adjustWeight(by: weightStepIncrement) } label: {
                                 Image(systemName: "plus.circle")
-                                    .font(.body)
+                                    .font(.lmBody)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .buttonStyle(.plain)
@@ -256,7 +256,7 @@ struct SetRowView: View {
                     // Show × separator only when reps follow (not for weighted-timed sets)
                     if set.entries.first?.target?.time == nil {
                         Text("×")
-                            .font(.callout)
+                            .font(.lmCallout)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                     }
@@ -270,12 +270,12 @@ struct SetRowView: View {
                 if set.entries.first?.target?.time != nil {
                     VStack(alignment: .center, spacing: 2) {
                         Text(timeFieldLabel)
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         HStack(spacing: 2) {
                             Button { adjustTime(by: -timeStepSeconds) } label: {
                                 Image(systemName: "minus.circle")
-                                    .font(.callout)
+                                    .font(.lmCallout)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .buttonStyle(.plain)
@@ -285,14 +285,14 @@ struct SetRowView: View {
                                 #if os(iOS)
                                 .keyboardType(useMinuteTimeFormat ? .numbersAndPunctuation : .numberPad)
                                 #endif
-                                .font(.title3.monospacedDigit())
+                                .font(.lmTitle3.monospacedDigit())
                                 .multilineTextAlignment(.center)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: timeFieldWidth)
 
                             Button { adjustTime(by: timeStepSeconds) } label: {
                                 Image(systemName: "plus.circle")
-                                    .font(.callout)
+                                    .font(.lmCallout)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .buttonStyle(.plain)
@@ -306,12 +306,12 @@ struct SetRowView: View {
                 if set.entries.first?.target?.time == nil {
                     VStack(alignment: .center, spacing: 2) {
                         Text("Reps")
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         HStack(spacing: 2) {
                             Button { adjustReps(by: -1) } label: {
                                 Image(systemName: "minus.circle")
-                                    .font(.callout)
+                                    .font(.lmCallout)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .buttonStyle(.plain)
@@ -321,14 +321,14 @@ struct SetRowView: View {
                                 #if os(iOS)
                                 .keyboardType(.numberPad)
                                 #endif
-                                .font(.title3.monospacedDigit())
+                                .font(.lmTitle3.monospacedDigit())
                                 .multilineTextAlignment(.center)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 50)
 
                             Button { adjustReps(by: 1) } label: {
                                 Image(systemName: "plus.circle")
-                                    .font(.callout)
+                                    .font(.lmCallout)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .buttonStyle(.plain)
@@ -345,7 +345,7 @@ struct SetRowView: View {
                     onSkip()
                 } label: {
                     Image(systemName: "forward.fill")
-                        .font(.body)
+                        .font(.lmBody)
                         .foregroundStyle(LiftMarkTheme.warning)
                         .frame(width: 44, height: 44)
                 }
@@ -384,9 +384,9 @@ struct SetRowView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
-                            .font(.subheadline.bold())
+                            .font(.lmSubheadline.bold())
                         Text("Add Drop")
-                            .font(.subheadline.bold())
+                            .font(.lmSubheadline.bold())
                     }
                     .foregroundStyle(LiftMarkTheme.destructive)
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -406,7 +406,7 @@ struct SetRowView: View {
             // Middle row: target hint — always reserve space, show when values differ from target
             if let target = targetHint {
                 Text(target)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                     .opacity(valuesChangedFromTarget ? 1 : 0)
             }
@@ -430,9 +430,9 @@ struct SetRowView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark")
-                            .font(.footnote.bold())
+                            .font(.lmFootnote.bold())
                         Text("Complete Set")
-                            .font(.footnote.bold())
+                            .font(.lmFootnote.bold())
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -489,16 +489,16 @@ struct SetRowView: View {
                             let target = set.entries.first?.target
                             if let w = target?.weight?.value, let u = target?.weight?.unit {
                                 Text("\(formatWeight(w)) \(u.rawValue)")
-                                    .font(.subheadline.monospacedDigit())
+                                    .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.warning)
                             }
                             if let r = target?.reps {
                                 Text("\u{00D7} \(r)")
-                                    .font(.subheadline.monospacedDigit())
+                                    .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.warning)
                             }
                             Text("-- Skipped")
-                                .font(.subheadline)
+                                .font(.lmSubheadline)
                                 .foregroundStyle(LiftMarkTheme.warning)
 
                             Spacer()
@@ -509,17 +509,17 @@ struct SetRowView: View {
                             let target = set.entries.first?.target
                             if let w = target?.weight?.value, let u = target?.weight?.unit {
                                 Text("\(formatWeight(w)) \(u.rawValue)")
-                                    .font(.subheadline.monospacedDigit())
+                                    .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
                             if let r = target?.reps {
                                 Text("\u{00D7} \(r)")
-                                    .font(.subheadline.monospacedDigit())
+                                    .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
                             if let t = target?.time {
                                 Text(formatTime(t))
-                                    .font(.subheadline.monospacedDigit())
+                                    .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
 
@@ -542,13 +542,13 @@ struct SetRowView: View {
             if showsWeightField {
                 VStack(alignment: .center, spacing: 2) {
                     Text("Weight\(weightUnitLabel)")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     TextField("--", text: $weightText)
                         #if os(iOS)
                         .keyboardType(.decimalPad)
                         #endif
-                        .font(.body.monospacedDigit())
+                        .font(.lmBody.monospacedDigit())
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 80)
@@ -558,7 +558,7 @@ struct SetRowView: View {
                 // Show × separator only for non-timed sets (weighted reps)
                 if set.entries.first?.target?.time == nil {
                     Text("×")
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                 }
@@ -573,13 +573,13 @@ struct SetRowView: View {
             if set.entries.first?.target?.time == nil {
                 VStack(alignment: .center, spacing: 2) {
                     Text("Reps")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     TextField("--", text: $repsText)
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
-                        .font(.body.monospacedDigit())
+                        .font(.lmBody.monospacedDigit())
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 60)
@@ -591,13 +591,13 @@ struct SetRowView: View {
             if set.entries.first?.actual?.time != nil || set.entries.first?.target?.time != nil {
                 VStack(alignment: .center, spacing: 2) {
                     Text(timeFieldLabel)
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     TextField("--", text: $timeText)
                         #if os(iOS)
                         .keyboardType(useMinuteTimeFormat ? .numbersAndPunctuation : .numberPad)
                         #endif
-                        .font(.body.monospacedDigit())
+                        .font(.lmBody.monospacedDigit())
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: timeFieldWidth)
@@ -626,7 +626,7 @@ struct SetRowView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.body)
+                    .font(.lmBody)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(width: 36, height: 36)
                     .overlay(
@@ -644,7 +644,7 @@ struct SetRowView: View {
                 isEditing = false
             } label: {
                 Image(systemName: "checkmark")
-                    .font(.body.bold())
+                    .font(.lmBody.bold())
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
                     .background(LiftMarkTheme.primary)
@@ -660,7 +660,7 @@ struct SetRowView: View {
                 isEditing = false
             } label: {
                 Image(systemName: "xmark")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(width: 36, height: 36)
                     .overlay(
@@ -681,12 +681,12 @@ struct SetRowView: View {
         HStack(spacing: LiftMarkTheme.spacingSM) {
             // Drop arrow indicator
             Image(systemName: "arrow.turn.down.right")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.destructive)
                 .frame(width: 28)
 
             Text("Drop \(index + 1)")
-                .font(.caption2)
+                .font(.lmCaption2)
                 .fontWeight(.semibold)
                 .foregroundStyle(LiftMarkTheme.destructive)
 
@@ -694,7 +694,7 @@ struct SetRowView: View {
                 HStack(spacing: 2) {
                     Button { adjustDropWeight(index: index, by: -weightStepIncrement) } label: {
                         Image(systemName: "minus.circle")
-                            .font(.body)
+                            .font(.lmBody)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     }
                     .buttonStyle(.plain)
@@ -707,14 +707,14 @@ struct SetRowView: View {
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
-                    .font(.body.monospacedDigit())
+                    .font(.lmBody.monospacedDigit())
                     .multilineTextAlignment(.center)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 72)
 
                     Button { adjustDropWeight(index: index, by: weightStepIncrement) } label: {
                         Image(systemName: "plus.circle")
-                            .font(.body)
+                            .font(.lmBody)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     }
                     .buttonStyle(.plain)
@@ -722,14 +722,14 @@ struct SetRowView: View {
                 }
 
                 Text("\u{00D7}")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
 
             HStack(spacing: 2) {
                 Button { adjustDropReps(index: index, by: -1) } label: {
                     Image(systemName: "minus.circle")
-                        .font(.callout)
+                        .font(.lmCallout)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 }
                 .buttonStyle(.plain)
@@ -742,14 +742,14 @@ struct SetRowView: View {
                 #if os(iOS)
                 .keyboardType(.numberPad)
                 #endif
-                .font(.body.monospacedDigit())
+                .font(.lmBody.monospacedDigit())
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 50)
 
                 Button { adjustDropReps(index: index, by: 1) } label: {
                     Image(systemName: "plus.circle")
-                        .font(.callout)
+                        .font(.lmCallout)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 }
                 .buttonStyle(.plain)
@@ -763,7 +763,7 @@ struct SetRowView: View {
                 dropEntries.remove(at: index)
             } label: {
                 Image(systemName: "minus.circle.fill")
-                    .font(.body)
+                    .font(.lmBody)
                     .foregroundStyle(LiftMarkTheme.destructive.opacity(0.7))
             }
             .buttonStyle(.plain)
@@ -783,18 +783,18 @@ struct SetRowView: View {
                 ForEach(Array(actualEntries.enumerated()), id: \.offset) { index, entry in
                     if index > 0 {
                         Image(systemName: "arrow.right")
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .foregroundStyle(LiftMarkTheme.success.opacity(0.6))
                     }
                     HStack(spacing: 2) {
                         if let w = entry.actual?.weight?.value {
                             Text(formatWeight(w))
-                                .font(.subheadline.monospacedDigit())
+                                .font(.lmSubheadline.monospacedDigit())
                                 .foregroundStyle(LiftMarkTheme.success)
                         }
                         if let r = entry.actual?.reps {
                             Text("\u{00D7}\(r)")
-                                .font(.subheadline.monospacedDigit())
+                                .font(.lmSubheadline.monospacedDigit())
                                 .foregroundStyle(LiftMarkTheme.success)
                         }
                     }
@@ -817,17 +817,17 @@ struct SetRowView: View {
             let actual = set.entries.first?.actual
             if let w = actual?.weight?.value, let u = actual?.weight?.unit {
                 Text("\(formatWeight(w)) \(u.rawValue)")
-                    .font(.subheadline.monospacedDigit())
+                    .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }
             if let r = actual?.reps {
                 Text("\u{00D7} \(r)")
-                    .font(.subheadline.monospacedDigit())
+                    .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }
             if let t = actual?.time {
                 Text(formatTime(t))
-                    .font(.subheadline.monospacedDigit())
+                    .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }
 
@@ -844,7 +844,7 @@ struct SetRowView: View {
         HStack(spacing: 4) {
             if set.isDropset {
                 Text("Drop")
-                    .font(.caption2)
+                    .font(.lmCaption2)
                     .fontWeight(.semibold)
                     .foregroundStyle(LiftMarkTheme.destructive)
                     .padding(.horizontal, 6)
@@ -855,7 +855,7 @@ struct SetRowView: View {
             // Side label (/side badge for non-expanded per-side sets) — expanded Left/Right shown inline before data
             if set.isPerSide && set.side == nil {
                 Text("/side")
-                    .font(.caption2)
+                    .font(.lmCaption2)
                     .fontWeight(.semibold)
                     .foregroundStyle(LiftMarkTheme.primary)
                     .padding(.horizontal, 6)

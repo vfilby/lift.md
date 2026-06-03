@@ -182,7 +182,7 @@ struct WorkoutDetailView: View {
 
                             // Exercises heading
                             Text("Exercises")
-                                .font(.callout)
+                                .font(.lmCallout)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
@@ -326,7 +326,7 @@ struct WorkoutDetailView: View {
             // Plan name + favorite
             HStack(alignment: .top) {
                 Text(plan.name)
-                    .font(.title2)
+                    .font(.lmTitle2)
                     .fontWeight(.bold)
 
                 Spacer()
@@ -335,7 +335,7 @@ struct WorkoutDetailView: View {
                     planStore.toggleFavorite(id: planId)
                 } label: {
                     Image(systemName: plan.isFavorite ? "heart.fill" : "heart")
-                        .font(.title3)
+                        .font(.lmTitle3)
                         .foregroundStyle(plan.isFavorite ? .red : LiftMarkTheme.tertiaryLabel)
                         .frame(width: 36, height: 36)
                 }
@@ -345,7 +345,7 @@ struct WorkoutDetailView: View {
             // Description
             if let description = plan.description, !description.isEmpty {
                 Text(description)
-                    .font(.body)
+                    .font(.lmBody)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
 
@@ -354,7 +354,7 @@ struct WorkoutDetailView: View {
                 HStack(spacing: 4) {
                     ForEach(plan.tags, id: \.self) { tag in
                         Text(tag.lowercased())
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .fontWeight(.semibold)
                             .foregroundStyle(LiftMarkTheme.primary)
                             .padding(.horizontal, 8)
@@ -378,7 +378,7 @@ struct WorkoutDetailView: View {
                 showEditMarkdown = true
             } label: {
                 Label("Edit", systemImage: "pencil.line")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity)
@@ -396,7 +396,7 @@ struct WorkoutDetailView: View {
                 showReprocessConfirm = true
             } label: {
                 Label("Reprocess", systemImage: "arrow.clockwise")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity)
@@ -423,7 +423,7 @@ struct WorkoutDetailView: View {
             }
         } label: {
             Text(sessionStore.activeSession != nil ? "Replace Active Workout" : "Start Workout")
-                .font(.headline)
+                .font(.lmHeadline)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
                 .background(LiftMarkTheme.primary)

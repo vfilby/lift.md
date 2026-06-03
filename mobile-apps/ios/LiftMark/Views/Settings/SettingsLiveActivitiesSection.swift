@@ -21,7 +21,7 @@ struct SettingsLiveActivitiesSection: View {
                 .accessibilityIdentifier("switch-live-activities")
 
                 Text(liveActivitiesStatusText)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .accessibilityIdentifier("live-activities-status-label")
 
@@ -30,7 +30,7 @@ struct SettingsLiveActivitiesSection: View {
                         openUserSettings()
                     } label: {
                         Text("Open Settings to enable Live Activities")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.primary)
                     }
                     .accessibilityIdentifier("live-activities-open-settings")

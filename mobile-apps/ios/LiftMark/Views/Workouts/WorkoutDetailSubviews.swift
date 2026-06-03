@@ -83,12 +83,12 @@ struct WorkoutStatCard: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.title2)
+                .font(.lmTitle2)
                 .fontWeight(.bold)
                 .foregroundStyle(LiftMarkTheme.primary)
                 .monospacedDigit()
             Text(label)
-                .font(.caption)
+                .font(.lmCaption)
                 .fontWeight(.medium)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
         }
@@ -110,7 +110,7 @@ struct WorkoutSectionHeader: View {
                 .fill(workoutSectionColor(for: name))
                 .frame(height: 1)
             Text(name.uppercased())
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(workoutSectionColor(for: name))
                 .tracking(1)
@@ -139,7 +139,7 @@ struct PlanExerciseCard: View {
             HStack(alignment: .top, spacing: LiftMarkTheme.spacingMD) {
                 // Numbered index
                 Text("\(exerciseIndex)")
-                    .font(.callout)
+                    .font(.lmCallout)
                     .fontWeight(.bold)
                     .foregroundStyle(workoutSectionColor(for: sectionName ?? ""))
                     .frame(minWidth: 20)
@@ -154,20 +154,20 @@ struct PlanExerciseCard: View {
 
                     // Exercise name
                     Text(exercise.exerciseName)
-                        .font(.callout)
+                        .font(.lmCallout)
                         .fontWeight(.semibold)
 
                     // Equipment
                     if let equipment = exercise.equipmentType {
                         Text(equipment)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     }
 
                     // Notes
                     if let notes = exercise.notes, !notes.isEmpty {
                         Text(notes)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .italic()
                     }
@@ -180,7 +180,7 @@ struct PlanExerciseCard: View {
                     onEdit()
                 } label: {
                     Image(systemName: "pencil")
-                        .font(.body)
+                        .font(.lmBody)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .frame(width: 36, height: 36)
                 }
@@ -194,7 +194,7 @@ struct PlanExerciseCard: View {
                     HStack(spacing: LiftMarkTheme.spacingMD) {
                         // Set badge (colored circle)
                         Text("\(set.orderIndex + 1)")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .fontWeight(.bold)
                             .foregroundStyle(workoutSectionColor(for: sectionName ?? ""))
                             .frame(width: 28, height: 28)
@@ -203,7 +203,7 @@ struct PlanExerciseCard: View {
 
                         // Set details
                         Text(planSetDetailString(set))
-                            .font(.body)
+                            .font(.lmBody)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
                         Spacer()
@@ -211,7 +211,7 @@ struct PlanExerciseCard: View {
                         // Modifier badges
                         if set.isDropset {
                             Text("Drop")
-                                .font(.caption2)
+                                .font(.lmCaption2)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
                                 .background(LiftMarkTheme.destructive.opacity(0.15))
@@ -219,7 +219,7 @@ struct PlanExerciseCard: View {
                         }
                         if set.isPerSide {
                             Text("/side")
-                                .font(.caption2)
+                                .font(.lmCaption2)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
                                 .background(LiftMarkTheme.primary.opacity(0.15))
@@ -243,9 +243,9 @@ struct PlanExerciseCard: View {
                 Link(destination: url) {
                     HStack(spacing: LiftMarkTheme.spacingSM) {
                         Image(systemName: "play.rectangle")
-                            .font(.caption)
+                            .font(.lmCaption)
                         Text("Search \"\(exercise.exerciseName)\" on YouTube")
-                            .font(.caption)
+                            .font(.lmCaption)
                     }
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -294,7 +294,7 @@ struct PlanSupersetCard: View {
             // Superset header
             HStack(spacing: LiftMarkTheme.spacingSM) {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.caption.bold())
+                    .font(.lmCaption.bold())
                     .foregroundStyle(.white)
                     .frame(width: 24, height: 24)
                     .background(Color.purple)
@@ -302,16 +302,16 @@ struct PlanSupersetCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("SUPERSET")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .fontWeight(.bold)
                         .foregroundStyle(.purple)
 
                     Text(parent.exerciseName)
-                        .font(.callout)
+                        .font(.lmCallout)
                         .fontWeight(.semibold)
 
                     Text(children.map { $0.exerciseName }.joined(separator: " + "))
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 }
 
@@ -322,7 +322,7 @@ struct PlanSupersetCard: View {
                         onEdit()
                     } label: {
                         Image(systemName: "pencil")
-                            .font(.body)
+                            .font(.lmBody)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .frame(width: 36, height: 36)
                     }
@@ -337,10 +337,10 @@ struct PlanSupersetCard: View {
                 if let notes = child.notes, !notes.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(child.exerciseName)
-                            .font(.caption2.weight(.semibold))
+                            .font(.lmCaption2.weight(.semibold))
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         Text(notes)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .italic()
                     }
@@ -355,7 +355,7 @@ struct PlanSupersetCard: View {
                 ForEach(Array(interleaved.enumerated()), id: \.element.set.id) { idx, item in
                     HStack(spacing: LiftMarkTheme.spacingMD) {
                         Text("\(item.round + 1)")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .fontWeight(.bold)
                             .foregroundStyle(workoutSectionColor(for: sectionName ?? ""))
                             .frame(width: 28, height: 28)
@@ -364,12 +364,12 @@ struct PlanSupersetCard: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.exercise.exerciseName)
-                                .font(.caption2)
+                                .font(.lmCaption2)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
                             Text(planSetDetailString(item.set))
-                                .font(.body)
+                                .font(.lmBody)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         }
 
@@ -377,7 +377,7 @@ struct PlanSupersetCard: View {
 
                         if item.set.isDropset {
                             Text("Drop")
-                                .font(.caption2)
+                                .font(.lmCaption2)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
                                 .background(LiftMarkTheme.destructive.opacity(0.15))
@@ -385,7 +385,7 @@ struct PlanSupersetCard: View {
                         }
                         if item.set.isPerSide {
                             Text("/side")
-                                .font(.caption2)
+                                .font(.lmCaption2)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
                                 .background(LiftMarkTheme.primary.opacity(0.15))
@@ -411,9 +411,9 @@ struct PlanSupersetCard: View {
                         Link(destination: url) {
                             HStack(spacing: LiftMarkTheme.spacingSM) {
                                 Image(systemName: "play.rectangle")
-                                    .font(.caption)
+                                    .font(.lmCaption)
                                 Text("Search \"\(child.exerciseName)\" on YouTube")
-                                    .font(.caption)
+                                    .font(.lmCaption)
                             }
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .frame(maxWidth: .infinity, alignment: .center)

@@ -76,7 +76,7 @@ struct EditPlanExerciseSheet: View {
                     .accessibilityIdentifier("edit-plan-exercise-mode-picker")
                 } else {
                     Text("Edit superset block — children are nested under #### headings")
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
@@ -135,7 +135,7 @@ struct EditPlanExerciseSheet: View {
                 ForEach(Array(editableSets.enumerated()), id: \.element.id) { index, setRow in
                     HStack(spacing: LiftMarkTheme.spacingSM) {
                         Text("Set \(index + 1)")
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                             .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             .frame(width: 45, alignment: .leading)
 
@@ -166,7 +166,7 @@ struct EditPlanExerciseSheet: View {
                             .frame(width: 50)
                             .accessibilityIdentifier("edit-plan-set-time-\(index)")
                         Text("s")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
                         Spacer()
@@ -192,18 +192,18 @@ struct EditPlanExerciseSheet: View {
         VStack(spacing: LiftMarkTheme.spacingSM) {
             if let error = markdownError {
                 Text(error)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.destructive)
                     .padding(.horizontal)
             }
 
             TextEditor(text: $markdownText)
-                .font(.system(.body, design: .monospaced))
+                .font(.lmMono)
                 .padding(.horizontal)
                 .accessibilityIdentifier("edit-plan-exercise-markdown")
 
-            Text("LMWF format: ## Name [equipment]\n> notes\n- weight x reps")
-                .font(.caption)
+            Text("lift.md format: ## Name [equipment]\n> notes\n- weight x reps")
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 .padding(.horizontal)
                 .frame(maxWidth: .infinity, alignment: .leading)

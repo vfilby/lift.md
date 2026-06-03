@@ -48,7 +48,7 @@ struct RestTimerView: View {
             Spacer()
 
             Text(tick.displayString)
-                .font(.title)
+                .font(.lmTitle)
                 .fontWeight(.semibold)
                 .monospacedDigit()
                 .foregroundStyle(timerColor)
@@ -59,7 +59,7 @@ struct RestTimerView: View {
                 onSkip()
             } label: {
                 Text("Stop")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .fontWeight(.semibold)
                     .foregroundStyle(LiftMarkTheme.destructive)
                     .padding(.horizontal, 12)
@@ -238,13 +238,13 @@ struct ExerciseTimerView: View {
             // Timer display — tap to toggle count-up/count-down
             HStack(spacing: 6) {
                 Text(displayText)
-                    .font(.system(size: 40, weight: .light, design: .monospaced))
+                    .font(.lmMono(size: 40, relativeTo: .largeTitle))
                     .foregroundStyle(timerColor)
                     .tracking(1)
 
                 if targetSeconds != nil {
                     Image(systemName: showCountdown ? "arrow.down" : "arrow.up")
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 }
             }
@@ -260,11 +260,11 @@ struct ExerciseTimerView: View {
             if let target = targetSeconds {
                 HStack(spacing: 4) {
                     Text("Target: \(formatTime(target))")
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(isComplete ? LiftMarkTheme.success : LiftMarkTheme.secondaryLabel)
                     if isComplete {
                         Image(systemName: "checkmark")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.success)
                     }
                 }
@@ -280,7 +280,7 @@ struct ExerciseTimerView: View {
                     }
                 } label: {
                     Text(isRunning ? "Pause" : (displayElapsed > 0 ? "Resume" : "Start"))
-                        .font(.body)
+                        .font(.lmBody)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 40)
@@ -299,7 +299,7 @@ struct ExerciseTimerView: View {
                         onComplete(elapsed)
                     } label: {
                         Text("Done")
-                            .font(.body)
+                            .font(.lmBody)
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 40)

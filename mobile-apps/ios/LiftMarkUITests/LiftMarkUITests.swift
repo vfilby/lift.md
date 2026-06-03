@@ -30,7 +30,7 @@ final class LiftMarkUITests: XCTestCase {
         // SwiftUI's .accessibilityIdentifier on tab content only works for
         // the active tab; inactive tabs must be found by their label text.
         runner.adapter.tabIdToLabel = [
-            "tab-home": "LiftMark",
+            "tab-home": "lift.md",
             "tab-workouts": "Plans",
             "tab-history": "Workouts",
             "tab-settings": "Settings"

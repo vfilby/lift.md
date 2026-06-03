@@ -113,24 +113,24 @@ struct ActiveExerciseCard: View {
                 } label: {
                     HStack(spacing: LiftMarkTheme.spacingSM) {
                         Text("\(displayNumber)")
-                            .font(.caption.bold())
+                            .font(.lmCaption.bold())
                             .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
                             .background(dotFill)
                             .clipShape(Circle())
 
                         Text(exercise.exerciseName)
-                            .font(.headline)
+                            .font(.lmHeadline)
                             .foregroundStyle(exercise.sets.allSatisfy({ $0.status == .completed || $0.status == .skipped }) ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
 
                         Spacer()
 
                         if isCollapsed {
                             Text(collapsedSummary)
-                                .font(.caption)
+                                .font(.lmCaption)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             Image(systemName: "chevron.right")
-                                .font(.caption)
+                                .font(.lmCaption)
                                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                         }
                     }
@@ -147,7 +147,7 @@ struct ActiveExerciseCard: View {
                         onEditExercise()
                     } label: {
                         Image(systemName: "pencil")
-                            .font(.body)
+                            .font(.lmBody)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .frame(width: 36, height: 36)
                     }
@@ -162,7 +162,7 @@ struct ActiveExerciseCard: View {
                 // Notes — indented to align with title
                 if let notes = exercise.notes, !notes.isEmpty {
                     Text(notes)
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .italic()
                         .padding(.leading, 32) // badge width + spacing
@@ -225,7 +225,7 @@ struct ActiveExerciseCard: View {
                                 .frame(height: 1)
                                 .accessibilityHidden(true)
                             Text("Rest \(rest)s")
-                                .font(.caption2)
+                                .font(.lmCaption2)
                                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             Rectangle()
                                 .fill(LiftMarkTheme.tertiaryLabel.opacity(0.3))
@@ -244,10 +244,10 @@ struct ActiveExerciseCard: View {
                     Link(destination: url) {
                         HStack(spacing: LiftMarkTheme.spacingSM) {
                             Image(systemName: "play.rectangle")
-                                .font(.caption)
+                                .font(.lmCaption)
                                 .accessibilityHidden(true)
                             Text("Search \"\(exercise.exerciseName)\" on YouTube")
-                                .font(.caption)
+                                .font(.lmCaption)
                         }
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .frame(maxWidth: .infinity, alignment: .center)

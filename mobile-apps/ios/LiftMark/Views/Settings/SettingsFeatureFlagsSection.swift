@@ -27,7 +27,7 @@ private struct FeatureFlagRow: View {
                 Text(flag.title)
             }
             Text(flag.summary)
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
         }
         .accessibilityIdentifier("feature-flag-\(flag.rawValue)")

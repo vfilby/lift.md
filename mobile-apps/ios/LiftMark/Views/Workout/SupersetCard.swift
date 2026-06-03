@@ -97,7 +97,7 @@ struct SupersetCard: View {
                 HStack(spacing: LiftMarkTheme.spacingSM) {
                     // Purple superset icon
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.caption.bold())
+                        .font(.lmCaption.bold())
                         .foregroundStyle(.white)
                         .frame(width: 24, height: 24)
                         .background(Color.purple)
@@ -106,17 +106,17 @@ struct SupersetCard: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("SUPERSET")
-                            .font(.caption2.bold())
+                            .font(.lmCaption2.bold())
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.purple)
                             .clipShape(Capsule())
                         Text(supersetTitle)
-                            .font(.headline)
+                            .font(.lmHeadline)
                             .foregroundStyle(allSetsCompleted ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
                         Text(children.map { "\($0.displayNumber). \($0.exercise.exerciseName)" }.joined(separator: " + "))
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     }
 
@@ -124,10 +124,10 @@ struct SupersetCard: View {
 
                     if isCollapsed {
                         Text("\(completedSetCount)/\(totalSetCount) sets")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         Image(systemName: "chevron.right")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                     }
                 }
@@ -143,10 +143,10 @@ struct SupersetCard: View {
                     if let notes = child.exercise.notes, !notes.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(child.exercise.exerciseName)
-                                .font(.caption2.weight(.semibold))
+                                .font(.lmCaption2.weight(.semibold))
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             Text(notes)
-                                .font(.caption)
+                                .font(.lmCaption)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                 .italic()
                         }
@@ -163,7 +163,7 @@ struct SupersetCard: View {
 
                     // Exercise name label for each set
                     Text(item.exercise.exerciseName)
-                        .font(.caption2.weight(.semibold))
+                        .font(.lmCaption2.weight(.semibold))
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .padding(.leading, 32)
 
@@ -220,10 +220,10 @@ struct SupersetCard: View {
                             Link(destination: url) {
                                 HStack(spacing: LiftMarkTheme.spacingSM) {
                                     Image(systemName: "play.rectangle")
-                                        .font(.caption)
+                                        .font(.lmCaption)
                                         .accessibilityHidden(true)
                                     Text("Search \"\(child.exercise.exerciseName)\" on YouTube")
-                                        .font(.caption)
+                                        .font(.lmCaption)
                                 }
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                 .frame(maxWidth: .infinity, alignment: .center)

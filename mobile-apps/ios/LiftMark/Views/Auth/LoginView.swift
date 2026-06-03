@@ -129,7 +129,7 @@ struct LoginView: View {
             }
             .accessibilityIdentifier("login-error-unverified")
         case .network:
-            Text("Couldn't reach LiftMark. Check your connection and try again.")
+            Text("Couldn't reach lift.md. Check your connection and try again.")
                 .foregroundStyle(LiftMarkTheme.destructive)
                 .accessibilityIdentifier("login-error-network")
         case .unknown(let message):
@@ -156,12 +156,12 @@ struct LoginView: View {
             }
         case .sent:
             Text("Verification email sent.")
-                .font(.footnote)
+                .font(.lmFootnote)
                 .foregroundStyle(LiftMarkTheme.success)
         case .failed(let message):
             VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
                 Text(message)
-                    .font(.footnote)
+                    .font(.lmFootnote)
                     .foregroundStyle(LiftMarkTheme.destructive)
                 Button("Try again") {
                     Task { await resendVerification() }

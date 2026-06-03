@@ -67,10 +67,10 @@ struct InboxPreviewSheet: View {
                     "\(plan.exercises.count) exercise\(plan.exercises.count == 1 ? "" : "s")",
                     systemImage: "figure.strengthtraining.traditional"
                 )
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 Spacer()
                 Label("\(totalSetCount) set\(totalSetCount == 1 ? "" : "s")", systemImage: "list.number")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
             }
             .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
@@ -80,19 +80,19 @@ struct InboxPreviewSheet: View {
 
             if let unit = plan.defaultWeightUnit {
                 Text("Default unit: \(unit.rawValue)")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
 
             if let description = plan.description, !description.isEmpty {
                 Text(description)
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.label)
                     .padding(.top, 4)
             }
 
             Text(receivedFootnote)
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .padding(.top, 2)
         }
@@ -127,22 +127,22 @@ struct InboxPreviewSheet: View {
 
             HStack(alignment: .firstTextBaseline, spacing: LiftMarkTheme.spacingSM) {
                 Text(exercise.exerciseName)
-                    .font(.headline)
+                    .font(.lmHeadline)
                 Spacer()
                 Text("\(exercise.sets.count) set\(exercise.sets.count == 1 ? "" : "s")")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
 
             if let equipment = exercise.equipmentType, !equipment.isEmpty {
                 Text(equipment)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
 
             if let notes = exercise.notes, !notes.isEmpty {
                 Text(notes)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .italic()
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
@@ -165,7 +165,7 @@ struct InboxPreviewSheet: View {
         switch exercise.groupType {
         case .superset:
             Text("SUPERSET")
-                .font(.caption2.bold())
+                .font(.lmCaption2.bold())
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)
                 .foregroundStyle(.purple)
@@ -173,7 +173,7 @@ struct InboxPreviewSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 4))
         case .section:
             Text((exercise.groupName ?? "Section").uppercased())
-                .font(.caption2.bold())
+                .font(.lmCaption2.bold())
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)
                 .foregroundStyle(LiftMarkTheme.primary)
@@ -189,11 +189,11 @@ struct InboxPreviewSheet: View {
     private func setRow(index: Int, set: PlannedSet, defaultUnit: WeightUnit?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: LiftMarkTheme.spacingSM) {
             Text("\(index)")
-                .font(.callout.monospacedDigit())
+                .font(.lmCallout.monospacedDigit())
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .frame(minWidth: 18, alignment: .leading)
             Text(setDescription(set, defaultUnit: defaultUnit))
-                .font(.callout)
+                .font(.lmCallout)
                 .foregroundStyle(LiftMarkTheme.label)
             Spacer(minLength: 4)
             modifierChips(set)
@@ -249,7 +249,7 @@ struct InboxPreviewSheet: View {
 
     private func chip(_ text: String) -> some View {
         Text(text)
-            .font(.caption2)
+            .font(.lmCaption2)
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
             .foregroundStyle(LiftMarkTheme.secondaryLabel)
@@ -317,7 +317,7 @@ private struct FlowingTagRow: View {
             HStack(spacing: 4) {
                 ForEach(tags, id: \.self) { tag in
                     Text(tag)
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(LiftMarkTheme.primary.opacity(0.12))

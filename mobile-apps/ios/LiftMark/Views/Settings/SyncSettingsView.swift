@@ -20,11 +20,11 @@ struct SyncSettingsView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(statusLabel)
-                            .font(.subheadline.weight(.medium))
+                            .font(.lmSubheadline.weight(.medium))
                             .accessibilityIdentifier("sync-status-label")
 
                         Text(statusDescription)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             .accessibilityIdentifier("sync-status-description")
                     }
@@ -125,13 +125,13 @@ struct SyncSettingsView: View {
             // Sync Info Section (always visible)
             Section {
                 Text("iCloud Sync keeps your workout plans, session history, and settings in sync across all your devices signed into the same iCloud account.")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .accessibilityIdentifier("sync-info-text")
 
                 if accountStatus != .available {
                     Text("To use iCloud Sync, sign in to iCloud in your device's Settings app.")
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
                         .foregroundStyle(LiftMarkTheme.warning)
                 }
             } header: {

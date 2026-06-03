@@ -8,12 +8,12 @@ struct AddExerciseSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: LiftMarkTheme.spacingMD) {
-                Text("Enter exercise in LMWF format:")
-                    .font(.subheadline)
+                Text("Enter exercise in lift.md format:")
+                    .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
                 TextEditor(text: $markdown)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.lmMono)
                     .frame(minHeight: 120)
                     .overlay(
                         RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM)
@@ -21,7 +21,7 @@ struct AddExerciseSheet: View {
                     )
 
                 Text("Example:\n## Bicep Curl [dumbbell]\n- 25 x 12\n- 25 x 10")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                     .frame(maxWidth: .infinity, alignment: .leading)
 

@@ -76,7 +76,7 @@ enum WorkoutGenerationService {
     ) -> String {
         var sections: [String] = []
 
-        sections.append("You are a professional strength coach creating a personalized workout plan in LiftMark Workout Format (LMWF).")
+        sections.append("You are a professional strength coach creating a personalized workout plan in lift.md format (LMWF).")
 
         let userContext = buildUserContextSection(context: context, params: params)
         if !userContext.isEmpty {
@@ -94,7 +94,7 @@ enum WorkoutGenerationService {
         sections.append("""
         # OUTPUT INSTRUCTIONS
 
-        Output ONLY the workout in LMWF markdown. No preamble, no explanation, no surrounding prose — the response will be parsed directly.
+        Output ONLY the workout in lift.md format. No preamble, no explanation, no surrounding prose — the response will be parsed directly.
         """)
 
         return sections.joined(separator: "\n\n")
@@ -149,9 +149,9 @@ enum WorkoutGenerationService {
 
     private static func formatPointerBlock(unit: WeightUnit) -> String {
         """
-        # LMWF FORMAT
+        # lift.md FORMAT
 
-        Output valid LiftMark Workout Format (LMWF) markdown — full spec at \(lmwfSpecURL)
+        Output valid lift.md format (LMWF) markdown — full spec at \(lmwfSpecURL)
 
         Minimal shape:
         ```

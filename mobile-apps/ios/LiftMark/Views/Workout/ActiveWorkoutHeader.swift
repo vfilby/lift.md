@@ -21,9 +21,9 @@ struct ActiveWorkoutHeader: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "pause.fill")
-                        .font(.caption)
+                        .font(.lmCaption)
                     Text("Pause")
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
                 }
             }
             .accessibilityIdentifier("active-workout-pause-button")
@@ -33,7 +33,7 @@ struct ActiveWorkoutHeader: View {
             Spacer()
 
             Text(sessionName)
-                .font(.headline)
+                .font(.lmHeadline)
                 .lineLimit(1)
 
             Spacer()
@@ -51,7 +51,7 @@ struct ActiveWorkoutHeader: View {
                 onFinish()
             } label: {
                 Text("Finish")
-                    .font(.subheadline.bold())
+                    .font(.lmSubheadline.bold())
             }
             .accessibilityIdentifier("active-workout-finish-button")
             .accessibilityLabel("Finish workout")
@@ -80,7 +80,7 @@ struct ActiveWorkoutFooter: View {
                 onAddExercise()
             } label: {
                 Label("Add Exercise", systemImage: "plus")
-                    .font(.footnote.weight(.semibold))
+                    .font(.lmFootnote.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                     .contentShape(Capsule())
@@ -100,7 +100,7 @@ struct ActiveWorkoutFooter: View {
                 // `Log Anyway` in confirm alerts) can't accidentally match this button
                 // when the confirm alert is what should be hit.
                 Text("End Workout")
-                    .font(.footnote.weight(.semibold))
+                    .font(.lmFootnote.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                     .contentShape(Capsule())
@@ -164,7 +164,7 @@ struct ActiveWorkoutProgressBar: View {
             }
             .frame(height: 4)
             Text("\(doneSets) / \(totalSets) sets done")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
         }
         .padding(.horizontal)

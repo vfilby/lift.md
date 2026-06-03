@@ -53,16 +53,16 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_CFBundleDisplayName: LiftMark
-        INFOPLIST_KEY_NSHealthShareUsageDescription: "LiftMark reads your workout history to track progress."
-        INFOPLIST_KEY_NSHealthUpdateUsageDescription: "LiftMark saves your completed workouts to Apple Health."
+        INFOPLIST_KEY_CFBundleDisplayName: lift.md
+        INFOPLIST_KEY_NSHealthShareUsageDescription: "lift.md reads your workout history to track progress."
+        INFOPLIST_KEY_NSHealthUpdateUsageDescription: "lift.md saves your completed workouts to Apple Health."
         INFOPLIST_KEY_NSSupportsLiveActivities: true
         CODE_SIGN_ENTITLEMENTS: LiftMark/LiftMark.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.eff3.liftmark.native-ios.dev
-          INFOPLIST_KEY_CFBundleDisplayName: "LiftMark Dev"
+          INFOPLIST_KEY_CFBundleDisplayName: "lift.md Dev"
           CODE_SIGN_IDENTITY: "-"
           CODE_SIGN_STYLE: Automatic
         Release:
@@ -72,6 +72,12 @@ targets:
     info:
       path: LiftMark/Info.plist
       properties:
+        UIAppFonts:
+          - Inter-Regular.ttf
+          - Inter-SemiBold.ttf
+          - SpaceGrotesk-Bold.ttf
+          - SpaceGrotesk-Medium.ttf
+          - JetBrainsMono-Medium.ttf
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - liftmark
@@ -119,6 +125,7 @@ targets:
       path: LiftMark/LiftMark.entitlements
       properties:
         com.apple.developer.associated-domains:
+          - webcredentials:getlift.md
           - webcredentials:liftmark.app
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access:
@@ -143,12 +150,22 @@ targets:
       - path: Shared
         excludes:
           - "**/.DS_Store"
+    info:
+      path: LiveWorkouts/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        UIAppFonts:
+          - Inter-Regular.ttf
+          - Inter-SemiBold.ttf
+          - SpaceGrotesk-Bold.ttf
+          - SpaceGrotesk-Medium.ttf
+          - JetBrainsMono-Medium.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.eff3.liftmark.native-ios.LiveWorkouts
         GENERATE_INFOPLIST_FILE: true
         INFOPLIST_KEY_CFBundleDisplayName: LiveWorkouts
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_EMIT_LOC_STRINGS: true

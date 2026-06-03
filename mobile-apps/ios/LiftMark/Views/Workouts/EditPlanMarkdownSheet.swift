@@ -35,7 +35,7 @@ struct EditPlanMarkdownSheet: View {
             VStack(spacing: 0) {
                 // Markdown editor
                 TextEditor(text: $markdownText)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.lmMono)
                     .padding(LiftMarkTheme.spacingSM)
                     .accessibilityIdentifier("edit-plan-markdown-editor")
 
@@ -45,7 +45,7 @@ struct EditPlanMarkdownSheet: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(LiftMarkTheme.destructive)
                         Text(error)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.destructive)
                         Spacer()
                     }
@@ -60,7 +60,7 @@ struct EditPlanMarkdownSheet: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(LiftMarkTheme.success)
                         Text("\(result.name) - \(result.exerciseCount) exercises, \(result.setCount) sets")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.success)
                         Spacer()
                     }
@@ -73,10 +73,10 @@ struct EditPlanMarkdownSheet: View {
                             ForEach(result.warnings, id: \.self) { warning in
                                 HStack(spacing: 4) {
                                     Image(systemName: "exclamationmark.triangle")
-                                        .font(.caption2)
+                                        .font(.lmCaption2)
                                         .foregroundStyle(LiftMarkTheme.warning)
                                     Text(warning)
-                                        .font(.caption2)
+                                        .font(.lmCaption2)
                                         .foregroundStyle(LiftMarkTheme.warning)
                                 }
                             }
