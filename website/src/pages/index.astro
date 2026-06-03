@@ -12,10 +12,9 @@ import Base from '../layouts/Base.astro';
       <img class="hero-logo hero-logo-ink" src="/brand/logos/lockup-liftmd-ink.svg" alt="" width="689" height="260" />
       <img class="hero-logo hero-logo-white" src="/brand/logos/lockup-liftmd-white.svg" alt="" width="689" height="260" />
     </div>
-    <h1 class="hero-title">Own your training.</h1>
     <p class="hero-sub">
-      Simple, markdown-based workout plans — write them yourself or let an
-      agent draft them. Bring your own data in, and export it just as easily.
+      Track your workouts with simple, markdown-based workout plans — write them
+      yourself or let an agent draft them.
     </p>
     <div class="hero-cta">
       <a class="lm-btn lm-btn-primary" href="https://testflight.apple.com/join/u8EJFzYu" rel="external noopener">
@@ -84,15 +83,6 @@ import Base from '../layouts/Base.astro';
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme='light']):not([data-color-scheme='light']) .hero-logo-ink { display: none; }
       :root:not([data-theme='light']):not([data-color-scheme='light']) .hero-logo-white { display: block; }
-    }
-    .hero-title {
-      font-family: var(--font-display);
-      font-weight: var(--lm-fw-bold);
-      font-size: 2.5rem;
-      line-height: var(--lm-lh-tight);
-      letter-spacing: var(--lm-tracking-tight);
-      margin: 0 auto 0.75rem;
-      max-width: 18ch;
     }
     .hero-sub {
       color: var(--color-muted);
