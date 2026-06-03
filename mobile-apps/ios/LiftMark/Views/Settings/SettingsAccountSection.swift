@@ -10,6 +10,7 @@ import SwiftUI
 struct SettingsAccountSection: View {
     @Environment(AuthenticationStore.self) private var authStore
     @Environment(InboxPollerService.self) private var inboxPoller
+    @Environment(OutboxPusherService.self) private var outboxPusher
     @Environment(FeatureFlagsStore.self) private var featureFlags
     @State private var showingLogin = false
     @State private var isSigningOut = false
@@ -61,17 +62,26 @@ struct SettingsAccountSection: View {
         .accessibilityIdentifier("account-inbox-status")
 
         Button {
-            Task { await inboxPoller.pollIfAuthenticated() }
+            // A manual "Sync now" must move data in BOTH directions: poll the
+            // inbox AND flush the outbox. `force: true` bypasses the per-item
+            // retry backoff so completed workouts parked behind `next_attempt_
+            // after` push immediately — the backoff timer is an automatic-flush
+            // concern, not a manual-sync one. See spec/services/workout-outbox.md.
+            Task {
+                async let poll: Void = inboxPoller.pollIfAuthenticated()
+                async let flush: Void = outboxPusher.flushIfAuthenticated(force: true)
+                _ = await (poll, flush)
+            }
         } label: {
             HStack {
                 Text("Sync now")
                 Spacer()
-                if inboxPoller.isPolling {
+                if inboxPoller.isPolling || outboxPusher.isFlushing {
                     ProgressView()
                 }
             }
         }
-        .disabled(inboxPoller.isPolling)
+        .disabled(inboxPoller.isPolling || outboxPusher.isFlushing)
         .accessibilityIdentifier("account-inbox-sync-now")
     }
 
