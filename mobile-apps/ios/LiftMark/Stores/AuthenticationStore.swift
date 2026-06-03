@@ -34,6 +34,26 @@ private struct ResendVerificationRequest: Encodable {
     let email: String
 }
 
+/// `GET /v1/me` response. Snake-case → camelCase via the client decoder.
+/// Maps onto `AuthenticatedUser` (server `primary_email` → `email`).
+private struct MeResponse: Decodable {
+    let userId: String
+    let primaryEmail: String
+    let displayName: String?
+    let tier: AuthenticatedUser.Tier
+    let trialEndsAt: Date?
+
+    var asAuthenticatedUser: AuthenticatedUser {
+        AuthenticatedUser(
+            userId: userId,
+            email: primaryEmail,
+            displayName: displayName ?? "",
+            tier: tier,
+            trialEndsAt: trialEndsAt
+        )
+    }
+}
+
 // MARK: - JWT Helper
 
 /// Decodes the payload of a JWT WITHOUT verifying the signature. We only
@@ -81,6 +101,7 @@ enum JWTDecoder {
 final class AuthenticationStore {
     private let api: APIClientProtocol
     private let tokenStore: TokenStore
+    private let profileStore: ProfileStore
 
     /// Buffer applied to JWT `exp` checks. If the token expires within this
     /// window, we proactively refresh rather than racing the server clock.
@@ -111,6 +132,11 @@ final class AuthenticationStore {
     /// or concurrent `restoreSession()` calls await the same work.
     private var restoreTask: Task<Void, Never>?
 
+    /// Single-flight handle for the `/v1/me` profile fetch. Coalesces concurrent
+    /// `fetchMe()` callers (e.g. two refreshes resuming together) onto one
+    /// round-trip so we don't fire redundant `/v1/me` requests.
+    private var inFlightFetchMe: Task<Void, Never>?
+
     /// Set `true` when the refresh chain dies (refresh token rejected with
     /// 401 in `refreshIfNeeded`). Distinguishes a *silently expired* session
     /// from a *user-initiated* logout: the expired-session path drops the dead
@@ -127,9 +153,14 @@ final class AuthenticationStore {
     /// Left nil in tests that don't exercise the flush.
     var onAuthenticated: (() -> Void)?
 
-    init(api: APIClientProtocol, tokenStore: TokenStore) {
+    init(
+        api: APIClientProtocol,
+        tokenStore: TokenStore,
+        profileStore: ProfileStore = ProfileStore()
+    ) {
         self.api = api
         self.tokenStore = tokenStore
+        self.profileStore = profileStore
         rehydrateFromKeychain()
     }
 
@@ -172,9 +203,11 @@ final class AuthenticationStore {
                 body: req,
                 accessToken: nil
             )
-            tokenStore.saveAccessToken(response.accessJwt)
-            tokenStore.saveRefreshToken(response.refreshToken)
+            tokenStore.saveTokens(access: response.accessJwt, refresh: response.refreshToken)
             currentUser = response.user
+            // Persist the full server profile so a relaunch restores the real
+            // tier/email verbatim instead of a claims-derived placeholder.
+            profileStore.save(response.user)
             lastError = nil
             // A fresh session clears any prior "needs re-auth" state and drains
             // any completed-but-unsynced workouts queued under the old session.
@@ -217,6 +250,9 @@ final class AuthenticationStore {
         }
 
         tokenStore.clear()
+        // Deliberate sign-out is a clean slate — drop the persisted profile so
+        // the next launch shows nobody signed in.
+        profileStore.clear()
         currentUser = nil
         lastError = nil
         // A deliberate sign-out is a clean state, not a lapsed one.
@@ -293,7 +329,17 @@ final class AuthenticationStore {
 
         // Access token missing or stale → refresh. The local exp check above
         // already short-circuited the fresh-token case.
-        return try await forceRefresh()
+        let token = try await forceRefresh()
+        // If the refresh succeeded but we have no in-memory user (e.g. a
+        // runtime refresh after the session was cleared, with no persisted
+        // profile to fall back on), repopulate from /v1/me. Awaited and
+        // guarded on `currentUser == nil` so it's deterministic and fires at
+        // most once; fetchMe re-enters `refreshIfNeeded` but the token is now
+        // fresh, so it short-circuits above and never re-refreshes.
+        if currentUser == nil {
+            await fetchMe()
+        }
+        return token
     }
 
     /// Performs `/v1/auth/refresh`, coalescing concurrent callers onto a single
@@ -330,8 +376,11 @@ final class AuthenticationStore {
                 body: RefreshRequest(refreshToken: refresh),
                 accessToken: nil
             )
-            tokenStore.saveAccessToken(response.accessJwt)
-            tokenStore.saveRefreshToken(response.refreshToken)
+            // Persist the rotated pair atomically (refresh-before-access)
+            // BEFORE returning, so a relaunch or a kill mid-refresh always
+            // reads the new refresh token and never re-presents the consumed
+            // one. See spec (Refresh-token rotation / client hardening).
+            tokenStore.saveTokens(access: response.accessJwt, refresh: response.refreshToken)
             // A successful refresh proves the session is alive: clear any stale
             // expired flag so the UI leaves the re-auth state.
             sessionExpired = false
@@ -387,10 +436,55 @@ final class AuthenticationStore {
 
     /// Drop the dead session tokens and flag re-auth needed WITHOUT wiping the
     /// outbox/inbox (that is `logout()`'s job, for deliberate sign-out only).
+    /// The persisted profile is intentionally KEPT so the re-auth UI can still
+    /// show who was signed in while prompting for the password.
     private func markSessionExpired() {
         tokenStore.clear()
         currentUser = nil
         sessionExpired = true
+    }
+
+    // MARK: - Profile (/v1/me)
+
+    /// Fetches the authoritative profile from `GET /v1/me` and repopulates
+    /// `currentUser` + the persisted profile. Runs through
+    /// `withAuthorizedRequest` so it shares the single-flight refresh and the
+    /// refresh-on-401 retry. Best-effort: a transient failure (network, 5xx,
+    /// edge block, or a refresh that couldn't complete) is swallowed and
+    /// logged — it never signs the user out and never clears the persisted
+    /// profile. See `spec/services/authentication.md` (Client use of /v1/me).
+    func fetchMe() async {
+        // Coalesce concurrent callers onto one round-trip (two refreshes
+        // resuming together would otherwise each fire a /v1/me).
+        if let inFlight = inFlightFetchMe {
+            return await inFlight.value
+        }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.performFetchMe()
+        }
+        inFlightFetchMe = task
+        defer { inFlightFetchMe = nil }
+        await task.value
+    }
+
+    private func performFetchMe() async {
+        do {
+            let user = try await withAuthorizedRequest { token in
+                let response: MeResponse = try await self.api.send(
+                    path: "/v1/me",
+                    method: "GET",
+                    body: Optional<EmptyBody>.none,
+                    accessToken: token
+                )
+                return response.asAuthenticatedUser
+            }
+            currentUser = user
+            profileStore.save(user)
+        } catch {
+            // Keep the persisted/claims user; the next launch or refresh retries.
+            Logger.shared.warn(.network, "fetchMe (/v1/me) failed (ignored): \(error)")
+        }
     }
 
     // MARK: - Private
@@ -417,18 +511,24 @@ final class AuthenticationStore {
             return
         }
 
-        // Best-effort user reconstitution from JWT claims. The login flow
-        // populates `currentUser` with the full server-returned object;
-        // here we only know what the JWT carries (likely just `sub`), so
-        // downstream UI that needs `email`/`displayName` should fetch them
-        // when the inbox poller / /v1/me lands.
-        currentUser = AuthenticatedUser(
-            userId: payload.sub,
-            email: payload.email ?? "",
-            displayName: payload.displayName ?? "",
-            tier: .free,
-            trialEndsAt: nil
-        )
+        // Restore the in-memory user. Prefer the PERSISTED profile (real tier,
+        // real email, verbatim) so a trial user no longer relaunches into a
+        // "Free plan" placeholder. Only when nothing is persisted do we fall
+        // back to reconstituting a partial user from the JWT claims — the JWT
+        // carries no tier, so `.free` is the unknown-plan default here (and is
+        // promptly corrected by `fetchMe()` after restore). A persisted profile
+        // for a *different* user_id is stale (e.g. a prior account); ignore it.
+        if let persisted = profileStore.load(), persisted.userId == payload.sub {
+            currentUser = persisted
+        } else {
+            currentUser = AuthenticatedUser(
+                userId: payload.sub,
+                email: payload.email ?? "",
+                displayName: payload.displayName ?? "",
+                tier: .free,
+                trialEndsAt: nil
+            )
+        }
 
         // Access token still fresh → nothing to await; we're done.
         guard payload.exp <= Date().timeIntervalSince1970 + refreshBufferSeconds else {
@@ -466,7 +566,15 @@ final class AuthenticationStore {
             // change that matters here (markSessionExpired on 401). A transient
             // failure is intentionally a no-op — we stay authenticated-offline.
             Logger.shared.warn(.network, "Launch session restore did not complete: \(error)")
+            return
         }
+        // Refresh succeeded → replace the claims/persisted user with the
+        // authoritative server profile (real tier/email). Best-effort:
+        // fetchMe never signs us out on a transient failure. `refreshIfNeeded`
+        // already self-heals the `currentUser == nil` case (no persisted
+        // profile / no claims), so this awaited fetch is what upgrades a
+        // claims- or persisted-reconstituted user to the live server profile.
+        await fetchMe()
     }
 
     private static func mapLoginError(_ error: APIError) -> AuthError {

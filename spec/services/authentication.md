@@ -95,6 +95,30 @@ authentication, since it is the caller's own data.
 authenticated `user_id` has no user row (e.g. a deleted account whose token is
 still cryptographically valid).
 
+### Client use of `/v1/me`
+
+The JWT carries only `sub` (and sometimes `email`/`display_name`); it does NOT
+carry `tier` or `trial_ends_at`. Reconstituting `currentUser` from claims alone
+therefore cannot know the real plan — historically the client hardcoded
+`tier: .free`, so a *trial* user relaunching saw "Free plan / please sign in".
+`/v1/me` is the authoritative source for the profile fields the JWT lacks.
+
+`AuthenticationStore.fetchMe()` calls `GET /v1/me` through
+`withAuthorizedRequest` (so it shares the single-flight refresh and the
+refresh-on-401 retry), decodes the response into `AuthenticatedUser`, sets
+`currentUser`, and persists it (see *Persisted profile* below). It is invoked:
+
+- after a **successful launch restore** (`performRestore`), to replace the
+  claims-reconstituted user with the real server profile; and
+- after a **successful runtime refresh** when `currentUser` is missing or was
+  reconstituted from claims (so a long-idle relaunch that refreshes still
+  shows the real tier/email).
+
+`fetchMe()` is **best-effort**: a transient `/v1/me` failure (network, 5xx,
+edge block) is swallowed and logged. It never signs the user out and never
+clears the persisted profile — the user keeps whatever profile was already
+restored (persisted or claims-derived) and the next launch/refresh retries.
+
 ## Keychain storage
 
 Tokens are persisted by `TokenStore` in the iOS Keychain
@@ -105,6 +129,29 @@ Tokens are persisted by `TokenStore` in the iOS Keychain
 | Access token account | `access_token` |
 | Refresh token account | `refresh_token` |
 | Accessibility | `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` |
+
+### Persisted profile
+
+The Keychain holds only the tokens. The last-known **profile**
+(`email`, `display_name`, `tier`, `trial_ends_at`, plus `user_id`) is persisted
+separately by `ProfileStore` in `UserDefaults` (key
+`auth.lastKnownProfile`). The profile is non-secret display data — it is
+not a credential — so it does not need Keychain protection, and storing it in
+`UserDefaults` lets launch rehydration read it synchronously without a Keychain
+round-trip.
+
+- **On successful login** the full server-returned `AuthenticatedUser` is
+  persisted verbatim.
+- **On launch rehydration** `currentUser` is restored from the persisted
+  profile *verbatim* (real tier, real email) when one exists. Only when no
+  profile is persisted does the store fall back to reconstituting a partial
+  user from the JWT claims (with `tier: .free` as the unknown-plan default).
+  The hardcoded `.free` is thus a last-resort fallback, never applied over a
+  known persisted tier.
+- **On `logout()`** the persisted profile is cleared (deliberate sign-out is a
+  clean slate).
+- **On `markSessionExpired()`** the persisted profile is **kept**, so the
+  re-auth UI can still show who was signed in while prompting for the password.
 
 `AfterFirstUnlockThisDeviceOnly` is **required and must not be weakened**:
 
@@ -122,12 +169,18 @@ Keychain. The contract:
 
 1. **No tokens in Keychain** → logged out. Restoration is complete immediately.
 2. **Access token present and not within the refresh buffer of expiry**
-   (`exp > now + 30s`) → authenticated immediately from the JWT claims; no
-   network call.
+   (`exp > now + 30s`) → authenticated immediately from the persisted profile
+   (or, absent one, the JWT claims); no network call.
 3. **Access token expired (or within buffer) and a refresh token is present** →
    the store enters a *restoring* state and performs an **awaited** refresh
    before concluding anything about auth state:
    - Refresh **succeeds** → authenticated with the freshly-minted tokens.
+     The rotated access + refresh tokens are persisted **atomically before the
+     refresh call returns** (`TokenStore.saveTokens(access:refresh:)`), so a
+     relaunch (or a kill mid-refresh) always reads the *new* refresh token and
+     never re-presents the consumed one. After the refresh resolves, the store
+     calls `fetchMe()` (best-effort) to replace the claims-reconstituted user
+     with the real server profile.
    - Refresh rejected with **401** (refresh token expired/revoked) → and only
      then → logged out, with `sessionExpired = true` (device-local
      outbox/inbox preserved; see GH #143).

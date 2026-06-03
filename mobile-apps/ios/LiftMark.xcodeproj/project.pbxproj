@@ -150,6 +150,7 @@
 		A079FD288F0F237454EE55FD /* WorkoutHistoryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CB06D57A0B9533D74D0431 /* WorkoutHistoryServiceTests.swift */; };
 		A17CDED61F53A3856B35BB52 /* exercise-dictionary.json in Resources */ = {isa = PBXBuildFile; fileRef = A178CE4E73F55B275E245A02 /* exercise-dictionary.json */; };
 		A2994975FB6B2B6580CA34C5 /* PlateCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4406CB6F8705596A59036876 /* PlateCalculatorTests.swift */; };
+		A2F7492945F5277ABF7BB84A /* ProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 654972C6C1759CA67F11DCA9 /* ProfileStore.swift */; };
 		A3275CAEA4376A2F94A89A9B /* AuthenticationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92856F532EAAA8940E6CFDF5 /* AuthenticationStore.swift */; };
 		A47498AD84CC4B09D112D56A /* RestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C826AE567713686B32DDE784 /* RestTimerView.swift */; };
 		A6F4017919B1551AFD9AE57E /* OutboxPusherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D265C4177D34E4EE964C09C3 /* OutboxPusherService.swift */; };
@@ -347,6 +348,7 @@
 		602B65899BCBD9026FEB621C /* OutboxPusherServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxPusherServiceTests.swift; sourceTree = "<group>"; };
 		62BC30CC7136FEBF11EFB81E /* DebugLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogsView.swift; sourceTree = "<group>"; };
 		64A76A2194E3AF636AD5C75F /* StoreIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreIntegrationTests.swift; sourceTree = "<group>"; };
+		654972C6C1759CA67F11DCA9 /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
 		661D15791C0AD1574A2334AB /* MigratorBridgeFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratorBridgeFailureTests.swift; sourceTree = "<group>"; };
 		688A5D549F3414C22FBB97D8 /* WorkoutSessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionRow.swift; sourceTree = "<group>"; };
 		6A259EFF7FFA8F1DD3070318 /* SessionLMWFEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLMWFEncoder.swift; sourceTree = "<group>"; };
@@ -587,6 +589,7 @@
 				777DBE3773D5EB279EFB7089 /* MarkdownParserHelpers.swift */,
 				D265C4177D34E4EE964C09C3 /* OutboxPusherService.swift */,
 				6CBE5F077F0F3EA293E45AE5 /* PlateCalculator.swift */,
+				654972C6C1759CA67F11DCA9 /* ProfileStore.swift */,
 				3F69FC1D6757DC923E65FCFF /* SecureStorage.swift */,
 				6A259EFF7FFA8F1DD3070318 /* SessionLMWFEncoder.swift */,
 				EAAF9A728BCBE8C842B01E9D /* SyncSessionGuard.swift */,
@@ -1239,6 +1242,7 @@
 				B7FFCD8C43EF830EDB879E0E /* OutboxPendingQueueRepository.swift in Sources */,
 				A6F4017919B1551AFD9AE57E /* OutboxPusherService.swift in Sources */,
 				F37EC6ABED84F7A871698B2A /* PlateCalculator.swift in Sources */,
+				A2F7492945F5277ABF7BB84A /* ProfileStore.swift in Sources */,
 				8A5E5266EC0AF8521010B53C /* RestTimerState.swift in Sources */,
 				A47498AD84CC4B09D112D56A /* RestTimerView.swift in Sources */,
 				DE179F500208338C247CC1D7 /* ScreenshotSeed.swift in Sources */,

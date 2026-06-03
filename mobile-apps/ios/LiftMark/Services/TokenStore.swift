@@ -26,6 +26,16 @@ final class TokenStore: @unchecked Sendable {
         store(token, account: refreshAccount)
     }
 
+    /// Persist a rotated access + refresh pair, writing the **refresh token
+    /// first**. After `/v1/auth/refresh` rotates, the refresh token is the
+    /// durable proof of session: if the app is killed mid-write, we want the
+    /// *new* refresh token on disk (so a relaunch never re-presents the
+    /// consumed one). Writing refresh-before-access guarantees that ordering.
+    func saveTokens(access: String, refresh: String) {
+        store(refresh, account: refreshAccount)
+        store(access, account: accessAccount)
+    }
+
     // MARK: - Load
 
     func loadAccessToken() -> String? {
