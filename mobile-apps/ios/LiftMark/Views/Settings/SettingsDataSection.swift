@@ -93,7 +93,7 @@ struct SettingsDataSection: View {
                 let importService = JsonImportService()
                 guard importService.validateJsonFile(at: tempURL) else {
                     try? FileManager.default.removeItem(at: tempURL)
-                    importErrorMessage = "The selected file is not a valid LiftMark export."
+                    importErrorMessage = "The selected file is not a valid lift.md export."
                     showImportError = true
                     return
                 }
@@ -104,7 +104,7 @@ struct SettingsDataSection: View {
                 // Validate database
                 guard DatabaseBackupService.validateDatabaseFile(at: tempURL) else {
                     try? FileManager.default.removeItem(at: tempURL)
-                    importErrorMessage = "The selected file is not a valid LiftMark database."
+                    importErrorMessage = "The selected file is not a valid lift.md database."
                     showImportError = true
                     return
                 }

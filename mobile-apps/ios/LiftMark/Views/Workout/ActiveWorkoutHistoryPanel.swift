@@ -7,7 +7,7 @@ struct ActiveWorkoutHistoryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Exercise History")
-                .font(.headline)
+                .font(.lmHeadline)
                 .padding()
 
             Divider()
@@ -16,7 +16,7 @@ struct ActiveWorkoutHistoryPanel: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {
                         Text(exerciseName)
-                            .font(.title3)
+                            .font(.lmTitle3)
                             .fontWeight(.semibold)
 
                         ExerciseHistoryChartView(exerciseName: exerciseName)
@@ -32,10 +32,10 @@ struct ActiveWorkoutHistoryPanel: View {
             } else {
                 VStack(spacing: LiftMarkTheme.spacingMD) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.largeTitle)
+                        .font(.lmLargeTitle)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                     Text("Complete sets to see exercise history")
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

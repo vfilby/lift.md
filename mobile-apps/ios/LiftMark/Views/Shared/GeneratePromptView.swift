@@ -43,7 +43,7 @@ struct GeneratePromptView: View {
                     previewSection
                     if let error = generationError {
                         Text(error)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.destructive)
                     }
                 }
@@ -96,10 +96,10 @@ struct GeneratePromptView: View {
     private var intentSection: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             Text("What do you want to train?")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
             TextEditor(text: $intent)
-                .font(.body)
+                .font(.lmBody)
                 .frame(minHeight: 80)
                 .padding(LiftMarkTheme.spacingSM)
                 .background(LiftMarkTheme.secondaryBackground)
@@ -120,12 +120,12 @@ struct GeneratePromptView: View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             HStack {
                 Text("Gym")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 if gymStore.gyms.isEmpty {
                     Text("No gyms — using default equipment")
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 } else {
                     Picker("Gym", selection: Binding(
@@ -144,7 +144,7 @@ struct GeneratePromptView: View {
             if settings?.aiPromptIncludeEquipment == true, !equipment.isEmpty {
                 let available = equipment.filter { $0.isAvailable }.map(\.name)
                 Text(available.isEmpty ? "(no equipment marked available)" : available.joined(separator: ", "))
-                    .font(.caption2)
+                    .font(.lmCaption2)
                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
             }
         }
@@ -153,10 +153,10 @@ struct GeneratePromptView: View {
     private var togglesSection: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             Text("Include in prompt")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
             VStack(spacing: 0) {
-                Toggle("LMWF format pointer", isOn: toggle(\.aiPromptIncludeFormatPointer))
+                Toggle("lift.md format pointer", isOn: toggle(\.aiPromptIncludeFormatPointer))
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("toggle-ai-include-format-pointer")
                 Divider()
@@ -179,7 +179,7 @@ struct GeneratePromptView: View {
         DisclosureGroup(isExpanded: $showPreview) {
             ScrollView {
                 Text(builtPrompt)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.lmMono(size: 12, relativeTo: .caption))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
                     .padding(LiftMarkTheme.spacingSM)
@@ -190,7 +190,7 @@ struct GeneratePromptView: View {
             .accessibilityIdentifier("prompt-preview")
         } label: {
             Text("Prompt preview")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
         }
     }

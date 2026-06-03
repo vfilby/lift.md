@@ -33,10 +33,10 @@ struct DebugLogsView: View {
             } else if logs.isEmpty {
                 VStack(spacing: LiftMarkTheme.spacingMD) {
                     Image(systemName: "doc.text")
-                        .font(.largeTitle)
+                        .font(.lmLargeTitle)
                         .foregroundStyle(.secondary)
                     Text("No Logs")
-                        .font(.headline)
+                        .font(.lmHeadline)
                     Text("Debug logs will appear here.")
                         .foregroundStyle(.secondary)
                 }
@@ -127,7 +127,7 @@ struct DebugLogsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .font(.subheadline)
+        .font(.lmSubheadline)
 
         HStack {
             Text("App")
@@ -135,7 +135,7 @@ struct DebugLogsView: View {
             Text("v\(info.appVersion) (\(info.buildType))")
                 .foregroundStyle(.secondary)
         }
-        .font(.subheadline)
+        .font(.lmSubheadline)
 
         HStack(spacing: LiftMarkTheme.spacingMD) {
             ForEach(LogLevel.allCases, id: \.self) { level in
@@ -145,10 +145,10 @@ struct DebugLogsView: View {
                         .fill(logLevelColor(level))
                         .frame(width: 6, height: 6)
                     Text("\(count)")
-                        .font(.caption)
+                        .font(.lmCaption)
                         .fontWeight(.medium)
                     Text(level.rawValue)
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -247,10 +247,10 @@ private struct LogEntryRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(formatTimestamp(entry.timestamp))
-                            .font(.system(.caption2, design: .monospaced))
+                            .font(.lmMono(size: 11, relativeTo: .caption2))
                             .foregroundStyle(.secondary)
                         Text(entry.category.rawValue)
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(LiftMarkTheme.secondaryBackground)
@@ -258,7 +258,7 @@ private struct LogEntryRow: View {
                     }
 
                     Text(entry.message)
-                        .font(.system(.caption, design: .monospaced))
+                        .font(.lmMono(size: 12, relativeTo: .caption))
                         .lineLimit(isExpanded ? nil : 2)
                 }
 
@@ -269,7 +269,7 @@ private struct LogEntryRow: View {
                         isExpanded.toggle()
                     } label: {
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption)
+                            .font(.lmCaption)
                     }
                     .buttonStyle(.plain)
                 }
@@ -279,13 +279,13 @@ private struct LogEntryRow: View {
                 if let metadata = entry.metadata, !metadata.isEmpty {
                     let formatted = metadata.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
                     Text(formatted)
-                        .font(.system(.caption2, design: .monospaced))
+                        .font(.lmMono(size: 11, relativeTo: .caption2))
                         .foregroundStyle(.secondary)
                         .padding(.leading, LiftMarkTheme.spacingMD)
                 }
                 if let stackTrace = entry.stackTrace {
                     Text(stackTrace)
-                        .font(.system(.caption2, design: .monospaced))
+                        .font(.lmMono(size: 11, relativeTo: .caption2))
                         .foregroundStyle(LiftMarkTheme.destructive.opacity(0.8))
                         .padding(.leading, LiftMarkTheme.spacingMD)
                 }
@@ -315,7 +315,7 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.caption)
+                .font(.lmCaption)
                 .fontWeight(isSelected ? .semibold : .regular)
                 .padding(.horizontal, LiftMarkTheme.spacingSM)
                 .padding(.vertical, LiftMarkTheme.spacingXS)

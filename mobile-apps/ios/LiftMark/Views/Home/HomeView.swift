@@ -38,15 +38,27 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: LiftMarkTheme.spacingMD) {
+                // Brand wordmark — uses the logo (with the custom 'l') rather
+                // than the typeface, which renders a plain 'l'.
+                HStack {
+                    Image("BrandWordmark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 34)
+                        .accessibilityLabel("lift.md")
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                }
+
                 // Resume Workout Banner
                 if let activeSession = sessionStore.activeSession {
                     NavigationLink(value: AppDestination.activeWorkout) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Resume \(activeSession.name)")
-                                    .font(.headline)
+                                    .font(.lmHeadline)
                                 Text(setProgressText(for: activeSession))
-                                    .font(.subheadline)
+                                    .font(.lmSubheadline)
                                     .opacity(0.9)
                             }
                             Spacer()
@@ -75,16 +87,16 @@ struct HomeView: View {
                     } label: {
                         HStack {
                             Image(systemName: "tray.full")
-                                .font(.title2)
+                                .font(.lmTitle2)
                                 .foregroundStyle(LiftMarkTheme.primary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(inboxCount == 1
                                      ? "1 workout in your inbox"
                                      : "\(inboxCount) workouts in your inbox")
-                                    .font(.headline)
+                                    .font(.lmHeadline)
                                     .foregroundStyle(LiftMarkTheme.label)
                                 Text("Tap to review")
-                                    .font(.subheadline)
+                                    .font(.lmSubheadline)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             Spacer()
@@ -107,7 +119,7 @@ struct HomeView: View {
                 // Max Lifts Section
                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
                     Text("Max Lifts")
-                        .font(.headline)
+                        .font(.lmHeadline)
 
                     LazyVGrid(columns: maxLiftColumns, spacing: LiftMarkTheme.spacingSM) {
                         ForEach(Array(homeTiles.enumerated()), id: \.offset) { index, exerciseName in
@@ -131,19 +143,19 @@ struct HomeView: View {
                 // Recent Plans Section
                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
                     Text("Recent Plans")
-                        .font(.headline)
+                        .font(.lmHeadline)
 
                     if planStore.plans.isEmpty {
                         VStack(spacing: LiftMarkTheme.spacingSM) {
                             Image(systemName: "dumbbell")
-                                .font(.largeTitle)
+                                .font(.lmLargeTitle)
                                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                                 .accessibilityHidden(true)
                             Text("No plans yet")
-                                .font(.headline)
+                                .font(.lmHeadline)
                                 .foregroundStyle(LiftMarkTheme.label)
                             Text("Import your first workout plan to get started")
-                                .font(.subheadline)
+                                .font(.lmSubheadline)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         }
                         .frame(maxWidth: .infinity)
@@ -181,7 +193,7 @@ struct HomeView: View {
                 showImport = true
             } label: {
                 Label("Create Plan", systemImage: "plus")
-                    .font(.headline)
+                    .font(.lmHeadline)
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.borderedProminent)
@@ -193,7 +205,11 @@ struct HomeView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home-screen")
-        .navigationTitle("LiftMark")
+        // No text title — the wordmark logo in the content serves as the
+        // screen heading (the typeface renders a plain 'l'; the logo keeps
+        // the custom one). Empty + inline collapses the nav-bar title area.
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showImport) {
             ImportView()
         }
@@ -368,7 +384,7 @@ private struct SparklineView: View {
 
             // Label
             Text("\(values.count) sessions \(trend)")
-                .font(.caption2)
+                .font(.lmCaption2)
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
         }
     }
@@ -387,24 +403,24 @@ private struct MaxLiftTile: View {
     var body: some View {
         VStack(spacing: LiftMarkTheme.spacingXS) {
             Text(exerciseName)
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .lineLimit(1)
 
             if let weight = maxWeight {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(formatWeight(weight))
-                        .font(.title2.bold())
+                        .font(.lmTitle2.bold())
                     Text(unit.rawValue)
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 }
             } else {
                 Text("\u{2014}")
-                    .font(.title2.bold())
+                    .font(.lmTitle2.bold())
                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 Text("No data yet")
-                    .font(.caption2)
+                    .font(.lmCaption2)
                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
             }
 
@@ -441,29 +457,29 @@ private struct WorkoutPlanCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: LiftMarkTheme.spacingXS) {
                     Text(plan.name)
-                        .font(.headline)
+                        .font(.lmHeadline)
                         .foregroundStyle(LiftMarkTheme.label)
                     if plan.isFavorite {
                         Image(systemName: "heart.fill")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(.pink)
                             .accessibilityHidden(true)
                     }
                 }
                 HStack(spacing: LiftMarkTheme.spacingSM) {
                     Text("\(plan.exercises.count) exercises")
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     if !plan.tags.isEmpty {
                         Text(plan.tags.prefix(2).joined(separator: ", "))
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                     }
                 }
             }
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 .accessibilityHidden(true)
         }

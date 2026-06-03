@@ -49,6 +49,14 @@
 	<false/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Inter-Regular.ttf</string>
+		<string>Inter-SemiBold.ttf</string>
+		<string>SpaceGrotesk-Bold.ttf</string>
+		<string>SpaceGrotesk-Medium.ttf</string>
+		<string>JetBrainsMono-Medium.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

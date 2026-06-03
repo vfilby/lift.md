@@ -27,10 +27,10 @@ struct SettingsAISection: View {
     private var togglesGroup: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             Text("Include in AI prompt")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
             VStack(spacing: 0) {
-                Toggle("LMWF format pointer", isOn: toggleBinding(\.aiPromptIncludeFormatPointer))
+                Toggle("lift.md format pointer", isOn: toggleBinding(\.aiPromptIncludeFormatPointer))
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("toggle-ai-include-format-pointer")
                 Divider()
@@ -52,7 +52,7 @@ struct SettingsAISection: View {
     private func customPromptGroup(settings: UserSettings) -> some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             Text("Custom Prompt")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
             TextField("Additional instructions for AI...", text: Binding(
                 get: { settings.customPromptAddition ?? "" },
@@ -70,7 +70,7 @@ struct SettingsAISection: View {
     private var apiKeyGroup: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             Text("API Key")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
             HStack(spacing: LiftMarkTheme.spacingSM) {
                 if showApiKey {
@@ -98,7 +98,7 @@ struct SettingsAISection: View {
                     saveApiKey()
                 } label: {
                     Text("Save")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.lmSubheadline.weight(.semibold))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
                         .background(LiftMarkTheme.primary)
@@ -112,7 +112,7 @@ struct SettingsAISection: View {
                     removeApiKey()
                 } label: {
                     Text("Remove")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.lmSubheadline.weight(.semibold))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
                         .overlay(
@@ -136,7 +136,7 @@ struct SettingsAISection: View {
                     .fill(apiKeyStatusColor(status))
                     .frame(width: 8, height: 8)
                 Text(apiKeyStatusLabel(status))
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(.secondary)
             }
         }

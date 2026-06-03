@@ -45,7 +45,7 @@ struct SettingsHealthKitSection: View {
                 .accessibilityIdentifier("switch-healthkit")
 
                 Text(healthKitStatusText)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .accessibilityIdentifier("healthkit-status-label")
 
@@ -54,7 +54,7 @@ struct SettingsHealthKitSection: View {
                         openUserSettings()
                     } label: {
                         Text("Open Health Settings")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.primary)
                     }
                     .accessibilityIdentifier("healthkit-open-settings")

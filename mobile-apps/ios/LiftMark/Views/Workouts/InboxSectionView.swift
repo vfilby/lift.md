@@ -44,7 +44,7 @@ struct InboxSectionView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 if let err = actionError {
                     Text(err)
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(Color.red)
                         .padding(.horizontal, LiftMarkTheme.spacingMD)
                         .padding(.bottom, LiftMarkTheme.spacingSM)
@@ -105,11 +105,11 @@ struct InboxSectionView: View {
         } label: {
             HStack {
                 Text("Inbox")
-                    .font(.headline)
+                    .font(.lmHeadline)
                     .foregroundStyle(LiftMarkTheme.label)
                 if !items.isEmpty {
                     Text("\(items.count)")
-                        .font(.caption.bold())
+                        .font(.lmCaption.bold())
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
@@ -119,7 +119,7 @@ struct InboxSectionView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.down")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .rotationEffect(.degrees(isExpanded ? 0 : -90))
                     .animation(.easeInOut(duration: 0.2), value: isExpanded)
@@ -174,7 +174,7 @@ struct InboxSectionView: View {
     private var emptyRow: some View {
         HStack {
             Text("No new workouts in your inbox.")
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
             Spacer()
         }
@@ -188,10 +188,10 @@ struct InboxSectionView: View {
         return HStack(spacing: LiftMarkTheme.spacingSM) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.summary.name)
-                    .font(.headline)
+                    .font(.lmHeadline)
                     .lineLimit(1)
                 Text("\(item.summary.exerciseCount) exercises • \(item.summary.setCount) sets • \(relativeStamp(item.createdAtServer))")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .lineLimit(1)
             }

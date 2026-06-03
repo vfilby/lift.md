@@ -126,7 +126,7 @@ struct EditExerciseSheet: View {
             if let error = validationError {
                 Section {
                     Text(error)
-                        .font(.caption)
+                        .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.destructive)
                         .accessibilityIdentifier("edit-exercise-form-error")
                 }
@@ -150,7 +150,7 @@ struct EditExerciseSheet: View {
                     VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
                         HStack(spacing: LiftMarkTheme.spacingSM) {
                             Text("Set \(index + 1)")
-                                .font(.subheadline)
+                                .font(.lmSubheadline)
                                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                                 .frame(width: 45, alignment: .leading)
 
@@ -182,7 +182,7 @@ struct EditExerciseSheet: View {
                                     .frame(width: 50)
                                     .accessibilityIdentifier("edit-set-time-\(index)")
                                 Text("s")
-                                    .font(.caption)
+                                    .font(.lmCaption)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
 
@@ -190,14 +190,14 @@ struct EditExerciseSheet: View {
 
                             if setRow.status != .pending {
                                 Text(setRow.status.rawValue)
-                                    .font(.caption2)
+                                    .font(.lmCaption2)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                         }
 
                         HStack(spacing: LiftMarkTheme.spacingSM) {
                             Text("Rest")
-                                .font(.caption)
+                                .font(.lmCaption)
                                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                                 .frame(width: 45, alignment: .leading)
                             TextField("Rest", text: $editableSets[index].restText, prompt: Text("none"))
@@ -208,7 +208,7 @@ struct EditExerciseSheet: View {
                                 .frame(width: 65)
                                 .accessibilityIdentifier("edit-set-rest-\(index)")
                             Text("s")
-                                .font(.caption)
+                                .font(.lmCaption)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             Spacer()
                         }
@@ -234,18 +234,18 @@ struct EditExerciseSheet: View {
         VStack(spacing: LiftMarkTheme.spacingSM) {
             if let error = validationError {
                 Text(error)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.destructive)
                     .padding(.horizontal)
             }
 
             TextEditor(text: $markdownText)
-                .font(.system(.body, design: .monospaced))
+                .font(.lmMono)
                 .padding(.horizontal)
                 .accessibilityIdentifier("edit-exercise-markdown")
 
-            Text("LMWF format: ## Name [equipment]\n> notes\n- weight x reps")
-                .font(.caption)
+            Text("lift.md format: ## Name [equipment]\n> notes\n- weight x reps")
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 .padding(.horizontal)
                 .frame(maxWidth: .infinity, alignment: .leading)

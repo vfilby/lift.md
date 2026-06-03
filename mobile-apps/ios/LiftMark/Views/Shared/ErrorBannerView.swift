@@ -10,7 +10,7 @@ struct ErrorBannerView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.white)
             Text(message)
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .foregroundStyle(.white)
                 .lineLimit(2)
             Spacer()
@@ -18,7 +18,7 @@ struct ErrorBannerView: View {
                 onDismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.caption.bold())
+                    .font(.lmCaption.bold())
                     .foregroundStyle(.white.opacity(0.8))
             }
             .accessibilityLabel("Dismiss error")

@@ -15,10 +15,10 @@ struct AppearancePicker: View {
                     VStack(spacing: 8) {
                         ThemeThumbnail(theme: theme, isSelected: selection == theme)
                         Text(theme.displayName)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(selection == theme ? LiftMarkTheme.primary : LiftMarkTheme.secondaryLabel)
                         Image(systemName: selection == theme ? "checkmark.circle.fill" : "circle")
-                            .font(.title3)
+                            .font(.lmTitle3)
                             .foregroundStyle(selection == theme ? LiftMarkTheme.primary : LiftMarkTheme.tertiaryLabel)
                     }
                     .accessibilityElement(children: .combine)

@@ -55,7 +55,7 @@ struct HistoryDetailView: View {
 
                         // Exercises heading
                         Text("Exercises")
-                            .font(.callout)
+                            .font(.lmCallout)
                             .fontWeight(.semibold)
                             .foregroundStyle(.secondary)
 
@@ -78,7 +78,7 @@ struct HistoryDetailView: View {
                             showDeleteConfirmation = true
                         } label: {
                             Text("Delete Workout")
-                                .font(.body)
+                                .font(.lmBody)
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, LiftMarkTheme.spacingMD)
@@ -213,24 +213,24 @@ struct HistoryDetailView: View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
             HStack {
                 Text("Notes")
-                    .font(.callout)
+                    .font(.lmCallout)
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button(session.notes?.isEmpty ?? true ? "Add" : "Edit") {
                     showNotesSheet = true
                 }
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .accessibilityIdentifier("history-detail-notes-edit-button")
             }
 
             if let notes = session.notes, !notes.isEmpty {
                 Text(notes)
-                    .font(.body)
+                    .font(.lmBody)
                     .foregroundStyle(.secondary)
             } else {
                 Text("No notes yet.")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(.tertiary)
                     .italic()
             }
@@ -251,7 +251,7 @@ struct HistoryDetailView: View {
                 .fill(sectionColor(for: name))
                 .frame(height: 1)
             Text(name.uppercased())
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(sectionColor(for: name))
                 .tracking(1)
@@ -293,7 +293,7 @@ struct HistoryDetailView: View {
                     return f
                 }()
                 Text(dateFormatter.string(from: date))
-                    .font(.body)
+                    .font(.lmBody)
                     .fontWeight(.semibold)
                 HStack(spacing: 8) {
                     Text(timeFormatter.string(from: date))
@@ -303,16 +303,16 @@ struct HistoryDetailView: View {
                         Text(minutes < 60 ? "\(minutes) min" : "\(minutes / 60)h \(minutes % 60)m")
                     }
                 }
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .foregroundStyle(.secondary)
             } else {
                 Text(session.date)
-                    .font(.body)
+                    .font(.lmBody)
                     .fontWeight(.semibold)
                 if let duration = session.duration {
                     let minutes = duration / 60
                     Text(minutes < 60 ? "\(minutes) min" : "\(minutes / 60)h \(minutes % 60)m")
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -335,10 +335,10 @@ struct HistoryDetailView: View {
     private func statCell(value: String, label: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 22, weight: .bold))
+                .font(.lmDisplay(size: 22, relativeTo: .title2))
                 .foregroundStyle(LiftMarkTheme.primary)
             Text(label)
-                .font(.caption)
+                .font(.lmCaption)
                 .fontWeight(.medium)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
         }
@@ -356,14 +356,14 @@ struct HistoryDetailView: View {
             HStack(alignment: .top, spacing: LiftMarkTheme.spacingMD) {
                 // Numbered blue badge
                 Text("\(number)")
-                    .font(.callout)
+                    .font(.lmCallout)
                     .fontWeight(.bold)
                     .foregroundStyle(LiftMarkTheme.primary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     if let groupType = exercise.groupType, groupType == .superset {
                         Text("SUPERSET")
-                            .font(.caption2)
+                            .font(.lmCaption2)
                             .fontWeight(.bold)
                             .foregroundStyle(.purple)
                             .padding(.horizontal, 8)
@@ -373,12 +373,12 @@ struct HistoryDetailView: View {
                     }
 
                     Text(exercise.exerciseName)
-                        .font(.callout)
+                        .font(.lmCallout)
                         .fontWeight(.semibold)
 
                     if let equipment = exercise.equipmentType {
                         Text(equipment)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -394,7 +394,7 @@ struct HistoryDetailView: View {
             // Exercise notes
             if let notes = exercise.notes, !notes.isEmpty {
                 Text(notes)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(.secondary)
                     .padding(.top, LiftMarkTheme.spacingXS)
             }
@@ -429,7 +429,7 @@ struct HistoryDetailView: View {
                     Text("○")
                 }
             }
-            .font(.caption)
+            .font(.lmCaption)
             .fontWeight(.bold)
             .frame(width: 28, height: 28)
             .background(statusColor(set.status).opacity(0.12))
@@ -439,7 +439,7 @@ struct HistoryDetailView: View {
             // Weight & reps or "Skipped"
             if set.status == .skipped {
                 Text("Skipped")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(.secondary)
                     .italic()
             } else {
@@ -449,16 +449,16 @@ struct HistoryDetailView: View {
                     if let weight = actual?.weight?.value ?? target?.weight?.value,
                        let unit = actual?.weight?.unit ?? target?.weight?.unit {
                         Text("\(Int(weight)) \(unit.rawValue)")
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                     }
                     if let reps = actual?.reps ?? target?.reps {
                         Text("× \(reps) reps")
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                             .foregroundStyle(.secondary)
                     }
                     if let time = actual?.time ?? target?.time {
                         Text("\(time)s")
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                     }
                 }
             }
@@ -522,7 +522,7 @@ struct ExerciseHistorySheetView: View {
             } else if historyPoints.isEmpty {
                 VStack(spacing: LiftMarkTheme.spacingMD) {
                     Image(systemName: "chart.line.downtrend.xyaxis")
-                        .font(.largeTitle)
+                        .font(.lmLargeTitle)
                         .foregroundStyle(.secondary)
                     Text("No history for this exercise")
                         .foregroundStyle(.secondary)
@@ -541,7 +541,7 @@ struct ExerciseHistorySheetView: View {
 
                         // Session list
                         Text("Sessions")
-                            .font(.headline)
+                            .font(.lmHeadline)
 
                         ForEach(historyPoints, id: \.date) { point in
                             historyPointRow(point)
@@ -566,30 +566,30 @@ struct ExerciseHistorySheetView: View {
         HStack(spacing: LiftMarkTheme.spacingMD) {
             VStack {
                 Text("\(stats.sessions)")
-                    .font(.title3).fontWeight(.bold)
+                    .font(.lmTitle3).fontWeight(.bold)
                 Text("Sessions")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.lmCaption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity)
 
             VStack {
                 Text("\(Int(stats.maxWeight))")
-                    .font(.title3).fontWeight(.bold)
+                    .font(.lmTitle3).fontWeight(.bold)
                 Text("Max Weight")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.lmCaption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity)
 
             VStack {
                 Text(String(format: "%.1f", stats.avgReps))
-                    .font(.title3).fontWeight(.bold)
+                    .font(.lmTitle3).fontWeight(.bold)
                 Text("Avg Reps")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.lmCaption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity)
 
             VStack {
                 Text(formatVolume(stats.totalVolume))
-                    .font(.title3).fontWeight(.bold)
+                    .font(.lmTitle3).fontWeight(.bold)
                 Text("Total Vol")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.lmCaption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity)
         }
         .padding()
@@ -602,11 +602,11 @@ struct ExerciseHistorySheetView: View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
             HStack {
                 Text(point.workoutName)
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .fontWeight(.medium)
                 Spacer()
                 Text(formatDate(point.date))
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(.secondary)
             }
 
@@ -619,7 +619,7 @@ struct ExerciseHistorySheetView: View {
                     Label(formatVolume(point.totalVolume), systemImage: "chart.bar")
                 }
             }
-            .font(.caption)
+            .font(.lmCaption)
             .foregroundStyle(.secondary)
         }
         .padding()

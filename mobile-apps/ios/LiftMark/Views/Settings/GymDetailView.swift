@@ -203,7 +203,7 @@ struct PresetEquipmentSheet: View {
                                 Spacer()
                                 if isExisting {
                                     Text("Added")
-                                        .font(.caption)
+                                        .font(.lmCaption)
                                         .foregroundStyle(.secondary)
                                 } else if selectedPresets.contains(item) {
                                     Image(systemName: "checkmark.circle.fill")

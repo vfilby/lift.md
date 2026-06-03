@@ -17,7 +17,7 @@ struct ExerciseCardView: View {
             // Section label (Warmup, Cooldown, etc.)
             if let sectionLabel {
                 Text(sectionLabel)
-                    .font(.caption.bold())
+                    .font(.lmCaption.bold())
                     .textCase(.uppercase)
                     .foregroundStyle(sectionColor(for: sectionLabel))
             }
@@ -25,7 +25,7 @@ struct ExerciseCardView: View {
             // Superset badge
             if let supersetIndex {
                 Text("Superset \(supersetIndex + 1)")
-                    .font(.caption2.bold())
+                    .font(.lmCaption2.bold())
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(LiftMarkTheme.primary.opacity(0.15))
@@ -37,11 +37,11 @@ struct ExerciseCardView: View {
             // Exercise header
             HStack(alignment: .firstTextBaseline) {
                 Text(exercise.exerciseName)
-                    .font(.headline)
+                    .font(.lmHeadline)
 
                 if let equipment = exercise.equipmentType {
                     Text(equipment)
-                        .font(.caption)
+                        .font(.lmCaption)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(LiftMarkTheme.secondaryBackground)
@@ -55,7 +55,7 @@ struct ExerciseCardView: View {
             // Notes
             if let notes = exercise.notes, !notes.isEmpty {
                 Text(notes)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .italic()
             }
@@ -91,29 +91,29 @@ private struct SetDisplayRow: View {
         HStack(spacing: LiftMarkTheme.spacingSM) {
             // Set number
             Text("Set \(set.orderIndex + 1)")
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .frame(width: 50, alignment: .leading)
 
             // Weight
             if let weight = target?.weight?.value, let unit = target?.weight?.unit {
                 Text("\(formatWeight(weight)) \(unit.rawValue)")
-                    .font(.subheadline.monospacedDigit())
+                    .font(.lmSubheadline.monospacedDigit())
             }
 
             // Reps
             if let reps = target?.reps {
                 Text("x \(reps)\(set.isAmrap ? "+" : "")")
-                    .font(.subheadline.monospacedDigit())
+                    .font(.lmSubheadline.monospacedDigit())
             } else if set.isAmrap {
                 Text("AMRAP")
-                    .font(.subheadline.monospacedDigit())
+                    .font(.lmSubheadline.monospacedDigit())
             }
 
             // Time
             if let time = target?.time {
                 Text(formatTime(time))
-                    .font(.subheadline.monospacedDigit())
+                    .font(.lmSubheadline.monospacedDigit())
             }
 
             Spacer()
@@ -122,7 +122,7 @@ private struct SetDisplayRow: View {
             HStack(spacing: 4) {
                 if let rpe = target?.rpe {
                     Text("RPE \(rpe)")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(LiftMarkTheme.warning.opacity(0.15))
@@ -131,7 +131,7 @@ private struct SetDisplayRow: View {
 
                 if set.isDropset {
                     Text("Drop")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(LiftMarkTheme.destructive.opacity(0.15))
@@ -140,7 +140,7 @@ private struct SetDisplayRow: View {
 
                 if set.isPerSide {
                     Text("/side")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(LiftMarkTheme.primary.opacity(0.15))
@@ -149,13 +149,13 @@ private struct SetDisplayRow: View {
 
                 if let rest = set.restSeconds, rest > 0 {
                     Text("\(rest)s rest")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 }
 
                 if let tempo = set.tempo {
                     Text(tempo)
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 }
             }

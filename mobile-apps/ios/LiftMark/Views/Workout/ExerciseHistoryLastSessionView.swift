@@ -17,7 +17,7 @@ struct ExerciseHistoryLastSessionView: View {
             } else if let session = lastSession {
                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
                     Text("Last Session")
-                        .font(.headline)
+                        .font(.lmHeadline)
 
                     VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
                         HStack {
@@ -26,7 +26,7 @@ struct ExerciseHistoryLastSessionView: View {
                             Spacer()
                             Text(formatDate(session.date))
                         }
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
 
                         HStack {
                             Text("Workout")
@@ -34,7 +34,7 @@ struct ExerciseHistoryLastSessionView: View {
                             Spacer()
                             Text(session.workoutName)
                         }
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
 
                         if session.maxWeight > 0 {
                             HStack {
@@ -43,7 +43,7 @@ struct ExerciseHistoryLastSessionView: View {
                                 Spacer()
                                 Text("\(Int(session.maxWeight)) \(session.unit.rawValue)")
                             }
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                         }
 
                         HStack {
@@ -52,7 +52,7 @@ struct ExerciseHistoryLastSessionView: View {
                             Spacer()
                             Text("\(session.setsCount)")
                         }
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
 
                         if session.avgReps > 0 {
                             HStack {
@@ -61,7 +61,7 @@ struct ExerciseHistoryLastSessionView: View {
                                 Spacer()
                                 Text(String(format: "%.1f", session.avgReps))
                             }
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                         }
 
                         if session.maxTime > 0 {
@@ -71,7 +71,7 @@ struct ExerciseHistoryLastSessionView: View {
                                 Spacer()
                                 Text("\(Int(session.maxTime))s")
                             }
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                         }
 
                         if session.totalVolume > 0 {
@@ -81,7 +81,7 @@ struct ExerciseHistoryLastSessionView: View {
                                 Spacer()
                                 Text(formatVolume(session.totalVolume))
                             }
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                         }
                     }
                     .padding()
@@ -90,7 +90,7 @@ struct ExerciseHistoryLastSessionView: View {
                 }
             } else {
                 Text("No previous sessions")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity, alignment: .center)
             }

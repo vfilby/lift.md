@@ -173,9 +173,9 @@ struct HistoryView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
             Text("No Workouts Yet")
-                .font(.title3.weight(.semibold))
+                .font(.lmTitle3.weight(.semibold))
             Text("Complete a workout to see it here")
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
             Spacer()
         }
@@ -189,7 +189,7 @@ struct HistoryView: View {
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .font(.system(size: 14))
             TextField("Search workouts...", text: $searchText)
-                .font(.body)
+                .font(.lmBody)
         }
         .padding(.horizontal, LiftMarkTheme.spacingMD)
         .padding(.vertical, LiftMarkTheme.spacingSM)
@@ -297,7 +297,7 @@ private struct SessionCardView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(session.name)
-                    .font(.headline)
+                    .font(.lmHeadline)
                     .foregroundStyle(LiftMarkTheme.label)
                     .lineLimit(1)
 
@@ -314,7 +314,7 @@ private struct SessionCardView: View {
                         }
                     }
                 }
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
                 HStack(spacing: 0) {
@@ -326,12 +326,12 @@ private struct SessionCardView: View {
                         Text(formatVolume(totalVolume))
                     }
                 }
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

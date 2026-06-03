@@ -227,7 +227,7 @@ struct WorkoutsView: View {
                 .font(.system(size: 14))
                 .accessibilityHidden(true)
             TextField("Search plans", text: $searchText)
-                .font(.body)
+                .font(.lmBody)
                 .submitLabel(.search)
             if !searchText.isEmpty {
                 Button {
@@ -259,10 +259,10 @@ struct WorkoutsView: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.right")
-                    .font(.caption2)
+                    .font(.lmCaption2)
                     .rotationEffect(.degrees(showFilters ? 90 : 0))
                 Text(showFilters ? "Hide Filters" : "Show Filters")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .fontWeight(.medium)
                 Spacer()
             }
@@ -281,7 +281,7 @@ struct WorkoutsView: View {
         VStack(spacing: LiftMarkTheme.spacingMD) {
             HStack {
                 Text("Favorites Only")
-                    .font(.body)
+                    .font(.lmBody)
                     .fontWeight(.medium)
                 Spacer()
                 Toggle("", isOn: $showFavoritesOnly)
@@ -291,7 +291,7 @@ struct WorkoutsView: View {
 
             HStack {
                 Text("Filter by Equipment")
-                    .font(.body)
+                    .font(.lmBody)
                     .fontWeight(.medium)
                 Spacer()
                 Toggle("", isOn: $showEquipmentFilter)
@@ -320,7 +320,7 @@ struct WorkoutsView: View {
     private var gymSelectionList: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
             Text("GYM")
-                .font(.caption)
+                .font(.lmCaption)
                 .fontWeight(.semibold)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .textCase(.uppercase)
@@ -342,7 +342,7 @@ struct WorkoutsView: View {
                             }
                         }
                         Text(gym.name)
-                            .font(.body)
+                            .font(.lmBody)
                             .foregroundStyle(LiftMarkTheme.label)
                     }
                     .padding(.horizontal, LiftMarkTheme.spacingMD)
@@ -374,17 +374,17 @@ struct WorkoutsView: View {
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 .accessibilityHidden(true)
             Text(emptyStateTitle)
-                .font(.title3)
+                .font(.lmTitle3)
                 .fontWeight(.semibold)
             Text(emptyStateMessage)
-                .font(.body)
+                .font(.lmBody)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 .multilineTextAlignment(.center)
 
             if showEquipmentFilter {
                 NavigationLink(value: AppDestination.gymDetail(id: selectedGymId ?? "")) {
                     Text("Set Up Equipment")
-                        .font(.headline)
+                        .font(.lmHeadline)
                         .padding(.horizontal, LiftMarkTheme.spacingLG)
                         .padding(.vertical, LiftMarkTheme.spacingXS)
                 }
@@ -397,7 +397,7 @@ struct WorkoutsView: View {
                     showImport = true
                 } label: {
                     Text("Import Plan")
-                        .font(.headline)
+                        .font(.lmHeadline)
                         .padding(.horizontal, LiftMarkTheme.spacingLG)
                         .padding(.vertical, LiftMarkTheme.spacingXS)
                 }
@@ -432,12 +432,12 @@ struct WorkoutsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: LiftMarkTheme.spacingXS) {
                     Text(plan.name)
-                        .font(.headline)
+                        .font(.lmHeadline)
                         .foregroundStyle(LiftMarkTheme.label)
                         .lineLimit(1)
                     if plan.isFavorite {
                         Image(systemName: "heart.fill")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(.pink)
                             .accessibilityLabel("Favorite")
                     }
@@ -448,18 +448,18 @@ struct WorkoutsView: View {
                         !(exercise.groupType == .section && exercise.sets.isEmpty)
                     }.count
                     Text("\(exerciseCount) exercises")
-                        .font(.subheadline)
+                        .font(.lmSubheadline)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     if !plan.tags.isEmpty {
                         Text(plan.tags.prefix(2).joined(separator: ", "))
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                     }
                 }
             }
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 .accessibilityHidden(true)
         }

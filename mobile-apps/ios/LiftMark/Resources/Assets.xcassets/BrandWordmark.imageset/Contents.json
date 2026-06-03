@@ -1,0 +1,8 @@
+{
+  "images" : [
+    { "filename" : "wm-liftmd-ink.svg", "idiom" : "universal" },
+    { "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ], "filename" : "wm-liftmd-white.svg", "idiom" : "universal" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 },
+  "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "original" }
+}

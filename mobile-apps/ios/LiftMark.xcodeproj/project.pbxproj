@@ -14,14 +14,17 @@
 		0705F5FA06427587A436B761 /* InboxItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1EFBC8A65FA33DF6A782E26 /* InboxItem.swift */; };
 		083A02957C5374F617C3B256 /* ParserConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9017628E208B7ED9FDC9E047 /* ParserConformanceTests.swift */; };
 		0A1408CC7EF27C2FCA9FAEF2 /* SessionLMWFEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A259EFF7FFA8F1DD3070318 /* SessionLMWFEncoder.swift */; };
+		0C2166A2FB014EF7EE09C8A7 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 20D282F055531B13A410F30D /* Inter-Regular.ttf */; };
 		0D172A0CBAA6155A8587C384 /* WorkoutHighlightsIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A8B391651053E5147378D2 /* WorkoutHighlightsIntegrationTests.swift */; };
 		0DD0E45B4C99EE210B5B50C8 /* V7Seed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28028FD88481B4B7BCFE34E0 /* V7Seed.swift */; };
+		0DEAE5FC86800080C15EE4E3 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BDEABC5E5704B7B4D44B5410 /* SpaceGrotesk-Medium.ttf */; };
 		0F63C0BE2CED1EB0BC8AE594 /* InboxPreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4557D49F5C04D0F17C4C4F76 /* InboxPreviewSheet.swift */; };
 		126A8904E9CCD3D3420C88E4 /* SettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6EB2D92849470F1D048482 /* SettingsSection.swift */; };
 		12D96B58A9C05219A259D752 /* SyncSessionGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58BA4F2232025DD4B5E50533 /* SyncSessionGuardTests.swift */; };
 		1330EAEB43A76F37FAD353AA /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BB00D28805B71DB987185E /* SessionStore.swift */; };
 		13DA23B878713DCFAB8AE668 /* DeviceLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0BE62F2191556A9EF27651 /* DeviceLayout.swift */; };
 		14967B2B2657BF98D5D0DC5A /* DisclaimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DBA645D80EF8F29BC26002 /* DisclaimerView.swift */; };
+		14FE1103EBA2EA594BBCCB2F /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BA685EEE79F8F9BE670D3F58 /* Inter-SemiBold.ttf */; };
 		154CD240701323B02E9B0788 /* UserSettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957D4A87021F20EE0AE5AFF2 /* UserSettingsRow.swift */; };
 		15615339CA0E2673280C1920 /* GymRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31B16E393D3A17DD248E8361 /* GymRow.swift */; };
 		15963F56C95DD902FAFF715E /* MigratorBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8237249141BCC8A29A52C430 /* MigratorBridgeTests.swift */; };
@@ -50,6 +53,7 @@
 		3273B2841C34A0D2FE1F203B /* CKSyncEngineManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EADAA4A9258171076A1B482F /* CKSyncEngineManagerTests.swift */; };
 		32E4D70E029E622762E0E280 /* SettingsFeatureFlagsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28DED09E01A60B3EB54CCE5A /* SettingsFeatureFlagsSection.swift */; };
 		3343180981AC06FEAE101E03 /* LiveWorkoutsLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F8D8C6B7DB03FE38BFEF1F2 /* LiveWorkoutsLiveActivity.swift */; };
+		33478EAF6DEE9B2EF7CDED5F /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 20D282F055531B13A410F30D /* Inter-Regular.ttf */; };
 		347BDEA12B7813E2E5100A23 /* DatabaseBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E08159618FF39CFB1C6166D5 /* DatabaseBackupService.swift */; };
 		354C76E9CD6721AB0EF459F0 /* SettingsAccountSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B740023A887785B38C59324 /* SettingsAccountSection.swift */; };
 		355E1C1963C45CE3D6B9F1CF /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C9B42D3BD8986494435EF5 /* HomeView.swift */; };
@@ -75,6 +79,7 @@
 		50650EE0BA8AC695493F03B6 /* V13Seed.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2742EAE0B278B7733538976 /* V13Seed.swift */; };
 		50B36ED3634D4244EB12525B /* LoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22FBBD1B7949397C1E5C8D9 /* LoggerTests.swift */; };
 		546AE7E2A848F9BC65C17886 /* ExerciseHistoryChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB64AAA0256291C97FA9D19B /* ExerciseHistoryChartView.swift */; };
+		5563C0D3FDD7CBC60675E733 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7A3122118DD1BBD6F81FF606 /* SpaceGrotesk-Bold.ttf */; };
 		55C41D670ADEC7A15EB4EFAA /* NavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D83446B2AFC5D21A415A51FA /* NavigationCoordinator.swift */; };
 		56616E490E58C9F25A205274 /* LiftMarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA5808AEA3816FAC1B69639 /* LiftMarkUITests.swift */; };
 		575D00310F4D056AE30775AA /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 90826DB9F2BC18668081C8B3 /* Logging */; };
@@ -102,6 +107,7 @@
 		6C719CD2D4AEF2D0928096A2 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 6D124AFE5C66ABF0FB74FBC2 /* Sentry */; };
 		6D543A2B5DAE7E7414CD09DA /* WorkoutPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F137B212FEE18D030DBC9C70 /* WorkoutPlan.swift */; };
 		6D835E5584FD9C63A619EBFC /* DatabaseMigrationCrossCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1C774749F46282DA0627E6 /* DatabaseMigrationCrossCheckTests.swift */; };
+		6E26B2707516EAE8AB5FF872 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7A3122118DD1BBD6F81FF606 /* SpaceGrotesk-Bold.ttf */; };
 		6E470AECCA4B776FDD395E88 /* WorkoutPlanStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183AA7541B9622B31C10CC50 /* WorkoutPlanStore.swift */; };
 		6EFA74E38221E7BD4E9BB291 /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F4306EFB81F0C2668F42D9 /* TokenStore.swift */; };
 		70481D0EAF2215976F676BC2 /* AuthSyncBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D49EC85640F289ECF7CB153 /* AuthSyncBannerView.swift */; };
@@ -144,6 +150,7 @@
 		9AB084ACC5B5E49965B0A0C8 /* CKSyncMetadataStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA40A430E6513546C353DA5 /* CKSyncMetadataStoreTests.swift */; };
 		9B5AF81B1F68483BD3AECF88 /* FileImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 470878A407B7BB8EB252FDB4 /* FileImportService.swift */; };
 		9CAE470F76941D0F5025BEBE /* WorkoutDetailSubviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EDB3E6457DAF77B78F2CDD /* WorkoutDetailSubviews.swift */; };
+		9DAB8B9369684A36233AE69E /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 21BE97A74F617CCDCB45D15A /* JetBrainsMono-Medium.ttf */; };
 		9F408B0DEC19079AD6EFAF65 /* LiftMarkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B5C9C6A595B9A570A75396 /* LiftMarkApp.swift */; };
 		9F9473920B361CB0A1ECCE5F /* EditExerciseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3ABAAB6882D92D306CB16D /* EditExerciseSheet.swift */; };
 		9FF69F8BFA2C5BCE2AD2C516 /* SettingsAISection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F79C5C73D0A1F3A438AF4AC /* SettingsAISection.swift */; };
@@ -158,7 +165,9 @@
 		A90938BAE05DAF9D8E577DC9 /* ActiveWorkoutHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87897A37B7987C30AF2FB898 /* ActiveWorkoutHeader.swift */; };
 		AAE6D732A65618504DA14D3B /* GeneratePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C78EB6FBD871ABC0072F7C /* GeneratePromptView.swift */; };
 		AB59B2427C54B7DE6715E1A4 /* AuthenticationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1E8D269112E454A906DCCF /* AuthenticationStoreTests.swift */; };
+		AC1C76AE5D2D02839866D62A /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32C3C9DD2398AC651AD5E001 /* Typography.swift */; };
 		AE4EB6EC971EF1017EE4BD3E /* DatabaseSeedLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37B6A4D35C21B1F5A03FFCE /* DatabaseSeedLoader.swift */; };
+		B083728BFDB63818EF40A8EF /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BA685EEE79F8F9BE670D3F58 /* Inter-SemiBold.ttf */; };
 		B24A5E45EBCB75DEE61DC2AC /* AdaptiveSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38E018F88DC33EB2158C6AC /* AdaptiveSplitView.swift */; };
 		B32B1213805C0FDA52C6DE0F /* MigrationGoldenShapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4809E1673A516FC331DFC5 /* MigrationGoldenShapes.swift */; };
 		B391EB80E72BA000101D5666 /* WorkoutGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D211B6F3FC0D3B798CCF7F /* WorkoutGenerationService.swift */; };
@@ -179,6 +188,7 @@
 		C7F92919C9509B277B918575 /* SettingsDataSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB97D63E7F518056280BE91A /* SettingsDataSection.swift */; };
 		C84E9480A8E438A11EE0B0DC /* ExercisePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B901D64AB8243A498892E4 /* ExercisePickerView.swift */; };
 		C9C3DB99E5E6CCF0F06942A1 /* AnthropicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FE10D43C37D15D55CD7E43 /* AnthropicService.swift */; };
+		CD13FD10DA7837DDE598F870 /* SpaceGrotesk-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BDEABC5E5704B7B4D44B5410 /* SpaceGrotesk-Medium.ttf */; };
 		CD2B1A71D7CC2E49364685BD /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B7BEBFD01C2F49EF43CD34 /* WorkoutActivityAttributes.swift */; };
 		CD52F65B3FE05BB40E1A3567 /* V11Seed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92937B564A71206CDF193713 /* V11Seed.swift */; };
 		CE922FBEF4CC3EB610AF4D68 /* WorkoutHighlightsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59613C15DB7D08E18367BB55 /* WorkoutHighlightsServiceTests.swift */; };
@@ -219,7 +229,9 @@
 		EEC4CAC229BCFC6336C2AECE /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A81B15C6333E3651B09FEC /* OnboardingView.swift */; };
 		EF4E02A74682DBE3A2A2E1B1 /* SetMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DD705455651A8CB95DA707 /* SetMeasurementTests.swift */; };
 		F0D9AF4CEA40EB9E5811878F /* EditPlanMarkdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFE17786DC0564D38BF1802 /* EditPlanMarkdownSheet.swift */; };
+		F0F1CB732AF37230C12C9B34 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32C3C9DD2398AC651AD5E001 /* Typography.swift */; };
 		F37EC6ABED84F7A871698B2A /* PlateCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBE5F077F0F3EA293E45AE5 /* PlateCalculator.swift */; };
+		F4ED8A631DF3AD44DE49CD23 /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 21BE97A74F617CCDCB45D15A /* JetBrainsMono-Medium.ttf */; };
 		F88CB52BE0BA57049864D90C /* SetRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F367406D6EAEEB16A1D945D6 /* SetRowView.swift */; };
 		F95E8FA5EFBDBE26F2C3489A /* EditExerciseSetValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEF145992A8D2FA03DABCC0 /* EditExerciseSetValidationTests.swift */; };
 		F9A6DF56F5084DCA93542C51 /* SettingsAboutSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 598097ACA9731458C838AD5E /* SettingsAboutSection.swift */; };
@@ -296,6 +308,8 @@
 		1B9F099C51166F64AE909892 /* SessionRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRepositoryTests.swift; sourceTree = "<group>"; };
 		1DE768C209F34223C2D46AEE /* ActiveWorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModel.swift; sourceTree = "<group>"; };
 		20C78EB6FBD871ABC0072F7C /* GeneratePromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratePromptView.swift; sourceTree = "<group>"; };
+		20D282F055531B13A410F30D /* Inter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Regular.ttf"; sourceTree = "<group>"; };
+		21BE97A74F617CCDCB45D15A /* JetBrainsMono-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Medium.ttf"; sourceTree = "<group>"; };
 		2461031C021EB0B3B5E5300B /* SettingsGymSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGymSection.swift; sourceTree = "<group>"; };
 		25C447D8C4134B2798F7DFFA /* ActiveWorkoutHistoryPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutHistoryPanel.swift; sourceTree = "<group>"; };
 		2631DD9FD25AA06EBF3FDA73 /* SettingsHealthKitSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHealthKitSection.swift; sourceTree = "<group>"; };
@@ -309,6 +323,7 @@
 		2FBA5B4F54D858F79D81D1A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30809D087CC810203A2B90DB /* V12Seed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V12Seed.swift; sourceTree = "<group>"; };
 		31B16E393D3A17DD248E8361 /* GymRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymRow.swift; sourceTree = "<group>"; };
+		32C3C9DD2398AC651AD5E001 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		339BCDD3A3DD50EB4BE72127 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		349FBA06AB83786EC1071ECA /* V1Seed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V1Seed.swift; sourceTree = "<group>"; };
 		3507D916606D7A07D255602A /* ActiveWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutView.swift; sourceTree = "<group>"; };
@@ -372,6 +387,7 @@
 		790A5CDE07EFFF281DAC47FA /* WorkoutExportIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutExportIntegrationTests.swift; sourceTree = "<group>"; };
 		790BF9E2E0D248724753225B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		79B30FE16C8238A00C2750CF /* InboxLMWFSourceOfTruthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxLMWFSourceOfTruthTests.swift; sourceTree = "<group>"; };
+		7A3122118DD1BBD6F81FF606 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
 		7B45DC7A3E8EAF0E19BE1083 /* MigratorBridgeAlertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratorBridgeAlertView.swift; sourceTree = "<group>"; };
 		7D49EC85640F289ECF7CB153 /* AuthSyncBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSyncBannerView.swift; sourceTree = "<group>"; };
 		7FE81B205D52B24B526C4350 /* AppearancePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePicker.swift; sourceTree = "<group>"; };
@@ -428,6 +444,8 @@
 		B849C53396E76AE83B0EA95D /* SchemaDiff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaDiff.swift; sourceTree = "<group>"; };
 		B85D10A4E19321EE0AEF31C1 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		B9175B7DB4682E974D72FBF5 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		BA685EEE79F8F9BE670D3F58 /* Inter-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-SemiBold.ttf"; sourceTree = "<group>"; };
+		BDEABC5E5704B7B4D44B5410 /* SpaceGrotesk-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Medium.ttf"; sourceTree = "<group>"; };
 		BE23FF382474D10663FDF662 /* MarkdownParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParserTests.swift; sourceTree = "<group>"; };
 		C20C4956D9B988C6978BAD36 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C215C0708BFBE0805A18EF8D /* GymDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymDetailView.swift; sourceTree = "<group>"; };
@@ -513,6 +531,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0803F94CFA4719C27968C80F /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				32C3C9DD2398AC651AD5E001 /* Typography.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
 		1A4AA1E9A2731880C8724F16 /* LiftMarkUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -538,6 +564,18 @@
 				709C800623C8F549D59F94BF /* V14SyntheticSeed.swift */,
 			);
 			path = Seeds;
+			sourceTree = "<group>";
+		};
+		249A50EECD997068FD7E5641 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				20D282F055531B13A410F30D /* Inter-Regular.ttf */,
+				BA685EEE79F8F9BE670D3F58 /* Inter-SemiBold.ttf */,
+				21BE97A74F617CCDCB45D15A /* JetBrainsMono-Medium.ttf */,
+				7A3122118DD1BBD6F81FF606 /* SpaceGrotesk-Bold.ttf */,
+				BDEABC5E5704B7B4D44B5410 /* SpaceGrotesk-Medium.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 		3228E63573AE7175D7107195 /* Utils */ = {
@@ -931,6 +969,8 @@
 		CF4D9110627A0C66ED251539 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				249A50EECD997068FD7E5641 /* Fonts */,
+				0803F94CFA4719C27968C80F /* Theme */,
 				05B7BEBFD01C2F49EF43CD34 /* WorkoutActivityAttributes.swift */,
 			);
 			path = Shared;
@@ -1098,6 +1138,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7B0F6465C43263B883F4638 /* Assets.xcassets in Resources */,
+				0C2166A2FB014EF7EE09C8A7 /* Inter-Regular.ttf in Resources */,
+				B083728BFDB63818EF40A8EF /* Inter-SemiBold.ttf in Resources */,
+				9DAB8B9369684A36233AE69E /* JetBrainsMono-Medium.ttf in Resources */,
+				6E26B2707516EAE8AB5FF872 /* SpaceGrotesk-Bold.ttf in Resources */,
+				0DEAE5FC86800080C15EE4E3 /* SpaceGrotesk-Medium.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1106,6 +1151,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				852658F6EF836C0E181BB45C /* Assets.xcassets in Resources */,
+				33478EAF6DEE9B2EF7CDED5F /* Inter-Regular.ttf in Resources */,
+				14FE1103EBA2EA594BBCCB2F /* Inter-SemiBold.ttf in Resources */,
+				F4ED8A631DF3AD44DE49CD23 /* JetBrainsMono-Medium.ttf in Resources */,
+				5563C0D3FDD7CBC60675E733 /* SpaceGrotesk-Bold.ttf in Resources */,
+				CD13FD10DA7837DDE598F870 /* SpaceGrotesk-Medium.ttf in Resources */,
 				57F4F3CDD8CB3F4716902824 /* complete.mp3 in Resources */,
 				A17CDED61F53A3856B35BB52 /* exercise-dictionary.json in Resources */,
 				8B40A2046135F45A0EF769D6 /* tick.mp3 in Resources */,
@@ -1282,6 +1332,7 @@
 				D58394B7DD799753774BD0A9 /* SyncSettingsView.swift in Sources */,
 				73297C88CA6649D0C63AEB78 /* Theme.swift in Sources */,
 				6EFA74E38221E7BD4E9BB291 /* TokenStore.swift in Sources */,
+				F0F1CB732AF37230C12C9B34 /* Typography.swift in Sources */,
 				154CD240701323B02E9B0788 /* UserSettingsRow.swift in Sources */,
 				8B21009E80390A8652181270 /* WeightFormatting.swift in Sources */,
 				944AB6118AC4A203250FC6EE /* WorkoutActivityAttributes.swift in Sources */,
@@ -1389,6 +1440,7 @@
 			files = (
 				632B08C759934F9473839948 /* LiveWorkoutsBundle.swift in Sources */,
 				3343180981AC06FEAE101E03 /* LiveWorkoutsLiveActivity.swift in Sources */,
+				AC1C76AE5D2D02839866D62A /* Typography.swift in Sources */,
 				CD2B1A71D7CC2E49364685BD /* WorkoutActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1423,7 +1475,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LiveWorkouts/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = LiveWorkouts;
-				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				MARKETING_VERSION = 1.0.0;
@@ -1508,7 +1559,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LiveWorkouts/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = LiveWorkouts;
-				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				MARKETING_VERSION = 1.0.0;
@@ -1568,9 +1618,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LiftMark/Info.plist;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
-				INFOPLIST_KEY_CFBundleDisplayName = LiftMark;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "LiftMark reads your workout history to track progress.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "LiftMark saves your completed workouts to Apple Health.";
+				INFOPLIST_KEY_CFBundleDisplayName = lift.md;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "lift.md reads your workout history to track progress.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "lift.md saves your completed workouts to Apple Health.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1695,9 +1745,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LiftMark/Info.plist;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
-				INFOPLIST_KEY_CFBundleDisplayName = "LiftMark Dev";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "LiftMark reads your workout history to track progress.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "LiftMark saves your completed workouts to Apple Health.";
+				INFOPLIST_KEY_CFBundleDisplayName = "lift.md Dev";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "lift.md reads your workout history to track progress.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "lift.md saves your completed workouts to Apple Health.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

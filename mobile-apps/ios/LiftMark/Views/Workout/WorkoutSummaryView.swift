@@ -102,11 +102,11 @@ struct WorkoutSummaryView: View {
                         .accessibilityHidden(true)
 
                         Text("Workout Complete!")
-                            .font(.system(size: 26, weight: .bold))
+                            .font(.lmDisplay(size: 26, relativeTo: .title))
 
                         if let name = session?.name {
                             Text(name)
-                                .font(.subheadline)
+                                .font(.lmSubheadline)
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
@@ -121,18 +121,18 @@ struct WorkoutSummaryView: View {
                         if !highlights.isEmpty {
                             VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
                                 Text("Highlights")
-                                    .font(.headline)
+                                    .font(.lmHeadline)
 
                                 ForEach(highlights) { highlight in
                                     HStack(spacing: LiftMarkTheme.spacingSM) {
                                         Text(highlight.emoji)
-                                            .font(.title2)
+                                            .font(.lmTitle2)
 
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(highlight.title)
-                                                .font(.subheadline.bold())
+                                                .font(.lmSubheadline.bold())
                                             Text(highlight.message)
-                                                .font(.caption)
+                                                .font(.lmCaption)
                                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                         }
 
@@ -147,9 +147,9 @@ struct WorkoutSummaryView: View {
                         } else {
                             VStack(spacing: LiftMarkTheme.spacingSM) {
                                 Text("Highlights")
-                                    .font(.headline)
+                                    .font(.lmHeadline)
                                 Text("Complete more workouts to see highlights and personal records.")
-                                    .font(.subheadline)
+                                    .font(.lmSubheadline)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                     .multilineTextAlignment(.center)
                             }
@@ -178,34 +178,34 @@ struct WorkoutSummaryView: View {
                     // Completion Card
                     VStack(spacing: LiftMarkTheme.spacingSM) {
                         Text("Completion")
-                            .font(.headline)
+                            .font(.lmHeadline)
 
                         HStack(spacing: LiftMarkTheme.spacingMD) {
                             VStack(spacing: 2) {
                                 Text("\(completedSets)")
-                                    .font(.system(size: 24, weight: .bold))
+                                    .font(.lmDisplay(size: 24, relativeTo: .title2))
                                     .foregroundStyle(LiftMarkTheme.success)
                                 Text("Completed")
-                                    .font(.caption)
+                                    .font(.lmCaption)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .frame(maxWidth: .infinity)
 
                             VStack(spacing: 2) {
                                 Text("\(skippedSets)")
-                                    .font(.system(size: 24, weight: .bold))
+                                    .font(.lmDisplay(size: 24, relativeTo: .title2))
                                 Text("Skipped")
-                                    .font(.caption)
+                                    .font(.lmCaption)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .frame(maxWidth: .infinity)
 
                             VStack(spacing: 2) {
                                 Text("\(Int(completionRate * 100))%")
-                                    .font(.system(size: 24, weight: .bold))
+                                    .font(.lmDisplay(size: 24, relativeTo: .title2))
                                     .foregroundStyle(LiftMarkTheme.primary)
                                 Text("Rate")
-                                    .font(.caption)
+                                    .font(.lmCaption)
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                             }
                             .frame(maxWidth: .infinity)
@@ -237,7 +237,7 @@ struct WorkoutSummaryView: View {
                     // Exercise Summary
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Exercises")
-                            .font(.title3.bold())
+                            .font(.lmTitle3.bold())
                             .padding(.bottom, LiftMarkTheme.spacingSM)
 
                         if let exercises = session?.exercises {
@@ -270,7 +270,7 @@ struct WorkoutSummaryView: View {
                 navCoordinator.popToRoot()
             } label: {
                 Text("Done")
-                    .font(.body.weight(.semibold))
+                    .font(.lmBody.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(LiftMarkTheme.primary)
@@ -338,23 +338,23 @@ struct WorkoutSummaryView: View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             HStack {
                 Text("Notes")
-                    .font(.headline)
+                    .font(.lmHeadline)
                 Spacer()
                 Button(currentNotes?.isEmpty ?? true ? "Add" : "Edit") {
                     showNotesSheet = true
                 }
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .accessibilityIdentifier("workout-summary-notes-edit-button")
             }
 
             if let notes = currentNotes, !notes.isEmpty {
                 Text(notes)
-                    .font(.body)
+                    .font(.lmBody)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 Text("How did this workout feel? Capture any notes while it's fresh.")
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -484,11 +484,11 @@ private struct StatPill: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.headline.monospacedDigit())
+                .font(.lmHeadline.monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(title)
-                .font(.caption2)
+                .font(.lmCaption2)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
         }
         .frame(maxWidth: .infinity)
@@ -514,7 +514,7 @@ private struct ExerciseSummaryRow: View {
     var body: some View {
         HStack(spacing: LiftMarkTheme.spacingMD) {
             Text("\(number)")
-                .font(.caption.bold())
+                .font(.lmCaption.bold())
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
                 .background(Color.gray)
@@ -522,11 +522,11 @@ private struct ExerciseSummaryRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(exercise.exerciseName)
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
 
                 if let equipment = exercise.equipmentType {
                     Text(equipment)
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 }
             }
@@ -534,7 +534,7 @@ private struct ExerciseSummaryRow: View {
             Spacer()
 
             Text("\(completedCount)/\(totalCount) sets")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(completedCount == totalCount ? LiftMarkTheme.success : LiftMarkTheme.secondaryLabel)
 
             // Best set weight
@@ -544,7 +544,7 @@ private struct ExerciseSummaryRow: View {
                 .max() {
                 let unit = exercise.sets.first?.entries.first?.actual?.weight?.unit ?? exercise.sets.first?.entries.first?.target?.weight?.unit ?? .lbs
                 Text("\(formatWeight(bestWeight)) \(unit.rawValue)")
-                    .font(.caption.monospacedDigit())
+                    .font(.lmCaption.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
         }

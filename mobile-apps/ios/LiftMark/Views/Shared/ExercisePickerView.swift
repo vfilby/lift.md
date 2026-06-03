@@ -43,7 +43,7 @@ struct ExercisePickerView: View {
                 Spacer()
 
                 Text("Choose Exercise")
-                    .font(.headline)
+                    .font(.lmHeadline)
 
                 Spacer()
             }

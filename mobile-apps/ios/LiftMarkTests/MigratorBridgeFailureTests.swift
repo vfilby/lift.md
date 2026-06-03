@@ -42,7 +42,7 @@ final class MigratorBridgeFailureTests: XCTestCase {
         let message = MigratorBridgeFailure.integrityFailed.alertMessage(context: .init())
         XCTAssertEqual(
             message,
-            "Your local workout database reports an inconsistency. LiftMark will not upgrade until this is resolved. Tap here to export a copy for support."
+            "Your local workout database reports an inconsistency. lift.md will not upgrade until this is resolved. Tap here to export a copy for support."
         )
     }
 
@@ -50,7 +50,7 @@ final class MigratorBridgeFailureTests: XCTestCase {
         let message = MigratorBridgeFailure.backupFailed.alertMessage(context: .init())
         XCTAssertEqual(
             message,
-            "LiftMark couldn't create a safety backup. Your data is unchanged. Please try again."
+            "lift.md couldn't create a safety backup. Your data is unchanged. Please try again."
         )
     }
 
@@ -78,7 +78,7 @@ final class MigratorBridgeFailureTests: XCTestCase {
         )
         XCTAssertEqual(
             message,
-            "This database was written by a newer version of LiftMark. Update the app to continue."
+            "This database was written by a newer version of lift.md. Update the app to continue."
         )
     }
 

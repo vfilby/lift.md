@@ -31,7 +31,7 @@ struct ImportView: View {
                             pasteFromClipboard()
                         } label: {
                             Label("Paste", systemImage: "doc.on.clipboard")
-                                .font(.subheadline)
+                                .font(.lmSubheadline)
                         }
                         .buttonStyle(.bordered)
                         .accessibilityIdentifier("button-paste")
@@ -40,7 +40,7 @@ struct ImportView: View {
                             showGeneratePrompt = true
                         } label: {
                             Label("Build with AI", systemImage: "sparkles")
-                                .font(.subheadline)
+                                .font(.lmSubheadline)
                         }
                         .buttonStyle(.bordered)
                         .accessibilityIdentifier("button-build-with-ai")
@@ -53,14 +53,14 @@ struct ImportView: View {
 
                 // Markdown input
                 TextEditor(text: $markdownText)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.lmMono)
                     .padding(LiftMarkTheme.spacingSM)
                     .accessibilityIdentifier("input-markdown")
                     .overlay(
                         Group {
                             if markdownText.isEmpty {
                                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
-                                    Text("Paste your workout in LiftMark format:")
+                                    Text("Paste your workout in lift.md format:")
                                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                     Text("""
                                     # Push Day
@@ -72,7 +72,7 @@ struct ImportView: View {
                                     - 185 x 5
                                     - 225 x 5
                                     """)
-                                    .font(.system(.caption, design: .monospaced))
+                                    .font(.lmMono(size: 12, relativeTo: .caption))
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                                 }
                                 .padding(LiftMarkTheme.spacingMD)
@@ -88,7 +88,7 @@ struct ImportView: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(LiftMarkTheme.destructive)
                         Text(error)
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.destructive)
                         Spacer()
                     }
@@ -102,7 +102,7 @@ struct ImportView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(LiftMarkTheme.success)
                         Text("\(result.name) - \(result.exerciseCount) exercises, \(result.setCount) sets")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.success)
                         Spacer()
                     }
@@ -115,10 +115,10 @@ struct ImportView: View {
                             ForEach(result.warnings, id: \.self) { warning in
                                 HStack(spacing: 4) {
                                     Image(systemName: "exclamationmark.triangle")
-                                        .font(.caption2)
+                                        .font(.lmCaption2)
                                         .foregroundStyle(LiftMarkTheme.warning)
                                     Text(warning)
-                                        .font(.caption2)
+                                        .font(.lmCaption2)
                                         .foregroundStyle(LiftMarkTheme.warning)
                                 }
                             }

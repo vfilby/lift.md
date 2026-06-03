@@ -92,11 +92,11 @@ struct MigratorBridgeStallView: View {
                     .accessibilityHidden(true)
 
                 Text(failure.alertTitle)
-                    .font(.title2.weight(.semibold))
+                    .font(.lmTitle2.weight(.semibold))
                     .multilineTextAlignment(.center)
 
                 Text(failure.alertMessage(context: context))
-                    .font(.body)
+                    .font(.lmBody)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -104,7 +104,7 @@ struct MigratorBridgeStallView: View {
                 if failure.offersSupportExport {
                     Button(action: onExportForSupport) {
                         Label("Export Database for Support", systemImage: "square.and.arrow.up")
-                            .font(.body.weight(.semibold))
+                            .font(.lmBody.weight(.semibold))
                             .padding(.horizontal, LiftMarkTheme.spacingMD)
                             .padding(.vertical, LiftMarkTheme.spacingSM)
                     }

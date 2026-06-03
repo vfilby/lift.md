@@ -8,28 +8,30 @@ struct OnboardingView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // App icon and welcome
-                    VStack(spacing: 8) {
-                        Image(systemName: "dumbbell.fill")
-                            .font(.system(size: 50))
-                            .foregroundStyle(.tint)
+                    VStack(spacing: 12) {
+                        Image("BrandMark")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 96, height: 96)
+                            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+                            .accessibilityHidden(true)
 
-                        Text("Welcome to LiftMark")
-                            .font(.title.weight(.bold))
+                        // Wordmark logo (custom 'l') rather than the typeface.
+                        Image("BrandWordmark")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 40)
+                            .accessibilityLabel("lift.md")
 
                         Text("Markdown workouts you own")
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top, 48)
 
                     // Brief explanation
-                    Text(
-                        "LiftMark helps you track your workouts using markdown — "
-                        + "putting you in control of your plans and your data. "
-                        + "Log your sets during sessions and keep a portable history of your training, "
-                        + "ready for any text editor or AI assistant."
-                    )
-                        .font(.body)
+                    Text("Track your workouts in markdown — portable, yours, and ready for any text editor or AI assistant.")
+                        .font(.lmBody)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
 
@@ -45,7 +47,7 @@ struct OnboardingView: View {
                         onAccept()
                     } label: {
                         Text("I Understand")
-                            .font(.headline)
+                            .font(.lmHeadline)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                     }

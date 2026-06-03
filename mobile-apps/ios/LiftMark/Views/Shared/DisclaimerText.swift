@@ -5,7 +5,7 @@ struct DisclaimerText: View {
         VStack(alignment: .leading, spacing: 16) {
             disclaimerSection(
                 title: "Tracking Only",
-                body: "LiftMark is a workout tracking tool. It does not provide exercise instruction, "
+                body: "lift.md is a workout tracking tool. It does not provide exercise instruction, "
                     + "form guidance, coaching, or medical advice. You are solely responsible for "
                     + "knowing how to safely perform any exercises you track."
             )
@@ -28,9 +28,9 @@ struct DisclaimerText: View {
     private func disclaimerSection(title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.lmSubheadline.weight(.semibold))
             Text(body)
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(.secondary)
         }
     }

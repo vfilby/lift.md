@@ -28,8 +28,8 @@ struct SettingsOpenSourceView: View {
     var body: some View {
         List {
             Section {
-                Text("LiftMark is built with the following open source packages. Thanks to their authors and maintainers.")
-                    .font(.footnote)
+                Text("lift.md is built with the following open source packages. Thanks to their authors and maintainers.")
+                    .font(.lmFootnote)
                     .foregroundStyle(.secondary)
             }
 
@@ -45,11 +45,11 @@ struct SettingsOpenSourceView: View {
                                     .foregroundStyle(.secondary)
                                 Image(systemName: "arrow.up.right.square")
                                     .foregroundStyle(.secondary)
-                                    .font(.footnote)
+                                    .font(.lmFootnote)
                             }
                         }
                         Link("View license", destination: package.licenseURL)
-                            .font(.footnote)
+                            .font(.lmFootnote)
                     }
                     .padding(.vertical, 2)
                     .accessibilityIdentifier("oss-package-\(package.name)")

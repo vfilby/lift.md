@@ -27,11 +27,11 @@ struct LiveWorkoutsLiveActivity: Widget {
             } compactTrailing: {
                 if let timerEnd = context.state.timerEndDate {
                     Text(timerEnd, style: .timer)
-                        .font(.caption.monospacedDigit())
+                        .font(.lmCaption.monospacedDigit())
                         .foregroundStyle(timerEnd > Date() ? .green : .red)
                 } else {
                     Text("\(Int(context.state.progress * 100))%")
-                        .font(.caption.monospacedDigit())
+                        .font(.lmCaption.monospacedDigit())
                 }
             } minimal: {
                 Image(systemName: "dumbbell.fill")
@@ -52,11 +52,11 @@ struct LiveWorkoutsLiveActivity: Widget {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Rest")
-                        .font(.headline)
+                        .font(.lmHeadline)
                     Spacer()
                     if let timerEnd = state.timerEndDate {
                         Text(timerEnd, style: .timer)
-                            .font(.title2.monospacedDigit().bold())
+                            .font(.lmTitle2.monospacedDigit().bold())
                             .foregroundStyle(timerEnd > Date() ? .green : .red)
                     }
                 }
@@ -64,13 +64,13 @@ struct LiveWorkoutsLiveActivity: Widget {
                 if let nextName = state.nextExerciseName {
                     HStack {
                         Text("Up Next: \(nextName)")
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                         if let detail = state.nextSetDetail {
                             Spacer()
                             Text(detail)
-                                .font(.subheadline.monospacedDigit())
+                                .font(.lmSubheadline.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -85,31 +85,31 @@ struct LiveWorkoutsLiveActivity: Widget {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(state.exerciseName)
-                        .font(.headline)
+                        .font(.lmHeadline)
                         .lineLimit(1)
                     Spacer()
                     if !state.setInfo.isEmpty {
                         Text(state.setInfo)
-                            .font(.subheadline)
+                            .font(.lmSubheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
 
                 if !state.weightReps.isEmpty {
                     Text(state.weightReps)
-                        .font(.title3.monospacedDigit().bold())
+                        .font(.lmTitle3.monospacedDigit().bold())
                 }
 
                 HStack {
                     if let nextName = state.nextExerciseName {
                         Text("Next: \(nextName)")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                     Spacer()
                     Text("\(Int(state.progress * 100))%")
-                        .font(.caption.monospacedDigit())
+                        .font(.lmCaption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
 
@@ -129,10 +129,10 @@ struct LiveWorkoutsLiveActivity: Widget {
         if state.isRestTimer {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Rest")
-                    .font(.headline)
+                    .font(.lmHeadline)
                 if let nextName = state.nextExerciseName {
                     Text("Next: \(nextName)")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -140,11 +140,11 @@ struct LiveWorkoutsLiveActivity: Widget {
         } else {
             VStack(alignment: .leading, spacing: 2) {
                 Text(state.exerciseName)
-                    .font(.headline)
+                    .font(.lmHeadline)
                     .lineLimit(1)
                 if !state.weightReps.isEmpty {
                     Text(state.setInfo.isEmpty ? state.weightReps : "\(state.setInfo) \u{2022} \(state.weightReps)")
-                        .font(.caption2)
+                        .font(.lmCaption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -158,11 +158,11 @@ struct LiveWorkoutsLiveActivity: Widget {
 
         if let timerEnd = state.timerEndDate {
             Text(timerEnd, style: .timer)
-                .font(.title3.monospacedDigit().bold())
+                .font(.lmTitle3.monospacedDigit().bold())
                 .foregroundStyle(timerEnd > Date() ? .green : .red)
         } else {
             Text("\(Int(state.progress * 100))%")
-                .font(.title3.bold())
+                .font(.lmTitle3.bold())
         }
     }
 
@@ -172,11 +172,11 @@ struct LiveWorkoutsLiveActivity: Widget {
 
         if state.isRestTimer, let detail = state.nextSetDetail {
             Text(detail)
-                .font(.caption2.monospacedDigit())
+                .font(.lmCaption2.monospacedDigit())
                 .foregroundStyle(.secondary)
         } else if !state.isRestTimer, let nextName = state.nextExerciseName {
             Text("Next: \(nextName)")
-                .font(.caption2)
+                .font(.lmCaption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }

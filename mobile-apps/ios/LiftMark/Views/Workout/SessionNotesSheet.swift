@@ -29,13 +29,13 @@ struct SessionNotesSheet: View {
         NavigationStack {
             VStack(spacing: LiftMarkTheme.spacingSM) {
                 Text("Capture how this workout felt — energy, form cues, soreness, anything worth remembering. Plain text.")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 TextEditor(text: $text)
                     .focused($isFocused)
-                    .font(.body)
+                    .font(.lmBody)
                     .frame(minHeight: 180)
                     .overlay(
                         RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM)

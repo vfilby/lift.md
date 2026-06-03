@@ -196,10 +196,10 @@ private struct StatItem: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(label)
-                .font(.caption2)
+                .font(.lmCaption2)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(color)
         }

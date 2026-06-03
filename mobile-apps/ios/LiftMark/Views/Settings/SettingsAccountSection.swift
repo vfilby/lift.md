@@ -46,16 +46,16 @@ struct SettingsAccountSection: View {
                 Spacer()
                 Text(lastSyncedLabel)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
             }
             if inboxPoller.pendingCount > 0 {
                 Text("\(inboxPoller.pendingCount) pending")
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
             if let err = inboxPoller.lastError {
                 Text(err)
-                    .font(.caption)
+                    .font(.lmCaption)
                     .foregroundStyle(Color.red)
             }
         }
@@ -99,12 +99,12 @@ struct SettingsAccountSection: View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
             if !user.displayName.isEmpty {
                 Text(user.displayName)
-                    .font(.body)
+                    .font(.lmBody)
                     .foregroundStyle(LiftMarkTheme.label)
             }
             if !user.email.isEmpty {
                 Text(user.email)
-                    .font(.subheadline)
+                    .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
         }
@@ -137,7 +137,7 @@ struct SettingsAccountSection: View {
     private func tierBadge(for user: AuthenticatedUser) -> some View {
         let (label, color) = tierLabelAndColor(for: user)
         Text(label)
-            .font(.caption.weight(.semibold))
+            .font(.lmCaption.weight(.semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(color.opacity(0.15))
@@ -168,10 +168,10 @@ struct SettingsAccountSection: View {
     private var signedOutContent: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
             Text("Sign in to receive workouts pushed from Claude Code, ChatGPT, or other tools.")
-                .font(.subheadline)
+                .font(.lmSubheadline)
                 .foregroundStyle(LiftMarkTheme.label)
             Text("Optional — the app works fully offline without an account.")
-                .font(.caption)
+                .font(.lmCaption)
                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
         }
         .padding(.vertical, LiftMarkTheme.spacingXS)
@@ -185,7 +185,7 @@ struct SettingsAccountSection: View {
                     .fontWeight(.semibold)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
+                    .font(.lmCaption.weight(.semibold))
                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
             }
         }

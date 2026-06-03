@@ -13,7 +13,7 @@ struct SettingsGymSection: View {
                     Spacer()
                     if gym.isDefault {
                         Text("Default")
-                            .font(.caption)
+                            .font(.lmCaption)
                             .fontWeight(.semibold)
                             .foregroundStyle(LiftMarkTheme.warning)
                             .padding(.horizontal, 8)

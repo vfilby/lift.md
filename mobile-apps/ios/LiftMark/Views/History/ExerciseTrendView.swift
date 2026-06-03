@@ -40,9 +40,9 @@ struct ExerciseTrendView: View {
                 // No history — disabled, non-tappable
                 HStack {
                     Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.caption)
+                        .font(.lmCaption)
                     Text("No History")
-                        .font(.caption)
+                        .font(.lmCaption)
                     Spacer()
                 }
                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
@@ -55,14 +55,14 @@ struct ExerciseTrendView: View {
                 } label: {
                     HStack {
                         Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.caption)
+                            .font(.lmCaption)
                         Text(isExpanded ? "Hide trends" : "Show trends")
-                            .font(.caption)
+                            .font(.lmCaption)
                         Text(trend)
                             .foregroundStyle(trendColor)
                         Spacer()
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption)
+                            .font(.lmCaption)
                     }
                     .foregroundStyle(LiftMarkTheme.primary)
                 }
@@ -81,9 +81,9 @@ struct ExerciseTrendView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "list.bullet")
-                                    .font(.caption)
+                                    .font(.lmCaption)
                                 Text("Details")
-                                    .font(.subheadline)
+                                    .font(.lmSubheadline)
                                     .fontWeight(.semibold)
                             }
                             .frame(maxWidth: .infinity)

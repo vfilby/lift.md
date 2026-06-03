@@ -32,7 +32,7 @@ struct ContentView: View {
             }
             .environment(navCoordinator)
             .tabItem {
-                Label("LiftMark", systemImage: "house")
+                Label("lift.md", systemImage: "house")
             }
             .tag(AppTab.home)
             .accessibilityIdentifier("tab-home")

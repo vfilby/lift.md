@@ -104,7 +104,7 @@ final class InboxPollerService {
             }
         } catch {
             Logger.shared.error(.network, "inbox list failed", error: error)
-            lastError = "Could not reach the LiftMark server."
+            lastError = "Could not reach the lift.md server."
             return
         }
 

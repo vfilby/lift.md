@@ -19,7 +19,7 @@ struct SettingsPrivacySection: View {
             .accessibilityIdentifier("toggle-include-content")
 
         Text("Reports help diagnose crashes and sync failures. Content inclusion sends your workout text to our error reporter (Sentry) — only enable this to help us debug a parser bug you've hit.")
-            .font(.footnote)
+            .font(.lmFootnote)
             .foregroundStyle(.secondary)
     }
 }

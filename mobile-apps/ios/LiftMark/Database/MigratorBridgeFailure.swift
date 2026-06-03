@@ -37,17 +37,17 @@ enum MigratorBridgeFailure: String, CaseIterable {
             return "Free up ~\(needed) MB and relaunch."
         case .integrityFailed:
             return """
-            Your local workout database reports an inconsistency. LiftMark will not upgrade \
+            Your local workout database reports an inconsistency. lift.md will not upgrade \
             until this is resolved. Tap here to export a copy for support.
             """
         case .backupFailed:
-            return "LiftMark couldn't create a safety backup. Your data is unchanged. Please try again."
+            return "lift.md couldn't create a safety backup. Your data is unchanged. Please try again."
         case .bridgeWriteFailed:
             return "Database upgrade couldn't complete. Your data has been restored from backup. Please try again."
         case .postBridgeMigrationFailed, .fkViolation:
             return "Database upgrade failed and has been rolled back. Your data is unchanged."
         case .futureVersion:
-            return "This database was written by a newer version of LiftMark. Update the app to continue."
+            return "This database was written by a newer version of lift.md. Update the app to continue."
         }
     }
 
