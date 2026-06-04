@@ -1,0 +1,87 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const skillInstall = `curl -fsSL https://getlift.md/install.sh | sh`;
+
+const validateExample = `curl -sX POST https://getlift.md/validate \\
+  -H 'Content-Type: application/json' \\
+  -d '{"markdown": "# Bench Day\\n@units: lbs\\n\\n## Bench Press\\n- 135 x 5\\n- 185 x 5"}'`;
+---
+
+<Base
+  title="Agents"
+  description="Use lift.md format with LLMs and coding agents — an open markdown format, a machine-readable llms.txt index, a live validator API, and a one-line Claude Code skill installer."
+>
+  <h1>Built for agents</h1>
+
+  <p>
+    lift.md format is plain markdown, so any LLM can read and write workouts
+    without special tooling. Bring your own model — there's nothing
+    proprietary to learn, no SDK to install, and no lock-in. This page collects
+    the resources that make LiftMark easy to drive from an agent.
+  </p>
+
+  <h2>The format is just markdown</h2>
+
+  <p>
+    A workout plan is a header, exercises, and lists of sets. LLMs generate
+    and edit it reliably because it looks like the markdown they already
+    produce. See the <a href="/format">format hub</a> for the pitch and a live
+    validator, or the <a href="/format/spec">full spec</a> for every modifier
+    and rule. The spec is also available as
+    <a href="/spec.md">raw markdown</a> if you want to feed it directly into a
+    model's context.
+  </p>
+
+  <h2>llms.txt</h2>
+
+  <p>
+    <a href="/llms.txt">getlift.md/llms.txt</a> is a machine-readable index of
+    the format, spec, validator API, and skill installer — point an agent at
+    it as a single entry point to everything below.
+  </p>
+
+  <h2>Validate before you trust it</h2>
+
+  <p>
+    Have an agent check its own output against the live validator at
+    <code>POST https://getlift.md/validate</code>. Send a JSON body of
+    <code>&#123;"markdown": "..."&#125;</code> and you get back
+    <code>&#123;success, summary, errors, warnings&#125;</code> — feed the
+    errors back to the model to iterate.
+  </p>
+
+  <pre class="agents-code"><code>{validateExample}</code></pre>
+
+  <h2>Claude Code skill</h2>
+
+  <p>
+    If you use <a href="https://claude.com/claude-code" rel="external noopener">Claude Code</a>,
+    install the <code>generate-workout</code> skill with one line. It teaches
+    Claude to generate lift.md format workouts and validate them against the
+    API automatically:
+  </p>
+
+  <pre class="agents-code"><code>{skillInstall}</code></pre>
+
+  <h2>Links</h2>
+
+  <ul>
+    <li><a href="/format">Format hub</a> — pitch, examples, and live validator</li>
+    <li><a href="/format/spec">Full specification</a> (also <a href="/spec.md">raw markdown</a>)</li>
+    <li><a href="/llms.txt">llms.txt</a> — machine-readable index for LLMs</li>
+    <li>Validator API: <code>POST https://getlift.md/validate</code></li>
+    <li><a href="https://github.com/vfilby/liftmark" rel="external noopener">GitHub repository</a></li>
+  </ul>
+
+  <style>
+    .agents-code {
+      background: var(--color-bg-subtle);
+      border: 1px solid var(--color-border);
+      border-radius: var(--lm-radius-lg);
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-size: 0.9rem;
+    }
+  </style>
+</Base>
