@@ -97,12 +97,8 @@ const richHtml = highlightLmwf(richExample);
   title="Format"
   description="The lift.md format — a markdown-based format for strength training workouts. Human-writable, machine-parseable, open spec."
   ogImage="/brand/social/og-liftmd.png"
+  formatBrand
 >
-  <div class="format-lockup">
-    <img class="logo logo-ink" src="/brand/logos/lockup-liftmd-format-ink.svg" alt="lift.md format" width="1018" height="260" />
-    <img class="logo logo-white" src="/brand/logos/lockup-liftmd-format-white.svg" alt="lift.md format" width="1018" height="260" />
-  </div>
-
   <h1>lift.md format</h1>
 
   <p>
@@ -190,20 +186,8 @@ const richHtml = highlightLmwf(richExample);
   </ul>
 
   <style>
-    .format-lockup { margin-top: 0.5rem; }
-    .format-lockup .logo { height: 40px; width: auto; }
-    .format-lockup .logo-ink { display: block; }
-    .format-lockup .logo-white { display: none; }
-    :root[data-theme='dark'] .format-lockup .logo-ink,
-    :root[data-color-scheme='dark'] .format-lockup .logo-ink { display: none; }
-    :root[data-theme='dark'] .format-lockup .logo-white,
-    :root[data-color-scheme='dark'] .format-lockup .logo-white { display: block; }
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme='light']):not([data-color-scheme='light']) .format-lockup .logo-ink { display: none; }
-      :root:not([data-theme='light']):not([data-color-scheme='light']) .format-lockup .logo-white { display: block; }
-    }
-    /* The lockup already carries the wordmark; keep the H1 for SEO/structure
-       but visually hide it so the page doesn't read the name twice. */
+    /* The nav lockup (formatBrand) already carries the "lift.md format"
+       wordmark, so keep the H1 for SEO/structure but visually hide it. */
     h1 {
       position: absolute;
       width: 1px; height: 1px;

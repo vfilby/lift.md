@@ -843,27 +843,27 @@ struct SetRowView: View {
     private var modifierBadges: some View {
         HStack(spacing: 4) {
             if set.isDropset {
-                Text("Drop")
-                    .font(.lmCaption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(LiftMarkTheme.destructive)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(LiftMarkTheme.destructive.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                modifierBadge("Drop", color: LiftMarkTheme.destructive)
             }
-            // Side label (/side badge for non-expanded per-side sets) — expanded Left/Right shown inline before data
+            if set.isAmrap {
+                modifierBadge("AMRAP", color: LiftMarkTheme.primary)
+            }
+            // /side badge for non-expanded per-side sets — expanded Left/Right shown inline before data
             if set.isPerSide && set.side == nil {
-                Text("/side")
-                    .font(.lmCaption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(LiftMarkTheme.primary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(LiftMarkTheme.primary.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                modifierBadge("/side", color: LiftMarkTheme.primary)
             }
         }
+    }
+
+    private func modifierBadge(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.lmCaption2)
+            .fontWeight(.semibold)
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(color.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     // MARK: - Helpers
