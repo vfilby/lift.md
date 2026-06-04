@@ -1,9 +1,52 @@
 ---
 import Base from '../layouts/Base.astro';
+import { getImage } from 'astro:assets';
 
 // Marketing landing. No format/validator content — that lives at /format.
-// (A "See it in action" screenshot gallery will return once real app
-// captures exist — intentionally omitted rather than shown as placeholders.)
+
+// Screenshot carousel. Sources live in src/assets/screenshots/ as
+// <name>-light.png / <name>-dark.png; Astro's build pipeline (sharp) emits
+// optimized, resized WebP variants — small ones for the inline carousel and a
+// larger one for the lightbox. To update for a new app version, just replace
+// the PNGs (same names) and rebuild; to add/remove a screenshot, edit this
+// ordered list. Everything else is derived.
+// Order is intentional: the first three are the ones shown by default in the
+// 3-up carousel; the rest follow in the app's screenshot order.
+const SCREENSHOTS = [
+  { name: 'workout-detail', label: 'workout detail',  alt: 'lift.md workout detail view' },
+  { name: 'active-workout', label: 'active workout',  alt: 'lift.md active workout screen tracking sets' },
+  { name: 'trend',          label: 'trend graph',     alt: 'lift.md trend graph showing progress over time' },
+  { name: 'home',           label: 'home screen',     alt: 'lift.md home screen with workout list' },
+  { name: 'superset',       label: 'active superset', alt: 'lift.md active superset view' },
+  { name: 'history',        label: 'history',         alt: 'lift.md workout history' },
+  { name: 'workout-entry',  label: 'workout entry',   alt: 'lift.md workout entry editor' },
+  { name: 'amrap-dropset',  label: 'AMRAP & drop sets', alt: 'lift.md active workout with AMRAP and drop sets' },
+];
+
+const sources = import.meta.glob('../assets/screenshots/*.png', { eager: true, import: 'default' });
+const asset = (n) => {
+  const key = `../assets/screenshots/${n}.png`;
+  if (!sources[key]) throw new Error(`Missing screenshot source: ${key}`);
+  return sources[key];
+};
+
+// Carousel thumbs render at ~30vw (3-up) / ~92vw (1-up mobile); these widths
+// cover 1x–3x. The lightbox shows the shot at ~420px CSS, so 1080w is ~2.5x.
+const THUMB_WIDTHS = [240, 480, 720];
+const FULL_WIDTH = 1080;
+const SHOT_SIZES = '(max-width: 640px) 92vw, 30vw';
+
+const shots = await Promise.all(
+  SCREENSHOTS.map(async (s) => {
+    const [thumbLight, thumbDark, fullLight, fullDark] = await Promise.all([
+      getImage({ src: asset(`${s.name}-light`), widths: THUMB_WIDTHS, format: 'webp' }),
+      getImage({ src: asset(`${s.name}-dark`), widths: THUMB_WIDTHS, format: 'webp' }),
+      getImage({ src: asset(`${s.name}-light`), width: FULL_WIDTH, format: 'webp' }),
+      getImage({ src: asset(`${s.name}-dark`), width: FULL_WIDTH, format: 'webp' }),
+    ]);
+    return { ...s, thumbLight, thumbDark, fullLight, fullDark };
+  }),
+);
 ---
 
 <Base title="lift.md" home>
@@ -14,25 +57,128 @@ import Base from '../layouts/Base.astro';
     </div>
     <p class="hero-sub">
       Track your workouts with simple, markdown-based workout plans — write them
-      yourself or let an agent draft them.
+      yourself or let an agent take the wheel.
     </p>
-    <div class="hero-cta">
-      <a class="lm-btn lm-btn-primary" href="https://testflight.apple.com/join/u8EJFzYu" rel="external noopener">
-        Join the iOS beta
-      </a>
-      <a class="lm-btn lm-btn-secondary" href="/format">Explore the format →</a>
-    </div>
-    <p class="hero-cta-note">iOS only — public beta on TestFlight, not yet on the App Store.</p>
   </section>
 
   <section class="pillars" aria-label="Why lift.md">
     <div class="pillar">
-      <h2>Open</h2>
-      <p>No lock-in. Bring your own data in, and export it just as easily.</p>
+      <h2>Own Your Data</h2>
+      <p>Bring your own data in, and export out just as easily. No lock-in.</p>
+      <p class="pillar-cta"><a href="/format">Explore the format →</a></p>
     </div>
     <div class="pillar">
       <h2>Agent Friendly</h2>
-      <p>Plans are just markdown, so any LLM can read and write them — and you can export your training data in clean, machine-readable formats.</p>
+      <p>Bring your own LLM. Markdown-based and flexible for any agent.</p>
+      <p class="pillar-cta"><a href="/agents">Built for agents →</a></p>
+    </div>
+    <div class="pillar">
+      <h2>Open Source</h2>
+      <p>Both the app and the format are open source.</p>
+      <p class="pillar-cta"><a href="https://github.com/vfilby/liftmark" rel="external noopener">View on GitHub →</a></p>
+    </div>
+  </section>
+
+  <div class="hero-cta pillars-cta">
+    <a class="lm-btn lm-btn-primary" href="https://testflight.apple.com/join/u8EJFzYu" rel="external noopener">
+      Join the iOS beta
+    </a>
+    <a class="lm-btn lm-btn-secondary" href="/format">Explore the format →</a>
+  </div>
+
+  <h2 class="shots-title">App built for flexible training</h2>
+
+  <section class="shots" aria-label="App screenshots" aria-roledescription="carousel">
+    <button type="button" class="shots-arrow shots-prev" aria-label="Previous screenshots">‹</button>
+    <div class="shots-viewport">
+      <div class="shots-track">
+        {shots.map((s) => (
+          <button
+            type="button"
+            class="shot"
+            aria-label={`Enlarge ${s.label} screenshot`}
+            data-full-light={s.fullLight.src}
+            data-full-dark={s.fullDark.src}
+          >
+            <img
+              class="shot-img shot-light"
+              src={s.thumbLight.src}
+              srcset={s.thumbLight.srcSet.attribute}
+              sizes={SHOT_SIZES}
+              width="1320"
+              height="2868"
+              alt={s.alt}
+              loading="lazy"
+              decoding="async"
+            />
+            <img
+              class="shot-img shot-dark"
+              src={s.thumbDark.src}
+              srcset={s.thumbDark.srcSet.attribute}
+              sizes={SHOT_SIZES}
+              width="1320"
+              height="2868"
+              alt={s.alt}
+              loading="lazy"
+              decoding="async"
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+    <button type="button" class="shots-arrow shots-next" aria-label="Next screenshots">›</button>
+  </section>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot viewer" hidden>
+    <button type="button" class="lightbox-close" aria-label="Close">×</button>
+    <button type="button" class="lightbox-prev" aria-label="Previous screenshot">‹</button>
+    <div class="lightbox-stage">
+      <img class="lightbox-img shot-light" src="" alt="" />
+      <img class="lightbox-img shot-dark" src="" alt="" />
+    </div>
+    <button type="button" class="lightbox-next" aria-label="Next screenshot">›</button>
+    <p class="lightbox-counter" aria-live="polite"></p>
+  </div>
+
+  <section class="features" aria-label="Features">
+    <h2 class="features-title">Handy features to make training easy</h2>
+    <div class="features-grid">
+      <div class="feature">
+        <h3>Supersets</h3>
+        <p>Group exercises and track interleaved sets, with rest that stays visible when collapsed.</p>
+      </div>
+      <div class="feature">
+        <h3>Rest timers</h3>
+        <p>Countdown timers with audio cues that keep running when the app is backgrounded.</p>
+      </div>
+      <div class="feature">
+        <h3>Plate Math</h3>
+        <p>Per-side barbell plate math, automatically, in pounds or kilograms.</p>
+      </div>
+      <div class="feature">
+        <h3>Progress trends</h3>
+        <p>Searchable history with per-exercise trend indicators across recent sessions.</p>
+      </div>
+      <div class="feature">
+        <h3>iCloud sync</h3>
+        <p>Automatic backup and multi-device sync through CloudKit — no account required.</p>
+      </div>
+      <div class="feature">
+        <h3>Live Activities</h3>
+        <p>Rest timer and workout progress on the Lock Screen and in the Dynamic Island.</p>
+      </div>
+      <div class="feature">
+        <h3>Export &amp; import</h3>
+        <p>Take your data out as JSON or markdown, and import plans from any <code>.md</code> file.</p>
+      </div>
+      <div class="feature">
+        <h3>Apple Health</h3>
+        <p>Save completed workouts to Health with volume and duration metadata.</p>
+      </div>
+      <div class="feature">
+        <h3>Flexible set types</h3>
+        <p>Bodyweight, timed holds, AMRAP, and drop sets — all in plain text.</p>
+      </div>
     </div>
   </section>
 
@@ -50,12 +196,12 @@ import Base from '../layouts/Base.astro';
     /* Hero */
     .hero {
       text-align: center;
-      padding: 3.5rem 0 3rem;
+      padding: 1.25rem 0 0.75rem;
     }
     .hero-logo-wrap {
       display: flex;
       justify-content: center;
-      margin-bottom: 2rem;
+      margin-bottom: 3.25rem;
       transform-origin: center top;
       will-change: transform, opacity;
     }
@@ -76,7 +222,7 @@ import Base from '../layouts/Base.astro';
       color: var(--color-muted);
       font-size: var(--lm-fs-body-lg);
       max-width: 52ch;
-      margin: 0 auto 1.75rem;
+      margin: 0 auto;
     }
     .hero-cta {
       display: flex;
@@ -84,20 +230,17 @@ import Base from '../layouts/Base.astro';
       justify-content: center;
       flex-wrap: wrap;
     }
-    .hero-cta-note {
-      margin: 0.9rem 0 0;
-      font-size: 0.85rem;
-      color: var(--color-muted);
-    }
 
     /* Pillars */
     .pillars {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 1rem;
       margin: 1.5rem 0 3rem;
     }
     .pillar {
+      display: flex;
+      flex-direction: column;
       border: 1px solid var(--color-border);
       border-radius: var(--lm-radius-lg);
       background: var(--color-bg-subtle);
@@ -111,6 +254,183 @@ import Base from '../layouts/Base.astro';
       color: var(--color-accent);
     }
     .pillar p { margin: 0; font-size: 0.95rem; }
+    .pillar p.pillar-cta { margin-top: auto; padding-top: 1rem; }
+    .pillar-cta a {
+      font-weight: var(--lm-fw-semibold);
+      font-size: 0.95rem;
+      color: var(--color-accent);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .pillar-cta a:hover { text-decoration: underline; }
+
+    .pillars-cta { margin: 0 0 3rem; }
+
+    /* Screenshots */
+    .shots-title {
+      text-align: center;
+      border: 0;
+      padding: 0;
+      margin: 0 0 1.5rem;
+    }
+    /* Carousel: arrows flank a clipped viewport; the track slides one shot at
+       a time while three stay visible. --shots-per-view (set by JS) drives the
+       item width so the same CSS handles the mobile (1-up) breakpoint. */
+    .shots {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0 0 3rem;
+      --shots-per-view: 3;
+      --shots-gap: 1rem;
+    }
+    .shots-viewport { flex: 1 1 auto; overflow: hidden; }
+    .shots-track {
+      display: flex;
+      gap: var(--shots-gap);
+      transition: transform 0.35s ease;
+      will-change: transform;
+    }
+    .shots-arrow {
+      flex: none;
+      width: 2.5rem;
+      height: 2.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--color-border);
+      border-radius: 50%;
+      background: var(--color-bg-subtle);
+      color: var(--color-fg);
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+    }
+    .shots-arrow:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-accent); }
+    .shots-arrow:disabled { opacity: 0.3; cursor: default; }
+    .shots-arrow:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .shot {
+      flex: 0 0 calc((100% - (var(--shots-per-view) - 1) * var(--shots-gap)) / var(--shots-per-view));
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      cursor: pointer;
+      border-radius: var(--lm-radius-lg);
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .shot:hover { transform: translateY(-2px); opacity: 0.92; }
+    .shot:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+    .shot-img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: var(--lm-radius-lg);
+    }
+    /* Light/dark swap — mirrors the hero lockup. shot-light is the default;
+       shot-dark shows only under an explicit/auto dark theme. */
+    .shot-dark { display: none; }
+    :root[data-theme='dark'] .shot-light,
+    :root[data-color-scheme='dark'] .shot-light { display: none; }
+    :root[data-theme='dark'] .shot-dark,
+    :root[data-color-scheme='dark'] .shot-dark { display: block; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme='light']):not([data-color-scheme='light']) .shot-light { display: none; }
+      :root:not([data-theme='light']):not([data-color-scheme='light']) .shot-dark { display: block; }
+    }
+
+    /* Lightbox */
+    .lightbox[hidden] { display: none; }
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1.5rem;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(2px);
+    }
+    .lightbox-stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    .lightbox-img {
+      max-height: 88vh;
+      max-width: min(420px, 80vw);
+      width: auto;
+      height: auto;
+      border-radius: var(--lm-radius-lg);
+      box-shadow: var(--lm-shadow-2, 0 20px 60px rgba(0, 0, 0, 0.5));
+    }
+    .lightbox-close,
+    .lightbox-prev,
+    .lightbox-next {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      cursor: pointer;
+      line-height: 1;
+      transition: background 0.15s ease;
+    }
+    .lightbox-close:hover,
+    .lightbox-prev:hover,
+    .lightbox-next:hover { background: rgba(255, 255, 255, 0.25); }
+    .lightbox-prev,
+    .lightbox-next { width: 3rem; height: 3rem; font-size: 1.8rem; flex: none; }
+    .lightbox-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      font-size: 1.6rem;
+    }
+    .lightbox-counter {
+      position: absolute;
+      bottom: 1rem;
+      left: 0;
+      right: 0;
+      margin: 0;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 0.9rem;
+    }
+    .lightbox :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+    /* Features */
+    .features { margin: 0 0 3rem; }
+    .features-title {
+      text-align: center;
+      border: 0;
+      padding: 0;
+      margin: 0 0 1.5rem;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem 1.5rem;
+    }
+    .feature {
+      border-top: 2px solid var(--color-accent);
+      padding-top: 0.85rem;
+    }
+    .feature h3 {
+      margin: 0 0 0.3rem;
+      font-size: var(--lm-fs-h5, 1.05rem);
+      color: var(--color-fg);
+    }
+    .feature p { margin: 0; font-size: 0.92rem; color: var(--color-muted); }
 
     /* Closing */
     .closing {
@@ -123,7 +443,18 @@ import Base from '../layouts/Base.astro';
 
     @media (max-width: 640px) {
       .pillars { grid-template-columns: 1fr; }
+      .shots { --shots-per-view: 1; }
+      .features-grid { grid-template-columns: 1fr; }
       .hero-logo { height: 84px; }
     }
   </style>
+
+  <!-- Inline screenshot carousel: external module for CSP `script-src 'self'`. -->
+  <script>
+    import '../scripts/screenshot-carousel.js';
+  </script>
+  <!-- Screenshot lightbox: external module for CSP `script-src 'self'`. -->
+  <script>
+    import '../scripts/lightbox.js';
+  </script>
 </Base>
