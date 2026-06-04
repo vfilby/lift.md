@@ -16,9 +16,14 @@ test.describe('Marketing landing page', () => {
     ).toBeVisible();
 
     // CTA that routes to the format hub (the format content moved off home).
-    await expect(
-      page.getByRole('link', { name: /explore the format/i }),
-    ).toBeVisible();
+    // The page carries more than one "Explore the format" link now (a pillar
+    // CTA and the button below the pillars), so assert at least one is visible
+    // and that every match points at /format.
+    const formatCtas = page.getByRole('link', { name: /explore the format/i });
+    await expect(formatCtas.first()).toBeVisible();
+    for (const cta of await formatCtas.all()) {
+      await expect(cta).toHaveAttribute('href', '/format');
+    }
 
     // The marketing landing must NOT carry the format examples anymore —
     // those live on /format.
