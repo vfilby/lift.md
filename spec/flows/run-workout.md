@@ -65,6 +65,7 @@ in_progress → canceled
 ## Variations
 
 - **Drop sets**: Sets with `isDropset == true` show a "+ Drop" button below the primary weight/reps inputs. Tapping "+ Drop" adds a new entry row with weight and reps fields, pre-filling weight from the previous entry. Multiple drops can be added before completing. "Complete Set" records all entries at different `groupIndex` values (0 for primary, 1+ for drops) via `completeDropSet()`. Each drop entry has a delete button (minus icon). Completed drop sets display compactly as "225x10 -> 185x6 -> 135x4" with a "Drop" badge. Drop sets with no added drops behave identically to normal sets.
+- **AMRAP sets**: Sets with `isAmrap == true` (rep value `AMRAP`, no target rep count) show an "AMRAP" badge in the set row across pending, current, and completed states — mirroring how the plan view renders AMRAP. The reps field is left open ("--") so the lifter records the count achieved on completion.
 - **Time-based sets**: The exercise timer tracks elapsed time against a target rather than counting reps. On completion, `actualTime` is set to the timer's elapsed seconds if started, or `targetTime` if not started.
 - **All sets completed**: The Finish button proceeds without confirmation.
 - **Partially completed workout**: The "Finish Anyway" confirmation is shown listing incomplete sets.
