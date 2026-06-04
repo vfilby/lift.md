@@ -315,10 +315,9 @@ enum ScreenshotSeed {
     - 20 x 12
 
     ### Cable Tricep Pushdown
-    Squeeze at the bottom, control the negative
-    - 50 x 12 @rest: 60s
-    - 60 x 10 @rest: 60s
-    - 60 x 10 @rest: 60s
+    Drop set to finish — strip the stack, then max reps
+    - 60 x 12 @dropset
+    - 40 x AMRAP
 
     ### Push-ups
     Finisher — go to failure on the last set
