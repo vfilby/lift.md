@@ -6,8 +6,10 @@ name: "App Store Screenshots"
 # history, and exercise progress charts all show realistic, varied content.
 #
 # Each `screenshot` action writes a PNG attachment into the .xcresult bundle
-# under the supplied name. The Makefile `screenshots` target extracts them
-# into mobile-apps/ios/Screenshots/.
+# under the supplied name. scripts/capture-screenshots.sh (via the Makefile
+# `screenshots` target) runs this scenario twice — once with the simulator in
+# light appearance, once in dark (the app's default `.auto` theme follows the
+# OS) — and extracts the PNGs into mobile-apps/ios/Screenshots/{light,dark}/.
 
 setupOnce:
   - action: launchApp
@@ -36,6 +38,40 @@ tests:
         ms: 500
       - action: screenshot
         name: "01-home"
+
+  # The workout entry screen with live LMWF validation. Open the importer from
+  # home, type a valid lift.md workout, and let the on-change parser render the
+  # green "<name> — N exercises, M sets" confirmation bar at the bottom. Cancel
+  # + Discard afterwards so the seeded plans aren't disturbed.
+  - name: "capture workout entry"
+    steps:
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "import-modal"
+        timeout: 5000
+      - action: typeText
+        target: "input-markdown"
+        value: |-
+          # Leg Day
+          @units: lbs
+
+          ## Back Squat
+          - 135 x 5
+          - 185 x 5
+          - 225 x 5
+
+          ## Romanian Deadlift
+          - 185 x 8
+          - 205 x 8
+      - action: delay
+        ms: 900
+      - action: screenshot
+        name: "07-workout-entry"
+      - action: tap
+        target: "button-cancel"
+      - action: dismissAlert
+        button: "Discard"
 
   # Push Day has no warmup so workout-detail opens directly on the working
   # sets — Bench Press, Overhead Press, and the Superset visible in frame.
@@ -71,19 +107,69 @@ tests:
       - action: screenshot
         name: "03-active-workout"
 
-  # Same active workout, scrolled so the Superset card lands in frame.
+  # Same active workout, but expand the Superset card so its interleaved
+  # exercises are the focus. Tapping the card header expands it and surfaces
+  # the live set-entry; completing the first two interleaved sets (Incline
+  # 50x10, Lateral 15x15) advances to Incline set 2 (55x10) and shows the
+  # alternating Incline/Lateral flow with checkmarks — the superset story.
   - name: "capture active workout superset"
     steps:
-      - action: scroll
-        target: "active-workout-scroll"
-        direction: "up"
-      - action: scroll
-        target: "active-workout-scroll"
-        direction: "up"
+      # Expand the superset. Its first pending set (Incline 50x10) becomes the
+      # active entry independent of overall workout order. Bench Press stays the
+      # globally-current exercise, so its own "set-complete-button" is index 0
+      # in the tree and the superset's is index 1 — target index 1.
+      - action: tap
+        target: "superset-card-Superset: Chest & Shoulders"
+      - action: waitFor
+        target: "set-complete-button"
+        timeout: 5000
+      # Complete the superset's first two interleaved sets (Incline 50x10,
+      # Lateral 15x15): green checks, then the active entry advances to
+      # Incline set 2 (55x10) — exactly the superset story (2/26 done).
+      - action: tapIndex
+        target: "set-complete-button"
+        index: 1
       - action: delay
-        ms: 400
+        ms: 700
+      - action: tapIndex
+        target: "set-complete-button"
+        index: 1
+      - action: delay
+        ms: 700
       - action: screenshot
         name: "04-active-superset"
+
+  # Active tracking view for an exercise mixing a drop set and an AMRAP set.
+  # Cable Tricep Pushdown leads with a @dropset — the current set, so its live
+  # "Add Drop" weight-reduction UI shows — and finishes with an AMRAP set.
+  # Tapping Add Drop records a reduced-weight entry, making drop-set tracking
+  # explicit; the AMRAP set sits below.
+  - name: "capture active amrap dropset"
+    steps:
+      # Tap the card header by name (index-independent — the flattened exercise
+      # index shifts with section headers and the superset parent). Collapsed,
+      # the header is the only element bearing this text, so the tap expands it
+      # and its first pending set (the @dropset) becomes the active entry.
+      - action: tapText
+        text: "Cable Tricep Pushdown"
+      - action: waitFor
+        target: "add-drop-button"
+        timeout: 5000
+      - action: tap
+        target: "add-drop-button"
+      - action: delay
+        ms: 600
+      # Bring the Cable card heading toward the top so the whole card — drop-set
+      # entry, the Drop 1 row, Complete Set, and the AMRAP set below — is in
+      # frame rather than the superset card above it.
+      - action: scroll
+        target: "active-workout-scroll"
+        direction: "up"
+        amount: 42
+      - action: delay
+        ms: 500
+      - action: screenshot
+        name: "08-active-amrap-dropset"
 
   # Relaunch with a fresh DB so the in-progress session left over from the
   # active workout step doesn't pollute the history list. Re-seeding gives
@@ -143,6 +229,18 @@ tests:
       # first "Show trends" button on the page belongs to it.
       - action: delay
         ms: 1200
+      # Scroll just past the date + session-stats header (a controlled ~25% of
+      # the screen, not a full-page swipe that overshoots) so Bench Press's card
+      # heading lands at the top, THEN expand trends. Scrolling before the chart
+      # exists keeps Swift Charts from swallowing the gesture; the whole card —
+      # heading, logged sets, note, chart, Current/Best/Change, Details — then
+      # fits in frame with Overhead Press peeking below.
+      - action: scroll
+        target: "history-detail-screen"
+        direction: "up"
+        amount: 20
+      - action: delay
+        ms: 500
       - action: tapText
         text: "Show trends"
       - action: delay
