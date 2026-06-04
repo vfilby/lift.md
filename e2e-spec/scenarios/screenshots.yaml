@@ -39,6 +39,40 @@ tests:
       - action: screenshot
         name: "01-home"
 
+  # The workout entry screen with live LMWF validation. Open the importer from
+  # home, type a valid lift.md workout, and let the on-change parser render the
+  # green "<name> — N exercises, M sets" confirmation bar at the bottom. Cancel
+  # + Discard afterwards so the seeded plans aren't disturbed.
+  - name: "capture workout entry"
+    steps:
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "import-modal"
+        timeout: 5000
+      - action: typeText
+        target: "input-markdown"
+        value: |-
+          # Leg Day
+          @units: lbs
+
+          ## Back Squat
+          - 135 x 5
+          - 185 x 5
+          - 225 x 5
+
+          ## Romanian Deadlift
+          - 185 x 8
+          - 205 x 8
+      - action: delay
+        ms: 900
+      - action: screenshot
+        name: "07-workout-entry"
+      - action: tap
+        target: "button-cancel"
+      - action: dismissAlert
+        button: "Discard"
+
   # Push Day has no warmup so workout-detail opens directly on the working
   # sets — Bench Press, Overhead Press, and the Superset visible in frame.
   - name: "capture workout detail"
@@ -104,6 +138,38 @@ tests:
         ms: 700
       - action: screenshot
         name: "04-active-superset"
+
+  # Active tracking view for an exercise mixing a drop set and an AMRAP set.
+  # Cable Tricep Pushdown leads with a @dropset — the current set, so its live
+  # "Add Drop" weight-reduction UI shows — and finishes with an AMRAP set.
+  # Tapping Add Drop records a reduced-weight entry, making drop-set tracking
+  # explicit; the AMRAP set sits below.
+  - name: "capture active amrap dropset"
+    steps:
+      # Tap the card header by name (index-independent — the flattened exercise
+      # index shifts with section headers and the superset parent). Collapsed,
+      # the header is the only element bearing this text, so the tap expands it
+      # and its first pending set (the @dropset) becomes the active entry.
+      - action: tapText
+        text: "Cable Tricep Pushdown"
+      - action: waitFor
+        target: "add-drop-button"
+        timeout: 5000
+      - action: tap
+        target: "add-drop-button"
+      - action: delay
+        ms: 600
+      # Bring the Cable card heading toward the top so the whole card — drop-set
+      # entry, the Drop 1 row, Complete Set, and the AMRAP set below — is in
+      # frame rather than the superset card above it.
+      - action: scroll
+        target: "active-workout-scroll"
+        direction: "up"
+        amount: 42
+      - action: delay
+        ms: 500
+      - action: screenshot
+        name: "08-active-amrap-dropset"
 
   # Relaunch with a fresh DB so the in-progress session left over from the
   # active workout step doesn't pollute the history list. Re-seeding gives
