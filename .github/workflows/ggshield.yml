@@ -26,6 +26,18 @@ jobs:
   ggshield:
     name: ggshield
     runs-on: ubuntu-latest
+    # Skip on Dependabot-authored PRs. GitHub runs Dependabot PRs in a
+    # restricted context that withholds repo Actions secrets, so
+    # GITGUARDIAN_API_KEY is empty and the scan dies with "Invalid GitGuardian
+    # API key" — a false failure that blocked this required check on every
+    # dependency bump. Dependabot only edits dependency manifests/lockfiles and
+    # cannot introduce secrets, and the push-to-main scan below (which DOES have
+    # the key) still covers the merged code. Keyed off the immutable PR author
+    # (not github.actor) so it stays skipped even when a maintainer updates the
+    # branch. A job skipped by `if:` reports "skipped", which the branch ruleset
+    # counts as a passing required check (same pattern as build-and-test in
+    # swift-ci.yml).
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v6
         with:
