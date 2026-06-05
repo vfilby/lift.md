@@ -1,16 +1,55 @@
 ---
 import Base from '../../layouts/Base.astro';
+import LmwfCode from '../../components/LmwfCode.astro';
 
+// The agent integrations, in tab order. The id drives the radio/label/panel
+// wiring and the CSS selectors below.
+const tabs = [
+  { id: 'claude', label: 'Claude Code' },
+  { id: 'cowork', label: 'Cowork / Claude' },
+  { id: 'codex', label: 'Codex' },
+  { id: 'generic', label: 'Generic' },
+];
+
+// One-line installer for Claude Code (and any agent that can run it).
 const skillInstall = `curl -fsSL https://getlift.md/install.sh | sh`;
 
-const validateExample = `curl -sX POST https://getlift.md/validate \\
-  -H 'Content-Type: application/json' \\
-  -d '{"markdown": "# Bench Day\\n@units: lbs\\n\\n## Bench Press\\n- 135 x 5\\n- 185 x 5"}'`;
+// A minimal workout — the whole format at a glance.
+const formatExample = `# Bench Day
+@units: lbs
+
+## Bench Press
+- 135 x 5
+- 185 x 5
+- 225 x 5`;
+
+// Codex reads this from AGENTS.md (repo root or ~/.codex/AGENTS.md).
+const agentsRecipe = `# lift.md workouts
+
+When I ask you to write or edit a lift.md (LiftMark) workout:
+
+1. Read the format spec first and follow it:
+   curl -s https://getlift.md/spec.md
+2. Write the plan in lift.md format — a \`# Title\`, \`## Exercise\`
+   headings, and \`- weight x reps\` set lines.
+3. Validate before showing it to me. Save the workout to a file and POST it:
+   curl -s -X POST https://getlift.md/validate \\
+     -H 'Content-Type: text/markdown' \\
+     --data-binary @workout.md
+4. The response is JSON: {success, summary, errors, warnings}. If success is
+   false, fix everything listed in errors and re-validate. Only hand me a
+   workout that validates.`;
+
+// Raw-markdown validate call — no JSON escaping, the simplest form for any
+// tool. The validator also accepts {"markdown": "..."} as application/json.
+const validateRaw = `curl -s -X POST https://getlift.md/validate \\
+  -H 'Content-Type: text/markdown' \\
+  --data-binary @workout.md`;
 ---
 
 <Base
   title="Agents"
-  description="Use lift.md format with LLMs and coding agents — an open markdown format, a machine-readable llms.txt index, a live validator API, and a one-line Claude Code skill installer."
+  description="Use lift.md format with any LLM or coding agent — an open markdown format, a machine-readable llms.txt index, a live validator API, and a downloadable skill for Claude Code, Cowork, and claude.ai."
 >
   <h1>Built for agents</h1>
 
@@ -18,19 +57,19 @@ const validateExample = `curl -sX POST https://getlift.md/validate \\
     lift.md format is plain markdown, so any LLM can read and write workouts
     without special tooling. Bring your own model — there's nothing
     proprietary to learn, no SDK to install, and no lock-in. This page collects
-    the resources that make LiftMark easy to drive from an agent.
+    the resources that make LiftMark easy to drive from an agent, plus
+    copy-paste setup for the common ones.
   </p>
 
   <h2>The format is just markdown</h2>
 
-  <p>
-    A workout plan is a header, exercises, and lists of sets. LLMs generate
-    and edit it reliably because it looks like the markdown they already
-    produce. See the <a href="/format">format hub</a> for the pitch and a live
-    validator, or the <a href="/format/spec">full spec</a> for every modifier
-    and rule. The spec is also available as
-    <a href="/spec.md">raw markdown</a> if you want to feed it directly into a
-    model's context.
+  <p>A header, exercises, and lists of sets:</p>
+
+  <LmwfCode code={formatExample} />
+
+  <p class="muted">
+    Full <a href="/format/spec">spec</a> (or
+    <a href="/spec.md">raw markdown</a> to feed into a model's context).
   </p>
 
   <h2>llms.txt</h2>
@@ -45,24 +84,132 @@ const validateExample = `curl -sX POST https://getlift.md/validate \\
 
   <p>
     Have an agent check its own output against the live validator at
-    <code>POST https://getlift.md/validate</code>. Send a JSON body of
-    <code>&#123;"markdown": "..."&#125;</code> and you get back
-    <code>&#123;success, summary, errors, warnings&#125;</code> — feed the
-    errors back to the model to iterate.
+    <code>POST https://getlift.md/validate</code>. The simplest call is the raw
+    markdown as the request body — no JSON escaping:
   </p>
 
-  <pre class="agents-code"><code>{validateExample}</code></pre>
+  <pre class="agents-code"><code>{validateRaw}</code></pre>
 
-  <h2>Claude Code skill</h2>
+  <p class="muted">
+    Prefer JSON? Send <code>Content-Type: application/json</code> with a body of
+    <code>&#123;"markdown": "..."&#125;</code>. Either way you get back
+    <code>&#123;success, summary, errors, warnings&#125;</code> — feed the
+    errors back to the model to iterate until <code>success</code> is true.
+  </p>
+
+  <h2>The skill</h2>
 
   <p>
-    If you use <a href="https://claude.com/claude-code" rel="external noopener">Claude Code</a>,
-    install the <code>generate-workout</code> skill with one line. It teaches
-    Claude to generate lift.md format workouts and validate them against the
-    API automatically:
+    Most of the work is packaged as one <a href="https://www.anthropic.com/news/skills" rel="external noopener">Agent
+    Skill</a>, <code>generate-workout</code>: it teaches the model the format
+    and validates every workout against the API. Install it with one line, or
+    <a href="/generate-workout.zip" download>download the skill bundle</a> and
+    add it to any tool that loads skills. Pick your agent below.
   </p>
 
-  <pre class="agents-code"><code>{skillInstall}</code></pre>
+  <div class="agent-tabs">
+    {tabs.map((t, i) => (
+      <input
+        type="radio"
+        name="agent-tab"
+        id={`tab-${t.id}`}
+        class="agent-tab-input"
+        checked={i === 0}
+      />
+    ))}
+
+    <div class="agent-tablist" role="tablist" aria-label="Agent setup">
+      {tabs.map((t) => (
+        <label class="agent-tab" for={`tab-${t.id}`}>{t.label}</label>
+      ))}
+    </div>
+
+    <div class="agent-panels">
+      <section class="agent-panel" id="panel-claude" aria-label="Claude Code">
+        <p>
+          Install the <code>generate-workout</code> skill with one line. It
+          teaches <a href="https://claude.com/claude-code" rel="external noopener">Claude
+          Code</a> the format and validates every workout against the API
+          automatically:
+        </p>
+        <pre class="agents-code"><code>{skillInstall}</code></pre>
+        <p>
+          Start a new session and ask for a workout — e.g. <em>"write me a
+          push day in lift.md format"</em>. The skill fetches the spec, drafts
+          the plan, and loops on the validator until it passes. (You can also
+          just tell Claude to run that installer for you.)
+        </p>
+      </section>
+
+      <section class="agent-panel" id="panel-cowork" aria-label="Cowork / Claude">
+        <p>
+          <a href="https://www.anthropic.com/news/cowork" rel="external noopener">Cowork</a>
+          and <a href="https://claude.ai" rel="external noopener">claude.ai</a>
+          both run the same Agent Skills. Grab the bundle and add it:
+        </p>
+        <p>
+          <a class="lm-btn lm-btn-primary" href="/generate-workout.zip" download>Download the skill (.zip)</a>
+        </p>
+        <ul>
+          <li>
+            <strong>claude.ai:</strong> Customize → Skills → <strong>+</strong>
+            → Create skill, and upload the zip.
+          </li>
+          <li>
+            <strong>Cowork:</strong> add it the same way under Customize, or
+            just ask Claude to install it for you.
+          </li>
+        </ul>
+        <p class="muted">
+          The skill validates automatically wherever the sandbox is allowed to
+          reach <code>getlift.md</code> (Cowork running locally, or a claude.ai
+          workspace with outbound access enabled). If network egress is locked
+          down, the skill still writes correct lift.md — validate the result
+          yourself by pasting it into the box on the
+          <a href="/format">format hub</a>.
+        </p>
+      </section>
+
+      <section class="agent-panel" id="panel-codex" aria-label="Codex">
+        <p>
+          <a href="https://developers.openai.com/codex/cli" rel="external noopener">Codex
+          CLI</a> reads an <code>AGENTS.md</code> file from your repo root (or
+          <code>~/.codex/AGENTS.md</code> for all projects). Drop in this
+          recipe and Codex will fetch the spec and validate its own output:
+        </p>
+        <pre class="agents-code"><code>{agentsRecipe}</code></pre>
+        <p class="muted">
+          Codex runs with network access off by default — approve the network
+          prompt when it validates, or run with Full Access. No other setup
+          needed.
+        </p>
+      </section>
+
+      <section class="agent-panel" id="panel-generic" aria-label="Generic">
+        <p>
+          No special tooling — this works with any model behind the OpenAI or
+          Anthropic API, or any agent that can make an HTTP request:
+        </p>
+        <ol>
+          <li>
+            Fetch the spec once and put it in your system prompt:
+            <code>curl -s https://getlift.md/spec.md</code>. It's static, so
+            cache it (with Anthropic, mark the block for prompt caching).
+          </li>
+          <li>Have the model produce a workout in lift.md format.</li>
+          <li>
+            POST the output to the validator (raw markdown is simplest):
+            <pre class="agents-code"><code>{validateRaw}</code></pre>
+          </li>
+          <li>
+            If <code>success</code> is false, append the <code>errors</code>
+            array to the conversation and ask for a fix. Repeat — bounded to a
+            few retries — until it validates.
+          </li>
+        </ol>
+      </section>
+    </div>
+  </div>
 
   <h2>Links</h2>
 
@@ -70,6 +217,7 @@ const validateExample = `curl -sX POST https://getlift.md/validate \\
     <li><a href="/format">Format hub</a> — pitch, examples, and live validator</li>
     <li><a href="/format/spec">Full specification</a> (also <a href="/spec.md">raw markdown</a>)</li>
     <li><a href="/llms.txt">llms.txt</a> — machine-readable index for LLMs</li>
+    <li><a href="/generate-workout.zip" download>generate-workout skill</a> (.zip) — or <code>curl -fsSL https://getlift.md/install.sh | sh</code></li>
     <li>Validator API: <code>POST https://getlift.md/validate</code></li>
     <li><a href="https://github.com/vfilby/lift.md" rel="external noopener">GitHub repository</a></li>
   </ul>
@@ -83,5 +231,84 @@ const validateExample = `curl -sX POST https://getlift.md/validate \\
       overflow-x: auto;
       font-size: 0.9rem;
     }
+
+    /* ── CSS-only tabs ──────────────────────────────────────────────────
+       Radio inputs hold the selected-tab state; labels are the clickable
+       tabs; the matching panel is revealed with a general-sibling selector.
+       No JS — keeps the strict `script-src 'self'` CSP clean. */
+    /* position:relative anchors the absolutely-positioned hidden radios to
+       this container, so focusing one (on tab click) doesn't scroll the page. */
+    .agent-tabs { margin: 1.25rem 0 2rem; position: relative; }
+
+    /* Visually hidden but still focusable for keyboard tab-switching. */
+    .agent-tab-input {
+      position: absolute;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .agent-tablist {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 1.25rem;
+    }
+
+    .agent-tab {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.55rem 0.95rem;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      font-weight: var(--lm-fw-medium);
+      color: var(--color-muted);
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: var(--lm-radius-md) var(--lm-radius-md) 0 0;
+      margin-bottom: -1px;
+      white-space: nowrap;
+    }
+    .agent-tab:hover { color: var(--color-fg); }
+
+    .agent-panel { display: none; }
+    .agent-panel > :first-child { margin-top: 0; }
+
+    /* Active tab: accent text + a connected "card" lip over the rule. */
+    #tab-claude:checked ~ .agent-tablist label[for="tab-claude"],
+    #tab-cowork:checked ~ .agent-tablist label[for="tab-cowork"],
+    #tab-codex:checked ~ .agent-tablist label[for="tab-codex"],
+    #tab-generic:checked ~ .agent-tablist label[for="tab-generic"] {
+      color: var(--color-accent);
+      border-color: var(--color-border);
+      border-bottom-color: var(--color-bg);
+      background: var(--color-bg);
+    }
+
+    /* Reveal the matching panel. */
+    #tab-claude:checked ~ .agent-panels #panel-claude,
+    #tab-cowork:checked ~ .agent-panels #panel-cowork,
+    #tab-codex:checked ~ .agent-panels #panel-codex,
+    #tab-generic:checked ~ .agent-panels #panel-generic {
+      display: block;
+    }
+
+    /* Keyboard focus ring on the active tab's label. */
+    #tab-claude:focus-visible ~ .agent-tablist label[for="tab-claude"],
+    #tab-cowork:focus-visible ~ .agent-tablist label[for="tab-cowork"],
+    #tab-codex:focus-visible ~ .agent-tablist label[for="tab-codex"],
+    #tab-generic:focus-visible ~ .agent-tablist label[for="tab-generic"] {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    .agent-panel ol { margin: 0; }
+    .agent-panel li { margin-bottom: 0.6rem; }
+    .agent-panel li .agents-code { margin: 0.5rem 0 0; }
+    .agent-panel .lm-btn { margin: 0.25rem 0; }
   </style>
 </Base>

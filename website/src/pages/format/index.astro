@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import LmwfCode from '../../components/LmwfCode.astro';
 
 const minimalExample = `# Bench Day
 @units: lbs
@@ -63,34 +64,8 @@ Strict press, no leg drive. If the last set feels easy, add 5 lbs next session.
 - 2m
 `;
 
-// "The format as brand" (brand book §12): show lift.md format with
-// consistent token coloring — headings muted, @modifiers orange, set lines
-// light blue — on an ink surface. Highlighting happens at build time so no
-// client JS is needed (keeps the strict `script-src 'self'` CSP clean).
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-function highlightLmwf(src: string): string {
-  return src
-    .split('\n')
-    .map((line) => {
-      if (/^#{1,6}\s/.test(line)) {
-        return `<span class="lmwf-h">${escapeHtml(line)}</span>`;
-      }
-      // Color @key: modifiers wherever they appear (metadata + inline @rest:).
-      const atColored = escapeHtml(line).replace(
-        /@[\w-]+:/g,
-        '<span class="lmwf-at">$&</span>',
-      );
-      if (/^\s*-\s/.test(line)) {
-        return `<span class="lmwf-set">${atColored}</span>`;
-      }
-      return atColored;
-    })
-    .join('\n');
-}
-const minimalHtml = highlightLmwf(minimalExample);
-const richHtml = highlightLmwf(richExample);
+// "The format as brand" code blocks use the shared <LmwfCode> widget so the
+// token coloring stays consistent across the site (format hub, agents page, …).
 ---
 
 <Base
@@ -114,7 +89,7 @@ const richHtml = highlightLmwf(richExample);
     At its simplest, a workout is a header, an exercise, and a list of sets:
   </p>
 
-  <pre class="lmwf-code"><code set:html={minimalHtml} /></pre>
+  <LmwfCode code={minimalExample} />
 
   <p>
     That's a valid lift.md format document. Most real programs need more —
@@ -122,7 +97,7 @@ const richHtml = highlightLmwf(richExample);
     time-based sets, tags, and supersets. All of it stays in plain markdown:
   </p>
 
-  <pre class="lmwf-code"><code set:html={richHtml} /></pre>
+  <LmwfCode code={richExample} />
 
   <p>
     A lift.md format document describes a workout <em>plan</em> — what you
@@ -196,22 +171,7 @@ const richHtml = highlightLmwf(richExample);
       white-space: nowrap; border: 0;
     }
 
-    /* "The format as brand" — colored lift.md format on an ink surface,
-       consistent in both light and dark themes (brand book §12).
-       The token spans are injected via set:html, so they never receive
-       Astro's scope attribute — the selectors must be :global to match. */
-    :global(.lmwf-code) {
-      background: var(--lm-ink);
-      color: #e6e9ee;
-      border: 1px solid var(--lm-n-800);
-      border-radius: var(--lm-radius-lg);
-      padding: 1.2rem 1.4rem;
-      line-height: 1.7;
-    }
-    :global(.lmwf-code code) { color: inherit; }
-    :global(.lmwf-h) { color: #9aa4b2; }
-    :global(.lmwf-at) { color: #ff8a3d; }
-    :global(.lmwf-set) { color: #8aa3ff; }
+    /* The lift.md "format as brand" code styling now lives in <LmwfCode>. */
 
     textarea {
       width: 100%;

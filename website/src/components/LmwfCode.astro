@@ -1,0 +1,55 @@
+---
+// Shared lift.md "format as brand" code widget (brand book §12): muted
+// headings, orange @modifiers, light-blue set lines, on an ink surface that's
+// the same in light and dark. Highlighting happens at build time so there's no
+// client JS — keeps the strict `script-src 'self'` CSP clean.
+//
+// The token spans are injected via set:html, so they never receive Astro's
+// scoped attribute; the token CSS is therefore global.
+interface Props {
+  /** lift.md format source to render. */
+  code: string;
+}
+const { code } = Astro.props;
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function highlightLmwf(src: string): string {
+  return src
+    .split('\n')
+    .map((line) => {
+      if (/^#{1,6}\s/.test(line)) {
+        return `<span class="lmwf-h">${escapeHtml(line)}</span>`;
+      }
+      // Color @key: modifiers wherever they appear (metadata + inline @rest:).
+      const atColored = escapeHtml(line).replace(
+        /@[\w-]+:/g,
+        '<span class="lmwf-at">$&</span>',
+      );
+      if (/^\s*-\s/.test(line)) {
+        return `<span class="lmwf-set">${atColored}</span>`;
+      }
+      return atColored;
+    })
+    .join('\n');
+}
+const html = highlightLmwf(code);
+---
+
+<pre class="lmwf-code"><code set:html={html} /></pre>
+
+<style is:global>
+  .lmwf-code {
+    background: var(--lm-ink);
+    color: #e6e9ee;
+    border: 1px solid var(--lm-n-800);
+    border-radius: var(--lm-radius-lg);
+    padding: 1.2rem 1.4rem;
+    line-height: 1.7;
+  }
+  .lmwf-code code { color: inherit; }
+  .lmwf-h { color: #8aa3ff; }   /* headers — brand blue */
+  .lmwf-at { color: #ff8a3d; }  /* @modifiers — orange */
+  .lmwf-set { color: #9aa4b2; } /* set lines — grey */
+</style>
