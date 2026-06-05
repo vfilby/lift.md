@@ -23,12 +23,28 @@ const {
   formatBrand = false,
 } = Astro.props;
 
-const TAGLINE = 'Your workouts, kept in plain text.';
+// Tagline rotation pool — see issue #237. TAGLINES[0] is the current primary;
+// the rest are kept for rotating a visible site tagline in the future.
+const TAGLINES = [
+  '# your workouts in markdown',
+  '# markdown-driven workouts',
+  '# workouts in plain markdown',
+  '# strength training in markdown',
+  '# every workout, in markdown',
+  '# workouts you can read, write, and diff',
+  '# agent-written, human-lifted',
+  '# AI writes, you lift',
+  '# workouts any LLM can write',
+  '# describe it, lift it',
+  '# write it, lift it',
+  '# prompt it, lift it',
+];
+const TAGLINE = TAGLINES[0];
 const fullTitle =
   title === 'lift.md' ? `lift.md — ${TAGLINE}` : `${title} — lift.md`;
 const metaDescription =
   description ??
-  'lift.md turns strength training into plain-text workouts you can read, write, and own — tracked in a fast native iOS app, generatable by any LLM.';
+  'lift.md turns strength training into markdown workouts you can read, write, and own — tracked in a fast native iOS app, generatable by any LLM.';
 
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const ogImageUrl = new URL(ogImage, Astro.site).href;
