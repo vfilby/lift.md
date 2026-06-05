@@ -17,7 +17,7 @@
 set -euo pipefail
 
 STAGE="${1:-}"
-REPO="vfilby/liftmark"
+REPO="vfilby/lift.md"
 ROLE_NAME="GitHubActionsDeploy"
 # Thumbprint is no longer security-critical for the GitHub provider (AWS
 # validates the token against its own trust store) but the create API still
