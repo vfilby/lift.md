@@ -20,7 +20,7 @@ The GitHub Actions deploy jobs (`.github/workflows/validator-ci.yml`) authentica
 
 - a GitHub OIDC identity provider (`token.actions.githubusercontent.com`), and
 - a role `GitHubActionsDeploy` whose trust is scoped to a single GitHub Environment `sub`
-  (`repo:vfilby/liftmark:environment:beta` / `…:environment:production`) and whose only
+  (`repo:vfilby/lift.md:environment:beta` / `…:environment:production`) and whose only
   permissions are to `sts:AssumeRole` the `cdk-lmwf-*` bootstrap roles (plus the e2e secret
   read in beta).
 
@@ -46,9 +46,9 @@ The script prints the role ARN and the `gh variable set` command to publish it t
 matching GitHub Environment, e.g.:
 
 ```bash
-gh variable set AWS_DEPLOY_ROLE_ARN --repo vfilby/liftmark --env beta \
+gh variable set AWS_DEPLOY_ROLE_ARN --repo vfilby/lift.md --env beta \
   --body "arn:aws:iam::323146837100:role/GitHubActionsDeploy"
-gh variable set AWS_DEPLOY_ROLE_ARN --repo vfilby/liftmark --env production \
+gh variable set AWS_DEPLOY_ROLE_ARN --repo vfilby/lift.md --env production \
   --body "arn:aws:iam::825347768149:role/GitHubActionsDeploy"
 ```
 
