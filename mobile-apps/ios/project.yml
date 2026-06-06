@@ -226,13 +226,20 @@ schemes:
       config: Debug
     test:
       config: Debug
-      # Plumb the UI-test timeout multiplier into the test-runner process.
-      # The runner doesn't inherit host env, so we expand a build setting:
-      # `xcodebuild test ... UITEST_TIMEOUT_SCALE=2.5` flows into the runner's
-      # environment via this $(...) expansion. Unset → empty → code defaults to
-      # 1.0. Set to ~2.5–3 on slow runners (e.g. an Intel CI box).
-      environmentVariables:
-        UITEST_TIMEOUT_SCALE: "$(UITEST_TIMEOUT_SCALE)"
+      # Two-tier test plans. Smoke (the default) runs the full unit suite plus a
+      # render-only UI subset — fast and deterministic enough to gate every PR.
+      # Full runs the entire UI suite (minus screenshot capture) and is driven
+      # nightly via `xcodebuild test -testPlan Full`. See TestPlans/*.xctestplan.
+      #
+      # The UI-test timeout multiplier (UITEST_TIMEOUT_SCALE) is plumbed into the
+      # runner process from within each plan's environmentVariableEntries: the
+      # `$(...)` expands a build setting so `xcodebuild test ... UITEST_TIMEOUT_SCALE=2.5`
+      # reaches the runner. Unset → empty → code defaults to 1.0. Set to ~2.5–3
+      # on slow runners.
+      testPlans:
+        - path: TestPlans/Smoke.xctestplan
+          defaultPlan: true
+        - path: TestPlans/Full.xctestplan
       targets:
         - LiftMarkTests
         - LiftMarkUITests

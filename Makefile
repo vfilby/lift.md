@@ -10,14 +10,15 @@ endif
 
 AWS_VAULT ?= $(AWS_VAULT_CMD) exec liftmark-validator-deploy --
 
-.PHONY: help build test test-unit test-ui generate release-alpha tools-test tools-validate tools-generate spec-generate spec-check website-install website-dev website-build website-deploy
+.PHONY: help build test test-smoke test-unit test-ui generate release-alpha tools-test tools-validate tools-generate spec-generate spec-check website-install website-dev website-build website-deploy
 
 help:
 	@echo "LiftMark Build"
 	@echo ""
 	@echo "App (mobile-apps/ios/):"
 	@echo "  make build          - Build the app"
-	@echo "  make test           - Run all tests"
+	@echo "  make test           - Run all tests (full UI suite)"
+	@echo "  make test-smoke     - Run the PR gate (unit + render-only UI subset)"
 	@echo "  make test-unit      - Run unit tests only"
 	@echo "  make test-ui        - Run UI tests only"
 	@echo "  make generate       - Regenerate Xcode project"
@@ -43,6 +44,9 @@ build:
 
 test:
 	cd mobile-apps/ios && make test
+
+test-smoke:
+	cd mobile-apps/ios && make test-smoke
 
 test-unit:
 	cd mobile-apps/ios && make test-unit

@@ -69,8 +69,17 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "NO"
+      shouldUseLaunchSchemeArgsEnv = "YES"
       onlyGenerateCoverageForSpecifiedTargets = "NO">
+      <TestPlans>
+         <TestPlanReference
+            default = "YES"
+            reference = "container:TestPlans/Smoke.xctestplan">
+         </TestPlanReference>
+         <TestPlanReference
+            reference = "container:TestPlans/Full.xctestplan">
+         </TestPlanReference>
+      </TestPlans>
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
@@ -106,13 +115,6 @@
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>
-      <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "UITEST_TIMEOUT_SCALE"
-            value = "$(UITEST_TIMEOUT_SCALE)"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-      </EnvironmentVariables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

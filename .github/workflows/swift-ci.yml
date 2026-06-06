@@ -86,20 +86,19 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
             | xcpretty
 
-      - name: Run unit tests
+      # PR gate runs the Smoke test plan: the full unit suite plus a render-only
+      # UI subset (testSmoke + testTabs). Fast and deterministic enough to gate
+      # every PR. The full UI suite — slow, with known flakes (issue #106) — runs
+      # nightly via .github/workflows/swift-nightly.yml (-testPlan Full).
+      - name: Run smoke tests (unit + UI render gate)
         run: |
           xcodebuild test \
             -scheme LiftMark \
             -project LiftMark.xcodeproj \
-            -only-testing:LiftMarkTests \
+            -testPlan Smoke \
             -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
             -resultBundlePath TestResults.xcresult \
             | xcpretty
-
-      # UI tests (LiftMarkUITests) are disabled on hosted runners until we move
-      # them to a self-hosted Mac runner — they take ~20 min on macos-26, dominate
-      # PR feedback time, and have known flakes (issue #106). Re-enable once the
-      # self-hosted runner is up.
 
       - name: Upload unit test results
         uses: actions/upload-artifact@v7

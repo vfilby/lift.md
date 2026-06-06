@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-ui clean resolve generate release-alpha screenshots
+.PHONY: build test test-smoke test-unit test-ui clean resolve generate release-alpha screenshots
 
 SCHEME = LiftMark
 PROJECT = LiftMark.xcodeproj
@@ -30,20 +30,26 @@ Config/Sentry.xcconfig:
 build:
 	xcodebuild -scheme $(SCHEME) -project $(PROJECT) -destination $(DESTINATION) build
 
-# Run all tests (unit + UI)
+# Run the entire suite (unit + full UI) via the Full test plan. This is what
+# the nightly CI workflow runs; Smoke is the default plan, so -testPlan Full is
+# required here to avoid silently shrinking to the PR-gate subset.
 test:
-	xcodebuild test -scheme $(SCHEME) -project $(PROJECT) -destination $(DESTINATION)
+	xcodebuild test -scheme $(SCHEME) -project $(PROJECT) -testPlan Full -destination $(DESTINATION)
+
+# Run exactly the PR gate: full unit suite + render-only UI subset (fast).
+test-smoke:
+	xcodebuild test -scheme $(SCHEME) -project $(PROJECT) -testPlan Smoke -destination $(DESTINATION)
 
 # Run unit tests only (fast, no simulator UI needed)
 test-unit:
 	xcodebuild test -scheme $(SCHEME) -project $(PROJECT) \
-		-only-testing:LiftMarkTests \
+		-testPlan Full -only-testing:LiftMarkTests \
 		-destination $(DESTINATION)
 
-# Run UI tests only
+# Run UI tests only (full UI suite — Full plan, not the Smoke subset)
 test-ui:
 	xcodebuild test -scheme $(SCHEME) -project $(PROJECT) \
-		-only-testing:LiftMarkUITests \
+		-testPlan Full -only-testing:LiftMarkUITests \
 		-destination $(DESTINATION)
 
 clean:
