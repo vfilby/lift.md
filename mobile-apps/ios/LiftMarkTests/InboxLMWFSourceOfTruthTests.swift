@@ -91,8 +91,12 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
         )
 
         XCTAssertEqual(item.summary.name, "Lift Day 1")
-        // Superset parent + 2 children = 3 parsed exercises; 4 working sets.
-        XCTAssertEqual(item.summary.exerciseCount, 3)
+        // The summary uses the shared display count: the empty superset parent
+        // is a structural header and is NOT counted, so 2 performed exercises
+        // (the two children), 4 working sets. This is the same number the
+        // promoted plan's detail header shows — the inbox/detail count mismatch
+        // bug was the summary counting the parent via raw `exercises.count`.
+        XCTAssertEqual(item.summary.exerciseCount, 2)
         XCTAssertEqual(item.summary.setCount, 4)
     }
 
@@ -133,7 +137,8 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
         XCTAssertEqual(loaded.lmwfText, Self.armsSupersetLMWF)
         // Summary is re-derived from lmwf_text on load (not persisted).
         XCTAssertEqual(loaded.summary.name, "Lift Day 1")
-        XCTAssertEqual(loaded.summary.exerciseCount, 3)
+        // Display count excludes the empty superset parent (see summary test).
+        XCTAssertEqual(loaded.summary.exerciseCount, 2)
 
         // The slimmed table has no pre-parse columns.
         let db = try DatabaseManager.shared.database()
@@ -293,6 +298,80 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
         let detailFetches = mock.sentPaths.filter { $0 == "/v1/workouts/01POLL" }.count
         XCTAssertEqual(detailFetches, 1, "cached item must not be re-fetched on the second poll")
         XCTAssertEqual(try ctx.repo.count(), 1)
+    }
+
+    // MARK: - 7. Deletion reconciliation (imported/discarded item must leave the inbox)
+
+    /// The reported bug: an item promoted/discarded server-side lingers in the
+    /// local inbox because the add-only poll never pruned it. After this fix the
+    /// next complete poll drops any local row the server no longer lists.
+    func testPollerPrunesLocalRowsAbsentFromServerListing() async throws {
+        DatabaseManager.shared.deleteDatabase()
+        defer { DatabaseManager.shared.deleteDatabase() }
+
+        let mock = RoutingMockAPIClient()
+        // First poll: server has the item; it lands locally.
+        mock.listResponse = ["items": [["inbox_id": "01POLL"]], "next_cursor": NSNull()]
+        mock.detailResponse = Self.detailPayload(inboxId: "01POLL")
+
+        let ctx = try makeAuthedPoller(mock: mock)
+        defer { ctx.tokenStore.clear() }
+
+        await ctx.poller.pollIfAuthenticated()
+        XCTAssertEqual(try ctx.repo.count(), 1)
+
+        // The item is consumed server-side (imported/discarded elsewhere, or a
+        // delete that this device's local cache didn't reflect): the listing no
+        // longer includes it. The next complete poll must prune the stale row.
+        mock.listResponse = ["items": [], "next_cursor": NSNull()]
+        await ctx.poller.pollIfAuthenticated()
+
+        XCTAssertEqual(try ctx.repo.count(), 0, "stale local row must be pruned once the server stops listing it")
+    }
+
+    /// Reconciliation must NOT run on a truncated listing — a partial page can't
+    /// prove a row is gone, so pruning then could delete live items we simply
+    /// didn't see. A non-nil `next_cursor` means "more pages exist".
+    func testPollerDoesNotPruneOnTruncatedListing() async throws {
+        DatabaseManager.shared.deleteDatabase()
+        defer { DatabaseManager.shared.deleteDatabase() }
+
+        let mock = RoutingMockAPIClient()
+        mock.listResponse = ["items": [["inbox_id": "01POLL"]], "next_cursor": NSNull()]
+        mock.detailResponse = Self.detailPayload(inboxId: "01POLL")
+
+        let ctx = try makeAuthedPoller(mock: mock)
+        defer { ctx.tokenStore.clear() }
+
+        await ctx.poller.pollIfAuthenticated()
+        XCTAssertEqual(try ctx.repo.count(), 1)
+
+        // Item absent from THIS page, but the listing is truncated (more pages).
+        // The cached row must survive — we can't conclude it was deleted.
+        mock.listResponse = ["items": [], "next_cursor": "cursor-more-pages"]
+        await ctx.poller.pollIfAuthenticated()
+
+        XCTAssertEqual(try ctx.repo.count(), 1, "must not prune when the listing is incomplete")
+    }
+
+    /// The repository exposes every cached id so the poller can diff the local
+    /// set against the server listing.
+    func testRepositoryAllIdsReturnsEveryCachedRow() throws {
+        DatabaseManager.shared.deleteDatabase()
+        defer { DatabaseManager.shared.deleteDatabase() }
+        let repo = InboxItemRepository()
+
+        for id in ["01A", "01B", "01C"] {
+            try repo.upsert(InboxItem(
+                id: id,
+                fetchedAt: Date(),
+                createdAtServer: Date(),
+                sourceTokenId: "session",
+                lmwfText: Self.armsSupersetLMWF
+            ))
+        }
+
+        XCTAssertEqual(Set(try repo.allIds()), ["01A", "01B", "01C"])
     }
 
     // MARK: - 5. v17 -> v18 migration drops the pre-parse columns

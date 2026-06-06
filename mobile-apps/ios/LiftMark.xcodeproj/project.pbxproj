@@ -178,6 +178,7 @@
 		B85DE5789943AAD087F8090A /* FileImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BBB53853F20402D24BEFB4 /* FileImportServiceTests.swift */; };
 		B8D182C16725D8FF02E9CEBD /* SetRowView+Weight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 028C434BF4EEA2EE413DB0A3 /* SetRowView+Weight.swift */; };
 		B904699BA329321042BAADA6 /* WorkoutExportIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790A5CDE07EFFF281DAC47FA /* WorkoutExportIntegrationTests.swift */; };
+		BB6CC5162E6C96D9067AD09E /* WorkoutPlanCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993F822FF083844914BFE257 /* WorkoutPlanCountTests.swift */; };
 		BB9409DBF9E147D486C2A9F4 /* SettingsGymSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2461031C021EB0B3B5E5300B /* SettingsGymSection.swift */; };
 		BBD197B5D1741C0149632CF3 /* FeatureFlag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4376CAE24293E2D766590CC3 /* FeatureFlag.swift */; };
 		BDF8B36AB77641C02F745A82 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AD29EB730B2F397E5B80216 /* ShareSheet.swift */; };
@@ -411,6 +412,7 @@
 		957D4A87021F20EE0AE5AFF2 /* UserSettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettingsRow.swift; sourceTree = "<group>"; };
 		95DDC3542DC00400DB0FE4A4 /* SettingsOpenSourceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsOpenSourceView.swift; sourceTree = "<group>"; };
 		97D5191B081A643D264F9790 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		993F822FF083844914BFE257 /* WorkoutPlanCountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPlanCountTests.swift; sourceTree = "<group>"; };
 		9998EA6926EF208F23FBFCC9 /* tick.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = tick.mp3; sourceTree = "<group>"; };
 		9B0A969D1C2B1A381AFA580D /* OutboxPendingQueueRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutboxPendingQueueRepository.swift; sourceTree = "<group>"; };
 		9BC1EDB3B698CE8E8A2E4E92 /* MigratorBridgeAlertUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratorBridgeAlertUITests.swift; sourceTree = "<group>"; };
@@ -960,6 +962,7 @@
 				E0A8B391651053E5147378D2 /* WorkoutHighlightsIntegrationTests.swift */,
 				59613C15DB7D08E18367BB55 /* WorkoutHighlightsServiceTests.swift */,
 				85CB06D57A0B9533D74D0431 /* WorkoutHistoryServiceTests.swift */,
+				993F822FF083844914BFE257 /* WorkoutPlanCountTests.swift */,
 				DCCF35B4BE5F3808F7C7098B /* WorkoutPlanRepositoryTests.swift */,
 				A5E8F64AF7979970B3D836F0 /* WorkoutSessionNotesTests.swift */,
 			);
@@ -1105,7 +1108,6 @@
 				};
 			};
 			buildConfigurationList = F90BF59E2681BF6798B0A2CB /* Build configuration list for PBXProject "LiftMark" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -1121,6 +1123,7 @@
 				C21050608BE79B97D9DAA152 /* XCRemoteSwiftPackageReference "swift-log" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 4DE8030DEC9CA6E9D8F448C7 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1429,6 +1432,7 @@
 				0D172A0CBAA6155A8587C384 /* WorkoutHighlightsIntegrationTests.swift in Sources */,
 				CE922FBEF4CC3EB610AF4D68 /* WorkoutHighlightsServiceTests.swift in Sources */,
 				A079FD288F0F237454EE55FD /* WorkoutHistoryServiceTests.swift in Sources */,
+				BB6CC5162E6C96D9067AD09E /* WorkoutPlanCountTests.swift in Sources */,
 				D5D8A7C48522D2B240101090 /* WorkoutPlanRepositoryTests.swift in Sources */,
 				1B5342A07E100C2107B7E7AD /* WorkoutSessionNotesTests.swift in Sources */,
 			);
@@ -1821,7 +1825,7 @@
 			repositoryURL = "https://github.com/groue/GRDB.swift.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 7.11.0;
+				minimumVersion = 7.10.0;
 			};
 		};
 		7240415DD379DA1A73C42ABC /* XCRemoteSwiftPackageReference "Yams" */ = {
@@ -1837,7 +1841,7 @@
 			repositoryURL = "https://github.com/apple/swift-log.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.13.1;
+				minimumVersion = 1.13.0;
 			};
 		};
 		E5A0C4B28CC82C9E0A371F5A /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
@@ -1845,7 +1849,7 @@
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 9.16.1;
+				minimumVersion = 9.14.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
