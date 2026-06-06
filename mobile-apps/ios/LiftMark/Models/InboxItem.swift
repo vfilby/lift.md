@@ -58,11 +58,13 @@ struct InboxItem: Identifiable, Hashable {
             guard let plan = result.data else {
                 return Summary(name: "Workout", exerciseCount: 0, setCount: 0)
             }
-            let setCount = plan.exercises.reduce(0) { $0 + $1.sets.count }
+            // Use the plan's shared display counts so the inbox row/preview
+            // report the same numbers the promoted plan will (structural
+            // section/superset headers excluded). See `WorkoutPlan`.
             return Summary(
                 name: plan.name,
-                exerciseCount: plan.exercises.count,
-                setCount: setCount
+                exerciseCount: plan.displayExerciseCount,
+                setCount: plan.plannedSetCount
             )
         }
     }

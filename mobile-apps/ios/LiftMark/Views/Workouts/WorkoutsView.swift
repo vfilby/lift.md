@@ -443,11 +443,7 @@ struct WorkoutsView: View {
                     }
                 }
                 HStack(spacing: LiftMarkTheme.spacingSM) {
-                    let exerciseCount = plan.exercises.filter { exercise in
-                        !(exercise.groupType == .superset && exercise.sets.isEmpty) &&
-                        !(exercise.groupType == .section && exercise.sets.isEmpty)
-                    }.count
-                    Text("\(exerciseCount) exercises")
+                    Text("\(plan.displayExerciseCount) exercises")
                         .font(.lmSubheadline)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     if !plan.tags.isEmpty {

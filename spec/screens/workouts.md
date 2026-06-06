@@ -18,7 +18,7 @@ Always visible at the top of the screen, between the header and the search bar. 
 
 - Header row: "Inbox" + a count badge (hidden when zero).
 - When empty: a single muted row reading "No new workouts in your inbox."
-- When non-empty: one row per inbox item showing the workout name, exercise count, set count, and a relative-time stamp ("2h ago"). Tap opens an Inbox Detail sheet (read-only preview + actions).
+- When non-empty: one row per inbox item showing the workout name, exercise count, set count, and a relative-time stamp ("2h ago"). Tap opens an Inbox Detail sheet (read-only preview + actions). The exercise/set counts use the shared plan-count definition below, so an inbox row reports the same numbers its promoted plan will.
 - Each row has a leading swipe action **Discard** (red) and trailing swipe actions **Add to Plans** and **Start**. Long-press shows the same three actions in a context menu.
 - Items in the Inbox section are NOT in the user's plan library yet. They do not respond to search, filter, or favorite. They are not exported via backup.
 
@@ -86,6 +86,15 @@ Displayed when a plan card is tapped (phone: push navigation, tablet: right pane
 - **Stats grid**: Exercise count, set count, weight units
 - **Reprocess button**: Shown if plan has `sourceMarkdown`
 - **Exercise list**: Cards for each exercise or superset group
+
+### Plan counts (shared definition)
+
+Every place that shows a plan's exercise/set tally — plan cards (Plans + Home), this detail header, the inbox row + preview, and the import/edit confirmation — reads one shared definition so the same plan never reports two different numbers:
+
+- **Exercise count** = exercises the user performs, **excluding structural headers**: an empty section header (`groupType == .section`, no sets) or an empty superset parent (`groupType == .superset`, no sets). Superset children and regular exercises each count once. This matches exercise numbering (structural headers get no number).
+- **Set count** = the sum of every exercise's planned sets.
+
+Implemented as `WorkoutPlan.displayExerciseCount` / `WorkoutPlan.plannedSetCount` (with `PlannedExercise.isStructuralHeader` as the single predicate). Counting a plan ad-hoc with `exercises.count` is a bug — it includes structural headers and drifts from the rest of the app.
 
 ### Exercise Display Rules
 
