@@ -84,6 +84,7 @@
 		56616E490E58C9F25A205274 /* LiftMarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA5808AEA3816FAC1B69639 /* LiftMarkUITests.swift */; };
 		575D00310F4D056AE30775AA /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 90826DB9F2BC18668081C8B3 /* Logging */; };
 		57F4F3CDD8CB3F4716902824 /* complete.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 9E064AE978D172E88F26E1DF /* complete.mp3 */; };
+		57F8502ACA1B48E1533E8EE8 /* SettingsSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5110D42846BCE10A32F2EF2F /* SettingsSectionTests.swift */; };
 		589768848F8054BCABF48594 /* ShareSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E207DFAAFEC931BC9C910783 /* ShareSheetTests.swift */; };
 		5A42ABE16700DB181A6DF24D /* WorkoutHighlightsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C597DD1B866C5E697491391 /* WorkoutHighlightsService.swift */; };
 		5A89491A1D1631DFCA0533B2 /* CKSyncMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156873BF197F953F583CBC22 /* CKSyncMetadataStore.swift */; };
@@ -127,6 +128,7 @@
 		80C8D2569FADEDE15CE14823 /* SyncSessionGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAAF9A728BCBE8C842B01E9D /* SyncSessionGuard.swift */; };
 		80F3FA9DC819E0E96FA89511 /* WorkoutSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13676ADC45623CA579A19E96 /* WorkoutSummaryView.swift */; };
 		81292E8D3BFED539C4C74A68 /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B78221ACC77E681F3AD7EC64 /* ImportView.swift */; };
+		84A34F364ACB346A3E0D91B8 /* FeatureFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E392194A68667686F14379 /* FeatureFlagTests.swift */; };
 		84F5BF4CD91103157C9C6CE2 /* ExerciseDisplayItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2BBD343ADD45A9C1074E5C4 /* ExerciseDisplayItem.swift */; };
 		8518A5CC78B2CA615192FCB5 /* TestSpecRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C9D252D8932F613C54BC51 /* TestSpecRunner.swift */; };
 		852658F6EF836C0E181BB45C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C20C4956D9B988C6978BAD36 /* Assets.xcassets */; };
@@ -345,6 +347,7 @@
 		4FB0FF7A71BDC475DA488AB4 /* SyncChange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncChange.swift; sourceTree = "<group>"; };
 		4FD57CEFF5022DFA698C39EF /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		4FFC4B0E050FECBAB275D1E5 /* ScreenshotSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSeed.swift; sourceTree = "<group>"; };
+		5110D42846BCE10A32F2EF2F /* SettingsSectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSectionTests.swift; sourceTree = "<group>"; };
 		518E43810147703F2482ED39 /* ExerciseCardTintTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCardTintTests.swift; sourceTree = "<group>"; };
 		52467400FBF874734EDFD73B /* SettingsPrivacySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPrivacySection.swift; sourceTree = "<group>"; };
 		53A93C9399CA16B146C3E734 /* InboxItemRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItemRepository.swift; sourceTree = "<group>"; };
@@ -365,6 +368,7 @@
 		64A76A2194E3AF636AD5C75F /* StoreIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreIntegrationTests.swift; sourceTree = "<group>"; };
 		654972C6C1759CA67F11DCA9 /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
 		661D15791C0AD1574A2334AB /* MigratorBridgeFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratorBridgeFailureTests.swift; sourceTree = "<group>"; };
+		66E392194A68667686F14379 /* FeatureFlagTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureFlagTests.swift; sourceTree = "<group>"; };
 		688A5D549F3414C22FBB97D8 /* WorkoutSessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionRow.swift; sourceTree = "<group>"; };
 		6A259EFF7FFA8F1DD3070318 /* SessionLMWFEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLMWFEncoder.swift; sourceTree = "<group>"; };
 		6A2AEF2440BDB5076F5D02A3 /* MigratorBridgeBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratorBridgeBackup.swift; sourceTree = "<group>"; };
@@ -931,6 +935,7 @@
 				518E43810147703F2482ED39 /* ExerciseCardTintTests.swift */,
 				14DB416A43A59922B4ADF59B /* ExerciseDictionaryTests.swift */,
 				FD62A5DD7A3746F10518F287 /* ExerciseHistoryRepositoryTests.swift */,
+				66E392194A68667686F14379 /* FeatureFlagTests.swift */,
 				71BBB53853F20402D24BEFB4 /* FileImportServiceTests.swift */,
 				3E4BB7CEBD7B739F748472F1 /* HealthKitServiceTests.swift */,
 				79B30FE16C8238A00C2750CF /* InboxLMWFSourceOfTruthTests.swift */,
@@ -951,6 +956,7 @@
 				295B37DB7BA42365973F4AEA /* SessionLMWFEncoderTests.swift */,
 				1B9F099C51166F64AE909892 /* SessionRepositoryTests.swift */,
 				15DD705455651A8CB95DA707 /* SetMeasurementTests.swift */,
+				5110D42846BCE10A32F2EF2F /* SettingsSectionTests.swift */,
 				E207DFAAFEC931BC9C910783 /* ShareSheetTests.swift */,
 				64A76A2194E3AF636AD5C75F /* StoreIntegrationTests.swift */,
 				58BA4F2232025DD4B5E50533 /* SyncSessionGuardTests.swift */,
@@ -1105,7 +1111,6 @@
 				};
 			};
 			buildConfigurationList = F90BF59E2681BF6798B0A2CB /* Build configuration list for PBXProject "LiftMark" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -1121,6 +1126,7 @@
 				C21050608BE79B97D9DAA152 /* XCRemoteSwiftPackageReference "swift-log" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 4DE8030DEC9CA6E9D8F448C7 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1390,6 +1396,7 @@
 				0036F605D492F1EF89705AA1 /* ExerciseCardTintTests.swift in Sources */,
 				8D9AF779D21C1E42D0059D6F /* ExerciseDictionaryTests.swift in Sources */,
 				7AB5F2F72412312FF135E237 /* ExerciseHistoryRepositoryTests.swift in Sources */,
+				84A34F364ACB346A3E0D91B8 /* FeatureFlagTests.swift in Sources */,
 				B85DE5789943AAD087F8090A /* FileImportServiceTests.swift in Sources */,
 				C356CB231094F4126BEFA796 /* HealthKitServiceTests.swift in Sources */,
 				DD6CD39DCC3B09C82E513346 /* InboxLMWFSourceOfTruthTests.swift in Sources */,
@@ -1412,6 +1419,7 @@
 				1E13DB942E2B9D247B000EEE /* SessionLMWFEncoderTests.swift in Sources */,
 				EADBB9AC425FBF39DE7CFB70 /* SessionRepositoryTests.swift in Sources */,
 				EF4E02A74682DBE3A2A2E1B1 /* SetMeasurementTests.swift in Sources */,
+				57F8502ACA1B48E1533E8EE8 /* SettingsSectionTests.swift in Sources */,
 				589768848F8054BCABF48594 /* ShareSheetTests.swift in Sources */,
 				5AFB4BC3349F22E53C712DCB /* StoreIntegrationTests.swift in Sources */,
 				12D96B58A9C05219A259D752 /* SyncSessionGuardTests.swift in Sources */,
@@ -1821,7 +1829,7 @@
 			repositoryURL = "https://github.com/groue/GRDB.swift.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 7.11.0;
+				minimumVersion = 7.10.0;
 			};
 		};
 		7240415DD379DA1A73C42ABC /* XCRemoteSwiftPackageReference "Yams" */ = {
@@ -1837,7 +1845,7 @@
 			repositoryURL = "https://github.com/apple/swift-log.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.13.1;
+				minimumVersion = 1.13.0;
 			};
 		};
 		E5A0C4B28CC82C9E0A371F5A /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
@@ -1845,7 +1853,7 @@
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 9.16.1;
+				minimumVersion = 9.14.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

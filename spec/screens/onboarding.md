@@ -46,6 +46,12 @@ The following disclaimer text is displayed in a scrollable area with clear visua
   - testID: `onboarding-accept-button`
   - On tap: sets `hasAcceptedDisclaimer = true`, transitions to Home Screen
 
+## Layout on larger screens
+
+- Content is constrained to a readable column (max width ~500pt) and centered horizontally.
+- When the content is shorter than the available height (e.g. iPad), the column is **centered vertically** rather than anchored to the top, so it does not float in the upper portion of a large screen.
+- When the content is taller than the available height (e.g. small phones or large Dynamic Type), it scrolls, with the content top-aligned.
+
 ## Test IDs
 
 | Element | testID |
