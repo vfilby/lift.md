@@ -40,7 +40,7 @@ const ALLOWED_SCOPES = new Set(['workouts:read', 'workouts:write']);
 // Generous cap — there are only two scopes today; this just bounds abuse.
 const MAX_SCOPES = 16;
 const TRIAL_MAX_ACTIVE_TOKENS = 2;
-const UPGRADE_URL = 'https://liftmark.app/account';
+const UPGRADE_URL = 'https://getlift.md/account';
 
 function patMode(): TokenMode {
   return process.env.STRIPE_MODE === 'live' ? 'live' : 'test';

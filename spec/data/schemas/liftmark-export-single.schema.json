@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://liftmark.app/schemas/liftmark-export-single.schema.json",
+  "$id": "https://getlift.md/schemas/liftmark-export-single.schema.json",
   "title": "LiftMark Single-Session Export",
   "description": "Export format for a single completed workout session.",
   "type": "object",

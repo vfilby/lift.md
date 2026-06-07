@@ -428,7 +428,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://liftmark.app
+      url: https://getlift.md
     env:
       AWS_DEFAULT_REGION: us-west-2
       AWS_REGION: us-west-2
@@ -500,18 +500,23 @@ jobs:
           set -euo pipefail
           fail() { echo "FAIL: $1" >&2; exit 2; }
 
-          # liftmark.app site page must 302 to getlift.md (preserving path).
+          # liftmark.app is redirect-only (GH #248): site pages 301, API 308,
+          # AASA served as the sole exception. Mirrors the topology table in
+          # spec/services/lmwf-validator.md + validator-e2e.md.
+
+          # 1) Site page: 301 to getlift.md (path preserved).
           loc=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://liftmark.app/format)
           echo "liftmark.app/format -> $loc"
-          [ "$loc" = "302 https://getlift.md/format" ] || fail "liftmark.app/format should 302 to getlift.md/format, got: $loc"
+          [ "$loc" = "301 https://getlift.md/format" ] || fail "liftmark.app/format should 301 to getlift.md/format, got: $loc"
 
-          # liftmark.app must STILL serve the API directly (no redirect).
-          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+          # 2) API: 308 (method + body preserved) to getlift.md — NOT served.
+          api=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -X POST -H 'Content-Type: application/json' \
             -d '{"markdown":"# T\n## Squat\n- 100 lbs x 5\n"}' https://liftmark.app/validate)
-          echo "liftmark.app/validate -> $code"
-          [ "$code" = "200" ] || fail "liftmark.app/validate should be 200 (API not redirected), got: $code"
+          echo "liftmark.app/validate -> $api"
+          [ "$api" = "308 https://getlift.md/validate" ] || fail "liftmark.app/validate should 308 to getlift.md/validate, got: $api"
 
-          # AASA must be served directly (Apple does not follow redirects).
+          # 3) AASA: served directly (200, no redirect) — Apple does not follow
+          #    redirects, and installed apps are pinned to liftmark.app.
           aasa=$(curl -s -o /dev/null -w '%{http_code} %{content_type} [%{redirect_url}]' https://liftmark.app/.well-known/apple-app-site-association)
           echo "liftmark.app AASA -> $aasa"
           case "$aasa" in
@@ -519,9 +524,20 @@ jobs:
             *) fail "AASA must be 200/application/json with no redirect, got: $aasa" ;;
           esac
 
-          # liftmd.app must 302 everything to getlift.md.
+          # 4) Canonical getlift.md serves the API directly (not a redirect).
+          gcode=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+            -d '{"markdown":"# T\n## Squat\n- 100 lbs x 5\n"}' https://getlift.md/validate)
+          echo "getlift.md/validate -> $gcode"
+          [ "$gcode" = "200" ] || fail "getlift.md/validate should be 200 (API served), got: $gcode"
+
+          # 5) Legacy spec host: 301 path-preserving to getlift.md/spec.md.
+          loc=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://workoutformat.liftmark.app/spec.md)
+          echo "workoutformat.liftmark.app/spec.md -> $loc"
+          [ "$loc" = "301 https://getlift.md/spec.md" ] || fail "workoutformat.liftmark.app/spec.md should 301 to getlift.md/spec.md, got: $loc"
+
+          # 6) liftmd.app: 301 everything to getlift.md.
           loc=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://liftmd.app/)
           echo "liftmd.app/ -> $loc"
-          [ "$loc" = "302 https://getlift.md/" ] || fail "liftmd.app/ should 302 to getlift.md/, got: $loc"
+          [ "$loc" = "301 https://getlift.md/" ] || fail "liftmd.app/ should 301 to getlift.md/, got: $loc"
 
           echo "✓ canonical redirect topology verified"

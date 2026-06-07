@@ -248,7 +248,7 @@ outboxPusher.pendingCount > 0
 
 ## Web surface
 
-Logged-in users can browse their own outbox at `liftmark.app/account/outbox` so they can see what their agents will read back. Same session JWT the rest of `/account/*` uses; PATs are not involved here.
+Logged-in users can browse their own outbox at `getlift.md/account/outbox` (beta: `beta.getlift.md/account/outbox`) so they can see what their agents will read back. Same session JWT the rest of `/account/*` uses; PATs are not involved here.
 
 ### Pages
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://liftmark.app/schemas/liftmark-export-multi.schema.json",
+  "$id": "https://getlift.md/schemas/liftmark-export-multi.schema.json",
   "title": "LiftMark Multi-Session Export",
   "description": "Export format for multiple completed workout sessions.",
   "type": "object",

@@ -97,7 +97,7 @@ export function renderTransactionalEmail(input: TransactionalEmailInput): string
             </tr>
             <tr>
               <td style="padding:18px 28px 22px 28px; border-top:1px solid ${BORDER};">
-                <p style="margin:0; font-size:12px; color:${MUTED};">LiftMark &middot; <a href="https://liftmark.app" style="color:${MUTED}; text-decoration:underline;">liftmark.app</a></p>
+                <p style="margin:0; font-size:12px; color:${MUTED};">LiftMark &middot; <a href="https://getlift.md" style="color:${MUTED}; text-decoration:underline;">getlift.md</a></p>
               </td>
             </tr>
           </table>

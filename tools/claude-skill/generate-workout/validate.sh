@@ -9,7 +9,7 @@
 # Exits non-zero on HTTP failure; prints the JSON response on stdout.
 set -eu
 
-ENDPOINT='https://workoutformat.liftmark.app/validate'
+ENDPOINT='https://getlift.md/validate'
 
 if [ $# -ge 1 ]; then
   if [ ! -r "$1" ]; then

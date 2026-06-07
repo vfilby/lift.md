@@ -66,20 +66,19 @@ export const LOCAL_DEV_ORIGIN = 'http://localhost:4321';
  * Browser origins permitted to make credentialed requests to the env's HTTP
  * API. Replaces the previous wildcard CORS: an explicit allowlist is required
  * once the refresh token moves to a SameSite cookie (credentialed CORS cannot
- * use `*`). The legacy `workoutformat.` prod subdomain is included because the
- * prod CloudFront still answers for it.
+ * use `*`).
+ *
+ * Only the host that actually *serves* the site + makes credentialed
+ * same-origin API calls is listed: the canonical web domain when set (prod:
+ * `getlift.md`), else the env apex (beta: `beta.liftmark.app`). The legacy
+ * redirect-only hosts (`liftmark.app`, `workoutformat.liftmark.app`,
+ * `liftmd.app`) never originate an XHR — their pages 301/308 to the canonical
+ * host before any script runs — so they are intentionally NOT allowlisted
+ * (GH #248).
  */
 export function corsAllowedOrigins(env: EnvConfig): string[] {
-  const origins = [`https://${env.domainName}`];
-  if (env.name === 'prod') {
-    origins.push(`https://workoutformat.${env.domainName}`);
-  }
-  // The canonical site (getlift.md) makes credentialed, same-origin API calls
-  // through its own CloudFront, so its origin must be allowed too. domainName
-  // stays in the list during the transition (it still proxies the API).
-  if (env.canonicalWebDomain && env.canonicalWebDomain !== env.domainName) {
-    origins.push(`https://${env.canonicalWebDomain}`);
-  }
+  const servingOrigin = env.canonicalWebDomain ?? env.domainName;
+  const origins = [`https://${servingOrigin}`];
   if (env.allowLocalDevOrigin) {
     origins.push(LOCAL_DEV_ORIGIN);
   }
@@ -104,9 +103,11 @@ export const ENVS: Record<EnvName, EnvConfig> = {
     account: '825347768149',
     region: 'us-west-2',
     domainName: 'liftmark.app',
-    // getlift.md is the canonical brand site; liftmark.app + liftmd.app
-    // redirect to it (liftmark.app keeps serving the API + AASA). Zones/certs
-    // for both come from the LmwfDnsFoundationStack.
+    // getlift.md is canonical and serves everything (site + API + spec +
+    // schemas + AASA). liftmark.app + liftmd.app are redirect-only (301 site /
+    // 308 API), with liftmark.app's AASA kept served as the sole exception for
+    // already-installed apps pinned to it (GH #248). Zones/certs for the
+    // canonical + redirect domains come from the LmwfDnsFoundationStack.
     canonicalWebDomain: 'getlift.md',
     redirectWebDomains: ['liftmd.app'],
     stripeMode: 'live',

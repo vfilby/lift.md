@@ -33,7 +33,7 @@ help:
 	@echo "  make tools-validate   - Validate JSON export (FILE=path.json)"
 	@echo "  make tools-generate   - Generate export fixture (ARGS='--single -o out.json')"
 	@echo ""
-	@echo "Website (workoutformat.liftmark.app):"
+	@echo "Website (getlift.md):"
 	@echo "  make website-install  - Install Astro dependencies"
 	@echo "  make website-dev      - Start local dev server"
 	@echo "  make website-build    - Build static site into website/dist/"
@@ -78,7 +78,7 @@ tools-validate:
 tools-generate:
 	python tools/generate_export.py $(ARGS)
 
-# ── Website (workoutformat.liftmark.app) ──
+# ── Website (getlift.md) ──
 # Infrastructure (S3 bucket + CloudFront distribution) is managed by
 # validator/cdk. Deploy infra with `cd validator && make deploy`. The
 # targets below only handle the static site content.

@@ -3,18 +3,25 @@
 ## Purpose
 
 Enable iCloud Keychain and third-party password managers (1Password, Bitwarden,
-etc.) to offer the user's saved `liftmark.app` credentials when the native iOS
-app shows its account sign-in form. This is Apple's
+etc.) to offer the user's saved credentials when the native iOS app shows its
+account sign-in form. This is Apple's
 [Shared Web Credentials / Associated Domains `webcredentials`](https://developer.apple.com/documentation/xcode/supporting-associated-domains)
 mechanism.
 
+The canonical domain is **`getlift.md`** (GH #248). `liftmark.app` is retained in
+the entitlement and keeps serving its AASA so credentials previously saved against
+`liftmark.app` (and already-installed apps pinned to it) keep working — see
+"Canonical domain & redirects" below.
+
 The association is bidirectional and only works when **both** halves agree:
 
-1. The **app** declares the domain it trusts via the
-   `com.apple.developer.associated-domains` entitlement (`webcredentials:liftmark.app`).
-2. The **domain** declares the app(s) it trusts via an
+1. The **app** declares the domains it trusts via the
+   `com.apple.developer.associated-domains` entitlement
+   (`webcredentials:getlift.md` + `webcredentials:liftmark.app`).
+2. Each **domain** declares the app(s) it trusts via an
    `apple-app-site-association` (AASA) file served at
-   `https://liftmark.app/.well-known/apple-app-site-association`.
+   `https://getlift.md/.well-known/apple-app-site-association` (canonical) and
+   `https://liftmark.app/.well-known/apple-app-site-association` (legacy).
 
 Apple's CDN fetches the AASA and matches the app's Team ID + bundle ID against
 the `webcredentials.apps` list. Only on a match does autofill light up.
@@ -26,7 +33,7 @@ the `webcredentials.apps` list. Only on a match does autofill light up.
 | Apple Team ID | `43DNX2P3T6` |
 | Prod app bundle ID | `com.eff3.liftmark.native-ios` |
 | Dev/debug app bundle ID | `com.eff3.liftmark.native-ios.dev` |
-| Associated domain | `liftmark.app` (apex) |
+| Associated domains | `getlift.md` (canonical) + `liftmark.app` (legacy) |
 
 The `.dev` bundle ID is included so debug/TestFlight-from-Xcode builds can be
 tested against the same AASA. Both fully-qualified app identifiers are
@@ -49,8 +56,14 @@ Required key/value (added alongside the existing HealthKit / CloudKit / iCloud
 entitlements, none of which are disturbed):
 
 ```
-com.apple.developer.associated-domains = [ "webcredentials:liftmark.app" ]
+com.apple.developer.associated-domains = [
+  "webcredentials:getlift.md",
+  "webcredentials:liftmark.app"
+]
 ```
+
+`getlift.md` is the canonical host; `liftmark.app` is retained so the QuickType
+bar still offers credentials users previously saved against `liftmark.app`.
 
 ### Login form requirements
 
@@ -61,7 +74,8 @@ must mark its fields so managers recognise them:
 - Password field → `.textContentType(.password)`
 
 There is **no native account-creation / new-password field** — signup and
-password reset are deferred to the web (`beta.liftmark.app`). If a native
+password reset are deferred to the web (`getlift.md`; `beta.getlift.md` in beta).
+If a native
 signup field is ever added, its password field must use
 `.textContentType(.newPassword)` so managers offer to generate and save a
 credential. (The Anthropic API-key `SecureField` in Settings is **not** an
@@ -81,10 +95,12 @@ lives at:
 website/public/.well-known/apple-app-site-association
 ```
 
-and is published at:
+The **same** S3 content backs both the canonical `getlift.md` distribution and
+the legacy `liftmark.app` distribution, so the identical AASA is published at:
 
 ```
-https://liftmark.app/.well-known/apple-app-site-association
+https://getlift.md/.well-known/apple-app-site-association     (canonical)
+https://liftmark.app/.well-known/apple-app-site-association   (legacy, not redirected)
 ```
 
 The file has **no extension** (Apple requires the exact filename).
@@ -147,16 +163,17 @@ routed to the `/validate`, `/v1/*`, or `/version` API origins.
 ### Canonical domain & redirects
 
 The canonical website domain is **`getlift.md`** (see "Domains & Hosting
-Topology" in `lmwf-validator.md`). `liftmark.app` now 302-redirects its **site
-pages** to `getlift.md`, but the AASA is the load-bearing exception: Apple's
-`webcredentials` fetcher does **not** follow redirects, so
+Topology" in `lmwf-validator.md`), and it serves the AASA directly. `liftmark.app`
+is now **redirect-only** — its site pages 301 and its API paths 308 to
+`getlift.md` — with **one exception**: the AASA. Apple's `webcredentials` fetcher
+does **not** follow redirects, so
 `https://liftmark.app/.well-known/apple-app-site-association` MUST keep returning
-the file directly (HTTP 200, no redirect). The same exclusion applies to the
-app's API paths (`/validate`, `/v1/*`, `/version`). The associated-domains
-entitlement still targets `webcredentials:liftmark.app`, so AASA hosting stays on
-`liftmark.app` even though the marketing site has moved. (`liftmd.app` redirects
-everything, including `/.well-known/*`, because it never hosted the app's
-entitlement.)
+the file directly (HTTP 200, no redirect) for already-installed apps still pinned
+to `liftmark.app`. It is the sole path still *served* (not redirected) from
+`liftmark.app`. The associated-domains entitlement targets both
+`webcredentials:getlift.md` (canonical) and `webcredentials:liftmark.app`
+(legacy). (`liftmd.app` and `workoutformat.liftmark.app` redirect everything,
+including `/.well-known/*`, because no installed app pins their AASA.)
 
 ## Deploy / order-of-operations
 
@@ -165,19 +182,21 @@ entitlement.)
 Committing the file under `website/public/` is therefore sufficient — it will
 be present in `website/dist` at deploy time.
 
-**Order matters.** The AASA must be LIVE on `liftmark.app` *before* (or at the
-same time as) an app build carrying the `webcredentials` entitlement reaches
-users. If the entitlement ships first, Apple's CDN caches a missing/old AASA and
-autofill stays silent until the AASA deploys and the CDN re-fetches.
+**Order matters.** The AASA must be LIVE on `getlift.md` (and still on
+`liftmark.app`) *before* (or at the same time as) an app build carrying the
+updated `webcredentials:getlift.md` entitlement reaches users. If the entitlement
+ships first, Apple's CDN caches a missing/old AASA and autofill stays silent until
+the AASA deploys and the CDN re-fetches.
 
 Recommended sequence:
 
-1. Deploy the validator/website change first (publishes the AASA):
+1. Deploy the validator/website change first (publishes the AASA on both hosts):
    `cd validator && make deploy-prod`.
-2. Verify:
-   `curl -sI https://liftmark.app/.well-known/apple-app-site-association`
-   → `200` + `content-type: application/json`, no redirect.
-3. Then ship the app build carrying the entitlement.
+2. Verify both hosts:
+   `curl -sI https://getlift.md/.well-known/apple-app-site-association`
+   and `curl -sI https://liftmark.app/.well-known/apple-app-site-association`
+   → each `200` + `content-type: application/json`, **no redirect**.
+3. Then ship the app build carrying the `getlift.md` entitlement.
 
 ## Verification
 
@@ -191,5 +210,5 @@ Recommended sequence:
 - `cd mobile-apps/ios && make generate && make build` regenerates the project
   with the entitlement and compiles cleanly.
 - Post-deploy, on device: invoke the sign-in form; iCloud Keychain / the
-  installed password manager offers saved `liftmark.app` credentials in the
-  QuickType bar.
+  installed password manager offers saved `getlift.md` (and legacy
+  `liftmark.app`) credentials in the QuickType bar.

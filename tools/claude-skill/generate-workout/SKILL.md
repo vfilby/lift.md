@@ -5,7 +5,7 @@ description: Generate a strength training workout plan in LMWF (LiftMark Workout
 
 # Generate a workout in LMWF
 
-LMWF is a markdown-based format for strength training **plans** (not session records). Full spec: https://workoutformat.liftmark.app/spec.md — fetch it if you need detail beyond what's below.
+LMWF is a markdown-based format for strength training **plans** (not session records). Full spec: https://getlift.md/spec.md — fetch it if you need detail beyond what's below.
 
 ## Critical semantic: plans, not records
 
@@ -91,7 +91,7 @@ Without a token, fall back to the basic workflow above — generate, validate, h
 Required scope: `workouts:read`. Returns the user's last 20 completed sessions (newest first), so you can avoid same-muscle adjacency, stage progressions on actual loads/reps, and acknowledge what they just finished.
 
 ```bash
-curl -fsS https://workoutformat.liftmark.app/v1/workouts/outbox \
+curl -fsS https://getlift.md/v1/workouts/outbox \
   -H "Authorization: Bearer $LIFTMARK_PAT"
 ```
 
@@ -114,7 +114,7 @@ Response shape (summary list):
 For per-set detail on one session (target vs actual weight, reps, time, RPE):
 
 ```bash
-curl -fsS https://workoutformat.liftmark.app/v1/workouts/outbox/<outbox_id> \
+curl -fsS https://getlift.md/v1/workouts/outbox/<outbox_id> \
   -H "Authorization: Bearer $LIFTMARK_PAT"
 ```
 
@@ -125,7 +125,7 @@ Returns `{ outbox_id, session_name, session_completed_at, payload: { session: { 
 Required scope: `workouts:write`. The workout lands in the iOS app's Plans → Inbox section for the user to review and start.
 
 ```bash
-curl -fsS -X POST https://workoutformat.liftmark.app/v1/workouts \
+curl -fsS -X POST https://getlift.md/v1/workouts \
   -H "Authorization: Bearer $LIFTMARK_PAT" \
   -H "Content-Type: text/markdown" \
   --data-binary @workout.md
@@ -134,7 +134,7 @@ curl -fsS -X POST https://workoutformat.liftmark.app/v1/workouts \
 Or with the LMWF in a JSON wrapper:
 
 ```bash
-curl -fsS -X POST https://workoutformat.liftmark.app/v1/workouts \
+curl -fsS -X POST https://getlift.md/v1/workouts \
   -H "Authorization: Bearer $LIFTMARK_PAT" \
   -H "Content-Type: application/json" \
   -d '{"lmwf": "# Push Day\n@units: lbs\n..."}'
@@ -160,12 +160,12 @@ After a successful push, surface the inbox_id + summary line to the user — "Qu
 
 - Never log or echo the token. Use `Authorization: Bearer "$LIFTMARK_PAT"` directly — don't print it into transcripts.
 - A 401 means the token is missing, malformed, revoked, or expired. A 403 means scope mismatch (e.g. trying to push with a read-only token).
-- Token management lives at https://liftmark.app/account — users mint and revoke tokens there.
+- Token management lives at https://getlift.md/account — users mint and revoke tokens there.
 
 ## Reference
 
-- Full spec (markdown): https://workoutformat.liftmark.app/spec.md
-- Human docs + in-browser validator: https://workoutformat.liftmark.app/
-- Validator API: `POST https://workoutformat.liftmark.app/validate` (Content-Type `application/json` with `{"markdown": "..."}` or `text/markdown` with the raw body)
-- Inbox API (push, requires `workouts:write` PAT): `POST https://workoutformat.liftmark.app/v1/workouts`
-- Outbox API (read recent completions, requires `workouts:read` PAT): `GET https://workoutformat.liftmark.app/v1/workouts/outbox` and `GET …/outbox/<outbox_id>`
+- Full spec (markdown): https://getlift.md/spec.md
+- Human docs + in-browser validator: https://getlift.md/
+- Validator API: `POST https://getlift.md/validate` (Content-Type `application/json` with `{"markdown": "..."}` or `text/markdown` with the raw body)
+- Inbox API (push, requires `workouts:write` PAT): `POST https://getlift.md/v1/workouts`
+- Outbox API (read recent completions, requires `workouts:read` PAT): `GET https://getlift.md/v1/workouts/outbox` and `GET …/outbox/<outbox_id>`
