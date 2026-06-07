@@ -168,8 +168,11 @@ struct HomeView: View {
                         .padding(LiftMarkTheme.spacingLG)
                         .accessibilityIdentifier("empty-state")
                     } else if isRegularWidth {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 280))], spacing: LiftMarkTheme.spacingSM) {
-                            ForEach(planStore.plans.prefix(3)) { plan in
+                        // iPad: fixed two-column grid showing up to 4 plans so the
+                        // grid fills evenly (2×2) instead of leaving a lone card on a
+                        // second row (the awkward 2+1 wrap of an odd count).
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: LiftMarkTheme.spacingSM) {
+                            ForEach(planStore.plans.prefix(4)) { plan in
                                 Button {
                                     navCoordinator.navigateToPlan(id: plan.id)
                                 } label: {
