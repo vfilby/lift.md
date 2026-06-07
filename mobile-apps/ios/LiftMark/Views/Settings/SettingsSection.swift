@@ -56,11 +56,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             filtered = allSections.filter { $0 != .general }
         }
 
-        #if DEBUG
-        return filtered
-        #else
+        // Developer visibility follows the easter-egg toggle in every build
+        // configuration so the confirmation alert ("now visible"/"hidden")
+        // never lies — see spec/screens/settings.md.
         return filtered.filter { $0 != .developer || settings.developerModeEnabled }
-        #endif
     }
 }
 

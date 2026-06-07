@@ -205,14 +205,8 @@ struct SettingsView: View {
                 SettingsPrivacySection()
             }
 
-            #if DEBUG
-            Section("Developer") {
-                SettingsDeveloperSection()
-            }
-            Section("Feature Flags") {
-                SettingsFeatureFlagsSection()
-            }
-            #else
+            // Developer + Feature Flags visibility follows the easter-egg
+            // toggle in every build configuration — see spec/screens/settings.md.
             if settings.developerModeEnabled {
                 Section("Developer") {
                     SettingsDeveloperSection()
@@ -221,7 +215,6 @@ struct SettingsView: View {
                     SettingsFeatureFlagsSection()
                 }
             }
-            #endif
 
             Section("About") {
                 SettingsAboutSection()

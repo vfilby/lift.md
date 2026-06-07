@@ -73,7 +73,7 @@ The Developer section is hidden by default. Users activate it via a classic east
    - Enabled: "Developer Mode Enabled" / "Developer options are now visible in Settings."
    - Disabled: "Developer Mode Disabled" / "Developer options have been hidden."
 4. The setting persists across app launches via the `developer_mode_enabled` column in `user_settings`
-5. In DEBUG builds, the Developer section is always visible regardless of the setting
+5. The Developer section's visibility follows `developerModeEnabled` in **all** build configurations (Debug and Release alike), so the easter-egg toggle reliably shows/hides it as the confirmation alert promises. Build configuration does not override the setting.
 
 **Tap behavior:**
 - Each tap increments a counter

@@ -29,7 +29,20 @@ Current flags:
 | Flag             | Default | Gates                                                                  |
 |------------------|---------|------------------------------------------------------------------------|
 | `workoutInbox`   | off     | Home inbox card, Plans Inbox section, `InboxPollerService` networking. |
-| `useBetaApi`     | off     | Routes the API base URL to `beta.liftmark.app` instead of the default `liftmark.app`. Off = prod. **Toggling forces a sign-out** because tokens issued by one env aren't valid in the other. |
+| `useBetaApi`     | off     | Routes the API base URL to the beta environment instead of prod. Off = prod. **Toggling forces a sign-out** because tokens issued by one env aren't valid in the other. **Child of `workoutInbox`** (see below). |
+
+## Flag hierarchy (parent/child)
+
+A flag may declare a `parent` (`FeatureFlag.parent`). A child flag only makes sense in the context of its parent:
+
+- It is **hidden** in the Settings list until the parent is enabled, and renders **nested/indented** beneath the parent.
+- Disabling the parent **cascades** the child off, running the child's toggle side effects (e.g. `useBetaApi`'s sign-out) so a hidden child can never keep silently affecting behavior.
+
+Current hierarchy:
+
+- `useBetaApi` is a child of `workoutInbox` — the beta environment only serves the account + sync API, which the inbox drives. There's no reason to switch environments unless the inbox is in use.
+
+`FeatureFlag.topLevelCases` are the roots the Settings list iterates; each root's `children` render beneath it.
 
 ## Storage
 

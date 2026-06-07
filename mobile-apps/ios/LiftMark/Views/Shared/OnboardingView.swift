@@ -4,7 +4,7 @@ struct OnboardingView: View {
     let onAccept: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        GeometryReader { proxy in
             ScrollView {
                 VStack(spacing: 24) {
                     // App icon and welcome
@@ -56,9 +56,13 @@ struct OnboardingView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 32)
                 }
+                // Cap the readable column width, then fill the viewport so the
+                // column centers both horizontally and vertically when it fits;
+                // taller content (small screens / large Dynamic Type) scrolls.
+                .frame(maxWidth: 500)
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
             }
         }
-        .frame(maxWidth: 500)
         .accessibilityIdentifier("onboarding-screen")
     }
 }
