@@ -29,6 +29,17 @@ struct InboxItemRepository {
         }
     }
 
+    /// Every `inbox_id` currently cached locally. Used by the poller to
+    /// reconcile the local cache down to the server's live set (prune rows
+    /// that were imported/discarded elsewhere or stranded by a delete/poll
+    /// race so they no longer exist server-side).
+    func allIds() throws -> [String] {
+        let dbQueue = try dbManager.database()
+        return try dbQueue.read { db in
+            try String.fetchAll(db, sql: "SELECT inbox_id FROM workout_inbox")
+        }
+    }
+
     func count() throws -> Int {
         let dbQueue = try dbManager.database()
         return try dbQueue.read { db in

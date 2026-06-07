@@ -128,22 +128,18 @@ struct WorkoutDetailView: View {
         return items
     }
 
-    /// Count exercises excluding superset parents (which have no sets)
+    /// Count exercises excluding structural headers (empty section/superset
+    /// rows). Shared with the plan list, inbox, and import via `WorkoutPlan`.
     private var exerciseCount: Int {
-        guard let plan else { return 0 }
-        return plan.exercises.filter { exercise in
-            !(exercise.groupType == .superset && exercise.sets.isEmpty) &&
-            !(exercise.groupType == .section && exercise.sets.isEmpty)
-        }.count
+        plan?.displayExerciseCount ?? 0
     }
 
-    /// Global exercise index (1-based) for numbering, excluding superset parents and section headers
+    /// Global exercise index (1-based) for numbering, excluding structural headers
     private func globalExerciseIndex(for exercise: PlannedExercise) -> Int {
         guard let plan else { return 1 }
         var index = 0
         for ex in plan.exercises {
-            if ex.groupType == .superset && ex.sets.isEmpty { continue }
-            if ex.groupType == .section && ex.sets.isEmpty { continue }
+            if ex.isStructuralHeader { continue }
             index += 1
             if ex.id == exercise.id { return index }
         }
@@ -166,7 +162,7 @@ struct WorkoutDetailView: View {
                                     label: "Exercises"
                                 )
                                 WorkoutStatCard(
-                                    value: "\(plan.exercises.reduce(0) { $0 + $1.sets.count })",
+                                    value: "\(plan.plannedSetCount)",
                                     label: "Sets"
                                 )
                                 WorkoutStatCard(
