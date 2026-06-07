@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://liftmark.app/schemas/liftmark-export-unified.schema.json",
+  "$id": "https://getlift.md/schemas/liftmark-export-unified.schema.json",
   "title": "LiftMark Unified Export",
   "description": "Unified export format containing plans, sessions, gyms, and settings for backup/transfer.",
   "type": "object",

@@ -7,8 +7,8 @@ import SwiftUI
 /// Account → Sign in.
 ///
 /// Password reset and account creation are deferred to the web
-/// (beta.liftmark.app) for now, so this view only handles login + the
-/// "Resend verification email" remediation path.
+/// (getlift.md; beta env in beta mode), so this view only handles login +
+/// the "Resend verification email" remediation path.
 struct LoginView: View {
     @Environment(AuthenticationStore.self) private var authStore
     @Environment(\.dismiss) private var dismiss
@@ -30,8 +30,17 @@ struct LoginView: View {
         case failed(String)
     }
 
-    private static let forgotPasswordURL = URL(string: "https://beta.liftmark.app/account/forgot")!
-    private static let signupURL = URL(string: "https://beta.liftmark.app/account/signup")!
+    /// Web host for the account pages, mirroring the API host the app talks
+    /// to (so a session created on the web is on the same origin the API
+    /// uses). Prod is canonical `getlift.md` (GH #248); beta mode keeps the
+    /// beta env until its `beta.getlift.md` cutover lands.
+    private static var accountWebBase: String {
+        let useBeta = UserDefaults.standard.object(forKey: "feature_flag.useBetaApi") != nil
+            && UserDefaults.standard.bool(forKey: "feature_flag.useBetaApi")
+        return useBeta ? "https://beta.liftmark.app" : "https://getlift.md"
+    }
+    private static var forgotPasswordURL: URL { URL(string: "\(accountWebBase)/account/forgot")! }
+    private static var signupURL: URL { URL(string: "\(accountWebBase)/account/signup")! }
 
     private var canSubmit: Bool {
         !isSubmitting

@@ -2,11 +2,11 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  // Canonical domain is now getlift.md; liftmark.app 302-redirects its site
-  // pages to getlift.md. The format hub lives at getlift.md/format; the
-  // legacy workoutformat.liftmark.app subdomain still resolves to the same
-  // CloudFront distribution (see validator/cdk/stack.ts), so old links keep
-  // working while canonical/OG/sitemap metadata points at getlift.md.
+  // Canonical domain is getlift.md, which serves everything. liftmark.app is
+  // redirect-only (301 site / 308 API; AASA excepted) and the legacy
+  // workoutformat.liftmark.app subdomain 301s to getlift.md (see GH #248 /
+  // validator/cdk/stack.ts), so old links keep working while canonical/OG/
+  // sitemap metadata points at getlift.md.
   site: 'https://getlift.md',
   output: 'static',
   trailingSlash: 'ignore',

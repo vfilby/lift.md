@@ -1,4 +1,4 @@
-# workoutformat.liftmark.app
+# getlift.md
 
 Static Astro site for the LiftMark Workout Format (LMWF): human landing page, full spec, validator playground, and LLM-oriented endpoints (`/llms.txt`, `/spec.md`, `/install.sh`).
 
@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Dev server runs on <http://localhost:4321>. The "Try it" widget on the landing page posts to the live production validator at <https://workoutformat.liftmark.app/validate> (CORS `*`), so you can exercise it against real infra from localhost.
+Dev server runs on <http://localhost:4321>. The "Try it" widget on the landing page posts to the live production validator at <https://getlift.md/validate> (CORS `*`), so you can exercise it against real infra from localhost.
 
 ## Build
 
@@ -34,7 +34,7 @@ Output lands in `dist/` — a fully static site that can be uploaded to any obje
 
 ## Deployment
 
-TBD. Phase 1 infra plan: S3 + CloudFront fronting both this site and the `/validate` Lambda under a single origin (`workoutformat.liftmark.app`). For now `dist/` is just built and synced manually.
+TBD. Phase 1 infra plan: S3 + CloudFront fronting both this site and the `/validate` Lambda under a single origin (`getlift.md`). For now `dist/` is just built and synced manually.
 
 ## Structure
 

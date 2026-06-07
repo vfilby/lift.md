@@ -63,7 +63,7 @@ struct WorkoutValidationResult {
 
 enum WorkoutGenerationService {
 
-    static let lmwfSpecURL = "https://workoutformat.liftmark.app/spec.md"
+    static let lmwfSpecURL = "https://getlift.md/spec.md"
 
     // MARK: - Prompt Building
 

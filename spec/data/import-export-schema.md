@@ -4,6 +4,15 @@
 >
 > Source of truth: `src/services/workoutExportService.ts`, `src/services/fileImportService.ts`, `src/services/databaseBackupService.ts`
 
+> **Schema `$id` migration (GH #248)**: the export schemas' `$id` URLs moved
+> from `https://liftmark.app/schemas/…` to `https://getlift.md/schemas/…`. The
+> `$id` is a JSON-Schema *identifier*, not a fetch location — every consumer
+> (`tools/validate_export.py`, the iOS `WorkoutExportIntegrationTests`) loads the
+> schema by local file path, so the rename is brand-only and breaks no resolver.
+> For any external party that did dereference the old URL, the redirect topology
+> (see `services/lmwf-validator.md`) 301-redirects `liftmark.app/schemas/*` to
+> `getlift.md/schemas/*`, so the old identifier still resolves to the same file.
+
 ---
 
 ## JSON Export Format

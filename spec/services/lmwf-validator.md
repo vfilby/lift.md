@@ -145,19 +145,38 @@ The TypeScript parser MUST pass the same test cases as the native iOS parser (`M
 
 ## Domains & Hosting Topology
 
-The service is fronted by CloudFront. As of the canonical-domain change, the
-public website lives at **`getlift.md`**; `liftmark.app` and `liftmd.app` are
-retained for the iOS app's API + password-autofill needs and for redirecting
-legacy traffic to the canonical site. This is **prod-only** — beta is unaffected
-and continues to serve everything (site + API) from `beta.liftmark.app`.
+The service is fronted by CloudFront. As of the canonical-domain migration
+(GH #248), **`getlift.md` is canonical and serves everything** — site, API, LMWF
+spec, export schemas, and AASA — entirely from the apex (no functional
+subdomains). The whole `liftmark.app` family is now **redirect-only**, kept alive
+solely so old links and shipped-app deep-links don't break. Beta mirrors this:
+**`beta.getlift.md`** is the all-in-one beta environment, and `beta.liftmark.app`
+redirects to it.
+
+> **Migration status (GH #248):** the **prod** cutover (table below) is
+> implemented — `getlift.md` serves everything; `liftmark.app` / `liftmd.app` /
+> `workoutformat.liftmark.app` are redirect-only. The **beta** half
+> (`beta.getlift.md`) is a tracked follow-up: it needs a cross-account DNS
+> delegation deploy (create the beta-account zone, read its NS, delegate from
+> the `getlift.md` zone, issue the cert), so until that lands beta still serves
+> from `beta.liftmark.app` and the e2e pipeline runs against it. The table and
+> the `beta.getlift.md` rows describe the target end state.
+
+The **one** exception to "liftmark.app redirects everything" is the AASA path:
+Apple does NOT follow redirects when fetching `apple-app-site-association`, and
+already-installed apps are pinned to `liftmark.app`, so `liftmark.app` MUST keep
+serving its AASA (200) for those installs to retain Universal Links + password
+autofill until they update. It is the sole thing still *served* from
+`liftmark.app`.
 
 | Domain | Role | Site pages (`/`, `/install.sh`, …) | API paths (`/validate`, `/v1/*`, `/version`) | `/.well-known/apple-app-site-association` |
 |---|---|---|---|---|
-| **`getlift.md`** | Canonical site | **Serves** (own CloudFront distribution; same S3 `website/dist` content + same API proxy behaviors) | **Serves** | Serves (200, `application/json`, no redirect) |
-| **`liftmark.app`** | App API + AASA host; legacy site → redirect | **302 → `getlift.md`** (same path) | **Serves** (unchanged — iOS app calls these) | **Serves** (unchanged — Apple does NOT follow redirects for AASA, so it must NOT be redirected) |
-| **`workoutformat.liftmark.app`** | Legacy alias of `liftmark.app` | **302 → `getlift.md`** | Serves | Serves |
-| **`liftmd.app`** | Legacy short domain | **302 → `getlift.md`** (everything) | 302 → `getlift.md` | 302 → `getlift.md` |
-| **`beta.liftmark.app`** | Beta (all-in-one) | Serves | Serves | Serves |
+| **`getlift.md`** | **Canonical (prod)** — serves everything | **Serves** (own CloudFront distribution; S3 `website/dist` + API proxy behaviors + spec/schemas) | **Serves** | **Serves** (200, `application/json`, no redirect) |
+| **`liftmark.app`** | Legacy → redirect-only (AASA excepted) | **301 → `getlift.md`** (same path) | **308 → `getlift.md`** (method + body preserved; shipped apps replay then reauth) | **Serves** (200 — sole exception; Apple does NOT follow AASA redirects, old installs pinned here) |
+| **`workoutformat.liftmark.app`** | Legacy spec alias → redirect | **301 → `getlift.md`** (path-preserving: `/spec.md` → `getlift.md/spec.md`) | 308 → `getlift.md` | 301 → `getlift.md` (no shipped app pins this host's AASA) |
+| **`liftmd.app`** | Legacy short domain | **301 → `getlift.md`** (everything) | 301 → `getlift.md` | 301 → `getlift.md` |
+| **`beta.getlift.md`** | **Beta (all-in-one)** | Serves | Serves | Serves |
+| **`beta.liftmark.app`** | Legacy beta → redirect | **301 → `beta.getlift.md`** | **308 → `beta.getlift.md`** | 301 → `beta.getlift.md` (test installs only; reauth acceptable) |
 
 ### CloudFront WAF (body-size policy)
 
@@ -187,24 +206,30 @@ attached to **both** region exec roles by `iam/refresh-deploy-policy.sh`.
 
 Redirect semantics:
 
-- Redirects are **302 (temporary)** initially; they are to be promoted to **301
-  (permanent)** once the canonical move is proven stable.
-- On `liftmark.app` / `workoutformat.liftmark.app` the redirect applies **only**
-  to site pages. The API paths (`/validate`, `/v1/*`, `/version`) and the AASA
-  path (`/.well-known/apple-app-site-association`) are explicitly excluded so the
-  shipped iOS app's API calls and password autofill keep working without a new
-  build. Per-path redirect/exclusion is implemented as a CloudFront Function (not
-  a second `BucketDeployment` / Lambda@Edge — see the BucketDeployment layer-limit
+- **Site pages** (GET) redirect **301 (permanent)** to the canonical host, path
+  preserved.
+- **API paths** (`/validate`, `/v1/*`, `/version`) redirect **308 (permanent,
+  method + body preserved)** rather than 301/302 — a 301/302 on a `POST` lets the
+  client downgrade to `GET` and drop the body, which would break a shipped app's
+  workout push. With 308 the shipped iOS app replays the exact request to
+  `getlift.md`; because session/refresh cookies are scoped per-host it then
+  reauthenticates against the canonical host (accepted — see GH #248).
+- **AASA** (`/.well-known/apple-app-site-association`) is the **one path NOT
+  redirected on `liftmark.app`**: Apple does not follow redirects for it, so it
+  keeps serving 200 for already-installed apps pinned to `liftmark.app`. Every
+  other `liftmark.app` path — and *all* paths on `liftmd.app` / `beta.liftmark.app`
+  / `workoutformat.liftmark.app` — redirects.
+- Per-path redirect/exclusion is implemented as a CloudFront Function (not a
+  second `BucketDeployment` / Lambda@Edge — see the BucketDeployment layer-limit
   constraint in the AASA section of `password-manager.md`).
-- `liftmd.app` redirects **all** paths (it never hosted the app's API or AASA).
 
 ## Deployment
 - Runtime: Node.js 22 on AWS Lambda (arm64)
-- Infrastructure: AWS CDK (`validator/cdk/`) — edge stack (us-east-1: hosted zone, ACM cert, CLOUDFRONT-scoped WAFv2 web ACL) + main stack (Lambda, HTTP API, DynamoDB, CloudFront, DNS, alarms). In prod the canonical `getlift.md` distribution serves the site + API, while the `liftmark.app` / `liftmd.app` distributions handle the redirect topology above.
+- Infrastructure: AWS CDK (`validator/cdk/`) — edge stack (us-east-1: hosted zone, ACM cert, CLOUDFRONT-scoped WAFv2 web ACL) + main stack (Lambda, HTTP API, DynamoDB, CloudFront, DNS, alarms). In prod the canonical `getlift.md` distribution serves the site + API + spec + schemas, while the `liftmark.app` / `liftmd.app` / `workoutformat.liftmark.app` distributions handle the redirect topology above (liftmark.app's distribution additionally serves the AASA exception). Beta serves everything from `beta.getlift.md`, with `beta.liftmark.app` redirecting to it.
 - The public `/validate` and `/version` endpoints require no authentication; the `/v1/*` auth/PAT/workout routes are bearer-authenticated (session JWT or PAT)
 
 ### Edge security controls
-- **CORS**: explicit origin allowlist (no wildcard), derived per-env via `corsAllowedOrigins()` in `validator/cdk/config.ts` — the env site domain (prod: the canonical `getlift.md`, plus `liftmark.app` and its legacy `workoutformat.` subdomain so requests originating from the redirecting hosts still pass), and (beta only) the local Astro dev origin. `allowCredentials: true` so the SameSite refresh-token cookie flow works.
+- **CORS**: explicit origin allowlist (no wildcard), derived per-env via `corsAllowedOrigins()` in `validator/cdk/config.ts` — the canonical serving origin (prod: `getlift.md`; beta: `beta.getlift.md`) and (beta only) the local Astro dev origin. The legacy `liftmark.app` hosts are *not* in the allowlist: browser requests there get redirected (308/301) to the canonical origin before any XHR, so they never originate a cross-origin request from a legacy host. `allowCredentials: true` so the SameSite refresh-token cookie flow works.
 - **Security response headers**: a CloudFront `ResponseHeadersPolicy` is attached to every behavior — strict CSP (`default-src 'self'`, no `unsafe-inline`; inline site scripts load via CSP hashes), HSTS (1y, includeSubDomains, preload), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` + `frame-ancestors 'none'`, `Referrer-Policy: strict-origin-when-cross-origin`.
 - **WAF**: CLOUDFRONT-scoped WAFv2 web ACL (in the us-east-1 edge stack, wired to the distribution via `crossRegionReferences`) — AWS managed rule groups (Common, KnownBadInputs, AmazonIpReputationList), a broad per-IP rate limit, and a stricter per-IP rate-based rule scoped to `/v1/auth/*` to blunt credential stuffing. Per-account application lockout is a deferred follow-up (needs a DDB counter table).
 - **Access logging**: the HTTP API stage writes a JSON access log (source IP, route, status, auth subject/principal) to CloudWatch Logs.

@@ -369,12 +369,16 @@ while the production topology stays untouched.
 
 ## Canonical-domain redirect topology (`remote:prod` only)
 
-The prod canonical site is `getlift.md`; `liftmark.app` (and its legacy
-`workoutformat.liftmark.app` alias) and `liftmd.app` redirect to it, with
-explicit non-redirect exceptions for the app's API + AASA paths (see
-"Domains & Hosting Topology" in `lmwf-validator.md`). This topology is a
-prod-only deploy concern, so it is verified only in `remote:prod` mode and
-is **not** wired into the pipeline (beta is single-origin and unaffected).
+The prod canonical site is `getlift.md`, which serves **everything** (site, API,
+spec, schemas, AASA). The entire `liftmark.app` family (`liftmark.app`, its legacy
+`workoutformat.liftmark.app` alias) and `liftmd.app` are **redirect-only**, with a
+**single** non-redirect exception: `liftmark.app`'s AASA path (Apple does not
+follow AASA redirects, old installs pinned there). See "Domains & Hosting
+Topology" in `lmwf-validator.md`. This topology is a prod-only deploy concern, so
+it is verified only in `remote:prod` mode and is **not** wired into the pipeline
+(beta still serves from `beta.liftmark.app` — its `beta.getlift.md` cutover is a
+tracked GH #248 follow-up). These checks are also enforced post-deploy by the
+`Verify canonical redirect topology` step in `validator-ci.yml`.
 
 These are HTTP-level checks (status / `Location` / `Content-Type`), run
 with redirect-following disabled so the redirect itself is observable:
@@ -383,13 +387,12 @@ with redirect-following disabled so the redirect itself is observable:
 |---|---------|-------------|
 | 1 | `GET https://getlift.md/` | 200, serves the site (canonical home page) |
 | 2 | `GET https://getlift.md/validate` (or `POST`) | reaches the validator API (not a redirect) |
-| 3 | `GET https://liftmark.app/` (a site page) | **302**, `Location: https://getlift.md/` (same path) |
-| 4 | `POST https://liftmark.app/validate` | **200** — served directly, **NOT** redirected (shipped iOS app depends on this) |
-| 5 | `GET https://liftmark.app/.well-known/apple-app-site-association` | **200**, `Content-Type: application/json`, **NOT** redirected (Apple does not follow redirects) |
-| 6 | `GET https://liftmd.app/` (and any path) | **302**, `Location: https://getlift.md/…` |
-
-Redirects are **302** today; when they are promoted to **301**, update
-the expected status in checks 3 and 6 accordingly.
+| 3 | `GET https://getlift.md/.well-known/apple-app-site-association` | **200**, `Content-Type: application/json`, no redirect (canonical AASA) |
+| 4 | `GET https://liftmark.app/` (a site page) | **301**, `Location: https://getlift.md/` (same path) |
+| 5 | `POST https://liftmark.app/validate` | **308**, `Location: https://getlift.md/validate` (method + body preserved on replay) |
+| 6 | `GET https://liftmark.app/.well-known/apple-app-site-association` | **200**, `Content-Type: application/json`, **NOT** redirected (sole exception — Apple does not follow AASA redirects) |
+| 7 | `GET https://workoutformat.liftmark.app/spec.md` | **301**, `Location: https://getlift.md/spec.md` (path preserved) |
+| 8 | `GET https://liftmd.app/` (and any path) | **301**, `Location: https://getlift.md/…` |
 
 ## Pipeline integration
 

@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 
 const body = `# lift.md format
 
-lift.md format (formerly "LMWF") is a markdown-based format for strength training workouts. It is human-writable and machine-parseable. Used by the LiftMark iOS app (https://liftmark.app) but open for any tooling.
+lift.md format (formerly "LMWF") is a markdown-based format for strength training workouts. It is human-writable and machine-parseable. Used by the LiftMark iOS app (https://getlift.md) but open for any tooling.
 
 ## Docs
 

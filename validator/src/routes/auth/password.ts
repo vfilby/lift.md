@@ -151,11 +151,13 @@ function classifyEmailError(err: unknown): string {
 
 function appBaseUrl(): string {
   // Hardcoded host derivation per spec — LMWF_ENV picks beta vs prod.
-  // In local dev SMTP_HOST=localhost; the link still points at the
-  // public host, which is fine for Mailpit inspection (we just read it
-  // out of the captured email rather than clicking through).
+  // Prod is the canonical getlift.md, which serves both the API (verify links
+  // hit /v1/*) and the web account pages (reset links hit /account/*) directly
+  // — no redirect hop (GH #248). Beta stays on beta.liftmark.app until its
+  // beta.getlift.md cutover lands. In local dev SMTP_HOST=localhost; the link
+  // still points at the public host, fine for Mailpit inspection.
   const env = process.env.LMWF_ENV;
-  return env === 'beta' ? 'https://beta.liftmark.app' : 'https://liftmark.app';
+  return env === 'beta' ? 'https://beta.liftmark.app' : 'https://getlift.md';
 }
 
 async function sendVerificationEmail(
@@ -170,7 +172,7 @@ async function sendVerificationEmail(
   await sendEmail({
     to: email,
     subject: 'Verify your LiftMark email',
-    text: `Welcome to LiftMark.\n\nConfirm your email by opening this link (it expires in 24 hours):\n\n${link}\n\nIf you didn't sign up, you can safely ignore this message.\n\n— LiftMark · https://liftmark.app`,
+    text: `Welcome to LiftMark.\n\nConfirm your email by opening this link (it expires in 24 hours):\n\n${link}\n\nIf you didn't sign up, you can safely ignore this message.\n\n— LiftMark · https://getlift.md`,
     html: renderTransactionalEmail({
       heading: 'Confirm your email',
       intro: 'Thanks for signing up for LiftMark. Tap the button below to confirm this email address and finish setting up your account.',
@@ -197,7 +199,7 @@ async function sendResetEmail(
   await sendEmail({
     to: email,
     subject: 'Reset your LiftMark password',
-    text: `A password reset was requested for your LiftMark account.\n\nOpen this link to choose a new password (it expires in 1 hour):\n\n${link}\n\nIf you didn't request a reset, you can safely ignore this message — your password is unchanged.\n\n— LiftMark · https://liftmark.app`,
+    text: `A password reset was requested for your LiftMark account.\n\nOpen this link to choose a new password (it expires in 1 hour):\n\n${link}\n\nIf you didn't request a reset, you can safely ignore this message — your password is unchanged.\n\n— LiftMark · https://getlift.md`,
     html: renderTransactionalEmail({
       heading: 'Reset your password',
       intro: 'A password reset was requested for your LiftMark account. Tap the button below to choose a new password.',

@@ -2,14 +2,14 @@
 
 Validation service for the [LiftMark Workout Format (LMWF)](../liftmark-workout-format/LIFTMARK_WORKOUT_FORMAT_SPEC.md). Accepts workout markdown and returns structured validation results.
 
-**Live endpoint:** `https://workoutformat.liftmark.app/validate`
+**Live endpoint:** `https://getlift.md/validate`
 
 ## Usage
 
 ### JSON request
 
 ```bash
-curl -X POST https://workoutformat.liftmark.app/validate \
+curl -X POST https://getlift.md/validate \
   -H "Content-Type: application/json" \
   -d '{
     "markdown": "# Push Day\n@units: lbs\n\n## Bench Press [barbell]\n- 225 x 5\n- 245 x 3"
@@ -19,7 +19,7 @@ curl -X POST https://workoutformat.liftmark.app/validate \
 ### Send a file
 
 ```bash
-curl -X POST https://workoutformat.liftmark.app/validate \
+curl -X POST https://getlift.md/validate \
   -H "Content-Type: text/markdown" \
   --data-binary @my-workout.md
 ```
@@ -69,7 +69,7 @@ POST the markdown as JSON, check `success` in the response, and iterate on any `
 
 ```
 1. Generate workout markdown
-2. POST to https://workoutformat.liftmark.app/validate
+2. POST to https://getlift.md/validate
 3. If success: done
 4. If errors: fix the issues and retry from step 2
 ```
@@ -225,6 +225,6 @@ If you skip the warm-up call and go straight to `make deploy`, the Make recipe r
 
 - **Runtime:** Node.js 20 on AWS Lambda (arm64, 256MB)
 - **API:** API Gateway v2 (HTTP API) with CORS
-- **Domain:** `workoutformat.liftmark.app` (ACM cert + Route 53)
+- **Domain:** `getlift.md` (ACM cert + Route 53)
 - **Throttle:** 100 burst / 50 sustained requests per second
 - **IaC:** AWS CDK (see `cdk/`)
