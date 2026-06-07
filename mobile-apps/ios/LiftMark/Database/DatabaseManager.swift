@@ -11,7 +11,7 @@ final class DatabaseManager: @unchecked Sendable {
     private let dbLock = NSLock()
 
     private static let dbName = "liftmark.db"
-    static let currentSchemaVersion = 18
+    static let currentSchemaVersion = 19
 
     private init() {}
 
@@ -207,6 +207,7 @@ final class DatabaseManager: @unchecked Sendable {
         if let dbQueue = try? database() {
             try? dbQueue.write { db in
                 // Order matters: children first due to foreign keys
+                try db.execute(sql: "DELETE FROM ck_record_metadata")
                 try db.execute(sql: "DELETE FROM sync_engine_state")
                 try db.execute(sql: "DELETE FROM sync_metadata")
                 try db.execute(sql: "DELETE FROM set_measurements")
@@ -268,24 +269,19 @@ final class DatabaseManager: @unchecked Sendable {
 
         if currentVersion >= targetVersion { return }
 
-        if currentVersion < 1 && targetVersion >= 1 { try migrateToV1(db) }
-        if currentVersion < 2 && targetVersion >= 2 { try migrateToV2(db) }
-        if currentVersion < 3 && targetVersion >= 3 { try migrateToV3(db) }
-        if currentVersion < 4 && targetVersion >= 4 { try migrateToV4(db) }
-        if currentVersion < 5 && targetVersion >= 5 { try migrateToV5(db) }
-        if currentVersion < 6 && targetVersion >= 6 { try migrateToV6(db) }
-        if currentVersion < 7 && targetVersion >= 7 { try migrateToV7(db) }
-        if currentVersion < 8 && targetVersion >= 8 { try migrateToV8(db) }
-        if currentVersion < 9 && targetVersion >= 9 { try migrateToV9(db) }
-        if currentVersion < 10 && targetVersion >= 10 { try migrateToV10(db) }
-        if currentVersion < 11 && targetVersion >= 11 { try migrateToV11(db) }
-        if currentVersion < 12 && targetVersion >= 12 { try migrateToV12(db) }
-        if currentVersion < 13 && targetVersion >= 13 { try migrateToV13(db) }
-        if currentVersion < 14 && targetVersion >= 14 { try migrateToV14(db) }
-        if currentVersion < 15 && targetVersion >= 15 { try migrateToV15(db) }
-        if currentVersion < 16 && targetVersion >= 16 { try migrateToV16(db) }
-        if currentVersion < 17 && targetVersion >= 17 { try migrateToV17(db) }
-        if currentVersion < 18 && targetVersion >= 18 { try migrateToV18(db) }
+        // Ordered migration chain. Each step runs when the DB is below its version and the
+        // target reaches it. Kept as data (not an if-chain) so adding a migration is one line
+        // and the dispatch stays within cyclomatic-complexity limits.
+        let steps: [(version: Int, migrate: (Database) throws -> Void)] = [
+            (1, migrateToV1), (2, migrateToV2), (3, migrateToV3), (4, migrateToV4),
+            (5, migrateToV5), (6, migrateToV6), (7, migrateToV7), (8, migrateToV8),
+            (9, migrateToV9), (10, migrateToV10), (11, migrateToV11), (12, migrateToV12),
+            (13, migrateToV13), (14, migrateToV14), (15, migrateToV15), (16, migrateToV16),
+            (17, migrateToV17), (18, migrateToV18), (19, migrateToV19)
+        ]
+        for step in steps where currentVersion < step.version && targetVersion >= step.version {
+            try step.migrate(db)
+        }
 
         try db.execute(sql: "UPDATE schema_version SET version = ?", arguments: [targetVersion])
     }
@@ -960,6 +956,17 @@ final class DatabaseManager: @unchecked Sendable {
                 created_at_server     TEXT NOT NULL,
                 source_token_id       TEXT,
                 lmwf_text             TEXT NOT NULL
+            )
+            """)
+    }
+
+    private static func migrateToV19(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE ck_record_metadata (
+                record_name   TEXT PRIMARY KEY NOT NULL,
+                record_type   TEXT NOT NULL,
+                system_fields BLOB NOT NULL,
+                updated_at    TEXT NOT NULL
             )
             """)
     }

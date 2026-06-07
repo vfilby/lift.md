@@ -329,7 +329,7 @@ final class MigratorBridgeTests: XCTestCase {
             guard case MigratorBridgeError.refusedFutureVersion(let version) = error else {
                 return XCTFail("expected refusedFutureVersion, got \(error)")
             }
-            XCTAssertEqual(version, 19)
+            XCTAssertEqual(version, 20)
         }
     }
 
@@ -346,7 +346,7 @@ final class MigratorBridgeTests: XCTestCase {
 
         XCTAssertEqual(rowsBefore, rowsAfter)
         // schema_version unchanged
-        XCTAssertEqual(try schemaVersion(queue), 19)
+        XCTAssertEqual(try schemaVersion(queue), 20)
         // grdb_migrations table should NOT have been created.
         let bridgeTablePresent = try queue.read { db in
             try Int.fetchOne(
@@ -487,7 +487,7 @@ final class MigratorBridgeTests: XCTestCase {
 
         let persisted = MigratorBridgeFailure.loadPersisted()
         XCTAssertEqual(persisted?.failure, .futureVersion)
-        XCTAssertEqual(persisted?.context.fromVersion, 19)
+        XCTAssertEqual(persisted?.context.fromVersion, 20)
     }
 
     /// A successful bridge must clear a stale lastAttemptFailed + failure case

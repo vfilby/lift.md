@@ -42,6 +42,7 @@
 		2150D4B618283A407AF9BAC1 /* ExerciseHistoryLastSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD93FB1BF42DD49919B91A5D /* ExerciseHistoryLastSessionView.swift */; };
 		226D16CFBA394A8F1826506E /* AnthropicServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD2CDC4A9F0168141B6F99C9 /* AnthropicServiceTests.swift */; };
 		23287E25CE8A3CE1B1889420 /* SettingsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 557BC7BEA37C9CC95B533600 /* SettingsRepository.swift */; };
+		239B8B672FC4D267BB431268 /* CKRecordMetadataStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C237971213AB0EEAEDED6E7 /* CKRecordMetadataStoreTests.swift */; };
 		23AF3037952B92C52B15C691 /* ExerciseHistoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BEB3274C4C17C07A3A27F52 /* ExerciseHistoryRepository.swift */; };
 		25930AC3BE23E8A59EF5A0F7 /* ActiveWorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE768C209F34223C2D46AEE /* ActiveWorkoutViewModel.swift */; };
 		2683EA07E89C34E9DB15B061 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888A9E535EF4C68643D49640 /* ContentView.swift */; };
@@ -102,6 +103,7 @@
 		63651EB054FBB107FBF226D2 /* SecureStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF868F5979A1635824B2B27 /* SecureStorageTests.swift */; };
 		6388EFE99FB16E7CE7281640 /* MigratorBridgeAlertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B45DC7A3E8EAF0E19BE1083 /* MigratorBridgeAlertView.swift */; };
 		6421E3FB66672D05E8EFC771 /* JsonImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48BC03CA247E92B49F3558D8 /* JsonImportServiceTests.swift */; };
+		64FF82FA887695EBF85C1F08 /* CKRecordMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB74310139D608AA23C9DD0 /* CKRecordMetadataStore.swift */; };
 		65DF287BCE23EABD6F60D848 /* MarkdownParserAdvancedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBFB6A09B3686193653A62B /* MarkdownParserAdvancedTests.swift */; };
 		67F8E833AB970E7C0B0D3E7F /* SyncChange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB0FF7A71BDC475DA488AB4 /* SyncChange.swift */; };
 		68FA9B5D53CC0AED850ACCCF /* SessionRepository+SetMutations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F661FFBD647E29D31221146 /* SessionRepository+SetMutations.swift */; };
@@ -338,6 +340,8 @@
 		349FBA06AB83786EC1071ECA /* V1Seed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V1Seed.swift; sourceTree = "<group>"; };
 		3507D916606D7A07D255602A /* ActiveWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutView.swift; sourceTree = "<group>"; };
 		38F9A6FA3792FED0C30FF203 /* DatabaseSeeds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseSeeds.swift; sourceTree = "<group>"; };
+		3AB74310139D608AA23C9DD0 /* CKRecordMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKRecordMetadataStore.swift; sourceTree = "<group>"; };
+		3C237971213AB0EEAEDED6E7 /* CKRecordMetadataStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKRecordMetadataStoreTests.swift; sourceTree = "<group>"; };
 		3C597DD1B866C5E697491391 /* WorkoutHighlightsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHighlightsService.swift; sourceTree = "<group>"; };
 		3E4BB7CEBD7B739F748472F1 /* HealthKitServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitServiceTests.swift; sourceTree = "<group>"; };
 		3F69FC1D6757DC923E65FCFF /* SecureStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureStorage.swift; sourceTree = "<group>"; };
@@ -631,6 +635,7 @@
 				D029E8EF3D26021C1DE6232F /* AudioService.swift */,
 				954B57205C002E2857EE075A /* CKRecordMapper.swift */,
 				FA978B791C36287F69431C8C /* CKRecordMapper+SetMeasurement.swift */,
+				3AB74310139D608AA23C9DD0 /* CKRecordMetadataStore.swift */,
 				B38D581107ECEEEBFDA783CD /* CKSyncConflictResolver.swift */,
 				18B78AC1165879EA49EE0A12 /* CKSyncEngineManager.swift */,
 				156873BF197F953F583CBC22 /* CKSyncMetadataStore.swift */,
@@ -940,6 +945,7 @@
 				71CC4A4FDCEB486218739935 /* AudioServiceTests.swift */,
 				6C1E8D269112E454A906DCCF /* AuthenticationStoreTests.swift */,
 				C3CB86B68F041A69E6F4E6B7 /* CKRecordMapperTests.swift */,
+				3C237971213AB0EEAEDED6E7 /* CKRecordMetadataStoreTests.swift */,
 				B79EBC001661D8B385B2F7E9 /* CKSyncConflictResolverTests.swift */,
 				EADAA4A9258171076A1B482F /* CKSyncEngineManagerTests.swift */,
 				0CA40A430E6513546C353DA5 /* CKSyncMetadataStoreTests.swift */,
@@ -1256,6 +1262,7 @@
 				D76A9B26D9C1583D5A4E7C95 /* BuildInfo.swift in Sources */,
 				427BED86761D60153C8502F0 /* CKRecordMapper+SetMeasurement.swift in Sources */,
 				D51863263DFBB6D10A1DEB3E /* CKRecordMapper.swift in Sources */,
+				64FF82FA887695EBF85C1F08 /* CKRecordMetadataStore.swift in Sources */,
 				D40C0999EBC0725D6A1270B4 /* CKSyncConflictResolver.swift in Sources */,
 				5F55ACA6E2E8C4EF04EF35EE /* CKSyncEngineManager.swift in Sources */,
 				5A89491A1D1631DFCA0533B2 /* CKSyncMetadataStore.swift in Sources */,
@@ -1406,6 +1413,7 @@
 				712B0C691B4ED8D1379D8774 /* AudioServiceTests.swift in Sources */,
 				AB59B2427C54B7DE6715E1A4 /* AuthenticationStoreTests.swift in Sources */,
 				DA40BCCFFD3A680879630392 /* CKRecordMapperTests.swift in Sources */,
+				239B8B672FC4D267BB431268 /* CKRecordMetadataStoreTests.swift in Sources */,
 				9A1587CA91B078A30A5F40B0 /* CKSyncConflictResolverTests.swift in Sources */,
 				3273B2841C34A0D2FE1F203B /* CKSyncEngineManagerTests.swift in Sources */,
 				9AB084ACC5B5E49965B0A0C8 /* CKSyncMetadataStoreTests.swift in Sources */,

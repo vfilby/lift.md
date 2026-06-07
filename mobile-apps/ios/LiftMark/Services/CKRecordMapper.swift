@@ -7,8 +7,32 @@ import GRDB
 final class CKRecordMapper {
     let dbManager: DatabaseManager
 
+    /// Per-record CloudKit system-fields (change tag) cache. Used to rehydrate CKRecords
+    /// on upload so updates carry the current change tag instead of conflicting forever.
+    let metadataStore: CKRecordMetadataStore
+
     init(dbManager: DatabaseManager = .shared) {
         self.dbManager = dbManager
+        self.metadataStore = CKRecordMetadataStore(dbManager: dbManager)
+    }
+
+    /// Rehydrate a freshly-built record onto its server-confirmed system fields (change
+    /// tag), so an upload of an already-existing record is accepted by CloudKit instead of
+    /// conflicting. If we hold stored system fields for this record, copy the fresh record's
+    /// data fields onto the decoded (metadata-only) base and return that; otherwise return
+    /// the fresh record unchanged (a genuinely new record CloudKit will create).
+    ///
+    /// Applied by `createCKRecord` *outside* any open database read — `decodedRecord` opens
+    /// its own read, so calling it inside another read would trip GRDB's non-reentrancy.
+    func applyStoredSystemFields(to record: CKRecord) -> CKRecord {
+        guard let base = metadataStore.decodedRecord(for: record.recordID.recordName),
+              base.recordType == record.recordType else {
+            return record
+        }
+        for key in record.allKeys() {
+            base[key] = record[key]
+        }
+        return base
     }
 
     // MARK: - Date Helpers
@@ -64,9 +88,11 @@ final class CKRecordMapper {
         return record[key] as? String
     }
 
-    /// Returns true if the given CKRecord's updatedAt is newer than the local record's updatedAt.
-    /// Used by conflict resolution to decide whether server or local wins.
-    /// Returns true if remote is newer or timestamps are equal (server wins tiebreaker).
+    /// Returns true if the given CKRecord's updatedAt is strictly newer than the local
+    /// record's updatedAt. Used by conflict resolution to decide whether server or local
+    /// wins. On equal timestamps this returns false — local is kept (last-writer-wins with
+    /// a local-keeps-tie rule), which is required so a recovery re-fetch can't clobber a
+    /// dirty local row that shares a timestamp with its server copy.
     func serverRecordIsNewer(_ record: CKRecord) -> Bool {
         do {
             let dbQueue = try dbManager.database()
@@ -128,8 +154,7 @@ final class CKRecordMapper {
     // MARK: - To CKRecord
 
     func toCKRecord(_ gym: GymRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: gym.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "Gym", recordID: recordID)
+        let record = CKRecord(recordType: "Gym", recordID: CKRecord.ID(recordName: gym.id, zoneID: zoneID))
         record["name"] = gym.name as CKRecordValue
         record["isDefault"] = Int64(gym.isDefault) as CKRecordValue
         if let d = parseDate(gym.createdAt) { record["createdAt"] = d as CKRecordValue }
@@ -138,8 +163,7 @@ final class CKRecordMapper {
     }
 
     func toCKRecord(_ eq: GymEquipmentRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: eq.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "GymEquipment", recordID: recordID)
+        let record = CKRecord(recordType: "GymEquipment", recordID: CKRecord.ID(recordName: eq.id, zoneID: zoneID))
         record["name"] = eq.name as CKRecordValue
         record["isAvailable"] = Int64(eq.isAvailable) as CKRecordValue
         if let gymId = eq.gymId {
@@ -152,8 +176,7 @@ final class CKRecordMapper {
     }
 
     func toCKRecord(_ plan: WorkoutPlanRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: plan.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "WorkoutPlan", recordID: recordID)
+        let record = CKRecord(recordType: "WorkoutPlan", recordID: CKRecord.ID(recordName: plan.id, zoneID: zoneID))
         record["name"] = plan.name as CKRecordValue
         record["isFavorite"] = Int64(plan.isFavorite) as CKRecordValue
         if let d = plan.description { record["planDescription"] = d as CKRecordValue }
@@ -166,8 +189,7 @@ final class CKRecordMapper {
     }
 
     func toCKRecord(_ ex: PlannedExerciseRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: ex.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "PlannedExercise", recordID: recordID)
+        let record = CKRecord(recordType: "PlannedExercise", recordID: CKRecord.ID(recordName: ex.id, zoneID: zoneID))
         record["workoutPlanId"] = makeReference(recordName: ex.workoutTemplateId, zoneID: zoneID) as CKRecordValue
         record["exerciseName"] = ex.exerciseName as CKRecordValue
         record["orderIndex"] = Int64(ex.orderIndex) as CKRecordValue
@@ -183,8 +205,7 @@ final class CKRecordMapper {
     }
 
     func toCKRecord(_ session: WorkoutSessionRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: session.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "WorkoutSession", recordID: recordID)
+        let record = CKRecord(recordType: "WorkoutSession", recordID: CKRecord.ID(recordName: session.id, zoneID: zoneID))
         record["name"] = session.name as CKRecordValue
         record["date"] = session.date as CKRecordValue
         record["status"] = session.status as CKRecordValue
@@ -198,8 +219,7 @@ final class CKRecordMapper {
     }
 
     func toCKRecord(_ se: SessionExerciseRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: se.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "SessionExercise", recordID: recordID)
+        let record = CKRecord(recordType: "SessionExercise", recordID: CKRecord.ID(recordName: se.id, zoneID: zoneID))
         record["workoutSessionId"] = makeReference(recordName: se.workoutSessionId, zoneID: zoneID) as CKRecordValue
         record["exerciseName"] = se.exerciseName as CKRecordValue
         record["orderIndex"] = Int64(se.orderIndex) as CKRecordValue
@@ -216,8 +236,7 @@ final class CKRecordMapper {
     }
 
     func toCKRecord(_ s: UserSettingsRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: "user-settings", zoneID: zoneID)
-        let record = CKRecord(recordType: "UserSettings", recordID: recordID)
+        let record = CKRecord(recordType: "UserSettings", recordID: CKRecord.ID(recordName: "user-settings", zoneID: zoneID))
         record["defaultWeightUnit"] = s.defaultWeightUnit as CKRecordValue
         record["enableWorkoutTimer"] = Int64(s.enableWorkoutTimer) as CKRecordValue
         record["autoStartRestTimer"] = Int64(s.autoStartRestTimer) as CKRecordValue
@@ -246,6 +265,13 @@ final class CKRecordMapper {
     /// Routes an incoming CKRecord to the appropriate merge method. Returns true if local DB was updated.
     func mergeIncoming(_ record: CKRecord) throws -> Bool {
         let dbQueue = try dbManager.database()
+
+        // Persist the server's system fields UNCONDITIONALLY — before (and regardless of)
+        // the row-merge decision. Even when local wins / is unchanged, the server's change
+        // tag is the concurrency token our NEXT upload of this record must carry, or that
+        // upload will conflict. A record first learned via fetch and later edited locally
+        // depends on this.
+        metadataStore.save(record)
 
         switch record.recordType {
         case "Gym":
@@ -635,7 +661,9 @@ final class CKRecordMapper {
         let id = recordID.recordName
         do {
             let dbQueue = try dbManager.database()
-            return try dbQueue.read { db -> CKRecord? in
+            // Build the fresh record inside the read, then rehydrate its change tag OUTSIDE
+            // the read (applyStoredSystemFields opens its own read → would be reentrant here).
+            let fresh = try dbQueue.read { db -> CKRecord? in
                 if let gym = try GymRow.fetchOne(db, key: id) {
                     if gym.deletedAt != nil { return nil }
                     return self.toCKRecord(gym, zoneID: zoneID)
@@ -680,6 +708,8 @@ final class CKRecordMapper {
                 }
                 return nil
             }
+            guard let fresh else { return nil }
+            return applyStoredSystemFields(to: fresh)
         } catch {
             Logger.shared.error(.sync, "Failed to look up local record for \(id)", error: error)
             return nil

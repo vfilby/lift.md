@@ -8,8 +8,7 @@ extension CKRecordMapper {
     // MARK: - To CKRecord
 
     func toCKRecord(_ m: SetMeasurementRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: m.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "SetMeasurement", recordID: recordID)
+        let record = CKRecord(recordType: "SetMeasurement", recordID: CKRecord.ID(recordName: m.id, zoneID: zoneID))
         record["setId"] = makeReference(recordName: m.setId, zoneID: zoneID) as CKRecordValue
         record["parentType"] = m.parentType as CKRecordValue
         record["role"] = m.role as CKRecordValue
@@ -22,8 +21,7 @@ extension CKRecordMapper {
     }
 
     func toCKRecord(_ ps: PlannedSetRow, measurements: [SetMeasurementRow] = [], zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: ps.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "PlannedSet", recordID: recordID)
+        let record = CKRecord(recordType: "PlannedSet", recordID: CKRecord.ID(recordName: ps.id, zoneID: zoneID))
         record["plannedExerciseId"] = makeReference(recordName: ps.templateExerciseId, zoneID: zoneID) as CKRecordValue
         record["orderIndex"] = Int64(ps.orderIndex) as CKRecordValue
         var attrs: [String] = []
@@ -42,8 +40,7 @@ extension CKRecordMapper {
     }
 
     func toCKRecord(_ ss: SessionSetRow, measurements: [SetMeasurementRow] = [], zoneID: CKRecordZone.ID) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: ss.id, zoneID: zoneID)
-        let record = CKRecord(recordType: "SessionSet", recordID: recordID)
+        let record = CKRecord(recordType: "SessionSet", recordID: CKRecord.ID(recordName: ss.id, zoneID: zoneID))
         record["sessionExerciseId"] = makeReference(recordName: ss.sessionExerciseId, zoneID: zoneID) as CKRecordValue
         record["orderIndex"] = Int64(ss.orderIndex) as CKRecordValue
         record["status"] = ss.status as CKRecordValue
