@@ -5,11 +5,12 @@ PROJECT = LiftMark.xcodeproj
 DESTINATION = 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0'
 
 # App Store screenshot capture. capture-screenshots.sh drives the screenshot
-# UI scenario on its OWN throwaway iPhone 17 Pro Max simulator (1320×2868,
-# the 6.9" slot App Store Connect accepts in lieu of 6.5"/6.7"), capturing
-# both light and dark appearance into Screenshots/light/ and Screenshots/dark/.
+# UI scenario on its OWN throwaway simulators — iPhone 17 Pro Max (1320×2868,
+# the 6.9" slot) and iPad Pro 13-inch M4 (2064×2752, the 13" slot) — capturing
+# both light and dark appearance into Screenshots/<device>/{light,dark}/.
+# Pass --only iphone (or ipad) via SCREENSHOT_ARGS to capture just one device.
 # Set SCREENSHOT_UDID to reuse a specific simulator (kept, not deleted), and
-# add --keep via SCREENSHOT_ARGS to leave a created sim booted for inspection.
+# add --keep via SCREENSHOT_ARGS to leave created sims booted for inspection.
 SCREENSHOT_UDID =
 SCREENSHOT_ARGS =
 
