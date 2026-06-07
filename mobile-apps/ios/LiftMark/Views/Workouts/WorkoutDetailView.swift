@@ -205,6 +205,8 @@ struct WorkoutDetailView: View {
                                                 parent: parent,
                                                 children: children,
                                                 sectionName: section.name,
+                                                exerciseIndex: { globalExerciseIndex(for: $0) },
+                                                onEditChild: { editingPlanExercise = $0 },
                                                 onEdit: { editingPlanExercise = parent }
                                             )
                                         }

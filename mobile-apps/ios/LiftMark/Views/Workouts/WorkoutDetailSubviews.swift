@@ -272,26 +272,19 @@ struct PlanSupersetCard: View {
     let parent: PlannedExercise
     let children: [PlannedExercise]
     let sectionName: String?
+    /// Plan-wide 1-based number for a member exercise, so nested cards share the
+    /// same numbering scheme as standalone exercises.
+    var exerciseIndex: (PlannedExercise) -> Int = { _ in 0 }
+    /// Edit a single member exercise.
+    var onEditChild: (PlannedExercise) -> Void = { _ in }
+    /// Edit the superset grouping itself (the parent).
     var onEdit: (() -> Void)? = nil
 
-    private var interleavedSets: [(exercise: PlannedExercise, set: PlannedSet, round: Int)] {
-        let maxSets = children.map { $0.sets.count }.max() ?? 0
-        var result: [(exercise: PlannedExercise, set: PlannedSet, round: Int)] = []
-        for round in 0..<maxSets {
-            for child in children {
-                if round < child.sets.count {
-                    result.append((exercise: child, set: child.sets[round], round: round))
-                }
-            }
-        }
-        return result
-    }
-
     var body: some View {
-        let interleaved = interleavedSets
-
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {
-            // Superset header
+            // Superset header — the purple superset accent (used app-wide) tints
+            // the group frame so it reads distinctly from the neutral exercise
+            // cards nested inside it.
             HStack(spacing: LiftMarkTheme.spacingSM) {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.lmCaption.bold())
@@ -301,7 +294,7 @@ struct PlanSupersetCard: View {
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("SUPERSET")
+                    Text("SUPERSET · \(children.count) EXERCISES")
                         .font(.lmCaption2)
                         .fontWeight(.bold)
                         .foregroundStyle(.purple)
@@ -309,10 +302,6 @@ struct PlanSupersetCard: View {
                     Text(parent.exerciseName)
                         .font(.lmCallout)
                         .fontWeight(.semibold)
-
-                    Text(children.map { $0.exerciseName }.joined(separator: " + "))
-                        .font(.lmCaption)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
                 }
 
                 Spacer()
@@ -332,105 +321,36 @@ struct PlanSupersetCard: View {
                 }
             }
 
-            // Per-child descriptions — only render if any child actually has notes.
-            ForEach(children, id: \.id) { child in
-                if let notes = child.notes, !notes.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(child.exerciseName)
-                            .font(.lmCaption2.weight(.semibold))
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                        Text(notes)
-                            .font(.lmCaption)
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            .italic()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
-            Divider()
-
-            // Interleaved sets
-            VStack(spacing: 0) {
-                ForEach(Array(interleaved.enumerated()), id: \.element.set.id) { idx, item in
-                    HStack(spacing: LiftMarkTheme.spacingMD) {
-                        Text("\(item.round + 1)")
-                            .font(.lmCaption)
-                            .fontWeight(.bold)
-                            .foregroundStyle(workoutSectionColor(for: sectionName ?? ""))
-                            .frame(width: 28, height: 28)
-                            .background(workoutSectionColor(for: sectionName ?? "").opacity(0.12))
-                            .clipShape(Circle())
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.exercise.exerciseName)
-                                .font(.lmCaption2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(LiftMarkTheme.secondaryLabel)
-
-                            Text(planSetDetailString(item.set))
-                                .font(.lmBody)
-                                .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                        }
-
-                        Spacer()
-
-                        if item.set.isDropset {
-                            Text("Drop")
-                                .font(.lmCaption2)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(LiftMarkTheme.destructive.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
-                        if item.set.isPerSide {
-                            Text("/side")
-                                .font(.lmCaption2)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(LiftMarkTheme.primary.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    .accessibilityIdentifier("set-\(item.set.id)")
-
-                    if idx < interleaved.count - 1 {
-                        Divider()
-                    }
-                }
-            }
-            .padding(.leading, 8)
-
-            // YouTube search — one link per child. Each link gets a tall row so
-            // adjacent links don't collide as tap targets.
-            Divider()
-            VStack(spacing: 16) {
+            // Each member renders with the standard PlanExerciseCard template, so
+            // set numbering, notes, badges and styling stay identical to
+            // standalone exercises. The nested cards just live inside the
+            // superset frame — sets stay grouped per exercise (no interleaving).
+            VStack(spacing: LiftMarkTheme.spacingSM) {
                 ForEach(children, id: \.id) { child in
-                    if let url = youtubeSearchURL(for: child.exerciseName) {
-                        Link(destination: url) {
-                            HStack(spacing: LiftMarkTheme.spacingSM) {
-                                Image(systemName: "play.rectangle")
-                                    .font(.lmCaption)
-                                Text("Search \"\(child.exerciseName)\" on YouTube")
-                                    .font(.lmCaption)
-                            }
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                        }
-                        .accessibilityIdentifier("youtube-link-\(child.exerciseName)")
-                    }
+                    PlanExerciseCard(
+                        exercise: child,
+                        sectionName: sectionName,
+                        exerciseIndex: exerciseIndex(child),
+                        onEdit: { onEditChild(child) }
+                    )
+                    // Hairline border so each member card reads distinctly against
+                    // the purple tint — their pale fill alone is too close to the
+                    // tint's lightness in light mode.
+                    .overlay(
+                        RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD)
+                            .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                    )
                 }
             }
         }
         .padding()
-        .background(LiftMarkTheme.secondaryBackground)
+        .background(Color.purple.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+        .overlay(
+            RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD)
+                .stroke(Color.purple.opacity(0.5), lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("superset-card-\(parent.id)")
-    }
-
-    private func youtubeSearchURL(for exerciseName: String) -> URL? {
-        let query = exerciseName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? exerciseName
-        return URL(string: "https://www.youtube.com/results?search_query=\(query)+form")
     }
 }
