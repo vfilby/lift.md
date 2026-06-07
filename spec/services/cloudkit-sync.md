@@ -450,6 +450,43 @@ The iCloud Sync settings screen (see `spec/screens/settings.md`, sub-screen: iCl
 
 The sync settings screen MUST refresh its displayed sync stats (last sync date, uploaded/downloaded counts) whenever a background sync completes — not only when the screen first appears. Subscribe to the `syncCompleted` notification and reload stats from persistent storage on receipt.
 
+### Live List Updates During Sync
+
+List views (workout history, plans) MUST update **as records arrive**, not only when the
+entire fetch finishes. A long multi-batch sync (e.g. a month of history on a fresh device)
+otherwise leaves the list frozen until the end, forcing the user to pull-to-refresh
+repeatedly.
+
+- The sync engine posts `.syncRecordsMerged` (userInfo `["changedRecordTypes": Set<String>]`)
+  after **each** incoming batch is merged, in addition to the single `.syncCompleted` at the
+  end of the fetch cycle.
+- The app reloads the affected stores on **both** notifications. An empty `changedRecordTypes`
+  set means "reload everything".
+
+### Sync Activity Indicator
+
+The app exposes an app-wide observable sync-activity flag (`SyncStatusStore.isSyncing`) so any
+screen can show a background-sync indicator.
+
+- The sync engine posts `.syncActivityDidChange` (userInfo `["isActive": Bool]`) on the 0→1
+  transition (a fetch or send cycle started) and the 1→0 transition (the last in-flight cycle
+  finished). An internal counter keeps the flag true while an overlapping fetch and send are
+  both active.
+- The History (Workouts) list shows a slim "Syncing…" bar (`sync-status-bar`) while
+  `isSyncing` is true.
+
+**Tests** (`SyncStatusStoreTests`): the store reports idle initially, true after an
+`isActive: true` notification, false after `isActive: false`, and treats a missing `isActive`
+as idle.
+
+### Pull-to-Refresh Triggers a Remote Fetch
+
+Pull-to-refresh on a synced list MUST trigger an actual CloudKit fetch
+(`CKSyncEngineManager.fetchChanges(manual: true)`), not merely re-read the local database.
+A manual pull bypasses the automatic-fetch rate limit. Reading only the local DB can never
+surface a genuinely new remote record, which was the original "the latest workout didn't
+sync until I refreshed (and even then it didn't)" report.
+
 See `spec/screens/settings.md` for the complete iCloud Sync sub-screen layout specification.
 
 ## Service Interface

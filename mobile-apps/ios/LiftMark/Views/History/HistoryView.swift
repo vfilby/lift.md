@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryView: View {
     @Environment(SessionStore.self) private var sessionStore
+    @Environment(SyncStatusStore.self) private var syncStatus
     @State private var searchText = ""
     @State private var showExportConfirmation = false
     @State private var exportFile: ExportFile?
@@ -26,6 +27,7 @@ struct HistoryView: View {
         AdaptiveSplitView {
             // iPad sidebar - session list
             VStack(spacing: 0) {
+                SyncStatusBar(isSyncing: syncStatus.isSyncing)
                 if completedSessions.isEmpty {
                     emptyState
                 } else {
@@ -33,6 +35,7 @@ struct HistoryView: View {
                     iPadSessionList
                 }
             }
+            .animation(.default, value: syncStatus.isSyncing)
         } detail: {
             // iPad detail - session detail
             if let selectedSessionId {
@@ -51,6 +54,10 @@ struct HistoryView: View {
         .accessibilityIdentifier("history-screen")
         .navigationTitle("Workouts")
         .refreshable {
+            // Pull-to-refresh must actually pull from iCloud — previously it only
+            // re-read the local DB, so a genuinely new remote workout never appeared.
+            // Records merge in via .syncRecordsMerged; reload local immediately too.
+            CKSyncEngineManager.shared.fetchChanges(manual: true)
             sessionStore.loadSessions()
         }
         .toolbar {
@@ -138,6 +145,15 @@ struct HistoryView: View {
     // MARK: - iPhone Layout
 
     private var iPhoneLayout: some View {
+        VStack(spacing: 0) {
+            SyncStatusBar(isSyncing: syncStatus.isSyncing)
+            content
+        }
+        .animation(.default, value: syncStatus.isSyncing)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         Group {
             if completedSessions.isEmpty {
                 emptyState
