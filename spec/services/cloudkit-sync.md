@@ -206,6 +206,30 @@ Maps to the `WorkoutPlan` entity in the data model.
 | `createdAt` | Date | `createdAt` |
 | `updatedAt` | Date | `updatedAt` |
 
+## Timestamp Serialization
+
+Date fields are stored in CloudKit as native `TIMESTAMP` values, but locally (and in the
+app's models) they are ISO8601 **strings**. Two formats are in circulation:
+
+- **Locally written** timestamps use a bare `ISO8601DateFormatter()` → **whole seconds**, e.g. `2026-06-02T16:32:00Z`.
+- **Synced** timestamps are re-serialized by `CKRecordMapper.dateToISO` with `.withFractionalSeconds` → **fractional seconds**, e.g. `2026-06-02T16:32:00.000Z`.
+
+A bare `ISO8601DateFormatter().date(from:)` returns `nil` on a fractional-second string.
+Therefore **all parsing of these timestamps for display or logic MUST be tolerant of both
+forms** — use the shared `ISO8601.parse` helper (tries fractional, then whole seconds),
+never a bare `ISO8601DateFormatter`.
+
+**Regression history**: A workout completed on one device showed its start time correctly
+on that device but, after syncing, lost its time on the receiving device — the History list
+row collapsed to "Day · duration" (with a dangling separator) and the detail header fell
+back to the raw `date` string. Root cause was a strict (`ISO8601DateFormatter()`) parser in
+the History views choking on the fractional-second strings produced by the sync round-trip.
+The data was present; only the parse failed.
+
+**Tests** (`SessionDateDisplayTests`): a fractional-second `startTime` parses and yields a
+formatted time; a whole-second `startTime` parses; an unparseable/absent `startTime` falls
+back to the formatted calendar date (never the raw string).
+
 ## Sync Strategy
 
 ### Phase 1: Full Download-then-Upload (Current Implementation)

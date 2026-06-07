@@ -357,8 +357,9 @@ struct ActiveWorkoutView: View {
             let nowDate = Date()
             let nowIso = ISO8601DateFormatter().string(from: nowDate)
             snap.endTime = nowIso
-            if let startTime = snap.startTime,
-               let start = ISO8601DateFormatter().date(from: startTime) {
+            // Tolerant parse: a session resumed from another device carries a
+            // fractional-second startTime that a bare ISO8601DateFormatter rejects.
+            if let start = ISO8601.parse(snap.startTime) {
                 snap.duration = Int(nowDate.timeIntervalSince(start))
             }
             snap.status = .completed

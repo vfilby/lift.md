@@ -280,22 +280,11 @@ private struct SessionCardView: View {
     }
 
     private var startTimeFormatted: String? {
-        guard let startTime = session.startTime,
-              let date = ISO8601DateFormatter().date(from: startTime) else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        SessionDateDisplay.shortTime(startTime: session.startTime)
     }
 
     private var durationFormatted: String? {
-        guard let duration = session.duration else { return nil }
-        let minutes = duration / 60
-        if minutes < 60 {
-            return "\(minutes) min"
-        }
-        let hours = minutes / 60
-        let remainingMinutes = minutes % 60
-        return "\(hours)h \(remainingMinutes)m"
+        SessionDateDisplay.duration(seconds: session.duration)
     }
 
     var body: some View {
@@ -308,15 +297,16 @@ private struct SessionCardView: View {
 
                 HStack(spacing: LiftMarkTheme.spacingSM) {
                     Text(formattedDate)
-                    if startTimeFormatted != nil || durationFormatted != nil {
+                    // Each component carries its own leading separator so a missing
+                    // start time never leaves a dangling "· ·" gap (e.g. on a synced
+                    // record whose startTime parsed to nil before the ISO8601 fix).
+                    if let time = startTimeFormatted {
                         Text("·")
-                        if let time = startTimeFormatted {
-                            Text(time)
-                        }
-                        if let duration = durationFormatted {
-                            Text("·")
-                            Text(duration)
-                        }
+                        Text(time)
+                    }
+                    if let duration = durationFormatted {
+                        Text("·")
+                        Text(duration)
                     }
                 }
                 .font(.lmSubheadline)

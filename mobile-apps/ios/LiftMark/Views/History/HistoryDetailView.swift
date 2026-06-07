@@ -279,42 +279,36 @@ struct HistoryDetailView: View {
     private func statsCard(_ session: WorkoutSession) -> some View {
         // Header card
         VStack(alignment: .leading, spacing: 4) {
-            // Full date
-            if let startTime = session.startTime,
-               let date = ISO8601DateFormatter().date(from: startTime) {
-                let dateFormatter: DateFormatter = {
-                    let f = DateFormatter()
-                    f.dateFormat = "EEEE, MMMM d, yyyy"
-                    return f
-                }()
-                let timeFormatter: DateFormatter = {
-                    let f = DateFormatter()
-                    f.timeStyle = .short
-                    return f
-                }()
-                Text(dateFormatter.string(from: date))
-                    .font(.lmBody)
-                    .fontWeight(.semibold)
+            // When embedded in the iPad split view the navigation title is suppressed,
+            // so surface the workout name here. On iPhone the name is the nav title.
+            if isEmbedded {
+                Text(session.name)
+                    .font(.lmTitle3)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 2)
+            }
+
+            // Full date — falls back to the calendar date when startTime is missing or
+            // unparseable, never the raw ISO string.
+            Text(SessionDateDisplay.fullDateLine(startTime: session.startTime, date: session.date))
+                .font(.lmBody)
+                .fontWeight(.semibold)
+
+            // Start time (if known) + duration, each with its own leading separator.
+            let startTime = SessionDateDisplay.shortTime(startTime: session.startTime)
+            let duration = SessionDateDisplay.duration(seconds: session.duration)
+            if startTime != nil || duration != nil {
                 HStack(spacing: 8) {
-                    Text(timeFormatter.string(from: date))
-                    if let duration = session.duration {
-                        Text("·")
-                        let minutes = duration / 60
-                        Text(minutes < 60 ? "\(minutes) min" : "\(minutes / 60)h \(minutes % 60)m")
+                    if let startTime {
+                        Text(startTime)
+                    }
+                    if let duration {
+                        if startTime != nil { Text("·") }
+                        Text(duration)
                     }
                 }
                 .font(.lmSubheadline)
                 .foregroundStyle(.secondary)
-            } else {
-                Text(session.date)
-                    .font(.lmBody)
-                    .fontWeight(.semibold)
-                if let duration = session.duration {
-                    let minutes = duration / 60
-                    Text(minutes < 60 ? "\(minutes) min" : "\(minutes / 60)h \(minutes % 60)m")
-                        .font(.lmSubheadline)
-                        .foregroundStyle(.secondary)
-                }
             }
         }
         .padding()
