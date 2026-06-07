@@ -39,6 +39,28 @@ struct WorkoutPlan: Identifiable, Codable, Hashable {
     }
 }
 
+// MARK: - Display counts
+//
+// One source of truth for the "how many exercises / sets" a plan shows.
+// Plan cards, the detail header, the inbox row + preview, and the import
+// confirmation all read these so the same plan never reports two different
+// numbers (the GH inbox bug: an inbox card said "16 exercises" while the
+// promoted plan said "14" because each counted structural rows differently).
+extension WorkoutPlan {
+    /// Number of exercises the user actually performs. Excludes structural
+    /// rows (empty section headers and empty superset parents), matching how
+    /// they render: no number, no standalone card. This is the count shown
+    /// everywhere a plan's exercise tally appears.
+    var displayExerciseCount: Int {
+        exercises.lazy.filter { !$0.isStructuralHeader }.count
+    }
+
+    /// Total planned sets across all exercises.
+    var plannedSetCount: Int {
+        exercises.reduce(0) { $0 + $1.sets.count }
+    }
+}
+
 // MARK: - PlannedExercise
 
 struct PlannedExercise: Identifiable, Codable, Hashable {
@@ -75,6 +97,15 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
         self.groupName = groupName
         self.parentExerciseId = parentExerciseId
         self.sets = sets
+    }
+
+    /// True for scaffolding rows that carry no sets of their own: empty
+    /// section headers and empty superset parents. These are excluded from
+    /// the user-facing exercise count and from exercise numbering — they are
+    /// structure, not exercises the user performs. The single predicate every
+    /// count/numbering site shares so they can't drift apart.
+    var isStructuralHeader: Bool {
+        sets.isEmpty && (groupType == .section || groupType == .superset)
     }
 }
 

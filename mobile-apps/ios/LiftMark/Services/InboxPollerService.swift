@@ -34,6 +34,11 @@ private struct InboxDetailResponse: Decodable {
 /// - One in-flight poll at a time (`isPolling` gate).
 /// - Per-item decode/store failures are logged and skipped; items stay
 ///   pending server-side and are retried on the next poll.
+/// - On a complete listing, reconciles the local cache down to the server's
+///   live set: any locally-cached row the server no longer lists is pruned
+///   (it was imported/discarded elsewhere, or a delete/poll race stranded it).
+///   Skipped when the listing is truncated (a partial page can't prove a row
+///   is gone). This is what keeps an imported item from lingering in the inbox.
 ///
 /// What it intentionally does NOT do:
 /// - Auto-create `WorkoutPlan` rows. Items live in the local inbox table
@@ -135,6 +140,35 @@ final class InboxPollerService {
             }
         }
 
+        // Reconcile deletions: drop local rows the server no longer lists.
+        // The loop above is add-only; without this, a row imported/discarded
+        // elsewhere — or stranded locally when a promote's delete lost a race
+        // with an in-flight poll re-adding it — lingers in the inbox forever
+        // even though it's gone server-side (the reported "imported AND still
+        // in the inbox" bug). The server is the source of truth, so any local
+        // id absent from the listing has been consumed and should be pruned.
+        //
+        // Only safe on a COMPLETE listing. A truncated page (nextCursor != nil)
+        // doesn't reveal the full server set, so pruning then could delete live
+        // rows we simply didn't see on this page — skip reconciliation that
+        // cycle rather than risk it. (The poll fetches a single page; see spec.)
+        var pruned = 0
+        if listResponse.nextCursor == nil {
+            let serverIds = Set(listResponse.items.map { $0.inboxId })
+            let localIds = (try? inboxRepository.allIds()) ?? []
+            for staleId in localIds where !serverIds.contains(staleId) {
+                do {
+                    try inboxRepository.delete(id: staleId)
+                    pruned += 1
+                } catch {
+                    Logger.shared.warn(
+                        .database,
+                        "inbox prune failed for \(staleId): \(error)"
+                    )
+                }
+            }
+        }
+
         lastSyncedAt = Date()
         pendingCount = (try? inboxRepository.count()) ?? pendingCount
 
@@ -144,13 +178,14 @@ final class InboxPollerService {
             metadata: [
                 "fetched": String(listResponse.items.count),
                 "upserted": String(upserted),
+                "pruned": String(pruned),
                 "skipped": String(skipped),
                 "failures": String(failures),
                 "localCount": String(pendingCount),
             ]
         )
 
-        if upserted > 0 {
+        if upserted > 0 || pruned > 0 {
             NotificationCenter.default.post(
                 name: Self.inboxDidChange,
                 object: nil

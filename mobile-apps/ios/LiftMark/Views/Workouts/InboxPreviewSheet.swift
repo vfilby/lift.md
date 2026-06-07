@@ -64,7 +64,7 @@ struct InboxPreviewSheet: View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             HStack(spacing: LiftMarkTheme.spacingSM) {
                 Label(
-                    "\(plan.exercises.count) exercise\(plan.exercises.count == 1 ? "" : "s")",
+                    "\(exerciseCount) exercise\(exerciseCount == 1 ? "" : "s")",
                     systemImage: "figure.strengthtraining.traditional"
                 )
                 .font(.lmSubheadline)
@@ -102,9 +102,11 @@ struct InboxPreviewSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
     }
 
-    private var totalSetCount: Int {
-        plan.exercises.reduce(0) { $0 + $1.sets.count }
-    }
+    /// Shared with the plan list/detail so the preview reports the same
+    /// numbers the promoted plan will (structural headers excluded).
+    private var exerciseCount: Int { plan.displayExerciseCount }
+
+    private var totalSetCount: Int { plan.plannedSetCount }
 
     private var receivedFootnote: String {
         let formatter = RelativeDateTimeFormatter()

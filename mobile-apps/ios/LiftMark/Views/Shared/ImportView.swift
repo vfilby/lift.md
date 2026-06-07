@@ -210,8 +210,8 @@ struct ImportView: View {
             parseError = nil
             parseResult = ParseResult(
                 name: result.data?.name ?? "Untitled",
-                exerciseCount: result.data?.exercises.count ?? 0,
-                setCount: result.data?.exercises.reduce(0) { $0 + $1.sets.count } ?? 0,
+                exerciseCount: result.data?.displayExerciseCount ?? 0,
+                setCount: result.data?.plannedSetCount ?? 0,
                 warnings: result.warnings
             )
         }

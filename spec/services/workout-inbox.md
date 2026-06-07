@@ -154,6 +154,7 @@ The table is **device-local**. It is not synced via CloudKit and is not included
 - **Does not** `ack`. Items are never transitioned server-side by the poll; they remain in the inbox until the user imports or discards them (which `DELETE`s the row). This is what makes the local table a disposable cache that self-heals after a wipe/reinstall (GH #164).
 - Rows already present locally are skipped without re-fetching the detail — pending rows are immutable (a push always creates a new `inbox_id`), so re-fetching them is pure waste. Poll cost is proportional to *new* items, not the whole inbox.
 - Per-item decode/store failures are logged and skipped; the item stays in the inbox server-side for retry on next poll.
+- **Reconciles deletions.** After the add pass, any locally-cached row whose `inbox_id` is **not** in the listing is deleted from the local table — the server is the source of truth, so a row it no longer lists has been imported/discarded (here or on another device) or was stranded locally by a delete/poll race. This is what stops an imported workout from lingering in the inbox alongside its promoted plan. Reconciliation runs **only on a complete listing** (`next_cursor == null`); a truncated page can't prove a row is gone, so pruning is skipped that cycle. The poll posts `inboxDidChange` when it prunes (not just when it adds) so the UI refreshes.
 
 Removed from the v1 poller:
 - Auto-creation of `WorkoutPlan` rows. The poller no longer touches `workout_templates`.
@@ -190,7 +191,7 @@ Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) �
 
 `Logger.shared.info(.network, ...)` events:
 
-- `inbox_poll_complete` — `{fetched, upserted, skipped, errors}`
+- `inbox_poll_complete` — `{fetched, upserted, pruned, skipped, failures, localCount}`
 - `inbox_discard` — `{inbox_id}`
 - `inbox_promote` — `{inbox_id, plan_id, started: bool}`
 - Errors via `Logger.shared.error(.network, ...)` with full error.
@@ -200,5 +201,5 @@ No Sentry capture for normal flows; only unexpected decode/DB failures.
 ## Open items
 
 - TTL/reaping of stale server-side inbox rows the user never acts on. Out of scope v1.
-- Multi-device behavior: two devices polling will both see the same items (the poll no longer mutates server state, so there's no first-to-fetch race). First-to-act `DELETE`s the server row; the other device's `DELETE` then 404s harmlessly, and that device drops the stale local row on its next poll only once it also acts — i.e. an item imported/discarded on device A can still linger in device B's local cache until device B acts on it. Reconciling the local cache down to the server set on every poll is a future improvement. Acceptable for v1.
+- Multi-device behavior: two devices polling will both see the same items (the poll no longer mutates server state, so there's no first-to-fetch race). First-to-act `DELETE`s the server row; the other device's `DELETE` then 404s harmlessly. The other device drops the stale local row on its **next poll** now, via deletion reconciliation (see Poller) — it no longer has to also act on the item first. The same reconciliation heals a single-device delete/poll race where an in-flight poll re-added a row the user had just promoted. (Only a `DELETE` that genuinely failed server-side, e.g. offline, leaves the row truly pending — reconciliation correctly keeps that one; see the lifecycle edge above.)
 - The legacy `ingested` status + `/ack` endpoint now have no caller (both iOS and the web portal stopped using them in GH #164). The endpoint is kept so stale clients/rows don't 404; removing it (and the `ingested` status, badge, and filter option) entirely is a candidate cleanup.

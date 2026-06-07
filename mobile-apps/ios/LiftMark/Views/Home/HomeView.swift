@@ -473,7 +473,7 @@ private struct WorkoutPlanCard: View {
                     }
                 }
                 HStack(spacing: LiftMarkTheme.spacingSM) {
-                    Text("\(plan.exercises.count) exercises")
+                    Text("\(plan.displayExerciseCount) exercises")
                         .font(.lmSubheadline)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     if !plan.tags.isEmpty {
@@ -494,6 +494,6 @@ private struct WorkoutPlanCard: View {
         .background(LiftMarkTheme.secondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(plan.name)\(plan.isFavorite ? ", favorite" : ""), \(plan.exercises.count) exercises\(!plan.tags.isEmpty ? ", " + plan.tags.prefix(2).joined(separator: ", ") : "")")
+        .accessibilityLabel("\(plan.name)\(plan.isFavorite ? ", favorite" : ""), \(plan.displayExerciseCount) exercises\(!plan.tags.isEmpty ? ", " + plan.tags.prefix(2).joined(separator: ", ") : "")")
     }
 }

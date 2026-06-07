@@ -119,8 +119,13 @@ class ActionAdapter {
                     return button
                 }
             }
-            // Return label-based query (will resolve when tab bar appears)
             if let label = tabIdToLabel[identifier] {
+                // iPad (iOS 18+): the root TabView renders tabs as a top bar of
+                // plain buttons (identifier is the SF Symbol name, label is the
+                // tab title) rather than under a tabBars element — match by label.
+                let topTab = app.buttons[label].firstMatch
+                if topTab.exists { return topTab }
+                // Return label-based query (will resolve when tab bar appears)
                 return app.tabBars.buttons[label]
             }
         }
@@ -165,6 +170,10 @@ class ActionAdapter {
             if let label = tabIdToLabel[identifier] {
                 let tabButton = app.tabBars.buttons[label]
                 if tabButton.waitForExistence(timeout: UITestTiming.scaled(min(timeout, 3))) { return tabButton }
+                // iPad (iOS 18+): tabs render as a top bar of plain buttons
+                // matched by their title label, not under a tabBars element.
+                let topTab = app.buttons[label].firstMatch
+                if topTab.waitForExistence(timeout: UITestTiming.scaled(min(timeout, 3))) { return topTab }
             }
         }
 

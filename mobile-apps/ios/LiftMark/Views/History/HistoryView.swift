@@ -43,6 +43,11 @@ struct HistoryView: View {
         } compact: {
             iPhoneLayout
         }
+        // Contain children as their own elements so this screen identifier does
+        // not propagate down and clobber the embedded detail pane's identifiers
+        // on iPad (the detail's `history-detail-view`/`history-detail-screen`).
+        // Mirrors WorkoutsView, whose detail pane survives for the same reason.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("history-screen")
         .navigationTitle("Workouts")
         .refreshable {

@@ -7,9 +7,10 @@ name: "App Store Screenshots"
 #
 # Each `screenshot` action writes a PNG attachment into the .xcresult bundle
 # under the supplied name. scripts/capture-screenshots.sh (via the Makefile
-# `screenshots` target) runs this scenario twice — once with the simulator in
-# light appearance, once in dark (the app's default `.auto` theme follows the
-# OS) — and extracts the PNGs into mobile-apps/ios/Screenshots/{light,dark}/.
+# `screenshots` target) runs this scenario on each device (iPhone + iPad),
+# twice per device — once with the simulator in light appearance, once in dark
+# (the app's default `.auto` theme follows the OS) — and extracts the PNGs into
+# mobile-apps/ios/Screenshots/<device>/{light,dark}/.
 
 setupOnce:
   - action: launchApp
