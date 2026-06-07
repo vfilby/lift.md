@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryView: View {
     @Environment(SessionStore.self) private var sessionStore
+    @Environment(SyncStatusStore.self) private var syncStatus
     @State private var searchText = ""
     @State private var showExportConfirmation = false
     @State private var exportFile: ExportFile?
@@ -26,6 +27,7 @@ struct HistoryView: View {
         AdaptiveSplitView {
             // iPad sidebar - session list
             VStack(spacing: 0) {
+                SyncStatusBar(isSyncing: syncStatus.isSyncing)
                 if completedSessions.isEmpty {
                     emptyState
                 } else {
@@ -33,6 +35,7 @@ struct HistoryView: View {
                     iPadSessionList
                 }
             }
+            .animation(.default, value: syncStatus.isSyncing)
         } detail: {
             // iPad detail - session detail
             if let selectedSessionId {
@@ -51,6 +54,10 @@ struct HistoryView: View {
         .accessibilityIdentifier("history-screen")
         .navigationTitle("Workouts")
         .refreshable {
+            // Pull-to-refresh must actually pull from iCloud — previously it only
+            // re-read the local DB, so a genuinely new remote workout never appeared.
+            // Records merge in via .syncRecordsMerged; reload local immediately too.
+            CKSyncEngineManager.shared.fetchChanges(manual: true)
             sessionStore.loadSessions()
         }
         .toolbar {
@@ -138,6 +145,15 @@ struct HistoryView: View {
     // MARK: - iPhone Layout
 
     private var iPhoneLayout: some View {
+        VStack(spacing: 0) {
+            SyncStatusBar(isSyncing: syncStatus.isSyncing)
+            content
+        }
+        .animation(.default, value: syncStatus.isSyncing)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         Group {
             if completedSessions.isEmpty {
                 emptyState
@@ -280,22 +296,11 @@ private struct SessionCardView: View {
     }
 
     private var startTimeFormatted: String? {
-        guard let startTime = session.startTime,
-              let date = ISO8601DateFormatter().date(from: startTime) else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        SessionDateDisplay.shortTime(startTime: session.startTime)
     }
 
     private var durationFormatted: String? {
-        guard let duration = session.duration else { return nil }
-        let minutes = duration / 60
-        if minutes < 60 {
-            return "\(minutes) min"
-        }
-        let hours = minutes / 60
-        let remainingMinutes = minutes % 60
-        return "\(hours)h \(remainingMinutes)m"
+        SessionDateDisplay.duration(seconds: session.duration)
     }
 
     var body: some View {
@@ -308,15 +313,16 @@ private struct SessionCardView: View {
 
                 HStack(spacing: LiftMarkTheme.spacingSM) {
                     Text(formattedDate)
-                    if startTimeFormatted != nil || durationFormatted != nil {
+                    // Each component carries its own leading separator so a missing
+                    // start time never leaves a dangling "· ·" gap (e.g. on a synced
+                    // record whose startTime parsed to nil before the ISO8601 fix).
+                    if let time = startTimeFormatted {
                         Text("·")
-                        if let time = startTimeFormatted {
-                            Text(time)
-                        }
-                        if let duration = durationFormatted {
-                            Text("·")
-                            Text(duration)
-                        }
+                        Text(time)
+                    }
+                    if let duration = durationFormatted {
+                        Text("·")
+                        Text(duration)
                     }
                 }
                 .font(.lmSubheadline)

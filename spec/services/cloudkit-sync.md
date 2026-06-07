@@ -206,6 +206,30 @@ Maps to the `WorkoutPlan` entity in the data model.
 | `createdAt` | Date | `createdAt` |
 | `updatedAt` | Date | `updatedAt` |
 
+## Timestamp Serialization
+
+Date fields are stored in CloudKit as native `TIMESTAMP` values, but locally (and in the
+app's models) they are ISO8601 **strings**. Two formats are in circulation:
+
+- **Locally written** timestamps use a bare `ISO8601DateFormatter()` → **whole seconds**, e.g. `2026-06-02T16:32:00Z`.
+- **Synced** timestamps are re-serialized by `CKRecordMapper.dateToISO` with `.withFractionalSeconds` → **fractional seconds**, e.g. `2026-06-02T16:32:00.000Z`.
+
+A bare `ISO8601DateFormatter().date(from:)` returns `nil` on a fractional-second string.
+Therefore **all parsing of these timestamps for display or logic MUST be tolerant of both
+forms** — use the shared `ISO8601.parse` helper (tries fractional, then whole seconds),
+never a bare `ISO8601DateFormatter`.
+
+**Regression history**: A workout completed on one device showed its start time correctly
+on that device but, after syncing, lost its time on the receiving device — the History list
+row collapsed to "Day · duration" (with a dangling separator) and the detail header fell
+back to the raw `date` string. Root cause was a strict (`ISO8601DateFormatter()`) parser in
+the History views choking on the fractional-second strings produced by the sync round-trip.
+The data was present; only the parse failed.
+
+**Tests** (`SessionDateDisplayTests`): a fractional-second `startTime` parses and yields a
+formatted time; a whole-second `startTime` parses; an unparseable/absent `startTime` falls
+back to the formatted calendar date (never the raw string).
+
 ## Sync Strategy
 
 ### Phase 1: Full Download-then-Upload (Current Implementation)
@@ -425,6 +449,43 @@ The iCloud Sync settings screen (see `spec/screens/settings.md`, sub-screen: iCl
 ### UI Refresh
 
 The sync settings screen MUST refresh its displayed sync stats (last sync date, uploaded/downloaded counts) whenever a background sync completes — not only when the screen first appears. Subscribe to the `syncCompleted` notification and reload stats from persistent storage on receipt.
+
+### Live List Updates During Sync
+
+List views (workout history, plans) MUST update **as records arrive**, not only when the
+entire fetch finishes. A long multi-batch sync (e.g. a month of history on a fresh device)
+otherwise leaves the list frozen until the end, forcing the user to pull-to-refresh
+repeatedly.
+
+- The sync engine posts `.syncRecordsMerged` (userInfo `["changedRecordTypes": Set<String>]`)
+  after **each** incoming batch is merged, in addition to the single `.syncCompleted` at the
+  end of the fetch cycle.
+- The app reloads the affected stores on **both** notifications. An empty `changedRecordTypes`
+  set means "reload everything".
+
+### Sync Activity Indicator
+
+The app exposes an app-wide observable sync-activity flag (`SyncStatusStore.isSyncing`) so any
+screen can show a background-sync indicator.
+
+- The sync engine posts `.syncActivityDidChange` (userInfo `["isActive": Bool]`) on the 0→1
+  transition (a fetch or send cycle started) and the 1→0 transition (the last in-flight cycle
+  finished). An internal counter keeps the flag true while an overlapping fetch and send are
+  both active.
+- The History (Workouts) list shows a slim "Syncing…" bar (`sync-status-bar`) while
+  `isSyncing` is true.
+
+**Tests** (`SyncStatusStoreTests`): the store reports idle initially, true after an
+`isActive: true` notification, false after `isActive: false`, and treats a missing `isActive`
+as idle.
+
+### Pull-to-Refresh Triggers a Remote Fetch
+
+Pull-to-refresh on a synced list MUST trigger an actual CloudKit fetch
+(`CKSyncEngineManager.fetchChanges(manual: true)`), not merely re-read the local database.
+A manual pull bypasses the automatic-fetch rate limit. Reading only the local DB can never
+surface a genuinely new remote record, which was the original "the latest workout didn't
+sync until I refreshed (and even then it didn't)" report.
 
 See `spec/screens/settings.md` for the complete iCloud Sync sub-screen layout specification.
 

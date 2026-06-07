@@ -4,7 +4,17 @@ import GRDB
 // MARK: - Notification
 
 extension Notification.Name {
+    /// Posted once at the end of a full fetch cycle (`didFetchChanges`), after sync stats
+    /// are finalized. userInfo: `["changedRecordTypes": Set<String>]`.
     static let syncCompleted = Notification.Name("syncCompleted")
+
+    /// Posted after each incoming batch of records is merged, so list views update live
+    /// during a long multi-batch sync instead of only at the very end.
+    /// userInfo: `["changedRecordTypes": Set<String>]`.
+    static let syncRecordsMerged = Notification.Name("syncRecordsMerged")
+
+    /// Posted when a sync fetch/send cycle starts or stops. userInfo: `["isActive": Bool]`.
+    static let syncActivityDidChange = Notification.Name("syncActivityDidChange")
 }
 
 // MARK: - CloudKit Account Status
@@ -42,6 +52,11 @@ final class CKSyncEngineManager: @unchecked Sendable {
     // Rate limiting for automatic fetches
     private static let minimumFetchInterval: TimeInterval = 30
     private var lastSyncTime: Date?
+
+    /// Number of in-flight fetch/send cycles. Incremented on willFetch/willSend, decremented
+    /// on didFetch/didSend. A counter (not a bool) keeps "syncing" true while an overlapping
+    /// fetch and send are both active, and only flips to idle when the last one finishes.
+    private var activeSyncOps = 0
 
     // Composed helpers
     private let metadataStore = CKSyncMetadataStore()
@@ -411,6 +426,19 @@ final class CKSyncEngineManager: @unchecked Sendable {
         syncDownloaded += downloaded
         syncChangedRecordTypes.formUnion(changedTypes)
         lock.unlock()
+
+        // Notify per-batch so list views refresh as records arrive during a long sync,
+        // rather than waiting for the single .syncCompleted at the end of all batches.
+        if !changedTypes.isEmpty {
+            let typesToReload = changedTypes
+            Task { @MainActor in
+                NotificationCenter.default.post(
+                    name: .syncRecordsMerged,
+                    object: nil,
+                    userInfo: ["changedRecordTypes": typesToReload]
+                )
+            }
+        }
     }
 
     // MARK: - Sent Changes (delegated)
@@ -495,6 +523,36 @@ final class CKSyncEngineManager: @unchecked Sendable {
 
     // MARK: - Sync Stats Helpers (synchronous, safe to call from async context)
 
+    /// Mark a fetch/send cycle as started. Posts `.syncActivityDidChange(isActive: true)`
+    /// only on the 0→1 transition.
+    private func beginSyncActivity() {
+        lock.lock()
+        activeSyncOps += 1
+        let becameActive = activeSyncOps == 1
+        lock.unlock()
+        if becameActive { postSyncActivity(true) }
+    }
+
+    /// Mark a fetch/send cycle as finished. Posts `.syncActivityDidChange(isActive: false)`
+    /// only on the 1→0 transition.
+    private func endSyncActivity() {
+        lock.lock()
+        if activeSyncOps > 0 { activeSyncOps -= 1 }
+        let becameIdle = activeSyncOps == 0
+        lock.unlock()
+        if becameIdle { postSyncActivity(false) }
+    }
+
+    private func postSyncActivity(_ active: Bool) {
+        Task { @MainActor in
+            NotificationCenter.default.post(
+                name: .syncActivityDidChange,
+                object: nil,
+                userInfo: ["isActive": active]
+            )
+        }
+    }
+
     private func resetSyncStats() {
         lock.lock()
         syncDownloaded = 0
@@ -532,6 +590,7 @@ extension CKSyncEngineManager: CKSyncEngineDelegate {
             handleSentChanges(sentChanges)
 
         case .willFetchChanges:
+            beginSyncActivity()
             currentSnapshot = SyncSessionGuard.takeSnapshot()
             resetSyncStats()
             CrashReporter.shared.addBreadcrumb("sync.fetch.begin", category: .sync)
@@ -551,14 +610,17 @@ extension CKSyncEngineManager: CKSyncEngineDelegate {
                     userInfo: ["changedRecordTypes": changedRecordTypes]
                 )
             }
+            endSyncActivity()
 
         case .willSendChanges:
+            beginSyncActivity()
             // Clear resolved conflicts so records modified since last cycle can be re-uploaded
             conflictResolver.clearResolved()
             CrashReporter.shared.addBreadcrumb("sync.send.begin", category: .sync)
 
         case .didSendChanges:
             CrashReporter.shared.addBreadcrumb("sync.send.end", category: .sync)
+            endSyncActivity()
 
         case .willFetchRecordZoneChanges, .didFetchRecordZoneChanges:
             break

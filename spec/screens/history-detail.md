@@ -49,8 +49,11 @@ Detailed view of a completed workout session showing date/time, stats, exercises
 ## HistoryDetailView Component
 
 ### Header Card
-- Full date (weekday, month, day, year)
-- Start time + duration
+- **Workout name** — rendered as the card's primary line **only in the embedded (iPad split-view) presentation**, where the navigation title is suppressed. On iPhone the name is the navigation title and is not repeated in the card.
+- **Full date** (weekday, month, day, year). Derived from `startTime` when it can be parsed; otherwise from the `date` field (`yyyy-MM-dd` calendar date). The raw ISO `date`/`startTime` string MUST NOT be shown to the user.
+- **Start time + duration**. Start time is shown only when `startTime` is present and parseable; duration is shown whenever recorded. Each present component carries its own separator so a missing start time never leaves a dangling separator gap.
+
+> **Timestamp parsing**: `startTime` is an ISO8601 string. Values written locally use whole seconds, but values that have round-tripped through CloudKit carry fractional seconds. All session date/time parsing for display MUST go through the tolerant `ISO8601.parse` helper (accepts both forms); a bare `ISO8601DateFormatter()` rejects fractional-second strings and silently drops synced start times. See `spec/services/cloudkit-sync.md` → "Timestamp Serialization".
 
 ### Stats Grid
 - Sets (completed count)

@@ -8,6 +8,7 @@ struct LiftMarkApp: App {
     @State private var settingsStore = SettingsStore()
     @State private var gymStore = GymStore()
     @State private var equipmentStore = EquipmentStore()
+    @State private var syncStatusStore = SyncStatusStore()
     @State private var authStore: AuthenticationStore
     @State private var inboxPoller: InboxPollerService
     @State private var outboxPusher: OutboxPusherService
@@ -150,6 +151,7 @@ struct LiftMarkApp: App {
                 .environment(settingsStore)
                 .environment(gymStore)
                 .environment(equipmentStore)
+                .environment(syncStatusStore)
                 .environment(authStore)
                 .environment(inboxPoller)
                 .environment(outboxPusher)
@@ -206,25 +208,35 @@ struct LiftMarkApp: App {
                     else { return }
                     outboxPusher.enqueue(clientSessionId: sessionId)
                 }
+                // Reload affected stores both incrementally (per merged batch) and at
+                // the end of the fetch cycle, so synced records appear live without a
+                // manual pull-to-refresh.
+                .onReceive(NotificationCenter.default.publisher(for: .syncRecordsMerged)) { notification in
+                    reloadStores(forChangedTypes: notification.userInfo?["changedRecordTypes"] as? Set<String> ?? [])
+                }
                 .onReceive(NotificationCenter.default.publisher(for: .syncCompleted)) { notification in
-                    let changed = notification.userInfo?["changedRecordTypes"] as? Set<String> ?? []
-                    // Only reload stores affected by the sync
-                    if changed.isEmpty || !changed.isDisjoint(with: ["WorkoutPlan", "PlannedExercise", "PlannedSet"]) {
-                        planStore.loadPlans()
-                    }
-                    if changed.isEmpty || !changed.isDisjoint(with: ["WorkoutSession", "SessionExercise", "SessionSet"]) {
-                        sessionStore.loadSessions()
-                    }
-                    if changed.isEmpty || changed.contains("UserSettings") {
-                        settingsStore.loadSettings()
-                    }
-                    if changed.isEmpty || !changed.isDisjoint(with: ["Gym", "GymEquipment"]) {
-                        gymStore.loadGyms()
-                    }
+                    reloadStores(forChangedTypes: notification.userInfo?["changedRecordTypes"] as? Set<String> ?? [])
                 }
                 .onOpenURL { url in
                     handleIncomingURL(url)
                 }
+        }
+    }
+
+    /// Reload the stores affected by an incoming sync. An empty `changedTypes` set means
+    /// "unknown — reload everything" (e.g. the final `.syncCompleted` with no detail).
+    private func reloadStores(forChangedTypes changed: Set<String>) {
+        if changed.isEmpty || !changed.isDisjoint(with: ["WorkoutPlan", "PlannedExercise", "PlannedSet"]) {
+            planStore.loadPlans()
+        }
+        if changed.isEmpty || !changed.isDisjoint(with: ["WorkoutSession", "SessionExercise", "SessionSet"]) {
+            sessionStore.loadSessions()
+        }
+        if changed.isEmpty || changed.contains("UserSettings") {
+            settingsStore.loadSettings()
+        }
+        if changed.isEmpty || !changed.isDisjoint(with: ["Gym", "GymEquipment"]) {
+            gymStore.loadGyms()
         }
     }
 
