@@ -232,7 +232,33 @@ back to the formatted calendar date (never the raw string).
 
 ## Sync Strategy
 
-### Phase 1: Full Download-then-Upload (Current Implementation)
+### Current Implementation: CKSyncEngine + Record System-Fields
+
+The app syncs via **`CKSyncEngine`** against the private database, custom zone `LiftMarkData`. The engine drives fetch/send cycles and persists its serialized state (database/zone change tokens + the set of pending record IDs) in the `sync_engine_state` table. The Phase 1/2/3 description below predates this and is retained only for historical context.
+
+#### Record System-Fields Persistence (change tags) — REQUIRED invariant
+
+`CKSyncEngine`'s serialized state does **not** store records or their `recordChangeTag`s — persisting them is the app's responsibility. The app keeps a per-record cache:
+
+- Table `ck_record_metadata(record_name PK, record_type, system_fields BLOB, updated_at)` — one row per CloudKit record, all record types. `system_fields` is `CKRecord.encodedSystemFields` (record ID, zone, and current change tag; no user fields).
+
+Invariants:
+
+1. **Rehydrate on upload.** When building a `CKRecord` to upload (`CKRecordMapper.baseRecord` → `toCKRecord`), if a metadata row exists for the record name, the `CKRecord` MUST be reconstructed from the stored `system_fields` (so it carries the current change tag) and then have its data fields written. A fresh `CKRecord` is built ONLY when no metadata row exists (a genuinely new record CloudKit will create).
+2. **Persist on confirm.** System fields MUST be saved whenever CloudKit hands us an authoritative record: (a) each `event.savedRecords` after a successful upload, (b) **unconditionally** in `mergeIncoming` for every fetched record — even when the row-merge is skipped because local is newer/unchanged (the server tag is still the token our next upload needs), and (c) from `error.serverRecord` on a `serverRecordChanged` conflict (handled via `mergeIncoming`).
+3. **Remove on delete.** Drop the metadata row on a confirmed delete (local `event.deletedRecordIDs`, or an incoming deletion).
+
+**Why:** without this, every upload builds a fresh tagless `CKRecord`; CloudKit rejects any update to an already-existing record with `serverRecordChanged`; the resolver re-uploads (still tagless) and conflicts again — a permanent loop that jams the pending queue and starves all other uploads (observed: ~92% SetMeasurement conflict rate, an ~8.6k-deep queue with ~0 net drain, completed workouts never reaching other devices). With durable tags, `serverRecordChanged` becomes a rare true-conflict (genuine concurrent edits) that converges in one cycle.
+
+#### One-time recovery (`fullUploadVersion` = 5)
+
+Devices jammed by the pre-fix loop have a large stale pending queue and no stored system fields. On a `fullUploadVersion` bump the app performs an **ordered reset → re-fetch → re-upload** (before creating the engine, so it restarts fresh):
+
+1. `DELETE FROM sync_engine_state` and clear `ck_record_metadata`. **No data tables are touched — no data loss.**
+2. The engine restarts with nil state → full zone re-fetch → `mergeIncoming` repopulates `ck_record_metadata` with authoritative tags. Merges key on stable UUID PKs (update-in-place, no duplication); locally-newer rows survive (LWW keeps local on newer/tie).
+3. Only **after** the first fetch completes (`.didFetchChanges`) does the app re-upload local rows (`scheduleFullUpload`) — now with correct tags — and bump the stored version. The account-change full-upload is deferred during the recovery window. The version is bumped only after the deferred upload is scheduled, so an app kill mid-recovery simply re-runs it (idempotent).
+
+### Phase 1: Full Download-then-Upload (superseded — historical)
 
 The sync runs in **download-first** order to avoid an upload storm when another device (or app version) has already synced records to the CloudKit container:
 

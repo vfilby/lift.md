@@ -76,6 +76,11 @@ final class CKSyncEngineManager: @unchecked Sendable {
             return
         }
 
+        // One-time recovery (must run before loadPersistedState): on a version bump this
+        // clears the engine's persisted state + system-fields cache so the engine restarts
+        // fresh and re-fetches every record before re-uploading. No data rows are touched.
+        prepareRecoveryIfNeeded()
+
         let serialization = loadPersistedState()
         let isFirstStart = serialization == nil
 
@@ -91,9 +96,7 @@ final class CKSyncEngineManager: @unchecked Sendable {
 
         // Don't create zone here — the engine fires .accountChange immediately,
         // which handles zone creation. Doing it here too causes a race.
-
-        // One-time recovery: re-upload all records after schema fix
-        scheduleFullUploadIfNeeded()
+        // The deferred recovery re-upload (if any) runs from `.didFetchChanges`.
     }
 
     func stop() {
@@ -192,15 +195,69 @@ final class CKSyncEngineManager: @unchecked Sendable {
 
     /// One-time recovery key. Bump the value to force a full re-upload on next launch.
     private static let fullUploadVersion = "sync.fullUploadVersion"
-    private static let currentFullUploadVersion = 4 // Bump to force re-upload
+    /// v5: heal the SetMeasurement conflict loop. Earlier builds uploaded records with no
+    /// change tag (CKRecord built fresh every time), so every update conflicted forever and
+    /// the pending queue jammed (~8.6k deep), starving completed-workout uploads. v5 resets
+    /// the engine's pending state + system-fields cache and re-fetches BEFORE re-uploading,
+    /// so the re-upload carries authoritative tags. See spec/services/cloudkit-sync.md.
+    private static let currentFullUploadVersion = 5
 
-    /// Check if a forced full re-upload is needed (schema fix recovery).
-    func scheduleFullUploadIfNeeded() {
+    /// Set during a recovery reset; the deferred local re-upload runs after the first fetch
+    /// completes (so `ck_record_metadata` is repopulated with real tags first).
+    private var pendingRecoveryUpload = false
+
+    /// One-time recovery: if the stored full-upload version is behind, reset the engine's
+    /// pending state + system-fields cache so the next sync does a clean fetch-then-upload.
+    /// MUST run before `loadPersistedState()` so the engine starts from a fresh (nil) state
+    /// and re-fetches every server record (repopulating authoritative change tags via
+    /// `mergeIncoming`). Local DB rows are never touched — no data loss. The version is NOT
+    /// bumped here; it's bumped only after the deferred upload is scheduled in
+    /// `.didFetchChanges`, so an app kill mid-recovery simply re-runs it (idempotent).
+    private func prepareRecoveryIfNeeded() {
         let current = UserDefaults.standard.integer(forKey: Self.fullUploadVersion)
         guard current < Self.currentFullUploadVersion else { return }
-        Logger.shared.info(.sync, "[sync-engine] Forcing full re-upload (version \(current) → \(Self.currentFullUploadVersion))")
+        Logger.shared.info(.sync, "[sync-engine] Recovery v\(Self.currentFullUploadVersion): resetting engine state + system-fields cache (was v\(current))")
+        CrashReporter.shared.addBreadcrumb("sync.recovery.v5.begin", category: .sync,
+                                           metadata: ["fromVersion": "\(current)"])
+        clearSyncEngineState()
+        mapper.metadataStore.clearAll()
+        pendingRecoveryUpload = true
+    }
+
+    /// Sync read of the recovery flag — safe to call from `async` contexts (the lock is
+    /// taken inside this synchronous function, not directly in the async scope).
+    private func isRecoveryUploadPending() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return pendingRecoveryUpload
+    }
+
+    /// After the first post-recovery fetch completes, re-upload local rows (now with correct
+    /// tags) and mark recovery done. Called from `.didFetchChanges`.
+    private func completeRecoveryUploadIfNeeded() {
+        lock.lock()
+        let shouldRun = pendingRecoveryUpload
+        pendingRecoveryUpload = false
+        lock.unlock()
+        guard shouldRun else { return }
+        Logger.shared.info(.sync, "[sync-engine] Recovery v\(Self.currentFullUploadVersion): fetch complete, scheduling clean re-upload of local records")
         scheduleFullUpload()
         UserDefaults.standard.set(Self.currentFullUploadVersion, forKey: Self.fullUploadVersion)
+        CrashReporter.shared.addBreadcrumb("sync.recovery.v5.end", category: .sync)
+    }
+
+    /// Delete the persisted CKSyncEngine state so the engine restarts with a fresh change
+    /// token (forcing a full re-fetch). Does not touch any data tables.
+    private func clearSyncEngineState() {
+        do {
+            let dbQueue = try DatabaseManager.shared.database()
+            try dbQueue.write { db in
+                try db.execute(sql: "DELETE FROM sync_engine_state")
+            }
+        } catch {
+            Logger.shared.error(.sync, "[sync-engine] Failed to clear sync engine state for recovery", error: error)
+            CrashReporter.shared.captureError(error, category: .sync, metadata: ["tag": "recovery-state-clear-failed"])
+        }
     }
 
     /// Classifies a CKError code from `privateCloudDatabase.save(zone)` as non-fatal.
@@ -235,6 +292,15 @@ final class CKSyncEngineManager: @unchecked Sendable {
                 }
                 CrashReporter.shared.captureError(error, category: .sync, metadata: metadata)
             }
+        }
+
+        // During a recovery reset, skip the immediate account-change upload — the deferred
+        // `.didFetchChanges` path re-uploads after tags are repopulated, avoiding a burst of
+        // (now self-healing, but noisy) conflicts in the recovery window.
+        // (Read via a sync helper: NSLock is unavailable directly in this async context.)
+        if isRecoveryUploadPending() {
+            Logger.shared.info(.sync, "[sync-engine] Deferring account-change full upload until post-recovery fetch")
+            return
         }
 
         scheduleFullUpload()
@@ -414,6 +480,7 @@ final class CKSyncEngineManager: @unchecked Sendable {
 
             do {
                 try mapper.deleteLocalRecord(id: recordId)
+                mapper.metadataStore.remove(recordId)
                 downloaded += 1
                 changedTypes.insert(recordType)
                 Logger.shared.debug(.sync, "[sync-engine] Deleted \(recordType)/\(recordId)")
@@ -444,9 +511,16 @@ final class CKSyncEngineManager: @unchecked Sendable {
     // MARK: - Sent Changes (delegated)
 
     private func handleSentChanges(_ event: CKSyncEngine.Event.SentRecordZoneChanges) {
-        // Log successful saves
+        // Log successful saves and persist their (now-advanced) system fields so the NEXT
+        // edit of each record uploads with the current change tag instead of conflicting.
         for saved in event.savedRecords {
+            mapper.metadataStore.save(saved)
             Logger.shared.info(.sync, "[sync-engine] Uploaded \(saved.recordType)/\(saved.recordID.recordName)")
+        }
+
+        // Drop metadata for confirmed deletes so a reused record name can't upload a dead tag.
+        for deletedID in event.deletedRecordIDs {
+            mapper.metadataStore.remove(deletedID.recordName)
         }
 
         let result = conflictResolver.handleSentChanges(event, removePendingType: { recordName in
@@ -610,6 +684,9 @@ extension CKSyncEngineManager: CKSyncEngineDelegate {
                     userInfo: ["changedRecordTypes": changedRecordTypes]
                 )
             }
+            // Now that the post-recovery fetch has repopulated authoritative change tags,
+            // re-upload local rows cleanly (one-time, gated by the recovery flag).
+            completeRecoveryUploadIfNeeded()
             endSyncActivity()
 
         case .willSendChanges:

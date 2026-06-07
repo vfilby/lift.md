@@ -11,6 +11,7 @@ enum MigrationGoldenShapes {
     /// Ordered alphabetically so it also serves as the expected set when compared against
     /// the live DB's `sqlite_master` table listing.
     static let expectedTablesAtHead: [String] = [
+        "ck_record_metadata",
         "gym_equipment",
         "gyms",
         "outbox_pending_queue",

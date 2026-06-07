@@ -2,12 +2,13 @@ import Foundation
 
 extension DatabaseSeeds {
 
-    // MARK: - Synthetic future (v19) — used to verify early-return behavior
+    // MARK: - Synthetic future (v20) — used to verify early-return behavior
     //
     // File is named V14SyntheticSeed.swift for historical reasons; the seed now
-    // represents a "from the future" DB at schema_version=19. DDL matches the
-    // current head (v18, which slimmed workout_inbox) so the shape is valid —
-    // only the version marker is ahead.
+    // represents a "from the future" DB at schema_version=20. DDL matches a recent
+    // head (pre-v19, so it omits ck_record_metadata) so the shape is valid — only the
+    // version marker is ahead. The runner must short-circuit on a future version and
+    // never inspect/mutate the schema.
 
     static let v17SyntheticDDL: String = #"""
     CREATE TABLE workout_templates (
@@ -135,6 +136,6 @@ extension DatabaseSeeds {
     INSERT INTO gyms (id, name, is_default, created_at, updated_at, deleted_at) VALUES
       ('\#(gymHome)', 'Home Gym', 1, '\#(ts1)', '\#(ts1)', NULL);
 
-    INSERT INTO schema_version (version) VALUES (19);
+    INSERT INTO schema_version (version) VALUES (20);
     """#
 }

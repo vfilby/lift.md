@@ -694,6 +694,24 @@ extension MigratorBridge {
                 """)
         }
 
+        // v19: per-record CloudKit system-fields (change tag) cache. CKSyncEngine
+        // persists only change tokens + pending record IDs, not the records
+        // themselves, so the app must store each record's `encodedSystemFields`
+        // and rehydrate the CKRecord from it on every subsequent upload —
+        // otherwise updates carry a nil change tag and CloudKit rejects them with
+        // `serverRecordChanged`, producing a permanent conflict loop.
+        // See spec/services/cloudkit-sync.md.
+        m.registerMigration("v19_ck_record_metadata") { db in
+            try db.execute(sql: """
+                CREATE TABLE ck_record_metadata (
+                    record_name   TEXT PRIMARY KEY NOT NULL,
+                    record_type   TEXT NOT NULL,
+                    system_fields BLOB NOT NULL,
+                    updated_at    TEXT NOT NULL
+                )
+                """)
+        }
+
         return m
     }
 

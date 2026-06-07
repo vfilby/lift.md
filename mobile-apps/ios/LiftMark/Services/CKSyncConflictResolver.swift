@@ -160,8 +160,11 @@ final class CKSyncConflictResolver: @unchecked Sendable {
 
     private func handleServerRecordChanged(recordName: String, recordType: String, error: CKError) {
         if let serverRecord = error.serverRecord {
-            // Always merge the server record first (to get latest changeTag into local state),
-            // then if local is newer, apply local values on top and queue for re-upload.
+            // Always merge the server record first. `mergeIncoming` persists the server's
+            // system fields (the fresh change tag) unconditionally before merging, so even a
+            // local-wins conflict leaves us holding the correct tag — our re-upload then
+            // succeeds and the conflict can't recur. If local is newer we additionally apply
+            // local values on top and cache for an immediate same-cycle re-upload.
             do {
                 _ = try mapper.mergeIncoming(serverRecord)
             } catch {
