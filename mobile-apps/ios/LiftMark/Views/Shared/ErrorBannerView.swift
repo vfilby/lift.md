@@ -26,7 +26,7 @@ struct ErrorBannerView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(Color.red.opacity(0.9))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusLG))
         .padding(.horizontal)
         .transition(.move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .combine)

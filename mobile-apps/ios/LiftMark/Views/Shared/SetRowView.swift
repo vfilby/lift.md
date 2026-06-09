@@ -58,7 +58,7 @@ struct SetRowView: View {
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(LiftMarkTheme.primary.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .clipShape(Capsule())
                     }
 
                     completedOrPendingContent
@@ -191,7 +191,7 @@ struct SetRowView: View {
                         .foregroundStyle(Color.blue.opacity(0.4)),
                     alignment: .leading
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusXS))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Plate loading: \(plateMathText)")
             }
@@ -210,7 +210,7 @@ struct SetRowView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(LiftMarkTheme.primary.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .clipShape(Capsule())
                         .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                 }
 
@@ -391,9 +391,9 @@ struct SetRowView: View {
                     .foregroundStyle(LiftMarkTheme.destructive)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(LiftMarkTheme.destructive.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM)
+                        Capsule()
                             .stroke(LiftMarkTheme.destructive.opacity(0.3), lineWidth: 1)
                     )
                 }
@@ -863,7 +863,7 @@ struct SetRowView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
             .background(color.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(Capsule())
     }
 
     // MARK: - Helpers

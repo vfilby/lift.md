@@ -172,7 +172,7 @@ struct InboxPreviewSheet: View {
                 .padding(.vertical, 2)
                 .foregroundStyle(.purple)
                 .background(Color.purple.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .clipShape(Capsule())
         case .section:
             Text((exercise.groupName ?? "Section").uppercased())
                 .font(.lmCaption2.bold())
@@ -180,7 +180,7 @@ struct InboxPreviewSheet: View {
                 .padding(.vertical, 2)
                 .foregroundStyle(LiftMarkTheme.primary)
                 .background(LiftMarkTheme.primary.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .clipShape(Capsule())
         case .none:
             EmptyView()
         }
@@ -273,6 +273,7 @@ struct InboxPreviewSheet: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
                 .accessibilityIdentifier("inbox-preview-discard")
 
                 Button {
@@ -283,6 +284,7 @@ struct InboxPreviewSheet: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
                 .accessibilityIdentifier("inbox-preview-add")
 
                 Button {
@@ -293,6 +295,7 @@ struct InboxPreviewSheet: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
                 .tint(.green)
                 .accessibilityIdentifier("inbox-preview-start")
             }

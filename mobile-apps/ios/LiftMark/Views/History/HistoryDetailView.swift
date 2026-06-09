@@ -363,7 +363,7 @@ struct HistoryDetailView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(Color.purple.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .clipShape(Capsule())
                     }
 
                     Text(exercise.exerciseName)

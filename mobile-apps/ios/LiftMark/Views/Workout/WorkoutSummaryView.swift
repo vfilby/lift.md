@@ -214,10 +214,10 @@ struct WorkoutSummaryView: View {
                         // Progress bar with orange fill
                         GeometryReader { geometry in
                             ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 4)
+                                RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusXS)
                                     .fill(LiftMarkTheme.tertiaryLabel.opacity(0.3))
                                     .frame(height: 8)
-                                RoundedRectangle(cornerRadius: 4)
+                                RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusXS)
                                     .fill(.orange)
                                     .frame(width: geometry.size.width * completionRate, height: 8)
                             }

@@ -378,16 +378,12 @@ struct WorkoutDetailView: View {
                 Label("Edit", systemImage: "pencil.line")
                     .font(.lmSubheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, LiftMarkTheme.spacingMD)
-                    .background(LiftMarkTheme.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM)
-                            .stroke(LiftMarkTheme.tertiaryLabel.opacity(0.3), lineWidth: 1)
-                    )
+                    .padding(.vertical, LiftMarkTheme.spacingSM)
             }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .tint(LiftMarkTheme.primary)
             .accessibilityIdentifier("edit-plan-markdown-button")
 
             Button {
@@ -396,16 +392,12 @@ struct WorkoutDetailView: View {
                 Label("Reprocess", systemImage: "arrow.clockwise")
                     .font(.lmSubheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, LiftMarkTheme.spacingMD)
-                    .background(LiftMarkTheme.secondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM)
-                            .stroke(LiftMarkTheme.tertiaryLabel.opacity(0.3), lineWidth: 1)
-                    )
+                    .padding(.vertical, LiftMarkTheme.spacingSM)
             }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .tint(LiftMarkTheme.primary)
             .accessibilityIdentifier("reprocess-plan-button")
         }
     }
@@ -426,7 +418,7 @@ struct WorkoutDetailView: View {
                 .frame(height: 50)
                 .background(LiftMarkTheme.primary)
                 .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+                .clipShape(Capsule())
         }
         .accessibilityIdentifier("start-workout-button")
         .padding(.horizontal)

@@ -80,10 +80,15 @@ enum LiftMarkTheme {
     static let spacingXL: CGFloat = 32
 
     // MARK: - Corner Radius
+    //
+    // The radius scale governs rectangular surfaces. Two element families are
+    // fully rounded instead and do NOT use these tokens: buttons and badges/chips
+    // are Capsule() / `.buttonBorderShape(.capsule)`. See spec/visual-spec.md.
 
-    static let cornerRadiusSM: CGFloat = 8
-    static let cornerRadiusMD: CGFloat = 12
-    static let cornerRadiusLG: CGFloat = 16
+    static let cornerRadiusXS: CGFloat = 4   // small chrome: side labels, set-number badge, progress bars, inline info boxes
+    static let cornerRadiusSM: CGFloat = 8   // input fields, small containers
+    static let cornerRadiusMD: CGFloat = 12  // cards (the standard card radius), modals
+    static let cornerRadiusLG: CGFloat = 16  // large surfaces / full-width banners (e.g. error banner)
 }
 
 // MARK: - Color Extension

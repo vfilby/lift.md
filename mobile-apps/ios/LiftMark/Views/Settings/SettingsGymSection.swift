@@ -19,7 +19,7 @@ struct SettingsGymSection: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(LiftMarkTheme.warning.opacity(0.12))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .clipShape(Capsule())
                     }
                 }
             }

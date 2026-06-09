@@ -90,7 +90,7 @@ struct ExerciseTrendView: View {
                             .padding(.vertical, LiftMarkTheme.spacingSM)
                             .background(LiftMarkTheme.primary)
                             .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
+                            .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
                     }
