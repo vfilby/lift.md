@@ -13,6 +13,7 @@ struct OnboardingView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 96, height: 96)
+                            // Intentional one-off: mirrors the app-icon squircle at 96pt (not tokenized).
                             .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
                             .accessibilityHidden(true)
 
@@ -39,7 +40,7 @@ struct OnboardingView: View {
                     DisclaimerText()
                         .padding()
                         .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
                         .padding(.horizontal)
 
                     // Accept button inside scroll content
@@ -52,6 +53,7 @@ struct OnboardingView: View {
                             .padding(.vertical, 14)
                     }
                     .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
                     .accessibilityIdentifier("onboarding-accept-button")
                     .padding(.horizontal)
                     .padding(.bottom, 32)

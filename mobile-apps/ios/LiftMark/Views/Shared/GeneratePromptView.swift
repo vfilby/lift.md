@@ -103,7 +103,7 @@ struct GeneratePromptView: View {
                 .frame(minHeight: 80)
                 .padding(LiftMarkTheme.spacingSM)
                 .background(LiftMarkTheme.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
                 .overlay(alignment: .topLeading) {
                     if intent.isEmpty {
                         Text("e.g. heavy push day, 45 minutes, focus on bench")
@@ -186,7 +186,7 @@ struct GeneratePromptView: View {
             }
             .frame(maxHeight: 360)
             .background(LiftMarkTheme.secondaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
             .accessibilityIdentifier("prompt-preview")
         } label: {
             Text("Prompt preview")

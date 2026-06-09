@@ -96,9 +96,23 @@ The app uses the iOS system font (SF Pro) throughout.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| SM | 8pt | Buttons, input fields, small cards |
-| MD | 12pt | Exercise cards, modals |
-| LG | 16pt | Large containers |
+| XS | 4pt | Small chrome: side/status labels, set-number badge, progress bars, inline info boxes |
+| SM | 8pt | Input fields, small containers |
+| MD | 12pt | Cards (plans, exercises, history rows, summaries), modals — the standard card radius |
+| LG | 16pt | Large surfaces / full-width banners (e.g. error banner) |
+
+All radii below SM (XS) come from a token; no raw literal radii live outside `Theme.swift`.
+
+### Shapes (Capsule)
+
+Two element families are fully rounded (Capsule / pill) rather than using the radius scale:
+
+| Family | Elements |
+|--------|----------|
+| **Buttons** | All primary/secondary filled buttons — Create Plan, Start Workout, Complete Set, Add Exercise, End Workout, Edit, Reprocess, Details, Add Drop, Paste, Build with AI, Import actions. System `.bordered`/`.borderedProminent` buttons use `.buttonBorderShape(.capsule)`; custom-background buttons clip to `Capsule()`. |
+| **Badges / chips** | Tag chips (`push`, `upper`), `SUPERSET`, `AMRAP`, `Drop`, `/side`, Left/Right side labels — all `Capsule()`. |
+
+**Intentional one-off radii** (not tokenized, by design): the 72×100pt phone-shaped theme thumbnails in the appearance picker (10pt, mimics a device), their 2pt skeleton content lines, and the 96pt onboarding app-icon mark (21pt continuous, mirrors the app-icon squircle).
 
 ## Component Dimensions
 

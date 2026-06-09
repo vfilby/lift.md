@@ -76,7 +76,7 @@ struct SettingsNavRow: View {
                 .foregroundStyle(section.iconColor)
                 .frame(width: 28, height: 28)
                 .background(section.iconColor.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusXS))
             Text(section.rawValue)
                 .font(.lmBody)
             Spacer()
@@ -84,7 +84,7 @@ struct SettingsNavRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(isSelected ? LiftMarkTheme.primary.opacity(0.12) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
         .contentShape(Rectangle())
     }
 }

@@ -47,6 +47,9 @@ private struct ThemeThumbnail: View {
         }
     }
 
+    // The 72×100pt theme thumbnail mimics a physical phone, and its 2pt skeleton
+    // content lines mimic text rows; both radii are intentional one-offs and are
+    // deliberately NOT mapped to the corner-radius tokens. See spec/visual-spec.md.
     var body: some View {
         ZStack {
             if theme == .auto {

@@ -109,6 +109,7 @@ struct MigratorBridgeStallView: View {
                             .padding(.vertical, LiftMarkTheme.spacingSM)
                     }
                     .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
                     .tint(LiftMarkTheme.primary)
                     .accessibilityIdentifier("migrator-stall-export-button")
                 }

@@ -45,7 +45,7 @@ struct HomeView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 34, height: 34)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM, style: .continuous))
                         .accessibilityHidden(true)
                     Image("BrandWordmark")
                         .resizable()

@@ -34,6 +34,7 @@ struct ImportView: View {
                                 .font(.lmSubheadline)
                         }
                         .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
                         .accessibilityIdentifier("button-paste")
 
                         Button {
@@ -43,6 +44,7 @@ struct ImportView: View {
                                 .font(.lmSubheadline)
                         }
                         .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
                         .accessibilityIdentifier("button-build-with-ai")
                     }
                     .padding(.horizontal)
