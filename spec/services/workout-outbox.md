@@ -217,6 +217,8 @@ When a flush cannot push because the device is effectively signed out — either
 
 This is the one normal-operation path (alongside the giveup-4xx case) that *does* emit a Sentry capture: a user who completed a workout that silently never synced is a real, actionable failure, not a transient network blip.
 
+**Self-recovering, but kept error-level (GH #265).** The capture fires on every flush *cycle* the workout stays stranded, even though the strand normally self-heals: a 401 never bumps `next_attempt_after` (see [OutboxPusherService](#outboxpusherservice) — only transient 5xx/429/network failures schedule a backoff), so the row stays immediately eligible and drains on the next successful auth (login, app foreground, or launch). GH #265 confirmed there is **no data-loss bug** on builds ≥ 147 and chose to keep the event at error level rather than downgrade it: the volume is low and the signal is genuinely data-at-risk (the workout is unsynced until re-auth, and permanently stuck if the user never signs back in). The recovery is proven end-to-end by `OutboxPusherServiceTests.testStrandedWorkoutDrainsAfterReLogin` — enqueue → 401 strand (queue preserved, alert fired once with `partialFailureCount: 1`) → `login()` → the recovery flush pushes the stranded row and the queue empties.
+
 ### Auth-sync banner (UI)
 
 An app-level banner is shown at the root (`ContentView`) when there are completed workouts that cannot sync because the device needs sign-in:

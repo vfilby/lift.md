@@ -239,6 +239,79 @@ final class OutboxPusherServiceTests: XCTestCase {
         XCTAssertTrue(logged, "Auth failure must write a device-log error entry")
     }
 
+    /// GH #265: the core unanswered question — after a 401 strands a completed
+    /// workout, does a successful re-login actually DRAIN it, or is the workout
+    /// lost? This proves the recovery half of GH #143 end-to-end: enqueue →
+    /// 401 strand (queue preserved, alert fired) → `login()` → the recovery
+    /// flush pushes the stranded row → queue empties. The prior tests only
+    /// proved the queue is *preserved* and that `onAuthenticated` *fires*;
+    /// neither proved the stranded row reaches the server after re-auth.
+    func testStrandedWorkoutDrainsAfterReLogin() async throws {
+        let sessionId = try makeCompletedSession()
+        try queue.enqueue(clientSessionId: sessionId)
+
+        var captures: [(LogCategory, [String: String])] = []
+        CrashReporter.captureErrorRecorder = { _, category, metadata in
+            captures.append((category, metadata))
+        }
+
+        // --- Strand: flush while signed out. ---
+        let auth = makeUnauthenticatedStore()
+        XCTAssertFalse(auth.isAuthenticated)
+        let pusher = OutboxPusherService(authStore: auth, apiClient: mockAPI, queue: queue)
+
+        await pusher.flushIfAuthenticated()
+
+        // The completed workout is stranded but PRESERVED, and the field
+        // signature from GH #265 fired exactly once: one capture, tagged
+        // `outbox_auth_failure`, `partialFailureCount: 1`. The API was never
+        // reached — nothing could push while signed out.
+        XCTAssertEqual(try queue.count(), 1, "Auth failure must not delete the queued completion")
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures.first?.1["tag"], "outbox_auth_failure")
+        XCTAssertEqual(captures.first?.1["partialFailureCount"], "1")
+        XCTAssertTrue(mockAPI.sentPaths.isEmpty, "Nothing should push while signed out")
+
+        // --- Recover: a successful login, then the recovery flush drains it. ---
+        // Sequence the two round-trips the recovery makes: the login itself,
+        // then the outbox push of the previously-stranded row.
+        mockAPI.responses = [
+            .success([                                  // POST /v1/auth/password/login
+                "access_jwt": Self.makeJWT(expSecondsFromNow: 3600),
+                "refresh_token": "lm_refresh_live",
+                "user": [
+                    "user_id": "user-test",
+                    "email": "a@b.co",
+                    "display_name": "Tester",
+                    "tier": "free",
+                ],
+            ]),
+            .success([                                  // POST /v1/workouts/outbox
+                "outbox_id": "ob-1",
+                "client_session_id": sessionId,
+                "dedup_hit": false,
+            ]),
+        ]
+
+        _ = try await auth.login(email: "a@b.co", password: "pw")
+        // `login()` fires `onAuthenticated`, which in `LiftMarkApp` drains the
+        // queue. Drive that same recovery flush deterministically here (the
+        // app's hook is a fire-and-forget Task; the existing
+        // AuthenticationStore test already proves it fires on login).
+        await pusher.flushIfAuthenticated()
+
+        // The stranded workout reached the server and its queue row is gone.
+        XCTAssertTrue(auth.isAuthenticated)
+        XCTAssertEqual(
+            mockAPI.sentPaths,
+            ["/v1/auth/password/login", "/v1/workouts/outbox"],
+            "Recovery must push the stranded row after login"
+        )
+        XCTAssertEqual(try queue.count(), 0, "Re-auth must drain the stranded completed workout")
+        XCTAssertEqual(pusher.pendingCount, 0)
+        XCTAssertNil(pusher.lastError, "A clean recovery flush clears lastError")
+    }
+
     /// Polls the SQLite log store for up to ~2s for a `.sync` error whose
     /// message contains `needle`. Logger writes are async (background queue).
     private func waitForSyncErrorLog(containing needle: String) async -> Bool {
