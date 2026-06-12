@@ -1,0 +1,126 @@
+name: "Beta — completed workout pushes to outbox"
+
+# Layer-3 e2e (GH #137): sign in, complete a workout in the UI (the proven
+# local completion flow from workout-flow.yaml), then force a sync. Under
+# --live-backend the session-complete notification enqueues + flushes to the
+# server outbox. The server-side round-trip is asserted by the CI workflow,
+# which queries GET /v1/workouts/outbox for "Detox Flow Workout" after this
+# scenario. See spec/services/ios-e2e-beta.md.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+    launchArgs:
+      - "--live-backend"
+      - "--api-base-url=${LMWF_E2E_BASE_URL}"
+      - "--enable-flag=workoutInbox"
+
+tests:
+  - name: "should sign in, complete a workout, and flush it to the outbox"
+    steps:
+      # --- Sign in ---
+      - action: tap
+        target: "tab-settings"
+      - action: waitFor
+        target: "account-sign-in"
+        timeout: 15000
+      - action: tap
+        target: "account-sign-in"
+      - action: waitFor
+        target: "login-email"
+        timeout: 15000
+      - action: replaceText
+        target: "login-email"
+        value: "${LMWF_E2E_EMAIL}"
+      - action: replaceText
+        target: "login-password"
+        value: "${LMWF_E2E_PASSWORD}"
+      - action: tap
+        target: "login-submit"
+      - action: waitFor
+        target: "account-identity"
+        timeout: 30000
+
+      # --- Import + complete a workout (proven flow from workout-flow.yaml) ---
+      - action: tap
+        target: "tab-home"
+      - action: delay
+        ms: 500
+      - action: waitFor
+        target: "button-import-workout"
+        timeout: 10000
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "input-markdown"
+        timeout: 10000
+      - action: replaceText
+        target: "input-markdown"
+        fixture: "detox-flow-workout.md"
+      - action: tap
+        target: "button-import"
+      - action: waitForText
+        text: "OK"
+        timeout: 10000
+      - action: tapText
+        text: "OK"
+      - action: waitForText
+        text: "Detox Flow Workout"
+        timeout: 10000
+      - action: tapText
+        text: "Detox Flow Workout"
+      - action: waitFor
+        target: "start-workout-button"
+        timeout: 10000
+      - action: tap
+        target: "start-workout-button"
+      - action: waitFor
+        target: "active-workout-screen"
+        timeout: 10000
+      - action: waitFor
+        target: "active-workout-finish-button"
+        timeout: 10000
+      - action: tap
+        target: "active-workout-finish-button"
+      # Finish dialog — "Finish Anyway" / "Log Anyway" / "Finish".
+      - action: tryCatch
+        try:
+          - action: waitForText
+            text: "Finish Anyway"
+            timeout: 3000
+          - action: tapText
+            text: "Finish Anyway"
+        catch:
+          - action: tryCatch
+            try:
+              - action: waitForText
+                text: "Log Anyway"
+                timeout: 3000
+              - action: tapText
+                text: "Log Anyway"
+            catch:
+              - action: tryCatch
+                try:
+                  - action: waitForText
+                    text: "Finish"
+                    timeout: 3000
+                  - action: tapText
+                    text: "Finish"
+                catch: []
+      - action: waitFor
+        target: "workout-summary-done-button"
+        timeout: 15000
+      - action: tap
+        target: "workout-summary-done-button"
+
+      # --- Force the outbox flush (CI asserts the server row) ---
+      - action: tap
+        target: "tab-settings"
+      - action: waitFor
+        target: "account-inbox-sync-now"
+        timeout: 15000
+      - action: tap
+        target: "account-inbox-sync-now"
+      # Give the push time to reach the server before the CI verify step.
+      - action: delay
+        ms: 4000

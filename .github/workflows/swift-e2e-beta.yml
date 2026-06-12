@@ -1,0 +1,225 @@
+name: '[iOS] E2E (beta)'
+
+# Layer-3 e2e (GH #137): drives the iOS UI against the DEPLOYED beta backend,
+# exercising the real client↔server contract (login, inbox poll, outbox push)
+# that the network-isolated PR/nightly suites never touch.
+#
+# Self-contained per run: seeds a fresh account via the beta-only
+# /v1/__test__/* backdoor (gated by lmwf-beta-e2e-test-secret; returns 404 when
+# LMWF_ENV=prod, so it can never run against prod), plants an inbox workout,
+# runs the BetaE2E test plan, verifies the outbox server-side, then deletes the
+# account. No persistent test account, no new secret.
+#
+# Targets https://beta.getlift.md. That host goes live with the beta DNS cutover
+# (GH #248); until then this workflow is red-on-run by design. The host is an
+# input/env var so it is a one-line flip if the cutover slips.
+# See spec/services/ios-e2e-beta.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Beta backend base URL'
+        required: false
+        default: 'https://beta.getlift.md'
+  schedule:
+    # Weekly, Monday 07:37 UTC. Odd minute — GitHub delays/drops cron at the top
+    # of the hour under load.
+    - cron: '37 7 * * 1'
+
+# A manual run during a scheduled one (or vice versa) shouldn't pile up macOS
+# jobs against the public-repo concurrency cap.
+concurrency:
+  group: ios-e2e-beta
+  cancel-in-progress: true
+
+jobs:
+  beta-e2e:
+    runs-on: macos-26
+    timeout-minutes: 75
+    # The `beta` environment scopes AWS_DEPLOY_ROLE_ARN to the beta account,
+    # exactly like validator-ci's deploy-beta / e2e-beta jobs.
+    environment:
+      name: beta
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-west-2
+      AWS_DEFAULT_REGION: us-west-2
+      LMWF_E2E_BASE_URL: ${{ github.event.inputs.base_url || 'https://beta.getlift.md' }}
+      # Fixed names the scenarios assert on (see e2e-spec/scenarios/beta-*.yaml).
+      INBOX_WORKOUT_NAME: 'Beta Inbox Probe'
+      OUTBOX_WORKOUT_NAME: 'Detox Flow Workout'
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Fetch E2E test secret from beta Secrets Manager
+        id: secret
+        run: |
+          set -euo pipefail
+          SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id lmwf-beta-e2e-test-secret \
+            --query SecretString --output text)
+          echo "::add-mask::$SECRET"
+          echo "secret=$SECRET" >> "$GITHUB_OUTPUT"
+
+      # Pre-warm the beta Lambda — the UI suite fires auth/poll/push calls that
+      # otherwise hit concurrent cold starts (mirrors validator-ci e2e-beta).
+      - name: Warm beta Lambda
+        run: |
+          set -uo pipefail
+          echo "==> warming $LMWF_E2E_BASE_URL"
+          for round in 1 2 3; do
+            for i in $(seq 1 8); do
+              curl -s -o /dev/null --max-time 30 "$LMWF_E2E_BASE_URL/version" &
+            done
+            wait
+          done
+          echo "==> warm-up complete"
+
+      - name: Seed beta account + plant inbox workout
+        id: seed
+        env:
+          TEST_SECRET: ${{ steps.secret.outputs.secret }}
+        run: |
+          set -euo pipefail
+          EMAIL="ios-e2e-$(date +%s)-${RANDOM}@e2e.getlift.md"
+          PASSWORD="Pw-$(openssl rand -hex 18)"
+          echo "::add-mask::$PASSWORD"
+
+          RESP=$(curl -fsS --retry 5 --retry-all-errors --retry-delay 2 \
+            -X POST "$LMWF_E2E_BASE_URL/v1/__test__/seed-user" \
+            -H 'content-type: application/json' \
+            -H "x-test-secret: $TEST_SECRET" \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"display_name\":\"iOS E2E\",\"tier\":\"trial\"}")
+          JWT=$(echo "$RESP" | jq -r '.session_jwt')
+          if [ -z "$JWT" ] || [ "$JWT" = "null" ]; then
+            echo "::error::seed-user returned no session_jwt: $RESP"; exit 1
+          fi
+          echo "::add-mask::$JWT"
+
+          # Plant a workout in the account's inbox for the beta-inbox scenario.
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 2 \
+            -X POST "$LMWF_E2E_BASE_URL/v1/workouts" \
+            -H 'content-type: application/json' \
+            -H "authorization: Bearer $JWT" \
+            -d "{\"lmwf\":\"# $INBOX_WORKOUT_NAME\n\n## Bench Press\n\n- 135 x 5\n\"}" > /dev/null
+
+          echo "email=$EMAIL" >> "$GITHUB_OUTPUT"
+          echo "password=$PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "==> seeded $EMAIL and planted inbox workout"
+
+      # ── Build the app (mirrors swift-nightly.yml) ──
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+          INSTALLED=$(xcodegen --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          MINIMUM="2.45.3"
+          if [ "$(printf '%s\n' "$MINIMUM" "$INSTALLED" | sort -V | head -n1)" != "$MINIMUM" ]; then
+            echo "::error::XcodeGen version too old: need >= $MINIMUM, got $INSTALLED"
+            exit 1
+          fi
+
+      - name: Write placeholder Sentry xcconfig
+        working-directory: mobile-apps/ios
+        run: |
+          cat > Config/Sentry.xcconfig <<'EOF'
+          // CI placeholder — no DSN. Real DSN written in deploy workflow.
+          SENTRY_DSN_REST =
+          EOF
+
+      - name: Generate SentryConfig (pre-xcodegen)
+        working-directory: mobile-apps/ios
+        run: ./scripts/gen-sentry-config.sh
+
+      - name: Generate Xcode project
+        working-directory: mobile-apps/ios
+        run: xcodegen generate
+
+      - name: Resolve Swift packages
+        working-directory: mobile-apps/ios
+        run: xcodebuild -resolvePackageDependencies -scheme LiftMark -project LiftMark.xcodeproj
+
+      # The test plan forwards these build settings into the runner process
+      # environment via $(...) expansion in BetaE2E.xctestplan; the runner
+      # interpolates them into the login scenario's replaceText values and the
+      # --api-base-url launch arg. A generous timeout scale absorbs
+      # CloudFront/Lambda edge latency on the live backend.
+      - name: Run BetaE2E plan against beta
+        working-directory: mobile-apps/ios
+        env:
+          E2E_EMAIL: ${{ steps.seed.outputs.email }}
+          E2E_PASSWORD: ${{ steps.seed.outputs.password }}
+        run: |
+          xcodebuild test \
+            -scheme LiftMark \
+            -project LiftMark.xcodeproj \
+            -testPlan BetaE2E \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' \
+            -resultBundlePath TestResults.xcresult \
+            LMWF_E2E_BASE_URL="$LMWF_E2E_BASE_URL" \
+            LMWF_E2E_EMAIL="$E2E_EMAIL" \
+            LMWF_E2E_PASSWORD="$E2E_PASSWORD" \
+            UITEST_TIMEOUT_SCALE=4 \
+            | xcpretty
+
+      # The app has no in-app outbox list view, so assert the outbox round-trip
+      # server-side. Re-login fresh (the seed JWT may have expired during the
+      # build) to fetch a token, then confirm the completed workout landed.
+      - name: Verify outbox round-trip (server-side)
+        if: success()
+        env:
+          EMAIL: ${{ steps.seed.outputs.email }}
+          PASSWORD: ${{ steps.seed.outputs.password }}
+        run: |
+          set -euo pipefail
+          LOGIN=$(curl -fsS --retry 5 --retry-all-errors --retry-delay 2 \
+            -X POST "$LMWF_E2E_BASE_URL/v1/auth/password/login" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
+          JWT=$(echo "$LOGIN" | jq -r '.access_jwt')
+          echo "::add-mask::$JWT"
+          ITEMS=$(curl -fsS --retry 5 --retry-all-errors --retry-delay 2 \
+            -H "authorization: Bearer $JWT" \
+            "$LMWF_E2E_BASE_URL/v1/workouts/outbox")
+          if ! echo "$ITEMS" | jq -e --arg n "$OUTBOX_WORKOUT_NAME" \
+              '.items[] | select(.session_name == $n)' > /dev/null; then
+            echo "::error::outbox did not receive '$OUTBOX_WORKOUT_NAME'"
+            echo "$ITEMS"
+            exit 1
+          fi
+          echo "==> outbox round-trip OK"
+
+      - name: Teardown beta test account
+        if: always() && steps.seed.outputs.email != ''
+        env:
+          TEST_SECRET: ${{ steps.secret.outputs.secret }}
+          EMAIL: ${{ steps.seed.outputs.email }}
+        run: |
+          curl -fsS -X POST "$LMWF_E2E_BASE_URL/v1/__test__/delete-user-by-email" \
+            -H 'content-type: application/json' \
+            -H "x-test-secret: $TEST_SECRET" \
+            -d "{\"email\":\"$EMAIL\"}" || echo "::warning::teardown failed; row may linger"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: beta-e2e-results
+          path: mobile-apps/ios/TestResults.xcresult
+          retention-days: 14
