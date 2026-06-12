@@ -57,10 +57,46 @@ export interface EnvConfig {
    * env's API from `localhost` during development. Beta only — never prod.
    */
   allowLocalDevOrigin?: boolean;
+  /**
+   * Phased beta.getlift.md cutover (GH #248 beta layer). Beta's canonical zone
+   * is a SUBDOMAIN delegated into the prod-account `getlift.md` zone, so —
+   * unlike prod's getlift.md (a foundation vanity zone) — it must be owned by
+   * the beta account's edge stack and reached via NS delegation, not the
+   * `canonicalWebDomain` vanity path. This flag drives the staged rollout:
+   *   - undefined  → no cutover; serve from `domainName` (beta.liftmark.app).
+   *   - 'zone-only'→ create the `beta.getlift.md` hosted zone in the beta
+   *                  account so its NS can be delegated from getlift.md, but
+   *                  keep serving from the apex (NO cert, NO canonical
+   *                  distribution). Avoids the DNS-validated-cert deadlock: a
+   *                  cert can't validate until the zone is delegated, and the
+   *                  zone's NS aren't known until it exists.
+   *   - 'live'     → issue the `beta.getlift.md` cert + serve canonically from
+   *                  it; `beta.liftmark.app` becomes 301/308 redirect + AASA.
+   * See spec/services/beta-getlift-cutover.md. Beta only.
+   */
+  betaCutoverPhase?: 'zone-only' | 'live';
 }
 
 /** Local Astro dev-server origin, allowed only when `allowLocalDevOrigin`. */
 export const LOCAL_DEV_ORIGIN = 'http://localhost:4321';
+
+/**
+ * Beta's canonical web domain — a subdomain delegated from the prod-account
+ * `getlift.md` zone into a beta-account hosted zone. Not a `VANITY_DOMAINS`
+ * entry (those are apex zones in the prod account); see `betaCutoverPhase`.
+ */
+export const BETA_CANONICAL_DOMAIN = 'beta.getlift.md';
+
+/**
+ * Name servers of the beta-account `beta.getlift.md` hosted zone, used by the
+ * prod stack to publish the NS delegation in the `getlift.md` zone. Hardcoded
+ * (cross-account HZ lookup needs extra IAM and the NS set is stable) and
+ * deliberately EMPTY until the 'zone-only' phase has been deployed: read the
+ * `LmwfBetaEdgeStack` → `BetaCanonicalZoneNameServers` output, paste the four
+ * values here, then deploy the prod stack to publish the delegation. While
+ * empty, no delegation record is emitted. See spec/services/beta-getlift-cutover.md.
+ */
+export const BETA_GETLIFT_MD_NS: readonly string[] = [];
 
 /**
  * Browser origins permitted to make credentialed requests to the env's HTTP
@@ -76,8 +112,23 @@ export const LOCAL_DEV_ORIGIN = 'http://localhost:4321';
  * host before any script runs — so they are intentionally NOT allowlisted
  * (GH #248).
  */
+/**
+ * The single web origin that actually serves the site + makes credentialed
+ * same-origin XHR for this env: the canonical web domain when set (prod:
+ * `getlift.md`), the beta canonical once the cutover is 'live'
+ * (`beta.getlift.md`), else the env apex. Drives the CORS allowlist and the
+ * Lambda's APP_BASE_URL (email link host). Legacy redirect-only hosts never
+ * originate an XHR — their pages 301/308 before any script runs — so they are
+ * intentionally excluded (GH #248).
+ */
+export function servingWebOrigin(env: EnvConfig): string {
+  if (env.canonicalWebDomain) return env.canonicalWebDomain;
+  if (env.betaCutoverPhase === 'live') return BETA_CANONICAL_DOMAIN;
+  return env.domainName;
+}
+
 export function corsAllowedOrigins(env: EnvConfig): string[] {
-  const servingOrigin = env.canonicalWebDomain ?? env.domainName;
+  const servingOrigin = servingWebOrigin(env);
   const origins = [`https://${servingOrigin}`];
   if (env.allowLocalDevOrigin) {
     origins.push(LOCAL_DEV_ORIGIN);

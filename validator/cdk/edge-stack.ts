@@ -7,6 +7,18 @@ import type { EnvConfig } from './config';
 
 export interface LmwfEdgeStackProps extends cdk.StackProps {
   envConfig: EnvConfig;
+  /**
+   * A canonical web domain this env OWNS (a delegated subdomain, e.g.
+   * `beta.getlift.md`) — distinct from `domainName`. When set, the edge stack
+   * creates its hosted zone in THIS account (the prod-account `getlift.md` zone
+   * delegates to it via NS). The zone is created so its name servers can be
+   * read for the delegation; the cert is created only when `issueCanonicalCert`
+   * is true (after delegation is live), avoiding a DNS-validation deadlock.
+   * See spec/services/beta-getlift-cutover.md.
+   */
+  selfManagedCanonicalDomain?: string;
+  /** Issue the cert for `selfManagedCanonicalDomain` (cutover phase 'live'). */
+  issueCanonicalCert?: boolean;
 }
 
 /**
@@ -22,6 +34,10 @@ export class LmwfEdgeStack extends cdk.Stack {
   public readonly certificate: acm.Certificate;
   /** ARN of the CLOUDFRONT-scoped web ACL — wired to the distribution's webAclId. */
   public readonly webAclArn: string;
+  /** Hosted zone for a self-managed canonical subdomain (e.g. beta.getlift.md), if any. */
+  public readonly canonicalZone?: route53.HostedZone;
+  /** Cert for the self-managed canonical subdomain — present only at cutover 'live'. */
+  public readonly canonicalCertificate?: acm.Certificate;
 
   constructor(scope: Construct, id: string, props: LmwfEdgeStackProps) {
     super(scope, id, props);
@@ -40,6 +56,32 @@ export class LmwfEdgeStack extends cdk.Stack {
       subjectAlternativeNames: [`*.${envConfig.domainName}`],
       validation: acm.CertificateValidation.fromDns(this.hostedZone),
     });
+
+    // Self-managed canonical subdomain (beta.getlift.md). The zone lives in
+    // this (beta) account; the prod `getlift.md` zone delegates to it by NS.
+    // Created zone-first so its NS can be read for that delegation — the cert
+    // (which DNS-validates against this zone) is deferred until delegation is
+    // live, or it would block the whole stack's CREATE forever.
+    if (props.selfManagedCanonicalDomain) {
+      const canonicalZone = new route53.HostedZone(this, 'CanonicalZone', {
+        zoneName: props.selfManagedCanonicalDomain,
+        comment: `LiftMark ${envConfig.name} canonical ${props.selfManagedCanonicalDomain} — created by CDK`,
+      });
+      this.canonicalZone = canonicalZone;
+
+      new cdk.CfnOutput(this, 'BetaCanonicalZoneNameServers', {
+        value: cdk.Fn.join(',', canonicalZone.hostedZoneNameServers ?? []),
+        description: `NS for ${props.selfManagedCanonicalDomain} — paste into BETA_GETLIFT_MD_NS so the prod getlift.md zone delegates here`,
+      });
+
+      if (props.issueCanonicalCert) {
+        this.canonicalCertificate = new acm.Certificate(this, 'CanonicalCert', {
+          domainName: props.selfManagedCanonicalDomain,
+          subjectAlternativeNames: [`*.${props.selfManagedCanonicalDomain}`],
+          validation: acm.CertificateValidation.fromDns(canonicalZone),
+        });
+      }
+    }
 
     // ── WAFv2 web ACL (CLOUDFRONT scope) ──
     // CLOUDFRONT-scoped web ACLs MUST be created in us-east-1, so this lives
