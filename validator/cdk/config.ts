@@ -96,7 +96,12 @@ export const BETA_CANONICAL_DOMAIN = 'beta.getlift.md';
  * values here, then deploy the prod stack to publish the delegation. While
  * empty, no delegation record is emitted. See spec/services/beta-getlift-cutover.md.
  */
-export const BETA_GETLIFT_MD_NS: readonly string[] = [];
+export const BETA_GETLIFT_MD_NS: readonly string[] = [
+  'ns-1316.awsdns-36.org.',
+  'ns-1984.awsdns-56.co.uk.',
+  'ns-681.awsdns-21.net.',
+  'ns-32.awsdns-04.com.',
+];
 
 /**
  * Browser origins permitted to make credentialed requests to the env's HTTP
