@@ -147,7 +147,7 @@ export const ENVS: Record<EnvName, EnvConfig> = {
     account: '323146837100',
     region: 'us-west-2',
     domainName: 'beta.liftmark.app',
-    betaCutoverPhase: 'zone-only', // GH #248 beta cutover — Phase 1: mint NS
+    betaCutoverPhase: 'live', // GH #248 beta cutover — Phase 3: serve beta.getlift.md
     stripeMode: 'test',
     // No sesMailFromSubdomain / dmarcPolicy: beta has an in-flight SES
     // production-access support case (177985180300561). Avoid changing
