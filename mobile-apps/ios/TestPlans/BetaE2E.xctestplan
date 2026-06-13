@@ -1,0 +1,51 @@
+{
+  "configurations" : [
+    {
+      "id" : "5A1F0003-0000-4000-8000-000000000003",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "UITEST_TIMEOUT_SCALE",
+        "value" : "$(UITEST_TIMEOUT_SCALE)"
+      },
+      {
+        "key" : "LMWF_E2E_BASE_URL",
+        "value" : "$(LMWF_E2E_BASE_URL)"
+      },
+      {
+        "key" : "LMWF_E2E_EMAIL",
+        "value" : "$(LMWF_E2E_EMAIL)"
+      },
+      {
+        "key" : "LMWF_E2E_PASSWORD",
+        "value" : "$(LMWF_E2E_PASSWORD)"
+      }
+    ],
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:LiftMark.xcodeproj",
+      "identifier" : "C85473E4DFB8A8D106D9E91F",
+      "name" : "LiftMark"
+    }
+  },
+  "testTargets" : [
+    {
+      "selectedTests" : [
+        "LiftMarkUITests\/testBetaLogin()",
+        "LiftMarkUITests\/testBetaInbox()",
+        "LiftMarkUITests\/testBetaOutbox()"
+      ],
+      "target" : {
+        "containerPath" : "container:LiftMark.xcodeproj",
+        "identifier" : "F8ECB0187FF2B538943D49D0",
+        "name" : "LiftMarkUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

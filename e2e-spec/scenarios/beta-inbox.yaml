@@ -1,0 +1,54 @@
+name: "Beta — inbox surfaces a pushed workout"
+
+# Layer-3 e2e (GH #137): the CI workflow pushes a workout named
+# "Beta Inbox Probe" to the seeded user's inbox via POST /v1/workouts BEFORE
+# this runs. The app logs in, forces an inbox poll, and the pushed workout must
+# surface in the Workouts-tab inbox. See spec/services/ios-e2e-beta.md.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+    launchArgs:
+      - "--live-backend"
+      - "--api-base-url=${LMWF_E2E_BASE_URL}"
+      - "--enable-flag=workoutInbox"
+
+tests:
+  - name: "should poll the inbox and show the API-pushed workout"
+    steps:
+      - action: tap
+        target: "tab-settings"
+      - action: waitFor
+        target: "account-sign-in"
+        timeout: 15000
+      - action: tap
+        target: "account-sign-in"
+      - action: waitFor
+        target: "login-email"
+        timeout: 15000
+      - action: replaceText
+        target: "login-email"
+        value: "${LMWF_E2E_EMAIL}"
+      - action: replaceText
+        target: "login-password"
+        value: "${LMWF_E2E_PASSWORD}"
+      - action: tap
+        target: "login-submit"
+      - action: waitFor
+        target: "account-identity"
+        timeout: 30000
+      # Force a poll (inbox + outbox) rather than waiting for a foreground tick.
+      - action: waitFor
+        target: "account-inbox-sync-now"
+        timeout: 10000
+      - action: tap
+        target: "account-inbox-sync-now"
+      # The pushed workout should land in the Workouts-tab inbox section.
+      - action: tap
+        target: "tab-workouts"
+      - action: waitFor
+        target: "inbox-section"
+        timeout: 30000
+      - action: waitForText
+        text: "Beta Inbox Probe"
+        timeout: 30000
