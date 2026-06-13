@@ -117,9 +117,28 @@ jobs:
             -H "authorization: Bearer $JWT" \
             -d "{\"lmwf\":\"# $INBOX_WORKOUT_NAME\n\n## Bench Press\n\n- 135 x 5\n\"}" > /dev/null
 
+          # Mint a real session (access + refresh) for the seeded scenarios
+          # (beta-inbox / beta-outbox start signed in via --seed-session, instead
+          # of driving the login UI). seed-user only returns an access JWT, so
+          # log in to get the refresh token too.
+          LOGIN=$(curl -fsS --retry 5 --retry-all-errors --retry-delay 2 \
+            -X POST "$LMWF_E2E_BASE_URL/v1/auth/password/login" \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
+          ACCESS=$(echo "$LOGIN" | jq -r '.access_jwt')
+          REFRESH=$(echo "$LOGIN" | jq -r '.refresh_token')
+          if [ -z "$ACCESS" ] || [ "$ACCESS" = "null" ] || [ -z "$REFRESH" ] || [ "$REFRESH" = "null" ]; then
+            echo "::error::login returned no tokens: $LOGIN"; exit 1
+          fi
+          echo "::add-mask::$ACCESS"
+          echo "::add-mask::$REFRESH"
+
           echo "email=$EMAIL" >> "$GITHUB_OUTPUT"
           echo "password=$PASSWORD" >> "$GITHUB_OUTPUT"
-          echo "==> seeded $EMAIL and planted inbox workout"
+          # `--seed-session` format is <accessJWT>:<refreshToken> (neither
+          # contains a colon, so the first colon is the separator).
+          echo "session=$ACCESS:$REFRESH" >> "$GITHUB_OUTPUT"
+          echo "==> seeded $EMAIL, planted inbox workout, minted session"
 
       # ── Build the app (mirrors swift-nightly.yml) ──
       - name: Select Xcode 26
@@ -165,6 +184,7 @@ jobs:
         env:
           E2E_EMAIL: ${{ steps.seed.outputs.email }}
           E2E_PASSWORD: ${{ steps.seed.outputs.password }}
+          E2E_SESSION: ${{ steps.seed.outputs.session }}
         run: |
           xcodebuild test \
             -scheme LiftMark \
@@ -175,6 +195,7 @@ jobs:
             LMWF_E2E_BASE_URL="$LMWF_E2E_BASE_URL" \
             LMWF_E2E_EMAIL="$E2E_EMAIL" \
             LMWF_E2E_PASSWORD="$E2E_PASSWORD" \
+            LMWF_E2E_SESSION="$E2E_SESSION" \
             UITEST_TIMEOUT_SCALE=4 \
             | xcpretty
 

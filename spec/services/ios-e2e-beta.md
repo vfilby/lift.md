@@ -59,6 +59,21 @@ Inbox polling additionally requires the `workoutInbox` feature flag, enabled per
 run with the existing `--enable-flag=workoutInbox` plumbing
 ([feature-flags.md](feature-flags.md)).
 
+### `--seed-session=<accessJWT>:<refreshToken>`
+
+Writes a token pair straight to the Keychain at launch (after the `--reset-data`
+wipe), so a scenario starts **already signed in** — combined with
+`--live-backend`, `restoreSession()` rehydrates it. This bypasses the login
+sheet, which is genuinely flaky to drive under XCUITest on iOS 26: the
+`SettingsAccountSection` sheet drops on the re-render that the first "Sign in"
+tap triggers (the documented `AuthSyncBannerView` instability), so it can take a
+second tap to stick. The data-round-trip scenarios (`beta-inbox`, `beta-outbox`)
+therefore seed the session and never touch the login UI; `beta-login` is the one
+scenario that exercises the real sheet (with a settle + re-tap). The access JWT
+is dot-delimited and the refresh token opaque — neither contains a colon — so the
+first colon is the separator. `--reset-data` also now clears the Keychain, so
+each scenario starts from a known auth state.
+
 ## Runner: environment-variable interpolation
 
 Credentials are minted fresh per CI run (see below), so they cannot be baked into
@@ -76,20 +91,30 @@ New scenarios live alongside the existing ones in `e2e-spec/scenarios/` and run
 **only** under the `BetaE2E` test plan (they are excluded from `Smoke` and
 `Full`, which have no backend).
 
-| Scenario | Exercises | Assertion surface |
-| --- | --- | --- |
-| `beta-login` | login → token persist → logout/revoke | `account-identity`, `account-sign-out`, `account-sign-in` (in-app) |
-| `beta-inbox` | API push → device poll → inbox surfaces | `inbox-section`, inbox row for the pushed workout (in-app) |
-| `beta-outbox` | complete workout in-app → outbox push | server-side `GET /v1/workouts/outbox` asserts in the workflow |
+| Scenario | Auth | Exercises | Assertion surface |
+| --- | --- | --- | --- |
+| `beta-login` | real login UI | login → token persist → logout/revoke | `account-identity`, `account-sign-out`, `account-sign-in` (in-app) |
+| `beta-inbox` | `--seed-session` | launch-time poll surfaces an API-pushed workout | `inbox-section` + the pushed workout name (in-app) |
+| `beta-outbox` | `--seed-session` | complete workout → relaunch flush → outbox push | server-side `GET /v1/workouts/outbox` asserts in the workflow |
 
-`beta-login` and `beta-inbox` assert entirely on in-app UI driven by real
-network calls. `beta-outbox` drives the app to complete a workout; the
-server-side round-trip is asserted by a workflow step that queries the outbox
-with the seeded user's token, because the app has no in-app outbox list view.
+Only `beta-login` drives the login sheet (with a settle + re-tap for its
+instability). `beta-inbox` / `beta-outbox` start signed in via `--seed-session`
+so they test the inbox/outbox contract without depending on the flaky login UI:
 
-All three launch with `--live-backend --api-base-url=$LMWF_E2E_BASE_URL
---enable-flag=workoutInbox` and rely on the runner's `waitFor*` polling for
-async settling (CloudFront/Lambda latency).
+- `beta-inbox` launches with `--enable-flag=workoutInbox`; `--live-backend`
+  polls the inbox at launch, and the pushed "Beta Inbox Probe" must surface in
+  the Workouts-tab inbox section.
+- `beta-outbox` deliberately omits `workoutInbox` (the outbox is
+  flag-independent, and the flag would render the home inbox card — the account's
+  inbox holds the probe — pushing `button-import-workout` below the fold). It
+  imports + completes a workout (the proven `workout-flow` steps), then
+  **relaunches** to fire `flushIfAuthenticated` (the completed session + queue
+  persist across the non-`--reset-data` relaunch). The server-side round-trip is
+  asserted by a workflow step querying the outbox, because the app has no in-app
+  outbox list view.
+
+All rely on the runner's `waitFor*` polling for async settling (CloudFront/Lambda
+latency).
 
 ## CI workflow — `[iOS] E2E (beta)`
 

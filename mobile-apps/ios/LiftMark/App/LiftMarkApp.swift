@@ -69,6 +69,14 @@ struct LiftMarkApp: App {
             TokenStore().clear()
         }
 
+        // Seed a session straight into the Keychain (runs AFTER --reset-data so
+        // it isn't wiped). Lets the Layer-3 beta e2e scenarios that exercise
+        // inbox/outbox start already signed in, bypassing the flaky login sheet
+        // — the login UI itself is covered by its own scenario. Combined with
+        // --live-backend, restoreSession() rehydrates these tokens on launch.
+        // See spec/services/ios-e2e-beta.md.
+        Self.seedSessionFromLaunchArgs()
+
         Self.seedMigratorFailureFromLaunchArgs()
 
         #if DEBUG
@@ -136,6 +144,24 @@ struct LiftMarkApp: App {
         // Prevent the real bridge from running and clearing the seeded failure.
         // This arg is strictly for UI-test harness use.
         MigratorBridge.isEnabled = false
+    }
+
+    /// Test seam: `--seed-session=<accessJWT>:<refreshToken>` writes the pair
+    /// straight to the Keychain so a UI test launches already authenticated,
+    /// skipping the login sheet. The access JWT is dot-delimited and the
+    /// refresh token is opaque — neither contains a colon — so the first colon
+    /// is the unambiguous separator. See spec/services/ios-e2e-beta.md (GH #137).
+    private static func seedSessionFromLaunchArgs() {
+        let prefix = "--seed-session="
+        guard let arg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }) else {
+            return
+        }
+        let value = String(arg.dropFirst(prefix.count))
+        guard let sep = value.firstIndex(of: ":") else { return }
+        let access = String(value[value.startIndex..<sep])
+        let refresh = String(value[value.index(after: sep)...])
+        guard !access.isEmpty, !refresh.isEmpty else { return }
+        TokenStore().saveTokens(access: access, refresh: refresh)
     }
 
     /// Parse --import-content launch argument at init time so the @State

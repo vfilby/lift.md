@@ -25,6 +25,10 @@
       {
         "key" : "LMWF_E2E_PASSWORD",
         "value" : "$(LMWF_E2E_PASSWORD)"
+      },
+      {
+        "key" : "LMWF_E2E_SESSION",
+        "value" : "$(LMWF_E2E_SESSION)"
       }
     ],
     "targetForVariableExpansion" : {

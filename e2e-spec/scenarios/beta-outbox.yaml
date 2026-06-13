@@ -1,11 +1,16 @@
 name: "Beta — completed workout pushes to outbox"
 
-# Layer-3 e2e (GH #137): sign in, complete a workout in the UI (the proven
-# local completion flow from workout-flow.yaml), then force a sync. Under
-# --live-backend the session-complete notification enqueues + flushes to the
-# server outbox. The server-side round-trip is asserted by the CI workflow,
-# which queries GET /v1/workouts/outbox for "Detox Flow Workout" after this
-# scenario. See spec/services/ios-e2e-beta.md.
+# Layer-3 e2e (GH #137). Starts signed in via ${LMWF_E2E_SESSION} (--seed-session,
+# bypassing the login sheet — covered by beta-login). Imports + completes a
+# workout; under --live-backend the session-complete notification enqueues it to
+# the outbox. A relaunch then fires flushIfAuthenticated (the completed session +
+# queue persist across the non-reset relaunch), pushing it to the server. The CI
+# workflow asserts the round-trip via GET /v1/workouts/outbox.
+#
+# Deliberately NO --enable-flag=workoutInbox: the outbox is flag-independent, and
+# the flag would render the home inbox card (the account's inbox holds the probe
+# workout) which pushes button-import-workout below the fold.
+# See spec/services/ios-e2e-beta.md.
 
 setupOnce:
   - action: launchApp
@@ -13,61 +18,11 @@ setupOnce:
     launchArgs:
       - "--live-backend"
       - "--api-base-url=${LMWF_E2E_BASE_URL}"
-      - "--enable-flag=workoutInbox"
+      - "--seed-session=${LMWF_E2E_SESSION}"
 
 tests:
-  - name: "should sign in, complete a workout, and flush it to the outbox"
+  - name: "should complete a workout and flush it to the outbox"
     steps:
-      # --- Sign in ---
-      - action: tap
-        target: "tab-settings"
-      - action: waitFor
-        target: "account-sign-in"
-        timeout: 15000
-      # The Settings → Sign-in sheet drops if it presents during launch
-      # settling: a store-load re-render tears the freshly-presented sheet down
-      # (the documented AuthSyncBannerView "needs a second tap" bug). Let the
-      # cold-launch re-renders settle first, then re-tap until login-email
-      # sticks. App-side fix (stable sheet presentation) tracked as follow-up.
-      - action: delay
-        ms: 3000
-      - action: tap
-        target: "account-sign-in"
-      - action: tryCatch
-        try:
-          - action: waitFor
-            target: "login-email"
-            timeout: 4000
-        catch:
-          - action: delay
-            ms: 1500
-          - action: tap
-            target: "account-sign-in"
-      - action: tryCatch
-        try:
-          - action: waitFor
-            target: "login-email"
-            timeout: 4000
-        catch:
-          - action: delay
-            ms: 1500
-          - action: tap
-            target: "account-sign-in"
-      - action: waitFor
-        target: "login-email"
-        timeout: 15000
-      - action: replaceText
-        target: "login-email"
-        value: "${LMWF_E2E_EMAIL}"
-      - action: replaceText
-        target: "login-password"
-        value: "${LMWF_E2E_PASSWORD}"
-      - action: tap
-        target: "login-submit"
-      - action: waitFor
-        target: "account-identity"
-        timeout: 30000
-
       # --- Import + complete a workout (proven flow from workout-flow.yaml) ---
       - action: tap
         target: "tab-home"
@@ -75,7 +30,7 @@ tests:
         ms: 500
       - action: waitFor
         target: "button-import-workout"
-        timeout: 10000
+        timeout: 15000
       - action: tap
         target: "button-import-workout"
       - action: waitFor
@@ -109,7 +64,6 @@ tests:
         timeout: 10000
       - action: tap
         target: "active-workout-finish-button"
-      # Finish dialog — "Finish Anyway" / "Log Anyway" / "Finish".
       - action: tryCatch
         try:
           - action: waitForText
@@ -140,14 +94,14 @@ tests:
       - action: tap
         target: "workout-summary-done-button"
 
-      # --- Force the outbox flush (CI asserts the server row) ---
-      - action: tap
-        target: "tab-settings"
-      - action: waitFor
-        target: "account-inbox-sync-now"
-        timeout: 15000
-      - action: tap
-        target: "account-inbox-sync-now"
-      # Give the push time to reach the server before the CI verify step.
+      # --- Relaunch to flush the outbox (onAppear flushIfAuthenticated under
+      # --live-backend); the completed session + queue persist (no --reset-data
+      # on a non-first launch). CI then asserts the server outbox. ---
+      - action: launchApp
+        newInstance: true
+        launchArgs:
+          - "--live-backend"
+          - "--api-base-url=${LMWF_E2E_BASE_URL}"
+          - "--seed-session=${LMWF_E2E_SESSION}"
       - action: delay
-        ms: 4000
+        ms: 6000
