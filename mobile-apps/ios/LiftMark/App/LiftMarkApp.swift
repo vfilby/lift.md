@@ -60,6 +60,13 @@ struct LiftMarkApp: App {
             if let bundleId = Bundle.main.bundleIdentifier {
                 UserDefaults.standard.removePersistentDomain(forName: bundleId)
             }
+            // Clear Keychain auth tokens too, so each scenario starts signed
+            // out. The DB + UserDefaults wipe above doesn't touch the Keychain,
+            // so under --live-backend a session from a previous scenario would
+            // auto-restore and the device would launch already signed in — the
+            // Layer-3 beta e2e needs a clean signed-out start per scenario
+            // (GH #137). No-op for scenarios that never sign in.
+            TokenStore().clear()
         }
 
         Self.seedMigratorFailureFromLaunchArgs()
