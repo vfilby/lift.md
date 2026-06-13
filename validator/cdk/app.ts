@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
-import { ENVS, VANITY_DOMAINS, envPrefix } from './config';
+import { BETA_CANONICAL_DOMAIN, ENVS, VANITY_DOMAINS, envPrefix } from './config';
 import { LmwfDnsFoundationStack } from './dns-stack';
 import { LmwfEdgeStack } from './edge-stack';
 import { LmwfValidatorStack } from './stack';
@@ -39,6 +39,12 @@ for (const cfg of Object.values(ENVS)) {
   const prefix = envPrefix(cfg);
   const tags = { ...commonTags, Env: cfg.name };
 
+  // Beta's canonical (beta.getlift.md) is a self-managed delegated subdomain,
+  // rolled out in phases (see EnvConfig.betaCutoverPhase). Its zone is created
+  // in the beta edge stack from the 'zone-only' phase on; its cert only at
+  // 'live'.
+  const selfCanonicalDomain = cfg.betaCutoverPhase ? BETA_CANONICAL_DOMAIN : undefined;
+
   // Edge stack — us-east-1 for CloudFront cert + hosted zone owner.
   const edge = new LmwfEdgeStack(app, `${prefix}EdgeStack`, {
     description: `LMWF ${cfg.name} edge (hosted zone + us-east-1 CloudFront cert)`,
@@ -46,14 +52,23 @@ for (const cfg of Object.values(ENVS)) {
     crossRegionReferences: true,
     tags,
     envConfig: cfg,
+    selfManagedCanonicalDomain: selfCanonicalDomain,
+    issueCanonicalCert: cfg.betaCutoverPhase === 'live',
   });
 
-  // When the env canonicalises to a vanity domain, hand the prod stack the
-  // canonical site's zone + cert plus each redirect domain's zone + cert.
-  const canonicalWeb =
-    cfg.canonicalWebDomain && cfg.canonicalWebDomain !== cfg.domainName
-      ? vanityWebDomain(cfg.canonicalWebDomain)
-      : undefined;
+  // The main stack gets a canonical {domain, zone, cert} when the env serves
+  // canonically: prod from a foundation vanity zone (getlift.md), beta from its
+  // own edge-owned zone once the cutover is 'live'.
+  let canonicalWeb;
+  if (cfg.canonicalWebDomain && cfg.canonicalWebDomain !== cfg.domainName) {
+    canonicalWeb = vanityWebDomain(cfg.canonicalWebDomain);
+  } else if (cfg.betaCutoverPhase === 'live' && edge.canonicalZone && edge.canonicalCertificate) {
+    canonicalWeb = {
+      domain: BETA_CANONICAL_DOMAIN,
+      zone: edge.canonicalZone,
+      certificate: edge.canonicalCertificate,
+    };
+  }
   const redirectWeb = canonicalWeb
     ? (cfg.redirectWebDomains ?? []).map(vanityWebDomain)
     : [];
