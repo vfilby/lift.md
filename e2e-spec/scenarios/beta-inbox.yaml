@@ -1,9 +1,12 @@
 name: "Beta — inbox surfaces a pushed workout"
 
-# Layer-3 e2e (GH #137): the CI workflow pushes a workout named
-# "Beta Inbox Probe" to the seeded user's inbox via POST /v1/workouts BEFORE
-# this runs. The app logs in, forces an inbox poll, and the pushed workout must
-# surface in the Workouts-tab inbox. See spec/services/ios-e2e-beta.md.
+# Layer-3 e2e (GH #137). The CI workflow pushes a workout named
+# "Beta Inbox Probe" to the seeded account's inbox via POST /v1/workouts before
+# this runs, and provides a ready session via ${LMWF_E2E_SESSION}. The app
+# starts signed in (--seed-session) — bypassing the flaky login sheet, which is
+# covered separately by beta-login — and under --live-backend polls the inbox at
+# launch. The pushed workout must surface in the Workouts-tab inbox.
+# See spec/services/ios-e2e-beta.md.
 
 setupOnce:
   - action: launchApp
@@ -12,67 +15,15 @@ setupOnce:
       - "--live-backend"
       - "--api-base-url=${LMWF_E2E_BASE_URL}"
       - "--enable-flag=workoutInbox"
+      - "--seed-session=${LMWF_E2E_SESSION}"
 
 tests:
-  - name: "should poll the inbox and show the API-pushed workout"
+  - name: "should surface the API-pushed workout in the inbox"
     steps:
       - action: tap
-        target: "tab-settings"
-      - action: waitFor
-        target: "account-sign-in"
-        timeout: 15000
-      # The Settings → Sign-in sheet drops if it presents during launch
-      # settling: a store-load re-render tears the freshly-presented sheet down
-      # (the documented AuthSyncBannerView "needs a second tap" bug). Let the
-      # cold-launch re-renders settle first, then re-tap until login-email
-      # sticks. App-side fix (stable sheet presentation) tracked as follow-up.
-      - action: delay
-        ms: 3000
-      - action: tap
-        target: "account-sign-in"
-      - action: tryCatch
-        try:
-          - action: waitFor
-            target: "login-email"
-            timeout: 4000
-        catch:
-          - action: delay
-            ms: 1500
-          - action: tap
-            target: "account-sign-in"
-      - action: tryCatch
-        try:
-          - action: waitFor
-            target: "login-email"
-            timeout: 4000
-        catch:
-          - action: delay
-            ms: 1500
-          - action: tap
-            target: "account-sign-in"
-      - action: waitFor
-        target: "login-email"
-        timeout: 15000
-      - action: replaceText
-        target: "login-email"
-        value: "${LMWF_E2E_EMAIL}"
-      - action: replaceText
-        target: "login-password"
-        value: "${LMWF_E2E_PASSWORD}"
-      - action: tap
-        target: "login-submit"
-      - action: waitFor
-        target: "account-identity"
-        timeout: 30000
-      # Force a poll (inbox + outbox) rather than waiting for a foreground tick.
-      - action: waitFor
-        target: "account-inbox-sync-now"
-        timeout: 10000
-      - action: tap
-        target: "account-inbox-sync-now"
-      # The pushed workout should land in the Workouts-tab inbox section.
-      - action: tap
         target: "tab-workouts"
+      # The launch-time inbox poll populates the section once it lands; the
+      # generous waits absorb CloudFront/Lambda latency.
       - action: waitFor
         target: "inbox-section"
         timeout: 30000
