@@ -114,4 +114,25 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "screenshots")
     }
 
+    // MARK: - Beta backend e2e (Layer 3, GH #137)
+    //
+    // These exercise the real client↔server contract against the deployed beta
+    // backend and run ONLY under the BetaE2E test plan — NOT Smoke or Full,
+    // which have no backend. They expect LMWF_E2E_BASE_URL / LMWF_E2E_EMAIL /
+    // LMWF_E2E_PASSWORD in the environment (forwarded by the test plan from the
+    // CI workflow). Run locally with those set + the beta host reachable.
+    // See spec/services/ios-e2e-beta.md.
+
+    func testBetaLogin() throws {
+        runner.runScenario(named: "beta-login")
+    }
+
+    func testBetaInbox() throws {
+        runner.runScenario(named: "beta-inbox")
+    }
+
+    func testBetaOutbox() throws {
+        runner.runScenario(named: "beta-outbox")
+    }
+
 }

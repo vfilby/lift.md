@@ -237,6 +237,32 @@ class ActionAdapter {
         return try String(contentsOfFile: path, encoding: .utf8)
     }
 
+    /// Substitute `${VAR}` tokens with values from the test process
+    /// environment. Credentials for the Layer-3 beta e2e are minted fresh per
+    /// CI run, so static YAML references them as `${LMWF_E2E_EMAIL}` etc. An
+    /// unset variable resolves to the empty string.
+    /// See spec/services/ios-e2e-beta.md.
+    func interpolateEnv(_ value: String) -> String {
+        guard value.contains("${") else { return value }
+        let env = ProcessInfo.processInfo.environment
+        var result = ""
+        var rest = Substring(value)
+        while let open = rest.range(of: "${") {
+            result += String(rest[rest.startIndex..<open.lowerBound])
+            let afterOpen = rest[open.upperBound...]
+            guard let close = afterOpen.range(of: "}") else {
+                // Unterminated token — emit the remainder verbatim.
+                result += String(rest[open.lowerBound...])
+                return result
+            }
+            let name = String(afterOpen[afterOpen.startIndex..<close.lowerBound])
+            result += env[name] ?? ""
+            rest = afterOpen[close.upperBound...]
+        }
+        result += String(rest)
+        return result
+    }
+
     // MARK: - Action Implementations
 
     private func executeTap(_ action: TestAction) throws {
@@ -389,12 +415,13 @@ class ActionAdapter {
             return
         }
 
-        // Resolve text value — from fixture or direct value
+        // Resolve text value — from fixture or direct value. Direct values
+        // support ${ENV_VAR} interpolation (e.g. per-run beta credentials).
         let textValue: String
         if let fixture = action.fixture {
             textValue = try readFixture(fixture)
         } else if let value = action.value {
-            textValue = value
+            textValue = interpolateEnv(value)
         } else {
             throw ActionError.missingParam("value or fixture", "replaceText")
         }
@@ -417,7 +444,7 @@ class ActionAdapter {
             return
         }
         el.tap()
-        el.typeText(value)
+        el.typeText(interpolateEnv(value))
     }
 
     private func executeWaitFor(_ action: TestAction) throws {
@@ -593,11 +620,13 @@ class ActionAdapter {
             isFirstLaunch = false
         }
 
-        // Apply additional launch arguments from the YAML action
+        // Apply additional launch arguments from the YAML action. Values
+        // support ${ENV_VAR} interpolation so e.g. the beta base URL can be
+        // injected per CI run (--api-base-url=${LMWF_E2E_BASE_URL}).
         if case .array(let yamlArgs) = action.launchArgs {
             for arg in yamlArgs {
                 if case .string(let value) = arg {
-                    args.append(value)
+                    args.append(interpolateEnv(value))
                 }
             }
         }

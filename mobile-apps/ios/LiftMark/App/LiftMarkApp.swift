@@ -163,10 +163,16 @@ struct LiftMarkApp: App {
                     gymStore.loadGyms()
                     handleLaunchArguments()
                     LiveActivityService.shared.cleanupOrphanedActivities()
+                    // CloudKit sync is ALWAYS off under tests (even with
+                    // --live-backend) — a beta UI run must never write to a
+                    // tester's iCloud. The network paths below run when not
+                    // testing, or under the --live-backend Layer-3 gate.
                     if !Self.isRunningTests {
                         Task {
                             await CKSyncEngineManager.shared.start()
                         }
+                    }
+                    if Self.networkPathsEnabled {
                         // Wait for launch session restoration to settle before
                         // the first authed calls, so an expired access token is
                         // refreshed first rather than tripping a premature 401
@@ -188,6 +194,8 @@ struct LiftMarkApp: App {
                             Task {
                                 await CKSyncEngineManager.shared.start()
                             }
+                        }
+                        if Self.networkPathsEnabled {
                             Task { @MainActor in
                                 await authStore.restoreSession()
                                 await inboxPoller.pollIfAuthenticated()
@@ -204,7 +212,7 @@ struct LiftMarkApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: SessionStore.sessionDidComplete)) { note in
                     guard
                         let sessionId = note.userInfo?["sessionId"] as? String,
-                        !Self.isRunningTests
+                        Self.networkPathsEnabled
                     else { return }
                     outboxPusher.enqueue(clientSessionId: sessionId)
                 }
@@ -241,6 +249,17 @@ struct LiftMarkApp: App {
     }
 
     private static let isRunningTests = NSClassFromString("XCTestCase") != nil
+
+    /// Layer-3 e2e gate (GH #137). UI tests are network-isolated by default;
+    /// `--live-backend` re-enables the auth/inbox/outbox network paths so a
+    /// scenario can exercise the real client↔server contract against beta.
+    /// CloudKit sync is deliberately NOT covered by this flag — it stays off
+    /// under tests regardless. See spec/services/ios-e2e-beta.md.
+    private static let isLiveBackend = ProcessInfo.processInfo.arguments.contains("--live-backend")
+
+    /// True when the auth/inbox/outbox network startup paths should run: always
+    /// outside tests, and under tests only when `--live-backend` is passed.
+    private static var networkPathsEnabled: Bool { !isRunningTests || isLiveBackend }
 
     private func handleLaunchArguments() {
         let args = ProcessInfo.processInfo.arguments
