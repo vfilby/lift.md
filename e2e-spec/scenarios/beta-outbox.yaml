@@ -24,18 +24,33 @@ tests:
       - action: waitFor
         target: "account-sign-in"
         timeout: 15000
+      # The Settings → Sign-in sheet drops if it presents during launch
+      # settling: a store-load re-render tears the freshly-presented sheet down
+      # (the documented AuthSyncBannerView "needs a second tap" bug). Let the
+      # cold-launch re-renders settle first, then re-tap until login-email
+      # sticks. App-side fix (stable sheet presentation) tracked as follow-up.
+      - action: delay
+        ms: 3000
       - action: tap
         target: "account-sign-in"
-      # The Settings → Sign-in sheet can drop on the first tap (a SwiftUI
-      # re-render during launch settling tears the freshly-presented sheet
-      # down — the documented AuthSyncBannerView "needs a second tap" bug).
-      # Re-tap if login-email didn't appear. App-side fix tracked as follow-up.
       - action: tryCatch
         try:
           - action: waitFor
             target: "login-email"
-            timeout: 5000
+            timeout: 4000
         catch:
+          - action: delay
+            ms: 1500
+          - action: tap
+            target: "account-sign-in"
+      - action: tryCatch
+        try:
+          - action: waitFor
+            target: "login-email"
+            timeout: 4000
+        catch:
+          - action: delay
+            ms: 1500
           - action: tap
             target: "account-sign-in"
       - action: waitFor
