@@ -18,7 +18,7 @@ import * as ses from 'aws-cdk-lib/aws-ses';
 import { Construct } from 'constructs';
 import * as path from 'path';
 import type { EnvConfig } from './config';
-import { corsAllowedOrigins } from './config';
+import { BETA_CANONICAL_DOMAIN, BETA_GETLIFT_MD_NS, corsAllowedOrigins, servingWebOrigin } from './config';
 import { redirectFnCode } from './redirect-fn';
 import { TABLES, type AttributeType, type TableSchema } from '../src/infra/tables';
 
@@ -264,6 +264,12 @@ export class LmwfValidatorStack extends cdk.Stack {
         SMTP_HOST: `email-smtp.${this.region}.amazonaws.com`,
         SMTP_PORT: '587',
         SMTP_FROM: `noreply@${env.domainName}`,
+        // Host for user-facing links in emails (verify, password reset). Tracks
+        // the env's serving origin so it follows the beta.getlift.md cutover
+        // automatically — beta.liftmark.app while undefined/zone-only,
+        // beta.getlift.md once 'live'. password.ts falls back to its LMWF_ENV
+        // hardcode if unset. See spec/services/beta-getlift-cutover.md.
+        APP_BASE_URL: `https://${servingWebOrigin(env)}`,
         SMTP_USER: cdk.SecretValue.secretsManager(smtpSecret.secretArn, {
           jsonField: 'user',
         }).unsafeUnwrap(),
@@ -746,6 +752,22 @@ function handler(event) {
         ],
         ttl: cdk.Duration.minutes(5),
       });
+
+      // NS delegation for beta.getlift.md → the beta-account canonical HZ
+      // (created by LmwfBetaEdgeStack). Published in the getlift.md zone
+      // (prod's canonicalWeb.zone). Same hardcoded-NS rationale as
+      // beta.liftmark.app above; emitted only once BETA_GETLIFT_MD_NS is
+      // populated from the beta edge stack's BetaCanonicalZoneNameServers
+      // output (the 'zone-only' phase). See spec/services/beta-getlift-cutover.md.
+      if (canonicalWeb && BETA_GETLIFT_MD_NS.length > 0) {
+        new route53.NsRecord(this, 'BetaGetliftMdDelegation', {
+          zone: canonicalWeb.zone,
+          // Leftmost label of beta.getlift.md, relative to the getlift.md zone.
+          recordName: BETA_CANONICAL_DOMAIN.split('.')[0],
+          values: [...BETA_GETLIFT_MD_NS],
+          ttl: cdk.Duration.minutes(5),
+        });
+      }
 
       // workoutformat.liftmark.app → same CloudFront as the apex. The legacy
       // subdomain becomes a permanent alias for the new prod stack; old prod
