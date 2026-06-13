@@ -107,6 +107,12 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "ai-prompt-settings")
     }
 
+    /// GH #279: first Settings → Account → Sign in tap must present the login
+    /// sheet and keep it presented (no second tap).
+    func testSettingsAccountLogin() throws {
+        runner.runScenario(named: "settings-account-login")
+    }
+
     /// Capture App Store screenshots. Invoke via `make screenshots` to land
     /// the PNGs under mobile-apps/ios/Screenshots/. Adds ~30s to a full
     /// `make test` run since the screenshot scenario is part of the suite.
