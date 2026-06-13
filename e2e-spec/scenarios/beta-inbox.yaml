@@ -3,9 +3,8 @@ name: "Beta — inbox surfaces a pushed workout"
 # Layer-3 e2e (GH #137). The CI workflow pushes a workout named
 # "Beta Inbox Probe" to the seeded account's inbox via POST /v1/workouts before
 # this runs, and provides a ready session via ${LMWF_E2E_SESSION}. The app
-# starts signed in (--seed-session) — bypassing the flaky login sheet, which is
-# covered separately by beta-login — and under --live-backend polls the inbox at
-# launch. The pushed workout must surface in the Workouts-tab inbox.
+# starts signed in (--seed-session) and, under --live-backend, polls the inbox
+# at launch. The pushed workout must surface in the Workouts-tab inbox.
 # See spec/services/ios-e2e-beta.md.
 
 setupOnce:
@@ -22,11 +21,31 @@ tests:
     steps:
       - action: tap
         target: "tab-workouts"
-      # The launch-time inbox poll populates the section once it lands; the
-      # generous waits absorb CloudFront/Lambda latency.
       - action: waitFor
         target: "inbox-section"
         timeout: 30000
+      # The launch-time poll usually populates the inbox, but it can hit a
+      # transient CloudFront/Lambda edge 403; if the probe hasn't landed, a
+      # relaunch re-polls (the seeded session persists across the non-reset
+      # relaunch). Then assert for real.
+      - action: tryCatch
+        try:
+          - action: waitForText
+            text: "Beta Inbox Probe"
+            timeout: 25000
+        catch:
+          - action: launchApp
+            newInstance: true
+            launchArgs:
+              - "--live-backend"
+              - "--api-base-url=${LMWF_E2E_BASE_URL}"
+              - "--enable-flag=workoutInbox"
+              - "--seed-session=${LMWF_E2E_SESSION}"
+          - action: tap
+            target: "tab-workouts"
+          - action: waitFor
+            target: "inbox-section"
+            timeout: 30000
       - action: waitForText
         text: "Beta Inbox Probe"
-        timeout: 30000
+        timeout: 40000
