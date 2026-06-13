@@ -6,6 +6,12 @@ struct SettingsView: View {
     @State private var selectedSection: SettingsSection? = .general
     @State private var healthKitAuthStatus: HealthKitAuthStatus = .notDetermined
     @State private var liveActivitiesEnabled = false
+    /// Hosts the `LoginView` sheet on this stably-mounted view rather than on
+    /// `SettingsAccountSection`'s transparent, auth-swapping `Group`, so the
+    /// first "Sign in" tap presents reliably instead of being dropped by a
+    /// launch-settling re-render (GH #279). `SettingsAccountSection` receives
+    /// this as a binding and flips it from its Sign in button.
+    @State private var showingLogin = false
 
     var body: some View {
         Group {
@@ -41,6 +47,12 @@ struct SettingsView: View {
         }
         .accessibilityIdentifier("settings-screen")
         .navigationTitle("Settings")
+        // Hosted here — not on SettingsAccountSection — so the presenter is
+        // stably mounted across the auth-state re-renders that otherwise drop
+        // the first-tap presentation (GH #279).
+        .sheet(isPresented: $showingLogin) {
+            LoginView()
+        }
         #if os(iOS)
         .scrollDismissesKeyboard(.interactively)
         #endif
@@ -77,7 +89,7 @@ struct SettingsView: View {
                 // shift this gate to an `anyAuthFeatureEnabled` predicate.
                 if featureFlags.isEnabled(.workoutInbox) {
                     Section("Account") {
-                        SettingsAccountSection()
+                        SettingsAccountSection(showingLogin: $showingLogin)
                     }
                 }
                 Section("Appearance") {
@@ -167,7 +179,7 @@ struct SettingsView: View {
         List {
             if featureFlags.isEnabled(.workoutInbox) {
                 Section("Account") {
-                    SettingsAccountSection()
+                    SettingsAccountSection(showingLogin: $showingLogin)
                 }
             }
 

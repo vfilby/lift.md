@@ -7,12 +7,24 @@ import SwiftUI
 /// Auth is optional — when not signed in, the section explains *why*
 /// you'd sign in (push from Claude Code / ChatGPT) and reassures that
 /// the app works offline without it.
+///
+/// The `LoginView` sheet is deliberately **not** presented from this view.
+/// This body is a transparent `Group` that swaps between the signed-in and
+/// signed-out branches, so a `.sheet` hung off it attaches to whichever
+/// branch is currently rendered; a re-render during launch settling tears
+/// that branch down mid-presentation and drops the sheet, forcing a second
+/// tap (GH #279 — same instability documented in `AuthSyncBannerView`). The
+/// presenter therefore lives in `SettingsView`, whose settings-loaded body
+/// is stably mounted across auth re-renders, and the Sign in button flips
+/// the `showingLogin` binding it owns. See `spec/screens/settings.md`.
 struct SettingsAccountSection: View {
     @Environment(AuthenticationStore.self) private var authStore
     @Environment(InboxPollerService.self) private var inboxPoller
     @Environment(OutboxPusherService.self) private var outboxPusher
     @Environment(FeatureFlagsStore.self) private var featureFlags
-    @State private var showingLogin = false
+    /// Owned by `SettingsView` so the `.sheet` is hosted on a stably-mounted
+    /// view (GH #279). Flipped `true` by the Sign in button below.
+    @Binding var showingLogin: Bool
     @State private var isSigningOut = false
 
     var body: some View {
@@ -25,9 +37,6 @@ struct SettingsAccountSection: View {
             } else {
                 signedOutContent
             }
-        }
-        .sheet(isPresented: $showingLogin) {
-            LoginView()
         }
     }
 
