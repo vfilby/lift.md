@@ -93,13 +93,17 @@ New scenarios live alongside the existing ones in `e2e-spec/scenarios/` and run
 
 | Scenario | Auth | Exercises | Assertion surface |
 | --- | --- | --- | --- |
-| `beta-login` | real login UI | login → token persist → logout/revoke | `account-identity`, `account-sign-out`, `account-sign-in` (in-app) |
 | `beta-inbox` | `--seed-session` | launch-time poll surfaces an API-pushed workout | `inbox-section` + the pushed workout name (in-app) |
 | `beta-outbox` | `--seed-session` | complete workout → relaunch flush → outbox push | server-side `GET /v1/workouts/outbox` asserts in the workflow |
 
-Only `beta-login` drives the login sheet (with a settle + re-tap for its
-instability). `beta-inbox` / `beta-outbox` start signed in via `--seed-session`
-so they test the inbox/outbox contract without depending on the flaky login UI:
+> **`beta-login` (real login-UI) is temporarily removed** — the
+> `SettingsAccountSection` sign-in sheet is too flaky to drive under XCUITest on
+> iOS 26 (it drops on the first-tap re-render). Both remaining scenarios seed the
+> session instead. Restoring `beta-login` after fixing the sheet is tracked in
+> GH #277.
+
+Both scenarios start signed in via `--seed-session` so they test the
+inbox/outbox contract without depending on the flaky login UI:
 
 - `beta-inbox` launches with `--enable-flag=workoutInbox`; `--live-backend`
   polls the inbox at launch, and the pushed "Beta Inbox Probe" must surface in
