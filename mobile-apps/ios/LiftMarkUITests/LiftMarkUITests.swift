@@ -129,11 +129,15 @@ final class LiftMarkUITests: XCTestCase {
     // CI workflow). Run locally with those set + the beta host reachable.
     // See spec/services/ios-e2e-beta.md.
 
-    // testBetaLogin (real login-UI sheet) is temporarily removed: the
-    // SettingsAccountSection sign-in sheet is too flaky to drive reliably under
-    // XCUITest on iOS 26 (it drops on the first-tap re-render). The data
-    // round-trips below seed the session instead. Tracked for restoration in a
-    // follow-up issue (see spec/services/ios-e2e-beta.md).
+    /// Real login-UI round-trip against beta (GH #137 / restored per GH #277).
+    /// Starts from a clean signed-out state via `--reset-data` (order-
+    /// independent) and drives Settings → Sign in → account-identity →
+    /// sign-out/revoke. The first-tap sheet-drop bug it used to work around is
+    /// fixed app-side (GH #279, stable-host sheet presentation), so the scenario
+    /// taps sign-in once with no settle/re-tap workaround.
+    func testBetaLogin() throws {
+        runner.runScenario(named: "beta-login")
+    }
 
     func testBetaInbox() throws {
         runner.runScenario(named: "beta-inbox")

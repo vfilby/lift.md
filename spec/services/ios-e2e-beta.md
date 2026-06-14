@@ -63,13 +63,12 @@ run with the existing `--enable-flag=workoutInbox` plumbing
 
 Writes a token pair straight to the Keychain at launch (after the `--reset-data`
 wipe), so a scenario starts **already signed in** — combined with
-`--live-backend`, `restoreSession()` rehydrates it. This bypasses the login
-sheet, which is genuinely flaky to drive under XCUITest on iOS 26: the
-`SettingsAccountSection` sheet drops on the re-render that the first "Sign in"
-tap triggers (the documented `AuthSyncBannerView` instability), so it can take a
-second tap to stick. The data-round-trip scenarios (`beta-inbox`, `beta-outbox`)
-therefore seed the session and never touch the login UI; `beta-login` is the one
-scenario that exercises the real sheet (with a settle + re-tap). The access JWT
+`--live-backend`, `restoreSession()` rehydrates it. This lets the data-round-trip
+scenarios (`beta-inbox`, `beta-outbox`) start signed in without re-driving the
+login UI — that contract is covered once by `beta-login`, which taps the real
+sheet a single time (the first-tap sheet-drop bug is fixed app-side, GH #279:
+`LoginView` is presented from a stable host so it no longer needs a settle +
+re-tap). The access JWT
 is dot-delimited and the refresh token opaque — neither contains a colon — so the
 first colon is the separator. `--reset-data` also now clears the Keychain, so
 each scenario starts from a known auth state.
@@ -88,22 +87,27 @@ Example: `replaceText target: login-email, value: "${LMWF_E2E_EMAIL}"`.
 ## Scenarios
 
 New scenarios live alongside the existing ones in `e2e-spec/scenarios/` and run
-**only** under the `BetaE2E` test plan (they are excluded from `Smoke` and
-`Full`, which have no backend).
+**only** under the `BetaE2E` test plan. They are excluded from `Smoke` and
+`Full` (which have no backend and no `LMWF_E2E_*` credentials): `Full` lists the
+three `testBeta*` methods in its `skippedTests`, so the nightly Full UI suite
+never drives them. (Before that exclusion existed they ran credential-less in the
+nightly and failed on `login-email` / empty `--seed-session` every run — GH #272.)
 
 | Scenario | Auth | Exercises | Assertion surface |
 | --- | --- | --- | --- |
+| `beta-login` | real login UI | login → token persist → logout/revoke | `account-identity`, `account-sign-out`, `account-sign-in` (in-app) |
 | `beta-inbox` | `--seed-session` | launch-time poll surfaces an API-pushed workout | `inbox-section` + the pushed workout name (in-app) |
 | `beta-outbox` | `--seed-session` | complete workout → relaunch flush → outbox push | server-side `GET /v1/workouts/outbox` asserts in the workflow |
 
-> **`beta-login` (real login-UI) is temporarily removed** — the
-> `SettingsAccountSection` sign-in sheet is too flaky to drive under XCUITest on
-> iOS 26 (it drops on the first-tap re-render). Both remaining scenarios seed the
-> session instead. Restoring `beta-login` after fixing the sheet is tracked in
-> GH #277.
-
-Both scenarios start signed in via `--seed-session` so they test the
-inbox/outbox contract without depending on the flaky login UI:
+`beta-login` drives the **real** Settings → Sign in sheet. It launches with
+`--reset-data`, which wipes the DB + UserDefaults + Keychain tokens, so it starts
+from a clean *signed-out* state independent of test order (a seeded session from
+another scenario can't bleed in). A single tap on `account-sign-in` presents
+`LoginView` reliably — the first-tap sheet-drop instability is fixed app-side
+(GH #279: the sheet is hosted from a stable parent, `SettingsView`), so the
+scenario needs no settle delay or re-tap workaround. `beta-inbox` / `beta-outbox`
+start signed in via `--seed-session` so they test the inbox/outbox contract
+without re-driving the login UI:
 
 - `beta-inbox` launches with `--enable-flag=workoutInbox`; `--live-backend`
   polls the inbox at launch, and the pushed "Beta Inbox Probe" must surface in
