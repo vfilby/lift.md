@@ -32,12 +32,12 @@ struct LoginView: View {
 
     /// Web host for the account pages, mirroring the API host the app talks
     /// to (so a session created on the web is on the same origin the API
-    /// uses). Prod is canonical `getlift.md` (GH #248); beta mode keeps the
-    /// beta env until its `beta.getlift.md` cutover lands.
+    /// uses). Prod is canonical `getlift.md`; beta is canonical `beta.getlift.md`
+    /// (both GH #248 — beta cutover is live, `beta.liftmark.app` redirects here).
     private static var accountWebBase: String {
         let useBeta = UserDefaults.standard.object(forKey: "feature_flag.useBetaApi") != nil
             && UserDefaults.standard.bool(forKey: "feature_flag.useBetaApi")
-        return useBeta ? "https://beta.liftmark.app" : "https://getlift.md"
+        return useBeta ? "https://beta.getlift.md" : "https://getlift.md"
     }
     private static var forgotPasswordURL: URL { URL(string: "\(accountWebBase)/account/forgot")! }
     private static var signupURL: URL { URL(string: "\(accountWebBase)/account/signup")! }

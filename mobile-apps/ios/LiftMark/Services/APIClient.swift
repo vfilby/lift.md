@@ -179,9 +179,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             useBeta = false
         }
         return useBeta
-            // Beta env. Migration to beta.getlift.md is a follow-up (GH #248);
-            // beta.liftmark.app still serves directly until then.
-            ? URL(string: "https://beta.liftmark.app")!
+            // Canonical beta host (GH #248 beta cutover is live). beta.liftmark.app
+            // now 308-redirects /v1/* here, but we target beta.getlift.md directly
+            // to skip the hop.
+            ? URL(string: "https://beta.getlift.md")!
             // Canonical prod host (GH #248). liftmark.app now 308-redirects
             // /v1/* here, but we target getlift.md directly to skip the hop.
             : URL(string: "https://getlift.md")!
