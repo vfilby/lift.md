@@ -13,6 +13,25 @@ final class LiftMarkUITests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
 
+        // iOS raises its AutoFill "Save Password?" sheet (springboard-owned)
+        // after a real password login — e.g. the beta login round-trip — and it
+        // covers the Settings Account controls. A UI-interruption monitor is the
+        // process-agnostic way to dismiss it (querying springboard directly
+        // times out its snapshot). The handler is scoped to the interrupting
+        // element, so it stays cheap. Fires on the next app interaction (the
+        // runner nudges one in scrollToHittable). Tapping "Not Now" leaves the
+        // keychain untouched.
+        addUIInterruptionMonitor(withDescription: "Save Password prompt") { element in
+            for label in ["Not Now", "Not now"] {
+                let button = element.buttons[label]
+                if button.exists {
+                    button.tap()
+                    return true
+                }
+            }
+            return false
+        }
+
         // Paths are relative to the project root.
         // When running from Xcode, the source root is available via the build setting.
         // Adjust these paths based on your scheme's working directory.

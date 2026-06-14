@@ -327,35 +327,26 @@ class ActionAdapter {
         guard !element.isHittable else { return }
         // On-screen-but-settling: poll briefly before deciding it's off-screen.
         if waitForHittable(element, timeout: 4) { return }
-        // A system "Save Password?" sheet (springboard) can sit over an
-        // on-screen control after a password login submit — e.g. it covers
-        // `account-sign-out` in the beta login round-trip. Dismiss it, then
-        // re-check, before assuming the element is merely off-screen.
-        if dismissSystemPasswordSheetIfPresent(), waitForHittable(element, timeout: 2) { return }
+        // A system "Save Password?" sheet (springboard) can cover an on-screen
+        // control after a password login submit — e.g. `account-sign-out` in the
+        // beta login round-trip. It's not an `app.alerts` alert and querying
+        // springboard directly times out its huge snapshot, so it's handled by
+        // a UI-interruption monitor (registered in the XCTestCase setUp). The
+        // monitor only fires on an app interaction, so nudge it with a tap on a
+        // safe, never-covered chrome element (the nav bar sits above the
+        // mid-screen sheet), then re-check.
+        if app.navigationBars.firstMatch.exists {
+            app.navigationBars.firstMatch.tap()
+        } else {
+            app.tap()
+        }
+        if waitForHittable(element, timeout: 2) { return }
         let scrollView = app.scrollViews.firstMatch
         guard scrollView.exists else { return }
         for _ in 0..<maxAttempts {
             scrollView.swipeUp()
             if element.isHittable { return }
         }
-    }
-
-    /// Dismisses the iOS AutoFill "Save Password?" prompt if it's up. It's a
-    /// springboard-owned sheet (not an `app.alerts` alert), so it has to be
-    /// reached through the springboard application. Tapping "Not Now" leaves
-    /// the keychain untouched, which is what the e2e wants. Returns whether a
-    /// sheet was dismissed.
-    @discardableResult
-    private func dismissSystemPasswordSheetIfPresent() -> Bool {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for label in ["Not Now", "Not now"] {
-            let button = springboard.buttons[label]
-            if button.exists && button.isHittable {
-                button.tap()
-                return true
-            }
-        }
-        return false
     }
 
     /// Polls `isHittable` until it's true or the (scaled) timeout elapses.
