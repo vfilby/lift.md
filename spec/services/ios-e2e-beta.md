@@ -115,9 +115,13 @@ from a clean *signed-out* state independent of test order (a seeded session from
 another scenario can't bleed in). A single tap on `account-sign-in` presents
 `LoginView` reliably — the first-tap sheet-drop instability is fixed app-side
 (GH #279: the sheet is hosted from a stable parent, `SettingsView`), so the
-scenario needs no settle delay or re-tap workaround. `beta-inbox` / `beta-outbox`
-start signed in via `--seed-session` so they test the inbox/outbox contract
-without re-driving the login UI:
+scenario needs no settle delay or re-tap workaround. After the password submit
+iOS raises its AutoFill **"Save Password?"** sheet (springboard-owned), which
+covers the Account section's `account-sign-out`; the runner dismisses it
+("Not Now") when a tap target is on-screen but not hittable, so the logout half
+of the round-trip proceeds. `beta-inbox` / `beta-outbox` start signed in via
+`--seed-session` so they test the inbox/outbox contract without re-driving the
+login UI:
 
 - `beta-inbox` launches with `--enable-flag=workoutInbox`; `--live-backend`
   polls the inbox at launch, and the pushed "Beta Inbox Probe" must surface in
