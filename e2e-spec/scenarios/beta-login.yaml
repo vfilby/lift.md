@@ -57,6 +57,12 @@ tests:
       - action: waitFor
         target: "account-sign-out"
         timeout: 10000
+      # Let the Account section settle after the login-sheet dismiss + the
+      # launch/auth inbox poll re-render before tapping — `account-sign-out` is
+      # briefly present-but-not-hittable while that animates (the runner's tap
+      # also waits out transient non-hittability, this is belt-and-suspenders).
+      - action: delay
+        ms: 1500
       - action: tap
         target: "account-sign-out"
       # logout() revokes server-side then clears local tokens → signed-out copy.
