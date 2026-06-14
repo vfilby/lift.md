@@ -153,14 +153,13 @@ solely so old links and shipped-app deep-links don't break. Beta mirrors this:
 **`beta.getlift.md`** is the all-in-one beta environment, and `beta.liftmark.app`
 redirects to it.
 
-> **Migration status (GH #248):** the **prod** cutover (table below) is
-> implemented — `getlift.md` serves everything; `liftmark.app` / `liftmd.app` /
-> `workoutformat.liftmark.app` are redirect-only. The **beta** half
-> (`beta.getlift.md`) is a tracked follow-up: it needs a cross-account DNS
-> delegation deploy (create the beta-account zone, read its NS, delegate from
-> the `getlift.md` zone, issue the cert), so until that lands beta still serves
-> from `beta.liftmark.app` and the e2e pipeline runs against it. The table and
-> the `beta.getlift.md` rows describe the target end state.
+> **Migration status (GH #248):** complete for both environments. The **prod**
+> cutover (table below) is implemented — `getlift.md` serves everything;
+> `liftmark.app` / `liftmd.app` / `workoutformat.liftmark.app` are redirect-only.
+> The **beta** cutover is also live (`betaCutoverPhase: 'live'`): `beta.getlift.md`
+> serves everything and `beta.liftmark.app` is 301/308 redirect-only (AASA
+> excepted), with the e2e pipeline running against `beta.getlift.md`. The table
+> rows describe the deployed end state.
 
 The **one** exception to "liftmark.app redirects everything" is the AASA path:
 Apple does NOT follow redirects when fetching `apple-app-site-association`, and

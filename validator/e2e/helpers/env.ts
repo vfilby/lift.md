@@ -20,7 +20,7 @@ export function getBaseUrl(): string {
   const explicit = process.env.LMWF_E2E_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, '');
   return getMode() === 'remote'
-    ? 'https://beta.liftmark.app'
+    ? 'https://beta.getlift.md'
     : 'http://localhost:3001';
 }
 
@@ -48,13 +48,13 @@ export function getMailpitUrl(): string {
  * The e2e process doesn't share the server's LMWF_ENV directly, so this is
  * configurable via LMWF_E2E_EXPECTED_EMAIL_HOST. The default matches the
  * local stack, which `scripts/e2e-local.sh` boots with LMWF_ENV=beta →
- * links resolve to beta.liftmark.app.
+ * links resolve to beta.getlift.md (appBaseUrl's beta fallback, GH #248).
  */
 export function expectedEmailLinkHost(): string {
   const explicit = process.env.LMWF_E2E_EXPECTED_EMAIL_HOST;
   if (explicit) return explicit;
   // The local stack runs with LMWF_ENV=beta (see scripts/e2e-local.sh).
-  return 'beta.liftmark.app';
+  return 'beta.getlift.md';
 }
 
 /**
