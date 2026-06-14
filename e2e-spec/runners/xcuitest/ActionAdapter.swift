@@ -316,15 +316,36 @@ class ActionAdapter {
 
     private enum Direction { case up, down }
 
-    /// Scrolls the nearest scroll view until the element becomes hittable.
+    /// Makes a target tappable: first waits out a *transient* non-hittable
+    /// state (an on-screen element mid-animation/re-render — e.g. the Settings
+    /// Account section just swapped to its signed-in branch and the inbox-status
+    /// poll is re-laying it out, which briefly leaves `account-sign-out`
+    /// present-but-not-hittable), then falls back to scrolling a genuinely
+    /// off-screen element into view. The fast path (already hittable) is a
+    /// no-op.
     private func scrollToHittable(_ element: XCUIElement, maxAttempts: Int = 5) {
         guard !element.isHittable else { return }
+        // On-screen-but-settling: poll briefly before deciding it's off-screen.
+        if waitForHittable(element, timeout: 4) { return }
         let scrollView = app.scrollViews.firstMatch
         guard scrollView.exists else { return }
         for _ in 0..<maxAttempts {
             scrollView.swipeUp()
             if element.isHittable { return }
         }
+    }
+
+    /// Polls `isHittable` until it's true or the (scaled) timeout elapses.
+    /// `waitForExistence` only covers presence, not interactability, so an
+    /// element animating in needs this extra settle before `tap()`.
+    @discardableResult
+    private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(UITestTiming.scaled(timeout))
+        while Date() < deadline {
+            if element.isHittable { return true }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        return element.isHittable
     }
 
     private func executeLongPress(_ action: TestAction) throws {
