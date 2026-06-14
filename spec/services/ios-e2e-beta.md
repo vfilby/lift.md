@@ -70,8 +70,18 @@ sheet a single time (the first-tap sheet-drop bug is fixed app-side, GH #279:
 `LoginView` is presented from a stable host so it no longer needs a settle +
 re-tap). The access JWT
 is dot-delimited and the refresh token opaque — neither contains a colon — so the
-first colon is the separator. `--reset-data` also now clears the Keychain, so
-each scenario starts from a known auth state.
+first colon is the separator. `--reset-data` also clears the Keychain, so each
+scenario starts from a known auth state.
+
+> **Ordering invariant (GH #277):** the `--reset-data` reset — DB +
+> UserDefaults + Keychain — runs at the very top of `LiftMarkApp.init`, **before
+> `AuthenticationStore` is constructed**. That store's init synchronously
+> rehydrates `currentUser` from the Keychain access token, so a Keychain clear
+> placed *after* construction would leave a prior scenario's seeded session live
+> in memory (the device renders signed-in despite an empty Keychain). This is
+> exactly the BetaE2E `testBetaInbox` → `testBetaLogin` sequence — login launches
+> `--reset-data` right after the seeded inbox scenario, and its first assertion
+> (`account-sign-in` is present) is the regression guard for this ordering.
 
 ## Runner: environment-variable interpolation
 

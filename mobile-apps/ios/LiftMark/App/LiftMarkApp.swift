@@ -21,6 +21,28 @@ struct LiftMarkApp: App {
         // happens here rather than from whichever call site logs first.
         LiftMarkLogging.bootstrap()
 
+        // Reset data before ANY store initializes (test isolation). This MUST
+        // precede the AuthenticationStore construction below: that init
+        // synchronously rehydrates `currentUser` from the Keychain access
+        // token, so clearing tokens *after* it would leave a previous
+        // scenario's seeded session live in memory — the device renders
+        // signed-in even though the Keychain is now empty. Under the BetaE2E
+        // plan, `testBetaLogin` (--reset-data) runs after the seeded
+        // `testBetaInbox`, which is exactly that case. See GH #277 / #137.
+        if ProcessInfo.processInfo.arguments.contains("--reset-data") {
+            DatabaseManager.shared.deleteDatabase()
+            // Clear SwiftUI navigation state restoration so stale navigation
+            // paths (e.g., WorkoutDetailView for a deleted plan) don't persist.
+            if let bundleId = Bundle.main.bundleIdentifier {
+                UserDefaults.standard.removePersistentDomain(forName: bundleId)
+            }
+            // Clear Keychain auth tokens too, so each scenario starts signed
+            // out — the DB + UserDefaults wipe above doesn't touch the Keychain,
+            // and under --live-backend a surviving session would auto-restore.
+            // No-op for scenarios that never sign in.
+            TokenStore().clear()
+        }
+
         // Build auth + inbox-poller from a single APIClient + TokenStore so
         // they share session state. Initializing here (rather than as
         // property-initializer defaults) keeps the wiring obvious and lets
@@ -50,23 +72,6 @@ struct LiftMarkApp: App {
         // leak concern.
         auth.onAuthenticated = { [weak pusher] in
             Task { @MainActor in await pusher?.flushIfAuthenticated() }
-        }
-
-        // Reset data before any views load (for test isolation)
-        if ProcessInfo.processInfo.arguments.contains("--reset-data") {
-            DatabaseManager.shared.deleteDatabase()
-            // Clear SwiftUI navigation state restoration so stale navigation
-            // paths (e.g., WorkoutDetailView for a deleted plan) don't persist
-            if let bundleId = Bundle.main.bundleIdentifier {
-                UserDefaults.standard.removePersistentDomain(forName: bundleId)
-            }
-            // Clear Keychain auth tokens too, so each scenario starts signed
-            // out. The DB + UserDefaults wipe above doesn't touch the Keychain,
-            // so under --live-backend a session from a previous scenario would
-            // auto-restore and the device would launch already signed in — the
-            // Layer-3 beta e2e needs a clean signed-out start per scenario
-            // (GH #137). No-op for scenarios that never sign in.
-            TokenStore().clear()
         }
 
         // Seed a session straight into the Keychain (runs AFTER --reset-data so
