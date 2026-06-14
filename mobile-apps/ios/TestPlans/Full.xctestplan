@@ -31,6 +31,9 @@
     },
     {
       "skippedTests" : [
+        "LiftMarkUITests\/testBetaInbox()",
+        "LiftMarkUITests\/testBetaLogin()",
+        "LiftMarkUITests\/testBetaOutbox()",
         "LiftMarkUITests\/testScreenshots()"
       ],
       "target" : {

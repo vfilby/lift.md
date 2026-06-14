@@ -40,6 +40,7 @@
   "testTargets" : [
     {
       "selectedTests" : [
+        "LiftMarkUITests\/testBetaLogin()",
         "LiftMarkUITests\/testBetaInbox()",
         "LiftMarkUITests\/testBetaOutbox()"
       ],
