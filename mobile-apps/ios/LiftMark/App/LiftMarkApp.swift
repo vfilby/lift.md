@@ -85,6 +85,9 @@ struct LiftMarkApp: App {
         Self.seedMigratorFailureFromLaunchArgs()
 
         #if DEBUG
+        // Runs after --reset-data (clean DB) so seeded rows survive. Drives the
+        // auth-sync banner UI tests (GH #143 banner fix).
+        Self.seedAuthSyncBannerFromLaunchArgs(auth: auth, pusher: pusher)
         if ProcessInfo.processInfo.arguments.contains("--seed-sample-plans") {
             Self.seedSamplePlans()
         }
@@ -118,6 +121,29 @@ struct LiftMarkApp: App {
             let result = MarkdownParser.parseWorkout(markdown)
             guard result.success, let plan = result.data else { continue }
             _ = try? repository.create(plan)
+        }
+    }
+    #endif
+
+    #if DEBUG
+    /// Test seam for the auth-sync banner (GH #143 banner fix).
+    /// `--seed-outbox-pending <n>` seeds `n` stranded outbox rows;
+    /// `--seed-session-expired` flips the lapsed-session flag. Together they
+    /// render the banner. The pending arg ALONE simulates a never-signed-in user
+    /// (sessionExpired stays false) and must NOT render the banner — the
+    /// regression this fix is about. Never compiled into release builds.
+    private static func seedAuthSyncBannerFromLaunchArgs(
+        auth: AuthenticationStore,
+        pusher: OutboxPusherService
+    ) {
+        let args = ProcessInfo.processInfo.arguments
+        if let idx = args.firstIndex(of: "--seed-outbox-pending"),
+           idx + 1 < args.count,
+           let n = Int(args[idx + 1]) {
+            pusher.seedPendingForTesting(count: n)
+        }
+        if args.contains("--seed-session-expired") {
+            auth.seedSessionExpiredForTesting()
         }
     }
     #endif
