@@ -70,6 +70,14 @@ jobs:
       # -retry-tests-on-failure — flakes should surface and be fixed (issue #106),
       # not be masked by auto-retry.
       - name: Run full suite (-testPlan Full)
+        # The shared macos-26 runner boots the simulator, launches the app, and
+        # animates 2-3x slower under load than a dev machine. Scale every UI-test
+        # timeout so slow renders/launches are absorbed instead of surfacing as
+        # spurious "Timed out waiting for ..." flakes. This loosens *how long we
+        # wait before failing*, not the assertions themselves — a genuine
+        # regression (element never appears) still fails, just later.
+        env:
+          UITEST_TIMEOUT_SCALE: '2.0'
         run: |
           xcodebuild test \
             -scheme LiftMark \
