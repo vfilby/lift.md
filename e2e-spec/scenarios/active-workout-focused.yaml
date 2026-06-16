@@ -110,37 +110,82 @@ tests:
 
   - name: "finish workout shows summary screen"
     steps:
-      - action: tap
-        target: "active-workout-finish-button"
-      # Handle finish dialogs — may be "Finish Anyway", "Log Anyway" (discard dialog), or "Finish"
+      # The finish → confirm-dialog → summary hop is the historically flakiest
+      # step in this suite (nightly timeouts on 2026-06-08 and 2026-06-16). Two
+      # distinct failure modes: (1) a slow summary render on a loaded CI runner,
+      # and (2) a dropped tap — the finish button or the confirm-dialog button
+      # silently fails to register, so the alert/summary never appears and the
+      # wait times out on nothing. A longer timeout only fixes (1). To also
+      # cover (2), wrap the whole tap → confirm → summary sequence so that if the
+      # summary doesn't appear, we re-tap finish and re-handle the dialog once.
       - action: tryCatch
         try:
-          - action: waitForText
-            text: "Finish Anyway"
-            timeout: 3000
-          - action: tapText
-            text: "Finish Anyway"
-        catch:
+          - action: tap
+            target: "active-workout-finish-button"
+          # Handle finish dialogs — may be "Finish Anyway", "Log Anyway" (discard dialog), or "Finish"
           - action: tryCatch
             try:
               - action: waitForText
-                text: "Log Anyway"
+                text: "Finish Anyway"
                 timeout: 3000
               - action: tapText
-                text: "Log Anyway"
+                text: "Finish Anyway"
             catch:
               - action: tryCatch
                 try:
                   - action: waitForText
-                    text: "Finish"
+                    text: "Log Anyway"
                     timeout: 3000
                   - action: tapText
-                    text: "Finish"
-                catch: []
-      # Should show workout summary
+                    text: "Log Anyway"
+                catch:
+                  - action: tryCatch
+                    try:
+                      - action: waitForText
+                        text: "Finish"
+                        timeout: 3000
+                      - action: tapText
+                        text: "Finish"
+                    catch: []
+          # Non-asserting probe for the summary; if absent, fall to the retry.
+          - action: waitFor
+            target: "workout-summary-done-button"
+            timeout: 12000
+        catch:
+          # Retry: a dropped tap left us on the active workout screen. Re-tap
+          # finish and re-handle the dialog; the asserting waitFor below then
+          # confirms the summary (so a genuine regression is still surfaced).
+          - action: tap
+            target: "active-workout-finish-button"
+          - action: tryCatch
+            try:
+              - action: waitForText
+                text: "Finish Anyway"
+                timeout: 3000
+              - action: tapText
+                text: "Finish Anyway"
+            catch:
+              - action: tryCatch
+                try:
+                  - action: waitForText
+                    text: "Log Anyway"
+                    timeout: 3000
+                  - action: tapText
+                    text: "Log Anyway"
+                catch:
+                  - action: tryCatch
+                    try:
+                      - action: waitForText
+                        text: "Finish"
+                        timeout: 3000
+                      - action: tapText
+                        text: "Finish"
+                    catch: []
+      # Should show workout summary (asserting — fails the test if still absent
+      # after the retry, so a genuine regression is not masked).
       - action: waitFor
         target: "workout-summary-done-button"
-        timeout: 10000
+        timeout: 12000
 
   - name: "summary navigates back to home"
     steps:
