@@ -219,17 +219,37 @@ This is the one normal-operation path (alongside the giveup-4xx case) that *does
 
 ### Auth-sync banner (UI)
 
-An app-level banner is shown at the root (`ContentView`) when there are completed workouts that cannot sync because the device needs sign-in:
+An app-level banner is shown at the root (`ContentView`) when a previously
+signed-in session has lapsed and there are completed workouts stranded in the
+queue because the device needs to re-authenticate:
 
 ```
 outboxPusher.pendingCount > 0
-  && (!authStore.isAuthenticated || authStore.sessionExpired)
+  && authStore.sessionExpired
   && sessionStore.activeSession == nil
+  && !bannerDismissed
 ```
 
+- **Gated on `sessionExpired`, NOT `!isAuthenticated` (GH #143 follow-up).** The
+  banner exists for exactly one situation: a user who *was* signed in, whose
+  session lapsed, and whose completed workouts are now stranded. A user who has
+  **never** signed in is not in a broken state — their workouts queue locally and
+  drain whenever they choose to sign in — so nagging them is wrong. Because
+  `sessionExpired` is only ever set by the 401 refresh-failure path (and reset by
+  `login`/`logout`/successful refresh), gating on it alone naturally excludes the
+  never-signed-in user (`sessionExpired == false`) while still firing for the
+  lapsed-session user. A deliberate `logout()` wipes the queue, so `pendingCount`
+  is already `0` on that path.
 - Copy: "N workout(s) waiting to sync — sign in to upload." Tapping it presents `LoginView`.
 - Accessibility identifier `auth-sync-banner` for UI tests.
 - A successful login resets `sessionExpired` and triggers `flushIfAuthenticated()`, which drains the queue and clears the banner.
+- **Dismissable — the banner must never permanently obscure the app.** A trailing
+  dismiss (✕) button hides it for the current launch (`bannerDismissed`, in-memory
+  `@State`, accessibility id `auth-sync-banner-dismiss`). It re-arms — i.e. shows
+  again — when `pendingCount` *increases* (a freshly completed workout is a new
+  reason to nag) or on the next app launch. This guards against the case where a
+  lapsed-session user cannot immediately sign back in (e.g. a login/server issue):
+  they can clear the banner and keep using the app instead of being blocked.
 - **Suppressed during an active workout** (`sessionStore.activeSession != nil`). The banner is mounted as a top `safeAreaInset` over the whole tab view; the active-workout screen draws its own header (including the Finish button) into that same top region, so a visible banner overlaps and intercepts the Finish tap. A sync nag for *past* completed workouts also shouldn't crowd a live session. The banner returns automatically once the workout ends.
 
 ### Re-authentication state
@@ -238,7 +258,7 @@ outboxPusher.pendingCount > 0
 
 - Set to `true` when `refreshIfNeeded()` receives `APIError.unauthorized` — the refresh chain is dead and the user must sign in again. The store clears the dead tokens and `currentUser` in this path (an expired refresh token is useless), but **does not** invoke the user-initiated `logout()` codepath and therefore **does not** wipe the `outbox_pending_queue` or inbox. This is the load-bearing distinction that makes a silently-completed workout recoverable (GH #143).
 - Reset to `false` on a successful `login(...)`. A successful login also kicks `OutboxPusherService.flushIfAuthenticated()` so queued completions sync immediately rather than waiting for the next foreground transition.
-- `isAuthenticated` remains `currentUser != nil`; `sessionExpired` is an orthogonal signal that the *last known* session lapsed and re-auth is needed. The banner condition treats either `!isAuthenticated` or `sessionExpired` as "needs sign-in".
+- `isAuthenticated` remains `currentUser != nil`; `sessionExpired` is an orthogonal signal that the *last known* session lapsed and re-auth is needed. The auth-sync banner keys off `sessionExpired` alone (see [Auth-sync banner](#auth-sync-banner-ui)) so it fires for a lapsed session but never for a user who has simply never signed in.
 
 ### Conflict + dedup rules
 

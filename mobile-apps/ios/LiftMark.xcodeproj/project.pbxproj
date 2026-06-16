@@ -165,6 +165,7 @@
 		A2994975FB6B2B6580CA34C5 /* PlateCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4406CB6F8705596A59036876 /* PlateCalculatorTests.swift */; };
 		A2F7492945F5277ABF7BB84A /* ProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 654972C6C1759CA67F11DCA9 /* ProfileStore.swift */; };
 		A3275CAEA4376A2F94A89A9B /* AuthenticationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92856F532EAAA8940E6CFDF5 /* AuthenticationStore.swift */; };
+		A3D8DACE811C034EF5AFD9ED /* AuthSyncBannerViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E57D80C4853D24794956E5 /* AuthSyncBannerViewTests.swift */; };
 		A47498AD84CC4B09D112D56A /* RestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C826AE567713686B32DDE784 /* RestTimerView.swift */; };
 		A6F4017919B1551AFD9AE57E /* OutboxPusherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D265C4177D34E4EE964C09C3 /* OutboxPusherService.swift */; };
 		A729B0D0216DC029A3343B47 /* ExerciseCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2EE730B57432DA41F655940 /* ExerciseCardView.swift */; };
@@ -473,6 +474,7 @@
 		C38E018F88DC33EB2158C6AC /* AdaptiveSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveSplitView.swift; sourceTree = "<group>"; };
 		C3CB86B68F041A69E6F4E6B7 /* CKRecordMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKRecordMapperTests.swift; sourceTree = "<group>"; };
 		C3E789B9A675739D485DEB8B /* Enums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Enums.swift; sourceTree = "<group>"; };
+		C4E57D80C4853D24794956E5 /* AuthSyncBannerViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSyncBannerViewTests.swift; sourceTree = "<group>"; };
 		C70744D9027695A5A6176D54 /* LiftMark.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiftMark.entitlements; sourceTree = "<group>"; };
 		C826AE567713686B32DDE784 /* RestTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerView.swift; sourceTree = "<group>"; };
 		C9441D6B1D8EE6194A1A0631 /* AppNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigation.swift; sourceTree = "<group>"; };
@@ -944,6 +946,7 @@
 				FD2CDC4A9F0168141B6F99C9 /* AnthropicServiceTests.swift */,
 				71CC4A4FDCEB486218739935 /* AudioServiceTests.swift */,
 				6C1E8D269112E454A906DCCF /* AuthenticationStoreTests.swift */,
+				C4E57D80C4853D24794956E5 /* AuthSyncBannerViewTests.swift */,
 				C3CB86B68F041A69E6F4E6B7 /* CKRecordMapperTests.swift */,
 				3C237971213AB0EEAEDED6E7 /* CKRecordMetadataStoreTests.swift */,
 				B79EBC001661D8B385B2F7E9 /* CKSyncConflictResolverTests.swift */,
@@ -1411,6 +1414,7 @@
 				760749A6BBDB7081D1742346 /* ActiveWorkoutViewModelTests.swift in Sources */,
 				226D16CFBA394A8F1826506E /* AnthropicServiceTests.swift in Sources */,
 				712B0C691B4ED8D1379D8774 /* AudioServiceTests.swift in Sources */,
+				A3D8DACE811C034EF5AFD9ED /* AuthSyncBannerViewTests.swift in Sources */,
 				AB59B2427C54B7DE6715E1A4 /* AuthenticationStoreTests.swift in Sources */,
 				DA40BCCFFD3A680879630392 /* CKRecordMapperTests.swift in Sources */,
 				239B8B672FC4D267BB431268 /* CKRecordMetadataStoreTests.swift in Sources */,
@@ -1881,7 +1885,7 @@
 			repositoryURL = "https://github.com/apple/swift-log.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.13.2;
+				minimumVersion = 1.13.0;
 			};
 		};
 		E5A0C4B28CC82C9E0A371F5A /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
