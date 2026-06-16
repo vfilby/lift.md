@@ -58,6 +58,20 @@ final class OutboxPusherService {
         self.pendingCount = (try? queue.count()) ?? 0
     }
 
+    #if DEBUG
+    /// Test-only seam: seed `count` stranded outbox rows and refresh
+    /// `pendingCount` WITHOUT kicking a flush, so UI tests can render the
+    /// auth-sync banner from a known queue depth. Clears existing rows first for
+    /// determinism. Never compiled into release builds.
+    func seedPendingForTesting(count: Int) {
+        try? queue.clear()
+        for i in 0..<count {
+            try? queue.enqueue(clientSessionId: "uitest-outbox-seed-\(i)")
+        }
+        pendingCount = (try? queue.count()) ?? count
+    }
+    #endif
+
     /// Enqueue a just-completed session for push. Must be called *after* the
     /// `WorkoutSession.status` row is durably `completed` — otherwise a crash
     /// between enqueue and write leaves a phantom queue row that points at

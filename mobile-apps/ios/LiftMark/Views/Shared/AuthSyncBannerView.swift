@@ -127,6 +127,12 @@ struct AuthSyncBannerView: View {
                         .font(.lmCaption.weight(.bold))
                         .foregroundStyle(.white.opacity(0.8))
                 }
+                // Fill the row *minus* the rigid dismiss button, so the content
+                // (and the dismiss ✕) never overflow the screen edge. Without
+                // this the long message holds its intrinsic width and pushes the
+                // trailing ✕ partly off-screen.
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
@@ -140,7 +146,9 @@ struct AuthSyncBannerView: View {
                 Image(systemName: "xmark")
                     .font(.lmSubheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.9))
-                    .padding(.leading, LiftMarkTheme.spacingSM)
+                    // A rigid 44×44 tap target keeps the trailing ✕ hittable and
+                    // stops the flexible sign-in label from starving its frame.
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -148,8 +156,9 @@ struct AuthSyncBannerView: View {
             .accessibilityHint("Hides the sync reminder until your next completed workout")
             .accessibilityIdentifier("auth-sync-banner-dismiss")
         }
-        .padding(.horizontal, LiftMarkTheme.spacingMD)
-        .padding(.vertical, LiftMarkTheme.spacingSM + 2)
+        .padding(.leading, LiftMarkTheme.spacingMD)
+        .padding(.trailing, LiftMarkTheme.spacingSM)
+        .padding(.vertical, LiftMarkTheme.spacingSM)
         .frame(maxWidth: .infinity)
         .background(LiftMarkTheme.warning)
         .transition(.move(edge: .top).combined(with: .opacity))
