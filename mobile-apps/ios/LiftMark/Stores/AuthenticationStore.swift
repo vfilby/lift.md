@@ -444,6 +444,16 @@ final class AuthenticationStore {
         sessionExpired = true
     }
 
+    #if DEBUG
+    /// Test-only seam: force the lapsed-session state (as if a refresh 401'd)
+    /// so UI tests can exercise the auth-sync banner without driving a real
+    /// network round-trip. Mirrors the `--seed-*` launch-arg pattern used by
+    /// the migrator-bridge UI tests. Never compiled into release builds.
+    func seedSessionExpiredForTesting() {
+        sessionExpired = true
+    }
+    #endif
+
     // MARK: - Profile (/v1/me)
 
     /// Fetches the authoritative profile from `GET /v1/me` and repopulates
