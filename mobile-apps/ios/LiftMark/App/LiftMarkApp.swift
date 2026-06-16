@@ -21,6 +21,28 @@ struct LiftMarkApp: App {
         // happens here rather than from whichever call site logs first.
         LiftMarkLogging.bootstrap()
 
+        // Reset data before ANY store initializes (test isolation). This MUST
+        // precede the AuthenticationStore construction below: that init
+        // synchronously rehydrates `currentUser` from the Keychain access
+        // token, so clearing tokens *after* it would leave a previous
+        // scenario's seeded session live in memory — the device renders
+        // signed-in even though the Keychain is now empty. Under the BetaE2E
+        // plan, `testBetaLogin` (--reset-data) runs after the seeded
+        // `testBetaInbox`, which is exactly that case. See GH #277 / #137.
+        if ProcessInfo.processInfo.arguments.contains("--reset-data") {
+            DatabaseManager.shared.deleteDatabase()
+            // Clear SwiftUI navigation state restoration so stale navigation
+            // paths (e.g., WorkoutDetailView for a deleted plan) don't persist.
+            if let bundleId = Bundle.main.bundleIdentifier {
+                UserDefaults.standard.removePersistentDomain(forName: bundleId)
+            }
+            // Clear Keychain auth tokens too, so each scenario starts signed
+            // out — the DB + UserDefaults wipe above doesn't touch the Keychain,
+            // and under --live-backend a surviving session would auto-restore.
+            // No-op for scenarios that never sign in.
+            TokenStore().clear()
+        }
+
         // Build auth + inbox-poller from a single APIClient + TokenStore so
         // they share session state. Initializing here (rather than as
         // property-initializer defaults) keeps the wiring obvious and lets
@@ -52,15 +74,13 @@ struct LiftMarkApp: App {
             Task { @MainActor in await pusher?.flushIfAuthenticated() }
         }
 
-        // Reset data before any views load (for test isolation)
-        if ProcessInfo.processInfo.arguments.contains("--reset-data") {
-            DatabaseManager.shared.deleteDatabase()
-            // Clear SwiftUI navigation state restoration so stale navigation
-            // paths (e.g., WorkoutDetailView for a deleted plan) don't persist
-            if let bundleId = Bundle.main.bundleIdentifier {
-                UserDefaults.standard.removePersistentDomain(forName: bundleId)
-            }
-        }
+        // Seed a session straight into the Keychain (runs AFTER --reset-data so
+        // it isn't wiped). Lets the Layer-3 beta e2e scenarios that exercise
+        // inbox/outbox start already signed in, bypassing the flaky login sheet
+        // — the login UI itself is covered by its own scenario. Combined with
+        // --live-backend, restoreSession() rehydrates these tokens on launch.
+        // See spec/services/ios-e2e-beta.md.
+        Self.seedSessionFromLaunchArgs()
 
         Self.seedMigratorFailureFromLaunchArgs()
 
@@ -157,6 +177,24 @@ struct LiftMarkApp: App {
         MigratorBridge.isEnabled = false
     }
 
+    /// Test seam: `--seed-session=<accessJWT>:<refreshToken>` writes the pair
+    /// straight to the Keychain so a UI test launches already authenticated,
+    /// skipping the login sheet. The access JWT is dot-delimited and the
+    /// refresh token is opaque — neither contains a colon — so the first colon
+    /// is the unambiguous separator. See spec/services/ios-e2e-beta.md (GH #137).
+    private static func seedSessionFromLaunchArgs() {
+        let prefix = "--seed-session="
+        guard let arg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }) else {
+            return
+        }
+        let value = String(arg.dropFirst(prefix.count))
+        guard let sep = value.firstIndex(of: ":") else { return }
+        let access = String(value[value.startIndex..<sep])
+        let refresh = String(value[value.index(after: sep)...])
+        guard !access.isEmpty, !refresh.isEmpty else { return }
+        TokenStore().saveTokens(access: access, refresh: refresh)
+    }
+
     /// Parse --import-content launch argument at init time so the @State
     /// initial value is non-nil before any views appear. This ensures the
     /// import sheet presents immediately rather than relying on onChange.
@@ -189,10 +227,16 @@ struct LiftMarkApp: App {
                     gymStore.loadGyms()
                     handleLaunchArguments()
                     LiveActivityService.shared.cleanupOrphanedActivities()
+                    // CloudKit sync is ALWAYS off under tests (even with
+                    // --live-backend) — a beta UI run must never write to a
+                    // tester's iCloud. The network paths below run when not
+                    // testing, or under the --live-backend Layer-3 gate.
                     if !Self.isRunningTests {
                         Task {
                             await CKSyncEngineManager.shared.start()
                         }
+                    }
+                    if Self.networkPathsEnabled {
                         // Wait for launch session restoration to settle before
                         // the first authed calls, so an expired access token is
                         // refreshed first rather than tripping a premature 401
@@ -214,6 +258,8 @@ struct LiftMarkApp: App {
                             Task {
                                 await CKSyncEngineManager.shared.start()
                             }
+                        }
+                        if Self.networkPathsEnabled {
                             Task { @MainActor in
                                 await authStore.restoreSession()
                                 await inboxPoller.pollIfAuthenticated()
@@ -230,7 +276,7 @@ struct LiftMarkApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: SessionStore.sessionDidComplete)) { note in
                     guard
                         let sessionId = note.userInfo?["sessionId"] as? String,
-                        !Self.isRunningTests
+                        Self.networkPathsEnabled
                     else { return }
                     outboxPusher.enqueue(clientSessionId: sessionId)
                 }
@@ -267,6 +313,17 @@ struct LiftMarkApp: App {
     }
 
     private static let isRunningTests = NSClassFromString("XCTestCase") != nil
+
+    /// Layer-3 e2e gate (GH #137). UI tests are network-isolated by default;
+    /// `--live-backend` re-enables the auth/inbox/outbox network paths so a
+    /// scenario can exercise the real client↔server contract against beta.
+    /// CloudKit sync is deliberately NOT covered by this flag — it stays off
+    /// under tests regardless. See spec/services/ios-e2e-beta.md.
+    private static let isLiveBackend = ProcessInfo.processInfo.arguments.contains("--live-backend")
+
+    /// True when the auth/inbox/outbox network startup paths should run: always
+    /// outside tests, and under tests only when `--live-backend` is passed.
+    private static var networkPathsEnabled: Bool { !isRunningTests || isLiveBackend }
 
     private func handleLaunchArguments() {
         let args = ProcessInfo.processInfo.arguments

@@ -271,7 +271,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: beta
-      url: https://beta.liftmark.app
+      url: https://beta.getlift.md
     env:
       AWS_DEFAULT_REGION: us-west-2
       AWS_REGION: us-west-2
@@ -335,7 +335,7 @@ jobs:
       - name: Smoke test beta
         run: |
           chmod +x validator/scripts/smoke-test-live.sh
-          validator/scripts/smoke-test-live.sh https://beta.liftmark.app "${{ github.sha }}"
+          validator/scripts/smoke-test-live.sh https://beta.getlift.md "${{ github.sha }}"
 
   # ── Stage 4.5: e2e-beta ────────────────────────────────────────────────
   # Browser-driven E2E suite against the live beta hostname. Uses the
@@ -394,10 +394,10 @@ jobs:
       - name: Warm beta Lambda
         run: |
           set -uo pipefail
-          echo "==> warming https://beta.liftmark.app"
+          echo "==> warming https://beta.getlift.md"
           for round in 1 2 3; do
             for i in $(seq 1 8); do
-              curl -s -o /dev/null --max-time 30 https://beta.liftmark.app/version &
+              curl -s -o /dev/null --max-time 30 https://beta.getlift.md/version &
             done
             wait
           done
@@ -406,7 +406,7 @@ jobs:
         working-directory: validator/e2e
         env:
           LMWF_E2E_MODE: remote
-          LMWF_E2E_BASE_URL: https://beta.liftmark.app
+          LMWF_E2E_BASE_URL: https://beta.getlift.md
           LMWF_E2E_TEST_SECRET: ${{ steps.get-secret.outputs.secret }}
         run: npx playwright test
       - name: Upload Playwright report on failure

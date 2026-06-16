@@ -13,6 +13,25 @@ final class LiftMarkUITests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
 
+        // iOS raises its AutoFill "Save Password?" sheet (springboard-owned)
+        // after a real password login — e.g. the beta login round-trip — and it
+        // covers the Settings Account controls. A UI-interruption monitor is the
+        // process-agnostic way to dismiss it (querying springboard directly
+        // times out its snapshot). The handler is scoped to the interrupting
+        // element, so it stays cheap. Fires on the next app interaction (the
+        // runner nudges one in scrollToHittable). Tapping "Not Now" leaves the
+        // keychain untouched.
+        addUIInterruptionMonitor(withDescription: "Save Password prompt") { element in
+            for label in ["Not Now", "Not now"] {
+                let button = element.buttons[label]
+                if button.exists {
+                    button.tap()
+                    return true
+                }
+            }
+            return false
+        }
+
         // Paths are relative to the project root.
         // When running from Xcode, the source root is available via the build setting.
         // Adjust these paths based on your scheme's working directory.
@@ -107,11 +126,44 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "ai-prompt-settings")
     }
 
+    /// GH #279: first Settings → Account → Sign in tap must present the login
+    /// sheet and keep it presented (no second tap).
+    func testSettingsAccountLogin() throws {
+        runner.runScenario(named: "settings-account-login")
+    }
+
     /// Capture App Store screenshots. Invoke via `make screenshots` to land
     /// the PNGs under mobile-apps/ios/Screenshots/. Adds ~30s to a full
     /// `make test` run since the screenshot scenario is part of the suite.
     func testScreenshots() throws {
         runner.runScenario(named: "screenshots")
+    }
+
+    // MARK: - Beta backend e2e (Layer 3, GH #137)
+    //
+    // These exercise the real client↔server contract against the deployed beta
+    // backend and run ONLY under the BetaE2E test plan — NOT Smoke or Full,
+    // which have no backend. They expect LMWF_E2E_BASE_URL / LMWF_E2E_EMAIL /
+    // LMWF_E2E_PASSWORD in the environment (forwarded by the test plan from the
+    // CI workflow). Run locally with those set + the beta host reachable.
+    // See spec/services/ios-e2e-beta.md.
+
+    /// Real login-UI round-trip against beta (GH #137 / restored per GH #277).
+    /// Starts from a clean signed-out state via `--reset-data` (order-
+    /// independent) and drives Settings → Sign in → account-identity →
+    /// sign-out/revoke. The first-tap sheet-drop bug it used to work around is
+    /// fixed app-side (GH #279, stable-host sheet presentation), so the scenario
+    /// taps sign-in once with no settle/re-tap workaround.
+    func testBetaLogin() throws {
+        runner.runScenario(named: "beta-login")
+    }
+
+    func testBetaInbox() throws {
+        runner.runScenario(named: "beta-inbox")
+    }
+
+    func testBetaOutbox() throws {
+        runner.runScenario(named: "beta-outbox")
     }
 
 }

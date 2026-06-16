@@ -237,6 +237,32 @@ class ActionAdapter {
         return try String(contentsOfFile: path, encoding: .utf8)
     }
 
+    /// Substitute `${VAR}` tokens with values from the test process
+    /// environment. Credentials for the Layer-3 beta e2e are minted fresh per
+    /// CI run, so static YAML references them as `${LMWF_E2E_EMAIL}` etc. An
+    /// unset variable resolves to the empty string.
+    /// See spec/services/ios-e2e-beta.md.
+    func interpolateEnv(_ value: String) -> String {
+        guard value.contains("${") else { return value }
+        let env = ProcessInfo.processInfo.environment
+        var result = ""
+        var rest = Substring(value)
+        while let open = rest.range(of: "${") {
+            result += String(rest[rest.startIndex..<open.lowerBound])
+            let afterOpen = rest[open.upperBound...]
+            guard let close = afterOpen.range(of: "}") else {
+                // Unterminated token — emit the remainder verbatim.
+                result += String(rest[open.lowerBound...])
+                return result
+            }
+            let name = String(afterOpen[afterOpen.startIndex..<close.lowerBound])
+            result += env[name] ?? ""
+            rest = afterOpen[close.upperBound...]
+        }
+        result += String(rest)
+        return result
+    }
+
     // MARK: - Action Implementations
 
     private func executeTap(_ action: TestAction) throws {
@@ -290,15 +316,50 @@ class ActionAdapter {
 
     private enum Direction { case up, down }
 
-    /// Scrolls the nearest scroll view until the element becomes hittable.
+    /// Makes a target tappable: first waits out a *transient* non-hittable
+    /// state (an on-screen element mid-animation/re-render — e.g. the Settings
+    /// Account section just swapped to its signed-in branch and the inbox-status
+    /// poll is re-laying it out, which briefly leaves `account-sign-out`
+    /// present-but-not-hittable), then falls back to scrolling a genuinely
+    /// off-screen element into view. The fast path (already hittable) is a
+    /// no-op.
     private func scrollToHittable(_ element: XCUIElement, maxAttempts: Int = 5) {
         guard !element.isHittable else { return }
+        // On-screen-but-settling: poll briefly before deciding it's off-screen.
+        if waitForHittable(element, timeout: 4) { return }
+        // A system "Save Password?" sheet (springboard) can cover an on-screen
+        // control after a password login submit — e.g. `account-sign-out` in the
+        // beta login round-trip. It's not an `app.alerts` alert and querying
+        // springboard directly times out its huge snapshot, so it's handled by
+        // a UI-interruption monitor (registered in the XCTestCase setUp). The
+        // monitor only fires on an app interaction, so nudge it with a tap on a
+        // safe, never-covered chrome element (the nav bar sits above the
+        // mid-screen sheet), then re-check.
+        if app.navigationBars.firstMatch.exists {
+            app.navigationBars.firstMatch.tap()
+        } else {
+            app.tap()
+        }
+        if waitForHittable(element, timeout: 2) { return }
         let scrollView = app.scrollViews.firstMatch
         guard scrollView.exists else { return }
         for _ in 0..<maxAttempts {
             scrollView.swipeUp()
             if element.isHittable { return }
         }
+    }
+
+    /// Polls `isHittable` until it's true or the (scaled) timeout elapses.
+    /// `waitForExistence` only covers presence, not interactability, so an
+    /// element animating in needs this extra settle before `tap()`.
+    @discardableResult
+    private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(UITestTiming.scaled(timeout))
+        while Date() < deadline {
+            if element.isHittable { return true }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        return element.isHittable
     }
 
     private func executeLongPress(_ action: TestAction) throws {
@@ -389,12 +450,13 @@ class ActionAdapter {
             return
         }
 
-        // Resolve text value — from fixture or direct value
+        // Resolve text value — from fixture or direct value. Direct values
+        // support ${ENV_VAR} interpolation (e.g. per-run beta credentials).
         let textValue: String
         if let fixture = action.fixture {
             textValue = try readFixture(fixture)
         } else if let value = action.value {
-            textValue = value
+            textValue = interpolateEnv(value)
         } else {
             throw ActionError.missingParam("value or fixture", "replaceText")
         }
@@ -417,7 +479,7 @@ class ActionAdapter {
             return
         }
         el.tap()
-        el.typeText(value)
+        el.typeText(interpolateEnv(value))
     }
 
     private func executeWaitFor(_ action: TestAction) throws {
@@ -593,11 +655,13 @@ class ActionAdapter {
             isFirstLaunch = false
         }
 
-        // Apply additional launch arguments from the YAML action
+        // Apply additional launch arguments from the YAML action. Values
+        // support ${ENV_VAR} interpolation so e.g. the beta base URL can be
+        // injected per CI run (--api-base-url=${LMWF_E2E_BASE_URL}).
         if case .array(let yamlArgs) = action.launchArgs {
             for arg in yamlArgs {
                 if case .string(let value) = arg {
-                    args.append(value)
+                    args.append(interpolateEnv(value))
                 }
             }
         }

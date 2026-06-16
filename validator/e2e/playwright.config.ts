@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
  * Modes (env LMWF_E2E_MODE):
  *   - local  → baseURL http://localhost:3001 (validator with WEBSITE_DIST,
  *              DDB Local, Mailpit). Pre-merge in CI + local dev.
- *   - remote → baseURL https://beta.liftmark.app, uses /v1/__test__
+ *   - remote → baseURL https://beta.getlift.md, uses /v1/__test__
  *              endpoint for token mint. Post-Beta-deploy gate.
  *
  * Override baseURL via LMWF_E2E_BASE_URL if needed (e.g. for ad-hoc
@@ -16,7 +16,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const mode = (process.env.LMWF_E2E_MODE ?? 'local') as 'local' | 'remote';
 const defaultBaseUrl =
-  mode === 'remote' ? 'https://beta.liftmark.app' : 'http://localhost:3001';
+  mode === 'remote' ? 'https://beta.getlift.md' : 'http://localhost:3001';
 const baseURL = process.env.LMWF_E2E_BASE_URL ?? defaultBaseUrl;
 
 const isCI = Boolean(process.env.CI);

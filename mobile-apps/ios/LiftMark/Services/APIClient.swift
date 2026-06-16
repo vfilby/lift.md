@@ -65,13 +65,17 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    /// - Parameter baseURL: Hard-override. When nil, the client reads
-    ///   `LMWF_API_BASE_URL` from Info.plist (also a hard-override), and
-    ///   otherwise resolves prod vs beta per request from the
-    ///   `feature_flag.useBetaApi` UserDefaults key. Default off → prod.
+    /// - Parameter baseURL: Hard-override. When nil, the client reads (in
+    ///   priority order) the `--api-base-url=<url>` launch argument (test-only,
+    ///   see spec/services/ios-e2e-beta.md) and then `LMWF_API_BASE_URL` from
+    ///   Info.plist — both hard-overrides — and otherwise resolves prod vs beta
+    ///   per request from the `feature_flag.useBetaApi` UserDefaults key.
+    ///   Default off → prod.
     init(baseURL: URL? = nil, session: URLSession = .shared) {
         if let baseURL {
             self.staticBaseURL = baseURL
+        } else if let argURL = Self.launchArgBaseURL() {
+            self.staticBaseURL = argURL
         } else if let plistValue = Bundle.main.object(forInfoDictionaryKey: "LMWF_API_BASE_URL") as? String,
                   let url = URL(string: plistValue) {
             self.staticBaseURL = url
@@ -105,6 +109,18 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             )
         }
         self.decoder = decoder
+    }
+
+    /// Parse the test-only `--api-base-url=<url>` launch argument. Lets the
+    /// Layer-3 beta e2e plan point the client at the deployed beta backend for
+    /// the test process only, without touching the production beta-mode toggle.
+    /// See spec/services/ios-e2e-beta.md.
+    private static func launchArgBaseURL() -> URL? {
+        let prefix = "--api-base-url="
+        guard let arg = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }) else {
+            return nil
+        }
+        return URL(string: String(arg.dropFirst(prefix.count)))
     }
 
     func send<Req: Encodable, Res: Decodable>(
@@ -163,9 +179,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             useBeta = false
         }
         return useBeta
-            // Beta env. Migration to beta.getlift.md is a follow-up (GH #248);
-            // beta.liftmark.app still serves directly until then.
-            ? URL(string: "https://beta.liftmark.app")!
+            // Canonical beta host (GH #248 beta cutover is live). beta.liftmark.app
+            // now 308-redirects /v1/* here, but we target beta.getlift.md directly
+            // to skip the hop.
+            ? URL(string: "https://beta.getlift.md")!
             // Canonical prod host (GH #248). liftmark.app now 308-redirects
             // /v1/* here, but we target getlift.md directly to skip the hop.
             : URL(string: "https://getlift.md")!

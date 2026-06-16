@@ -1,0 +1,107 @@
+name: "Beta — completed workout pushes to outbox"
+
+# Layer-3 e2e (GH #137). Starts signed in via ${LMWF_E2E_SESSION} (--seed-session,
+# bypassing the login sheet — covered by beta-login). Imports + completes a
+# workout; under --live-backend the session-complete notification enqueues it to
+# the outbox. A relaunch then fires flushIfAuthenticated (the completed session +
+# queue persist across the non-reset relaunch), pushing it to the server. The CI
+# workflow asserts the round-trip via GET /v1/workouts/outbox.
+#
+# Deliberately NO --enable-flag=workoutInbox: the outbox is flag-independent, and
+# the flag would render the home inbox card (the account's inbox holds the probe
+# workout) which pushes button-import-workout below the fold.
+# See spec/services/ios-e2e-beta.md.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+    launchArgs:
+      - "--live-backend"
+      - "--api-base-url=${LMWF_E2E_BASE_URL}"
+      - "--seed-session=${LMWF_E2E_SESSION}"
+
+tests:
+  - name: "should complete a workout and flush it to the outbox"
+    steps:
+      # --- Import + complete a workout (proven flow from workout-flow.yaml) ---
+      - action: tap
+        target: "tab-home"
+      - action: delay
+        ms: 500
+      - action: waitFor
+        target: "button-import-workout"
+        timeout: 15000
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "input-markdown"
+        timeout: 10000
+      - action: replaceText
+        target: "input-markdown"
+        fixture: "detox-flow-workout.md"
+      - action: tap
+        target: "button-import"
+      - action: waitForText
+        text: "OK"
+        timeout: 10000
+      - action: tapText
+        text: "OK"
+      - action: waitForText
+        text: "Detox Flow Workout"
+        timeout: 10000
+      - action: tapText
+        text: "Detox Flow Workout"
+      - action: waitFor
+        target: "start-workout-button"
+        timeout: 10000
+      - action: tap
+        target: "start-workout-button"
+      - action: waitFor
+        target: "active-workout-screen"
+        timeout: 10000
+      - action: waitFor
+        target: "active-workout-finish-button"
+        timeout: 10000
+      - action: tap
+        target: "active-workout-finish-button"
+      - action: tryCatch
+        try:
+          - action: waitForText
+            text: "Finish Anyway"
+            timeout: 3000
+          - action: tapText
+            text: "Finish Anyway"
+        catch:
+          - action: tryCatch
+            try:
+              - action: waitForText
+                text: "Log Anyway"
+                timeout: 3000
+              - action: tapText
+                text: "Log Anyway"
+            catch:
+              - action: tryCatch
+                try:
+                  - action: waitForText
+                    text: "Finish"
+                    timeout: 3000
+                  - action: tapText
+                    text: "Finish"
+                catch: []
+      - action: waitFor
+        target: "workout-summary-done-button"
+        timeout: 15000
+      - action: tap
+        target: "workout-summary-done-button"
+
+      # --- Relaunch to flush the outbox (onAppear flushIfAuthenticated under
+      # --live-backend); the completed session + queue persist (no --reset-data
+      # on a non-first launch). CI then asserts the server outbox. ---
+      - action: launchApp
+        newInstance: true
+        launchArgs:
+          - "--live-backend"
+          - "--api-base-url=${LMWF_E2E_BASE_URL}"
+          - "--seed-session=${LMWF_E2E_SESSION}"
+      - action: delay
+        ms: 6000

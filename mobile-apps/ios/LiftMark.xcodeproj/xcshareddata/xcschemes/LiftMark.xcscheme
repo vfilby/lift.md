@@ -79,6 +79,9 @@
          <TestPlanReference
             reference = "container:TestPlans/Full.xctestplan">
          </TestPlanReference>
+         <TestPlanReference
+            reference = "container:TestPlans/BetaE2E.xctestplan">
+         </TestPlanReference>
       </TestPlans>
       <MacroExpansion>
          <BuildableReference

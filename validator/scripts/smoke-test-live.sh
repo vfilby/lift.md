@@ -7,8 +7,8 @@
 #   scripts/smoke-test-live.sh <base_url> [expected_commit]
 #
 # Examples:
-#   scripts/smoke-test-live.sh https://beta.liftmark.app
-#   scripts/smoke-test-live.sh https://beta.liftmark.app $(git rev-parse HEAD)
+#   scripts/smoke-test-live.sh https://beta.getlift.md
+#   scripts/smoke-test-live.sh https://beta.getlift.md $(git rev-parse HEAD)
 #
 # Exits non-zero if:
 #   - expected_commit was supplied and /version reports a different commit

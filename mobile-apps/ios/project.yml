@@ -229,7 +229,10 @@ schemes:
       # Two-tier test plans. Smoke (the default) runs the full unit suite plus a
       # render-only UI subset — fast and deterministic enough to gate every PR.
       # Full runs the entire UI suite (minus screenshot capture) and is driven
-      # nightly via `xcodebuild test -testPlan Full`. See TestPlans/*.xctestplan.
+      # nightly via `xcodebuild test -testPlan Full`. BetaE2E runs the Layer-3
+      # scenarios that hit the deployed beta backend (GH #137) via the
+      # `[iOS] E2E (beta)` workflow — NOT part of the PR gate or nightly.
+      # See TestPlans/*.xctestplan and spec/services/ios-e2e-beta.md.
       #
       # The UI-test timeout multiplier (UITEST_TIMEOUT_SCALE) is plumbed into the
       # runner process from within each plan's environmentVariableEntries: the
@@ -240,6 +243,7 @@ schemes:
         - path: TestPlans/Smoke.xctestplan
           defaultPlan: true
         - path: TestPlans/Full.xctestplan
+        - path: TestPlans/BetaE2E.xctestplan
       targets:
         - LiftMarkTests
         - LiftMarkUITests

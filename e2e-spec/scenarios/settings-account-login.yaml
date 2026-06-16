@@ -1,0 +1,59 @@
+name: "Settings account sign-in sheet"
+
+# Regression guard for GH #279: tapping Settings → Account → Sign in must
+# present the LoginView sheet on the FIRST tap and keep it presented. The
+# Account section is gated behind the workout-inbox feature flag, so the
+# scenario enables it via launch argument. Fresh launches start signed out
+# (--reset-data; tests never log in), which is the state that exposed the
+# "sheet flashes up and drops on the first tap" instability.
+
+setup:
+  - action: launchApp
+    newInstance: true
+    launchArgs:
+      - "--enable-flag=workoutInbox"
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+
+tests:
+  - name: "first Sign in tap presents the login sheet and it stays"
+    steps:
+      - action: tap
+        target: "tab-settings"
+      - action: waitFor
+        target: "settings-screen"
+        timeout: 15000
+      # The signed-out Account section exposes the Sign in button (the section
+      # is gated behind the workout-inbox flag enabled via launchArgs above).
+      - action: waitFor
+        target: "account-sign-in"
+        timeout: 15000
+      # Single tap — must present LoginView and keep it presented. Before the
+      # GH #279 fix the sheet could appear and immediately dismiss during launch
+      # settling, forcing a second tap.
+      - action: tap
+        target: "account-sign-in"
+      # The login form must appear...
+      - action: waitFor
+        target: "login-email"
+        timeout: 10000
+      # ...and must still be present a beat later (i.e. not torn down by a
+      # re-render), which is the actual user-facing contract.
+      - action: delay
+        ms: 1500
+      - action: expect
+        target: "login-email"
+        assertion: "toBeVisible"
+      - action: expect
+        target: "login-submit"
+        assertion: "toExist"
+      # Dismiss so the scenario leaves the app on a clean screen.
+      - action: tap
+        target: "login-cancel"

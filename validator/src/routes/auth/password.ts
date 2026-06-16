@@ -150,14 +150,18 @@ function classifyEmailError(err: unknown): string {
 }
 
 function appBaseUrl(): string {
-  // Hardcoded host derivation per spec — LMWF_ENV picks beta vs prod.
-  // Prod is the canonical getlift.md, which serves both the API (verify links
-  // hit /v1/*) and the web account pages (reset links hit /account/*) directly
-  // — no redirect hop (GH #248). Beta stays on beta.liftmark.app until its
-  // beta.getlift.md cutover lands. In local dev SMTP_HOST=localhost; the link
-  // still points at the public host, fine for Mailpit inspection.
+  // The deploy sets APP_BASE_URL to the env's serving origin (CDK
+  // servingWebOrigin) — beta.getlift.md in beta, getlift.md in prod. Both serve
+  // the API (/v1/*) and account pages (/account/*) directly, no redirect hop
+  // (GH #248; the beta cutover to beta.getlift.md is live).
+  //
+  // Fallback (env var unset — older deploy / local dev): the canonical host per
+  // LMWF_ENV. In local dev the link still points at the public host, fine for
+  // Mailpit inspection.
+  const fromEnv = process.env.APP_BASE_URL;
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
   const env = process.env.LMWF_ENV;
-  return env === 'beta' ? 'https://beta.liftmark.app' : 'https://getlift.md';
+  return env === 'beta' ? 'https://beta.getlift.md' : 'https://getlift.md';
 }
 
 async function sendVerificationEmail(

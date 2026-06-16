@@ -10,7 +10,7 @@ next layer exists.
 | Layer | What it exercises | Transport | Where it lives | Status |
 |-------|-------------------|-----------|----------------|--------|
 | **1 — HTTP flow integration** | The full client journey through the real Hono app + DynamoDB Local + Mailpit, asserting the *protocol contract* composes end-to-end (each step consumes the exact token/id the previous step emitted). | In-process `app.request()` against DDB Local + Mailpit. | `validator/tests/flow.test.ts` | **Implemented** |
-| **2 — Live smoke flow** | The same journey against a deployed beta stack over real HTTP (`smoke-flow-live.sh`), proving the deploy topology (Lambda + API GW + DDB + SES) wires up. | Real HTTPS against `beta.liftmark.app`. | `validator/scripts/smoke-flow-live.sh` (planned) | Deferred |
+| **2 — Live smoke flow** | The same journey against a deployed beta stack over real HTTP (`smoke-flow-live.sh`), proving the deploy topology (Lambda + API GW + DDB + SES) wires up. | Real HTTPS against `beta.getlift.md`. | `validator/scripts/smoke-flow-live.sh` (planned) | Deferred |
 | **3 — iOS vs. beta** | The iOS client driving the live beta backend, proving the Swift client and the server agree on the wire format. | iOS UI/integration test against beta. | iOS test target (planned) | Deferred |
 
 ### Layer 1 — HTTP flow integration (`flow.test.ts`)
@@ -111,7 +111,7 @@ validate (Vitest: typecheck + npm test)
   → e2e-local   (Playwright vs local DDB+Mailpit stack)   ← gates prod
   → deploy-beta
   → smoke-beta
-  → e2e-beta    (Playwright vs https://beta.liftmark.app)  ← gates prod
+  → e2e-beta    (Playwright vs https://beta.getlift.md)    ← gates prod
   → deploy-prod
 ```
 
@@ -161,7 +161,7 @@ those are visible to an in-process `app.request()`.
 | # | Topology delta it guards | Why Vitest can't see it | Where it lives | Mode |
 |---|--------------------------|-------------------------|----------------|------|
 | a | `lmwf_refresh` Set-Cookie carries `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/v1/auth` **over the wire** | In-process pins the `setCookie()` *call*; APIGW (multiValueHeaders) / CloudFront can strip/fold/rewrite the actual header bytes | `e2e/tests/auth-session.spec.ts` | both (esp. e2e-beta) |
-| b | Verify/reset **email link host** == env `appBaseUrl` (beta→`beta.liftmark.app`) | The host comes from the Lambda's `LMWF_ENV`; a misconfigured env builds wrong-host links. Only readable where the email body is — Mailpit = local mode | `auth-signup-verify.spec.ts` (verify) + `auth-forgot-reset.spec.ts` (reset) | **local only** (guarded on `getMode()`) |
+| b | Verify/reset **email link host** == env `appBaseUrl` (beta→`beta.getlift.md`) | The host comes from the Lambda's `LMWF_ENV`; a misconfigured env builds wrong-host links. Only readable where the email body is — Mailpit = local mode | `auth-signup-verify.spec.ts` (verify) + `auth-forgot-reset.spec.ts` (reset) | **local only** (guarded on `getMode()`) |
 | c | A minted PAT authenticates a live `GET /v1/workouts`, then 401s after revoke | Proves the deployed APIGW authorizer + scope middleware are actually wired in front of the route and honour revocation over the wire — not just the in-process middleware logic | `e2e/tests/pat-live-auth.spec.ts` | both (esp. e2e-beta) |
 | d | Real-SES signup → 201 (SES credentials resolve on the deployed stack) | The signup handler's email send is the last step before 201 and rolls back to 503 if it throws (`password.ts:282-325`); a 201 for the SES-verified address therefore proves SES creds resolve — invisible in-process where SMTP is Mailpit | `auth-signup-verify.spec.ts` (the existing signup POST, now explicitly asserted) | real send only in remote/beta |
 
@@ -178,7 +178,7 @@ test that gates prod:
 
 #### Beta-vs-prod SES caveat (honest scope of (d))
 
-e2e-beta runs against `beta.liftmark.app`, so test (d) proves **beta** SES
+e2e-beta runs against `beta.getlift.md`, so test (d) proves **beta** SES
 credentials resolve — NOT prod. The prod stack uses a separate SES identity
 and IAM role; a prod-only SES-credential regression (the original #137
 shape, if it recurred on the prod stack) would NOT be caught by (d). Closing
@@ -282,7 +282,7 @@ The suite runs in three modes, selected by env var `LMWF_E2E_MODE`:
   Verification + reset tokens are extracted from Mailpit's REST API at
   `http://localhost:8025/api/v1/messages`.
 - `remote` — used post-Beta-deploy. The suite runs against the public
-  beta hostname (`https://beta.liftmark.app`). Email is real SES — the
+  beta hostname (`https://beta.getlift.md`). Email is real SES — the
   suite calls the test-only `/v1/__test__/mint-token` endpoint
   (see below) to obtain verification + reset tokens without inspecting
   email.
@@ -376,8 +376,9 @@ spec, schemas, AASA). The entire `liftmark.app` family (`liftmark.app`, its lega
 follow AASA redirects, old installs pinned there). See "Domains & Hosting
 Topology" in `lmwf-validator.md`. This topology is a prod-only deploy concern, so
 it is verified only in `remote:prod` mode and is **not** wired into the pipeline
-(beta still serves from `beta.liftmark.app` — its `beta.getlift.md` cutover is a
-tracked GH #248 follow-up). These checks are also enforced post-deploy by the
+(beta's equivalent redirect topology — `beta.liftmark.app` → `beta.getlift.md`,
+live since the GH #248 beta cutover — is exercised separately). These checks are
+also enforced post-deploy by the
 `Verify canonical redirect topology` step in `validator-ci.yml`.
 
 These are HTTP-level checks (status / `Location` / `Content-Type`), run
@@ -404,7 +405,7 @@ with redirect-following disabled so the redirect itself is observable:
   at the downloaded website bundle, runs Playwright. Required check on
   the PR. No deploy happens without this green.
 - `e2e-beta` — runs on `push` only. Needs: `smoke-beta`. Executes the
-  same Playwright spec set against `https://beta.liftmark.app` with
+  same Playwright spec set against `https://beta.getlift.md` with
   `LMWF_E2E_MODE=remote` and the shared secret from GHA secrets. Blocks
   `deploy-prod`.
 
