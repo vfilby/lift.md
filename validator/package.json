@@ -16,7 +16,7 @@
     "@hono/node-server": "^2.0.4",
     "@types/aws-lambda": "^8.10.162",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "@types/nodemailer": "^8.0.0",
     "esbuild": "^0.28.1",
     "tsx": "^4.22.4",
