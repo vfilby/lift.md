@@ -43,34 +43,7 @@ final class CrashReporter: @unchecked Sendable {
         "rawContent"
     ]
 
-    /// Keys permitted on migrator-class error events. See spec/services/migrator.md §5.1.
-    /// Without this allowlist the `beforeSend` sanitizer strips these keys.
-    static let migratorMetadataAllowlist: Set<String> = [
-        "fromVersion",
-        "toIdentifier",
-        "bridgedIdentifierCount",
-        "durationMs",
-        "backupPath",
-        "backupSizeBytes",
-        "dbSizeBytes",
-        "freeBytes",
-        "verificationStep",
-        "failedIdentifier",
-        "lastIdentifier",
-        "fkTable",
-        "errorDomain",
-        "errorCode",
-        "integrityCheckOutput",
-        "resumeReason",
-        "buildNumber",
-        "lastSuccessBuildNumber"
-    ]
-
     private var isStarted = false
-
-    /// Test seam — when set, every `captureMigratorEvent` invocation is recorded here
-    /// regardless of whether Sentry is initialized. Only set from unit tests.
-    nonisolated(unsafe) static var migratorEventRecorder: ((String, [String: String]) -> Void)?
 
     /// Test seam — when set, every `captureError` invocation is recorded here
     /// (with the allowlist-filtered metadata) regardless of whether Sentry is
@@ -215,43 +188,9 @@ final class CrashReporter: @unchecked Sendable {
         if var extras = event.extra {
             let allAllowed = syncMetadataAllowlist
                 .union(parseMetadataAllowlist)
-                .union(migratorMetadataAllowlist)
             extras = extras.filter { allAllowed.contains($0.key) }
             event.extra = extras
         }
         return event
-    }
-
-    // MARK: - Migrator capture
-
-    /// Capture a migrator-class event. Used by `MigratorBridge` to emit structural events
-    /// (no user data). Emits even without an underlying `Error` since most migrator events
-    /// are informational milestones, not exceptions.
-    func captureMigratorEvent(
-        _ event: String,
-        level: SentryLevel = .info,
-        metadata: [String: String]? = nil,
-        dataIntegrityRisk: Bool = false,
-        dataLossTag: Bool = false
-    ) {
-        let filtered = Self.filter(metadata: metadata, allowlist: Self.migratorMetadataAllowlist)
-        Self.migratorEventRecorder?(event, filtered)
-        guard isStarted, Self.isCrashReportingEnabled else { return }
-        let sentryEvent = Event()
-        sentryEvent.message = SentryMessage(formatted: event)
-        sentryEvent.level = level
-        SentrySDK.capture(event: sentryEvent) { scope in
-            scope.setTag(value: LogCategory.database.rawValue, key: "category")
-            scope.setTag(value: event, key: "migrator_event")
-            if dataIntegrityRisk {
-                scope.setTag(value: "true", key: "data_integrity_risk")
-            }
-            if dataLossTag {
-                scope.setTag(value: "data_loss", key: "tag")
-            }
-            for (key, value) in filtered {
-                scope.setExtra(value: value, key: key)
-            }
-        }
     }
 }

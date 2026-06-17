@@ -26,9 +26,14 @@ struct SchemaSnapshot: Equatable {
     let tables: [Table]   // sorted by name
 
     static func capture(_ db: Database) throws -> SchemaSnapshot {
+        // Exclude migration-bookkeeping tables: legacy `schema_version` (still
+        // present in frozen seeds) and GRDB's own `grdb_migrations` (created on the
+        // live side by the migrator). Neither is app schema, and comparing them
+        // would spuriously fail seed-vs-live diffs.
         let tableNames = try Row.fetchAll(db, sql: """
             SELECT name FROM sqlite_master
             WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+              AND name NOT IN ('schema_version', 'grdb_migrations')
             ORDER BY name
         """).map { $0["name"] as String }
 

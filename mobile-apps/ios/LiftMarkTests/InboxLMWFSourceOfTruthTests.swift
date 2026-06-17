@@ -397,7 +397,8 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
         defer { DatabaseSeedLoader.cleanup(loaded) }
         let q = try DatabaseSeedLoader.openQueue(at: loaded.path)
 
-        try DatabaseManager.runMigrations(on: q, upTo: 18)
+        // schema_version=17 stamps v1..v17 as applied; the migrator then runs only v18.
+        try DatabaseSeedLoader.migrate(q, upTo: "v18_workout_inbox_drop_preparse")
 
         let columns: [String] = try q.read { db in
             try Row.fetchAll(db, sql: "PRAGMA table_info(workout_inbox)").map { $0["name"] }
@@ -407,8 +408,6 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
             ["inbox_id", "fetched_at", "created_at_server", "source_token_id", "lmwf_text"],
             "v18 must drop workout_json + summary_* columns"
         )
-        let version = try q.read { try Int.fetchOne($0, sql: "SELECT version FROM schema_version LIMIT 1") }
-        XCTAssertEqual(version, 18)
     }
 
     // MARK: - Helpers

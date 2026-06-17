@@ -4,7 +4,7 @@
 // but the Swift constants in this file are what the tests actually load. If you update a seed, update
 // both — the README in that directory notes this.
 //
-// DDL strings were initially captured by running `DatabaseManager.runMigrations(on:upTo:)` and dumping
+// DDL strings were initially captured by running the migrator up to version N and dumping
 // `sqlite_master`. The cross-check test (`testVNSeedMatchesLiveMigrateToVN`) guards against future drift
 // by diffing PRAGMA table_info + index names between live migrations and the seed.
 //

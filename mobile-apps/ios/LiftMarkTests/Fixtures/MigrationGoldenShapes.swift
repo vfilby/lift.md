@@ -7,15 +7,15 @@ import Foundation
 /// these constants — drift here signals a behavioral regression, not a schema typo.
 enum MigrationGoldenShapes {
 
-    /// Tables that must exist after migrating any valid seed up to `currentSchemaVersion`.
+    /// Tables that must exist after migrating any valid seed up to head.
     /// Ordered alphabetically so it also serves as the expected set when compared against
-    /// the live DB's `sqlite_master` table listing.
+    /// the live DB's `sqlite_master` table listing (excluding GRDB's `grdb_migrations`
+    /// bookkeeping table). The legacy `schema_version` table is dropped at v20.
     static let expectedTablesAtHead: [String] = [
         "ck_record_metadata",
         "gym_equipment",
         "gyms",
         "outbox_pending_queue",
-        "schema_version",
         "session_exercises",
         "session_sets",
         "set_measurements",

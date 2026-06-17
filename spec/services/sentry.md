@@ -99,26 +99,13 @@ Record IDs (UUIDs) are allowed in breadcrumbs but **not** in captured error meta
 
 Any key not on the allowlist is dropped silently. The allowlist is a compile-time `Set<String>` constant.
 
-### Migrator-class errors
+### Migrator-class errors (removed)
 
-Events emitted by the one-time GRDB migration bridge and post-bridge schema migrations. Structural only — no user data is ever attached.
-
-**Allowed metadata keys** (enforced by a separate compile-time `migratorMetadataAllowlist` in `CrashReporter` — without it, `beforeSend` sanitizes these away):
-
-- `fromVersion` — starting `schema_version.version` (Int as String)
-- `toIdentifier` — highest bridge identifier written (e.g. `v13_default_timer_countdown`)
-- `bridgedIdentifierCount` — Int as String
-- `durationMs` — Int as String
-- `backupPath` — file path only, never content
-- `backupSizeBytes`, `dbSizeBytes`, `freeBytes` — Int as String
-- `verificationStep` — one of `integrity`, `header`, `tables`, `rowCount`
-- `failedIdentifier` — String
-- `fkTable` — String (shared with sync-class allowlist)
-- `errorDomain`, `errorCode` — shared with sync-class allowlist
-- `integrityCheckOutput` — truncated to 2 KB; SQLite's `integrity_check` emits structural messages only
-- `resumeReason` — for the app-killed-mid-bridge breadcrumb
-
-The full event catalog and breadcrumb list lives in [`migrator.md`](migrator.md) §5.2 (single source of truth); do not duplicate it here.
+The one-time GRDB migration **bridge** emitted a `migrator_*` event family and required a dedicated
+`migratorMetadataAllowlist` in `CrashReporter`. The bridge and its telemetry were removed in GH #96
+once every active device had bridged (see [`migrator.md`](migrator.md) §6). Schema migrations now run
+through GRDB's `DatabaseMigrator` directly; a failed migration surfaces as an unhandled error/crash,
+not a bespoke event. No migrator-specific allowlist remains.
 
 ### Tags
 
@@ -126,9 +113,8 @@ Tags attached to captured events:
 
 | Tag | Values | Purpose |
 |-----|--------|---------|
-| `tag: "data_loss"` | set on `SyncSessionGuard` data-loss-detected / restore-failed paths, and on `migrator_bridge_restore_failed` | Target for a single alert rule |
+| `tag: "data_loss"` | set on `SyncSessionGuard` data-loss-detected / restore-failed paths | Target for a single alert rule |
 | `tag: "outbox_auth_failure"` | set on `OutboxPusherService` flush cycles that cannot push completed workouts because the session is missing/expired (GH #143) | Target an alert: a user has completed workouts that silently aren't syncing |
-| `data_integrity_risk` | `"true"` on every migrator failure event except `skipped_already_done`, `skipped_fresh_install`, `build_number_changed` | Target for a single migrator-failure alert rule. See [`migrator.md`](migrator.md) §5.4. |
 
 ### `beforeSend` hook
 

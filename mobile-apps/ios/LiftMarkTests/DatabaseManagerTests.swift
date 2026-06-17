@@ -73,22 +73,26 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(orphanCount, 0, "Cascade delete should remove child template_exercises")
     }
 
-    // MARK: - Schema Version
+    // MARK: - Migration bookkeeping
 
-    func testSchemaVersionIsSetCorrectly() throws {
+    /// GRDB's `grdb_migrations` is the sole schema bookkeeping after the legacy
+    /// `schema_version` chain was removed (GH #96). All registered identifiers
+    /// must be applied after the migrator runs.
+    func testAllMigrationsAreApplied() throws {
         let db = try DatabaseManager.shared.database()
-        let version = try db.read { db in
-            try Int.fetchOne(db, sql: "SELECT version FROM schema_version LIMIT 1")
+        let applied = try db.read { db in
+            try Set(String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations"))
         }
-        XCTAssertEqual(version, DatabaseManager.currentSchemaVersion, "Schema version should match head after all migrations")
+        XCTAssertEqual(applied, Set(DatabaseMigrations.identifiers), "All migrator identifiers should be applied")
     }
 
-    func testSchemaVersionHasExactlyOneRow() throws {
+    /// The legacy `schema_version` table is dropped by `v20_drop_legacy_schema_version`.
+    func testLegacySchemaVersionTableIsDropped() throws {
         let db = try DatabaseManager.shared.database()
-        let count = try db.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM schema_version")
+        let exists = try db.read { db in
+            (try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'")) ?? 0
         }
-        XCTAssertEqual(count, 1, "schema_version table should contain exactly one row")
+        XCTAssertEqual(exists, 0, "schema_version should be dropped at v20")
     }
 
     // MARK: - Table Creation
@@ -96,7 +100,6 @@ final class DatabaseManagerTests: XCTestCase {
     func testAllExpectedTablesExist() throws {
         let db = try DatabaseManager.shared.database()
         let expectedTables: Set<String> = [
-            "schema_version",
             "workout_templates",
             "template_exercises",
             "template_sets",
@@ -220,11 +223,11 @@ final class DatabaseManagerTests: XCTestCase {
         let db = try DatabaseManager.shared.database()
         XCTAssertNotNil(db)
 
-        // Schema should still be correct
-        let version = try db.read { db in
-            try Int.fetchOne(db, sql: "SELECT version FROM schema_version LIMIT 1")
+        // Schema should be fully migrated again (all identifiers applied).
+        let applied = try db.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM grdb_migrations") ?? -1
         }
-        XCTAssertEqual(version, DatabaseManager.currentSchemaVersion)
+        XCTAssertEqual(applied, DatabaseMigrations.identifiers.count)
     }
 
     // MARK: - Close
