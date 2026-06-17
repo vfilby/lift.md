@@ -5,7 +5,6 @@ extension DatabaseSeeds {
     // MARK: - v13 DDL and data (head)
 
     /// v13 DDL = v12 DDL + `default_timer_countdown INTEGER DEFAULT 0` appended to user_settings.
-    /// The test migration chain from v13 is a no-op — schema is at currentSchemaVersion.
     static let v13DDL: String = #"""
     CREATE TABLE workout_templates (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, tags TEXT,

@@ -1,23 +1,49 @@
 import Foundation
 import GRDB
 
-// GRDB `DatabaseMigrator` registration for LiftMark's v1..v13 schema.
-//
-// These migration bodies intentionally DUPLICATE the corresponding `DatabaseManager.migrateToVN`
-// SQL verbatim. Keeping two copies during the bridge era means PR 5 (legacy cleanup) is a pure
-// delete of `DatabaseManager.runMigrations` — no code migration required. Until PR 5 lands, the
-// upgrade-path tests exercise the legacy chain and the bridge path exercises the migrator chain;
-// any drift between the two is caught by those tests.
-//
-// See spec/services/migrator.md §4.2 and /tmp/grdb-migration-bridge-design.md §4.2.
+/// GRDB `DatabaseMigrator` registration for LiftMark's schema — the sole source of
+/// truth for the on-disk shape.
+///
+/// History: a one-time `MigratorBridge` once translated legacy `schema_version`-tracked
+/// databases into GRDB's `grdb_migrations` bookkeeping, while the hand-rolled
+/// `DatabaseManager.runMigrations` chain ran in parallel as a safety net. Both were
+/// removed in GH #96 once telemetry proved every active device had bridged;
+/// `v20_drop_legacy_schema_version` drops the now-unused `schema_version` table.
+///
+/// See spec/services/migrator.md.
+enum DatabaseMigrations {
 
-extension MigratorBridge {
+    /// Canonical migration identifiers, in order. This is a wire-level contract:
+    /// identifiers must never be reordered or renamed after first ship (GRDB persists
+    /// them as one row per identifier in `grdb_migrations`). See spec/services/migrator.md §1.
+    static let identifiers: [String] = [
+        "v1_bootstrap",
+        "v2_sync_metadata_stats",
+        "v3_developer_mode",
+        "v4_soft_delete_gyms",
+        "v5_countdown_sounds",
+        "v6_session_set_side",
+        "v7_accepted_disclaimer",
+        "v8_updated_at_cksync",
+        "v9_api_key_fk_indexes",
+        "v10_distance_columns",
+        "v11_gym_unique_fk_indexes",
+        "v12_set_measurements",
+        "v13_default_timer_countdown",
+        "v14_default_weight_step_lbs",
+        "v15_ai_prompt_toggles",
+        "v16_workout_inbox",
+        "v17_outbox_pending_queue",
+        "v18_workout_inbox_drop_preparse",
+        "v19_ck_record_metadata",
+        "v20_drop_legacy_schema_version"
+    ]
 
     static var migrator: DatabaseMigrator {
         var m = DatabaseMigrator()
 
         m.registerMigration("v1_bootstrap") { db in
-            // v1_bootstrap — full schema as of migrateToV1.
+            // v1_bootstrap — full schema as of the original v1 schema.
 
             // Template tables
             try db.execute(sql: """
@@ -430,8 +456,8 @@ extension MigratorBridge {
                 arguments: [now]
             )
 
-            // schema_version may not exist in GRDB-migrator-from-scratch flow;
-            // the legacy chain guarantees it did for pre-bridge DBs.
+            // schema_version may not exist in the GRDB-migrator-from-scratch flow;
+            // legacy pre-bridge DBs always had it. Dedup defensively when present.
             let hasSchemaVersion = try Int.fetchOne(
                 db,
                 sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
@@ -710,6 +736,15 @@ extension MigratorBridge {
                     updated_at    TEXT NOT NULL
                 )
                 """)
+        }
+
+        // v20: drop the legacy `schema_version` table. The hand-rolled migration
+        // chain and its one-time bridge (GH #79 / removed in #96) tracked progress
+        // in `schema_version`; GRDB's `grdb_migrations` is now the sole bookkeeping.
+        // `IF EXISTS` keeps this a no-op on fresh installs (which never create it).
+        // See spec/services/migrator.md §6.
+        m.registerMigration("v20_drop_legacy_schema_version") { db in
+            try db.execute(sql: "DROP TABLE IF EXISTS schema_version")
         }
 
         return m

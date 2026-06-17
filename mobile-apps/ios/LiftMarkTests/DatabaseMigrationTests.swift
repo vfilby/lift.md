@@ -2,34 +2,41 @@ import XCTest
 import GRDB
 @testable import LiftMark
 
-/// Upgrade-path tests for the hand-rolled `DatabaseManager.runMigrations` chain.
+/// Upgrade-path tests for the GRDB `DatabaseMigrator` chain (`DatabaseMigrations.migrator`).
 ///
-/// Each test loads a frozen seed (DDL + data) at a historical schema version, runs the live
-/// migration to head, and asserts both the universal invariants (§6a) and the behavior-specific
+/// Each test loads a frozen seed (DDL + data) at a historical schema version, then runs the live
+/// migrator to head and asserts both the universal invariants (§6a) and the behavior-specific
 /// assertions (§6b) from the GRDB migration spec (GH #79).
+///
+/// Seeds are loaded via `DatabaseSeedLoader.migrate`, which first stamps `grdb_migrations` with the
+/// identifiers v1..vN already implied by the seed's legacy `schema_version` — reproducing the
+/// production reality after the now-deleted one-time bridge (GH #96) — and then runs the migrator.
 ///
 /// Failures here pin **current** migration behavior — if a future migration intentionally
 /// changes one of these invariants, update the assertion as part of that migration PR. They are
-/// not a requirements spec; they are a regression guard for a hand-written migrator with SR1–SR4.
+/// not a requirements spec; they are a regression guard for the migrator with SR1–SR4.
 final class DatabaseMigrationTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Load a seed and run the live migration chain to head, returning a queue on the same file.
+    /// Load a seed and run the live migrator to head, returning a queue on the same file.
     /// Caller is responsible for calling `DatabaseSeedLoader.cleanup` via the returned LoadedSeed.
-    private func loadAndMigrate(ddl: String, data: String, upTo version: Int = DatabaseManager.currentSchemaVersion)
+    private func loadAndMigrate(ddl: String, data: String, upTo targetIdentifier: String? = nil)
         throws -> (DatabaseSeedLoader.LoadedSeed, DatabaseQueue)
     {
         let loaded = try DatabaseSeedLoader.load(ddl: ddl, data: data)
         let q = try DatabaseSeedLoader.openQueue(at: loaded.path)
-        try DatabaseManager.runMigrations(on: q, upTo: version)
+        try DatabaseSeedLoader.migrate(q, upTo: targetIdentifier)
         return (loaded, q)
     }
 
     private func listTables(_ db: Database) throws -> [String] {
+        // Excludes GRDB's own `grdb_migrations` bookkeeping table — golden shapes
+        // describe app schema only.
         try Row.fetchAll(db, sql: """
             SELECT name FROM sqlite_master
             WHERE type='table' AND name NOT LIKE 'sqlite_%'
+              AND name != 'grdb_migrations'
             ORDER BY name
         """).map { $0["name"] as String }
     }
@@ -56,13 +63,20 @@ final class DatabaseMigrationTests: XCTestCase {
     /// Applies the universal post-migration assertions to a just-migrated DB.
     private func assertUniversalInvariants(_ q: DatabaseQueue, label: String) throws {
         try q.read { db in
-            // 1. schema_version at head
-            let version = try Int.fetchOne(db, sql: "SELECT version FROM schema_version LIMIT 1")
-            XCTAssertEqual(version, DatabaseManager.currentSchemaVersion, "\(label): schema_version")
+            // 1. Legacy schema_version table is dropped at head (v20).
+            let schemaVersionTables = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
+            ) ?? -1
+            XCTAssertEqual(schemaVersionTables, 0, "\(label): schema_version should be dropped at v20")
 
-            // 2. exactly one schema_version row (SR flag: dedup)
-            let versionRows = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM schema_version") ?? -1
-            XCTAssertEqual(versionRows, 1, "\(label): schema_version row count (dedup)")
+            // 2. grdb_migrations records every registered identifier as applied.
+            let appliedCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM grdb_migrations") ?? -1
+            XCTAssertEqual(
+                appliedCount,
+                DatabaseMigrations.identifiers.count,
+                "\(label): all migrator identifiers applied"
+            )
 
             // 3. FK check
             let fkViolations = try Row.fetchAll(db, sql: "PRAGMA foreign_key_check")
@@ -137,7 +151,7 @@ final class DatabaseMigrationTests: XCTestCase {
 
     /// SR1/SR2/SR3 pinning: v12 silently drops dropset chain + tempo data. The v12 reshape behaves
     /// asymmetrically for is_amrap: **template_sets.is_amrap is preserved**, but
-    /// **session_sets.is_amrap is forced to 0** (see `migrateToV12` — the template copy selects the
+    /// **session_sets.is_amrap is forced to 0** (see the v12 migration — the template copy selects the
     /// column unchanged, the session copy substitutes the literal `0`). We pin both halves.
     func testV1Seed_v12DroppedFieldsAndIsAmrapAsymmetry() throws {
         let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
@@ -301,29 +315,4 @@ final class DatabaseMigrationTests: XCTestCase {
         }
     }
 
-    // MARK: - Synthetic future seed: runner must not mutate a future-versioned DB
-
-    func testV17SyntheticSeed_migrationRunnerIsNoOp() throws {
-        // Build a head-shaped DB with schema_version=20 to simulate "DB from the future".
-        let loaded = try DatabaseSeedLoader.load(
-            ddl: DatabaseSeeds.v17SyntheticDDL,
-            data: DatabaseSeeds.v17SyntheticData
-        )
-        defer { DatabaseSeedLoader.cleanup(loaded) }
-        let q = try DatabaseSeedLoader.openQueue(at: loaded.path)
-
-        // Snapshot "before" state.
-        let beforeVersion = try q.read { try Int.fetchOne($0, sql: "SELECT version FROM schema_version LIMIT 1") }
-        let beforeRows = try q.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM user_settings") ?? -1 }
-
-        // Runner should short-circuit: seedVersion (20) > currentVersion (19).
-        try DatabaseManager.runMigrations(on: q)
-
-        let afterVersion = try q.read { try Int.fetchOne($0, sql: "SELECT version FROM schema_version LIMIT 1") }
-        let afterRows = try q.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM user_settings") ?? -1 }
-
-        XCTAssertEqual(beforeVersion, 20, "seed sanity")
-        XCTAssertEqual(afterVersion, 20, "runner must not lower schema_version")
-        XCTAssertEqual(beforeRows, afterRows, "runner must not mutate a future-versioned DB")
-    }
 }

@@ -82,8 +82,6 @@ struct LiftMarkApp: App {
         // See spec/services/ios-e2e-beta.md.
         Self.seedSessionFromLaunchArgs()
 
-        Self.seedMigratorFailureFromLaunchArgs()
-
         #if DEBUG
         // Runs after --reset-data (clean DB) so seeded rows survive. Drives the
         // auth-sync banner UI tests (GH #143 banner fix).
@@ -147,35 +145,6 @@ struct LiftMarkApp: App {
         }
     }
     #endif
-
-    /// Test seam: `--seed-migrator-failure <case>` lets UI tests pre-populate the
-    /// migrator bridge's failure state so the boot-time alert/stall flow is exercisable
-    /// without triggering a real failure. `<case>` is a `MigratorBridgeFailure` raw value.
-    /// Optional companion args `--seed-required-bytes <Int>` and `--seed-from-version <Int>`
-    /// set numeric context used by message substitution.
-    private static func seedMigratorFailureFromLaunchArgs() {
-        let args = ProcessInfo.processInfo.arguments
-        guard let idx = args.firstIndex(of: "--seed-migrator-failure"),
-              idx + 1 < args.count,
-              let failure = MigratorBridgeFailure(rawValue: args[idx + 1]) else {
-            return
-        }
-        var context = MigratorBridgeFailureContext()
-        if let rIdx = args.firstIndex(of: "--seed-required-bytes"),
-           rIdx + 1 < args.count,
-           let bytes = Int64(args[rIdx + 1]) {
-            context.requiredBytes = bytes
-        }
-        if let vIdx = args.firstIndex(of: "--seed-from-version"),
-           vIdx + 1 < args.count,
-           let version = Int(args[vIdx + 1]) {
-            context.fromVersion = version
-        }
-        MigratorBridgeFailure.persist(failure, context: context)
-        // Prevent the real bridge from running and clearing the seeded failure.
-        // This arg is strictly for UI-test harness use.
-        MigratorBridge.isEnabled = false
-    }
 
     /// Test seam: `--seed-session=<accessJWT>:<refreshToken>` writes the pair
     /// straight to the Keychain so a UI test launches already authenticated,

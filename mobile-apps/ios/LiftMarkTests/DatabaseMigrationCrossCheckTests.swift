@@ -23,7 +23,8 @@ final class DatabaseMigrationCrossCheckTests: XCTestCase {
     private func captureLiveSnapshot(upTo version: Int) throws -> (SchemaSnapshot, DatabaseSeedLoader.LoadedSeed) {
         let loaded = try DatabaseSeedLoader.load(ddl: "")
         let q = try DatabaseSeedLoader.openQueue(at: loaded.path)
-        try DatabaseManager.runMigrations(on: q, upTo: version)
+        // Fresh (empty) DB: nothing to stamp, so the migrator runs v1..vN from scratch.
+        try DatabaseSeedLoader.migrate(q, upTo: DatabaseMigrations.identifiers[version - 1])
         let snap = try q.read { try SchemaSnapshot.capture($0) }
         return (snap, loaded)
     }
