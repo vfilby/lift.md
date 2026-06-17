@@ -8,7 +8,10 @@
 //   1. In the Beta group, not yet in the Pre-flight group
 //   2. Build number > newest already in the Pre-flight group (downgrade guard)
 //   3. Build age ≥ SOAK_HOURS
-//   4. Build number not in BLOCKED_BUILDS (from block-promotion/build-N git tags)
+//   4. Build number not in BLOCKED_BUILDS (from block-promotion/build-N git tags).
+//      These tags can be created manually, or automatically by the nightly UI
+//      suite (swift-nightly.yml) when it fails on the code that produced the build;
+//      a subsequent green nightly on the same commit removes the tag.
 //   5. Sentry session count for the build's release ≥ MIN_SESSIONS
 //   6. Sentry crash-free session rate ≥ MIN_CRASH_FREE_RATE
 //   7. Sentry unresolved error/fatal issues for the release ≤ MAX_UNRESOLVED_ISSUES
