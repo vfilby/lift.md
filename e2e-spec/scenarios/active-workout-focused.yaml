@@ -68,10 +68,27 @@ tests:
       - action: waitFor
         target: "start-workout-button"
         timeout: 5000
-      - action: tap
-        target: "start-workout-button"
-      # CRITICAL: The active workout screen MUST appear
-      # If the session is created but navigation fails, this test catches it
+      # The Start → active-workout-screen nav is a dropped-tap flake point
+      # (nightly timeout 2026-06-17, issue #296): the Start tap silently fails
+      # to register, so the screen never pushes and the wait times out on
+      # nothing. Mirror the finish-step mitigation below — probe non-asserting,
+      # re-tap on a miss, then assert for real so a genuine nav regression (the
+      # original purpose of this step) still surfaces.
+      - action: tryCatch
+        try:
+          - action: tap
+            target: "start-workout-button"
+          # Non-asserting probe; if absent, fall to the retry.
+          - action: waitFor
+            target: "active-workout-screen"
+            timeout: 12000
+        catch:
+          # Retry: a dropped tap left us on the workout detail screen. Re-tap
+          # Start; the asserting waitFor below then confirms navigation.
+          - action: tap
+            target: "start-workout-button"
+      # CRITICAL: The active workout screen MUST appear. Asserting waitFor — if
+      # the session is created but navigation fails, this test catches it.
       - action: waitFor
         target: "active-workout-screen"
         timeout: 10000
