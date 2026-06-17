@@ -5,6 +5,15 @@ name: '[iOS] Nightly UI suite'
 # gate runs the Smoke test plan (unit + render checks); this workflow runs the
 # Full test plan nightly against main. Failures open/append a tracking issue so
 # a red nightly is never silently ignored.
+#
+# It also feeds the Pre-flight promotion gate. The nightly is time-triggered, not
+# build-triggered, so it can't certify a build as "passed" — but it CAN flag code
+# as known-bad. On failure it tags the newest build cut from code reachable at the
+# tested commit (`block-promotion/build-N`), which promote-preflight.mjs treats as
+# ineligible. On success it clears that same tag, so re-running the nightly green
+# (e.g. after fixing a flake, or via manual workflow_dispatch on the same commit)
+# automatically unblocks the build. This is fail-OPEN: only builds with a recorded
+# nightly failure are blocked. See gate #4 in .github/scripts/promote-preflight.mjs.
 
 on:
   schedule:
@@ -24,7 +33,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 90
     permissions:
-      contents: read
+      contents: write # push/delete block-promotion/build-N tags
       issues: write
     defaults:
       run:
@@ -34,6 +43,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          # Full history + tags so we can find the deploy/* tag reachable from the
+          # tested commit and map it to a build number for the promotion gate.
+          fetch-depth: 0
 
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
@@ -70,6 +83,7 @@ jobs:
       # -retry-tests-on-failure — flakes should surface and be fixed (issue #106),
       # not be masked by auto-retry.
       - name: Run full suite (-testPlan Full)
+        id: run_suite
         # The shared macos-26 runner boots the simulator, launches the app, and
         # animates 2-3x slower under load than a dev machine. Scale every UI-test
         # timeout so slow renders/launches are absorbed instead of surfacing as
@@ -95,7 +109,65 @@ jobs:
           path: mobile-apps/ios/TestResults.xcresult
           retention-days: 14
 
-      # A non-gating nightly is worthless if a red run goes unnoticed. On
+      # Map the tested commit to a build number for the promotion gate: the
+      # newest deploy/* tag reachable from HEAD. release-pipeline tags builds
+      # deploy/MAJOR.MINOR.PATCH where the build number is the PATCH. Runs on
+      # both pass and fail (always()) so the next two steps can act on the result.
+      - name: Resolve candidate build number
+        id: candidate
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          git fetch --tags --quiet
+          LATEST=$(git tag -l 'deploy/*' --merged HEAD | sed 's|deploy/||' | sort -V | tail -n1)
+          if [ -z "$LATEST" ]; then
+            echo "No deploy/* tag reachable from HEAD — no build to flag."
+            echo "build=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BUILD=$(echo "$LATEST" | cut -d. -f3)
+          echo "Candidate build: $BUILD (from deploy/$LATEST)"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+
+      # Nightly red → flag the covered build as ineligible for Pre-flight. Gated on
+      # the test step's own outcome (not failure()) so an infra/setup failure does
+      # not block a build. Idempotent: skip if the tag already exists.
+      - name: Block promotion on nightly failure
+        if: always() && steps.run_suite.outcome == 'failure' && steps.candidate.outputs.build != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          TAG: block-promotion/build-${{ steps.candidate.outputs.build }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "${TAG} already exists — build already blocked."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag "${TAG}" "${{ github.sha }}"
+            git push origin "${TAG}"
+            echo "::warning::Tagged ${TAG} — build ${{ steps.candidate.outputs.build }} is now ineligible for Pre-flight promotion."
+          fi
+
+      # Nightly green → clear any block on the covered build. A re-run that goes
+      # green on the same commit (manual workflow_dispatch, or a flake that passes)
+      # therefore re-enables promotion automatically. Only the build covered by
+      # this commit is unblocked; older genuinely-bad builds stay blocked.
+      - name: Unblock promotion on nightly success
+        if: always() && steps.run_suite.outcome == 'success' && steps.candidate.outputs.build != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          TAG: block-promotion/build-${{ steps.candidate.outputs.build }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git push origin ":refs/tags/${TAG}"
+            echo "Removed ${TAG} — nightly green again, build ${{ steps.candidate.outputs.build }} is eligible for Pre-flight promotion."
+          else
+            echo "No ${TAG} to remove — build not currently blocked."
+          fi
+
+      # A non-gating-by-default nightly is worthless if a red run goes unnoticed. On
       # failure, open a tracking issue (or append to the existing open one so we
       # don't spam a new issue every night).
       - name: Open/append failure issue
