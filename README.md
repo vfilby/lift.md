@@ -1,5 +1,9 @@
 # LiftMark
 
+[![iOS Release Pipeline](https://github.com/vfilby/lift.md/actions/workflows/release-pipeline.yml/badge.svg?branch=main)](https://github.com/vfilby/lift.md/actions/workflows/release-pipeline.yml)
+[![iOS Nightly UI Suite](https://github.com/vfilby/lift.md/actions/workflows/swift-nightly.yml/badge.svg?branch=main)](https://github.com/vfilby/lift.md/actions/workflows/swift-nightly.yml)
+[![Validator](https://github.com/vfilby/lift.md/actions/workflows/validator-ci.yml/badge.svg?branch=main)](https://github.com/vfilby/lift.md/actions/workflows/validator-ci.yml)
+
 Public beta: https://testflight.apple.com/join/u8EJFzYu
 
 I have tried many different fitness apps and programs to help me create and track workouts but they tend to be limited in what they allow you to do and they make it difficult to import of export workouts.  I have spent nearly as much time "creating" or "tweaking" workouts as I have actually working out in some cases. I want something that gives me all the benefits of tracking without the tedium.
