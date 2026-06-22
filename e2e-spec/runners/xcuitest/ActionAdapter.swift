@@ -51,6 +51,21 @@ class ActionAdapter {
         self.fixturesPath = fixturesPath
     }
 
+    /// Terminate the app only when there is a live process to terminate.
+    ///
+    /// Under iOS 26 memory pressure the app host can be SIGKILL'd before a
+    /// `newInstance` relaunch runs. Calling `XCUIApplication.terminate()` on an
+    /// already-dead process makes XCTest record a "Failed to terminate …:0"
+    /// failure (pid resolves to 0). `terminate()` is non-throwing, so a tryCatch
+    /// can't swallow it — gating on `app.state` is the only way to avoid the
+    /// spurious failure. Skipping the call when not running is harmless: the goal
+    /// of terminate here is purely to guarantee a fresh process before relaunch.
+    private func terminateIfRunning() {
+        if app.state != .notRunning {
+            app.terminate()
+        }
+    }
+
     // MARK: - Public
 
     func execute(_ action: TestAction) throws {
@@ -644,7 +659,7 @@ class ActionAdapter {
 
     private func executeLaunchApp(_ action: TestAction) throws {
         if action.newInstance == true {
-            app.terminate()
+            terminateIfRunning()
         }
         // Build launch arguments from scratch each time
         var args: [String] = []
@@ -698,7 +713,7 @@ class ActionAdapter {
         // path issues where the test runner's temp directory differs from the
         // app's sandboxed container (which causes validateDeepLinkPath to reject
         // the path).
-        app.terminate()
+        terminateIfRunning()
         if let content = sharedFileContent,
            url.contains("liftmark://") {
             let base64 = Data(content.utf8).base64EncodedString()
