@@ -25,7 +25,7 @@ jobs:
         shell: bash --noprofile --norc -eo pipefail {0}
         working-directory: mobile-apps/ios
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: SwiftLint
         run: |
@@ -113,7 +113,7 @@ jobs:
       build_number: ${{ steps.version.outputs.build_number }}
       marketing_version: ${{ steps.version.outputs.marketing_version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer

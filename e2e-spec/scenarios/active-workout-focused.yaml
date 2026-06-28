@@ -40,11 +40,29 @@ tests:
   # Issue 7: Workout detail must display weight values from imported plan
   - name: "workout detail shows exercise weights after import"
     steps:
-      - action: tapText
-        text: "Active Workout Test"
+      # The workout-row → detail nav is a dropped-tap flake point (nightly
+      # timeout 2026-06-26): the tap on the plan name silently fails to
+      # register, so the detail screen never pushes and the wait times out on
+      # nothing. Mirror the Start- and Finish-step mitigations below — probe
+      # non-asserting, re-tap on a miss, then assert for real so a genuine nav
+      # regression still surfaces.
+      - action: tryCatch
+        try:
+          - action: tapText
+            text: "Active Workout Test"
+          # Non-asserting probe; if absent, fall to the retry.
+          - action: waitFor
+            target: "workout-detail-view"
+            timeout: 12000
+        catch:
+          # Retry: a dropped tap left us on the workout list. Re-tap the plan
+          # name; the asserting waitFor below then confirms navigation.
+          - action: tapText
+            text: "Active Workout Test"
+      # Asserting waitFor — if nav genuinely regressed, this still fails.
       - action: waitFor
         target: "workout-detail-view"
-        timeout: 5000
+        timeout: 10000
       # Verify exercise name is shown
       - action: waitForText
         text: "Bench Press"

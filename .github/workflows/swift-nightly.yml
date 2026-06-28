@@ -42,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Full history + tags so we can find the deploy/* tag reachable from the
           # tested commit and map it to a build number for the promotion gate.

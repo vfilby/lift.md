@@ -39,7 +39,7 @@ jobs:
     # swift-ci.yml).
     if: github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Full history so the PR/push commit range can be scanned.
           fetch-depth: 0

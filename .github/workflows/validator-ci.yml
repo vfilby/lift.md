@@ -34,7 +34,7 @@ jobs:
     outputs:
       validator: ${{ steps.filter.outputs.validator }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -69,7 +69,7 @@ jobs:
       run:
         working-directory: validator
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: needs.changes.outputs.validator == 'true'
       - uses: actions/setup-node@v6
         if: needs.changes.outputs.validator == 'true'
@@ -93,7 +93,7 @@ jobs:
     if: ${{ needs.changes.outputs.validator == 'true' && needs.validate.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
@@ -154,7 +154,7 @@ jobs:
     # passes `-sharedDb`; we re-use it here so CI stays in lock-step
     # with `scripts/e2e-local.sh`.
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -277,7 +277,7 @@ jobs:
       AWS_REGION: us-west-2
       CI: 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -331,7 +331,7 @@ jobs:
     if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs['deploy-beta'].result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Smoke test beta
         run: |
           chmod +x validator/scripts/smoke-test-live.sh
@@ -357,7 +357,7 @@ jobs:
       AWS_DEFAULT_REGION: us-west-2
       AWS_REGION: us-west-2
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -434,7 +434,7 @@ jobs:
       AWS_REGION: us-west-2
       CI: 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -488,7 +488,7 @@ jobs:
     if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs['deploy-prod'].result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Smoke test prod
         run: |
           chmod +x validator/scripts/smoke-test-live.sh
