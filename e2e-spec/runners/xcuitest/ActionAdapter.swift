@@ -476,13 +476,43 @@ class ActionAdapter {
             throw ActionError.missingParam("value or fixture", "replaceText")
         }
 
+        robustReplaceText(el, with: textValue)
+    }
+
+    /// Replace a field's contents via hardware-keyboard select-all + type,
+    /// defending against the XCUITest flake that drops the modifier on the
+    /// first synthesized keystroke after focus.
+    ///
+    /// We use hardware-keyboard shortcuts rather than the UIKit edit menu: on
+    /// iOS 26 the "Select All" / "Paste" menu items don't reliably appear on
+    /// SwiftUI TextEditors via long-press, and the repeated menu probes cascade
+    /// into the accessibility-snapshot SIGKILL.
+    ///
+    /// The hazard: if the keyboard isn't fully up when `typeKey("a", .command)`
+    /// fires, XCUITest occasionally loses the ⌘ modifier and types a literal
+    /// "a". `typeText` then appends the real content, leaving `a# Push Day…` —
+    /// which fails LMWF header validation, disables the Import button, and
+    /// strands the import (observed in nightly testHistoryExport/testPlanExport
+    /// as "Timed out waiting for text 'OK'"). We wait for the keyboard to
+    /// settle, then verify the field holds exactly the intended text and retry
+    /// once on mismatch.
+    func robustReplaceText(_ el: XCUIElement, with text: String) {
         el.tap()
-        // Use hardware-keyboard shortcuts rather than the UIKit edit menu.
-        // On iOS 26 the "Select All" / "Paste" menu items don't reliably
-        // appear on SwiftUI TextEditors via long-press, and the repeated
-        // menu probes cascade into the accessibility-snapshot SIGKILL.
-        el.typeKey("a", modifierFlags: .command)
-        el.typeText(textValue)
+        // Let the keyboard come up so the first keystroke keeps its modifier.
+        _ = app.keyboards.firstMatch.waitForExistence(timeout: UITestTiming.scaled(5))
+
+        for attempt in 0..<2 {
+            el.typeKey("a", modifierFlags: .command)
+            el.typeText(text)
+            if (el.value as? String) == text { return }
+
+            // Mismatch — typically a dropped ⌘ left a stray leading char.
+            // Clear the field and try once more before giving up.
+            NSLog("[robustReplaceText] field value mismatch on attempt \(attempt + 1); clearing and retrying")
+            el.tap()
+            el.typeKey("a", modifierFlags: .command)
+            el.typeText(XCUIKeyboardKey.delete.rawValue)
+        }
     }
 
     private func executeTypeText(_ action: TestAction) throws {
@@ -909,10 +939,8 @@ class ActionAdapter {
             return
         }
 
-        // Hardware-keyboard select-all + typeText. See executeReplaceText for why.
-        inputMarkdown.tap()
-        inputMarkdown.typeKey("a", modifierFlags: .command)
-        inputMarkdown.typeText(content)
+        // Select-all + type with the dropped-modifier guard. See robustReplaceText.
+        robustReplaceText(inputMarkdown, with: content)
 
         guard let importBtn = waitForAnyElement(byId: "button-import", timeout: 5) else {
             XCTFail("button-import not found for runFixture")
