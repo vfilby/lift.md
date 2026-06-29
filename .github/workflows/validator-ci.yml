@@ -83,6 +83,84 @@ jobs:
         if: needs.changes.outputs.validator == 'true'
         run: npm run ${{ matrix.check }}
 
+  # ── Stage 1.5: integration ─────────────────────────────────────────────
+  # Vitest integration tier (tests/{repositories,middleware,routes}/** +
+  # flow.test.ts) against a live DynamoDB Local + Mailpit stack. These tests
+  # gate on DDB_ENDPOINT/SMTP_HOST and self-skip under the plain
+  # `validate (test)` job (which exports neither) — so WITHOUT this job the
+  # ~219 integration tests (every IDOR / scope / token-rotation / dedup /
+  # tier-gate contract, plus the Layer 1 full-flow suite) run NOWHERE in CI
+  # and gate nothing. This job is what makes "Vitest hard-gates prod" true.
+  # It is lighter than e2e-local: the suite drives the Hono app in-process
+  # via app.request(), so it needs neither the website bundle nor a running
+  # server nor Playwright — only DDB Local + Mailpit. Runs on PR + push.
+  # See spec/services/validator-e2e.md (Layer 1 + Pipeline integration).
+  integration:
+    name: integration
+    needs: changes
+    if: ${{ needs.changes.outputs.validator == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: validator
+    # NOTE: do NOT use GHA `services:` for DynamoDB Local — the default image
+    # command runs WITHOUT `-sharedDb`, so the bootstrap writes tables into
+    # one credential-scoped namespace and the test client reads from another
+    # (ResourceNotFoundException). The repo docker-compose.yml passes
+    # `-sharedDb`; reuse it, exactly as e2e-local does.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: validator/package-lock.json
+      - name: Install validator deps
+        run: npm ci --no-audit --no-fund
+      - name: Bring up DDB Local + Mailpit
+        run: |
+          set -euo pipefail
+          docker compose up -d
+          echo "==> waiting for DynamoDB Local"
+          for i in $(seq 1 60); do
+            if docker compose ps dynamodb-local --format json 2>/dev/null | grep -q '"Health":"healthy"'; then break; fi
+            sleep 0.5
+          done
+          echo "==> waiting for Mailpit"
+          for i in $(seq 1 60); do
+            if docker compose ps mailpit --format json 2>/dev/null | grep -q '"Health":"healthy"'; then break; fi
+            sleep 0.5
+          done
+      - name: Bootstrap DynamoDB tables
+        run: npx tsx scripts/ddb-local-bootstrap.ts
+        env:
+          DDB_ENDPOINT: http://localhost:8000
+          AWS_REGION: us-west-2
+          AWS_ACCESS_KEY_ID: local
+          AWS_SECRET_ACCESS_KEY: local
+      - name: Run Vitest integration suite (full, against live stack)
+        run: npx vitest run
+        env:
+          DDB_ENDPOINT: http://localhost:8000
+          AWS_REGION: us-west-2
+          AWS_ACCESS_KEY_ID: local
+          AWS_SECRET_ACCESS_KEY: local
+          DDB_TABLE_USERS: lmwf-local-users
+          DDB_TABLE_IDENTITIES: lmwf-local-identities
+          DDB_TABLE_PAT_TOKENS: lmwf-local-pat_tokens
+          DDB_TABLE_ENTITLEMENTS: lmwf-local-entitlements
+          DDB_TABLE_REFRESH_TOKENS: lmwf-local-refresh_tokens
+          DDB_TABLE_WORKOUT_INBOX: lmwf-local-workout_inbox
+          DDB_TABLE_WORKOUT_OUTBOX: lmwf-local-workout_outbox
+          SMTP_HOST: localhost
+          SMTP_PORT: '1025'
+          SMTP_FROM: noreply@local.test
+          JWT_SECRET: ci-integration-jwt-secret-do-not-use-in-prod
+          MAILPIT_API: http://localhost:8025
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs --no-color || true
+
   # ── Stage 2: build ─────────────────────────────────────────────────────
   # Produces validator/dist/ and website/dist/ and uploads both as artifacts
   # so deploy jobs deploy exactly what was tested. CDK's BucketDeployment
@@ -266,8 +344,8 @@ jobs:
   # (AWS_ACCESS_KEY_ID/SECRET) per environment.
   deploy-beta:
     name: deploy-beta
-    needs: [changes, build, e2e-local]
-    if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs.build.result == 'success' && needs['e2e-local'].result == 'success' }}
+    needs: [changes, build, e2e-local, integration]
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs.build.result == 'success' && needs['e2e-local'].result == 'success' && needs.integration.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: beta
