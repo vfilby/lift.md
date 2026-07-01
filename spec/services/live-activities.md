@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Display workout progress on the iOS Lock Screen and Dynamic Island via Live Activities. This gives users at-a-glance workout status without unlocking their device or navigating back to the app.
+Display workout progress on the iOS Lock Screen, Dynamic Island, and Apple Watch Smart Stack via Live Activities. This gives users at-a-glance workout status without unlocking their device or navigating back to the app.
 
 ## Public API
 
@@ -123,6 +123,25 @@ The rest timer uses `timerEndDate` with SwiftUI's `Text(date, style: .timer)`. C
 
 Note: The system `.timer` style automatically counts down to the target date, then counts up past it.
 
+#### Apple Watch Smart Stack (Small Activity Family)
+
+The widget must opt into Apple Watch rendering via `.supplementalActivityFamilies([.small])` on the `ActivityConfiguration`. Without this opt-in, watchOS shows only a default card built from the Dynamic Island compact views (dumbbell icon + percentage), which conveys no workout information.
+
+The content view reads the `\.activityFamily` environment value and renders a dedicated compact layout for `.small` (Apple Watch Smart Stack); `.medium` and unknown families render the standard lock-screen layout.
+
+The small-family layout must show "what's up next" so the watch card is useful mid-workout without pulling out the phone:
+
+- **Active set state**:
+  - Top row: Exercise name (left), "Set X/Y" (right)
+  - Middle row: Weight × reps (e.g., "185 lbs × 5")
+  - Bottom row: "Next: [exercise name]" (left, omitted when nil), percentage complete (right)
+- **Rest timer state**:
+  - Top row: "Rest" label (left), countdown timer (right, green when time remains / red when expired — same color logic as other surfaces)
+  - Middle row: "Next: [exercise name]" (omitted when nil)
+  - Bottom row: Next set detail (weight × reps, omitted when nil)
+- No progress bar in either state — vertical space is limited; the percentage in the active-set layout is sufficient.
+- The small-family layout uses system fonts, not the app's custom fonts: the watch renders the view on-device and the custom fonts bundled in the widget extension are not available there.
+
 ### Update Throttling
 
 `updateWorkoutLiveActivity()` throttles ordinary content refreshes to at most one per second to avoid excessive Live Activity churn during rapid set logging. However, two transitions are considered significant and must bypass the throttle so they are never dropped:
@@ -163,6 +182,7 @@ The service is called from the session store during these actions:
 - WidgetKit framework (widget extension).
 - The `LiveWorkouts` widget extension must be configured in `project.yml` and embedded in the main app.
 - The widget extension must use the same `WorkoutActivityAttributes` type as the main app (shared source file included in both targets).
+- Apple Watch Smart Stack rendering requires iOS 18 / watchOS 11 or later (`supplementalActivityFamilies`); the paired iPhone drives the activity — no watchOS target is required.
 
 ## Dependencies
 
@@ -205,6 +225,12 @@ All operations silently catch and discard errors. Live Activities are an optiona
 - Rest timer state must include: "Rest" as exercise name, timer end date, next exercise name with its set details, and progress.
 - When there is no next exercise (last exercise in workout), `nextExerciseName` and `nextSetDetail` must be nil.
 - Widget UI must show green timer color when time remains and red when timer has expired.
+
+### Apple Watch Smart Stack
+- The `ActivityConfiguration` must declare `.supplementalActivityFamilies([.small])` so watchOS renders the app-provided layout instead of the default icon + percentage card.
+- The small-family active-set layout must include the current exercise name, set info, weight × reps, next exercise name (when present), and progress percentage.
+- The small-family rest layout must include the countdown timer and the next exercise name with its set detail (when present).
+- The small-family views must use only system fonts (custom widget fonts are unavailable on the watch).
 
 ### Cursor Advance on Skip
 - Skipping the last pending set of an exercise resolves the current exercise to the next exercise with pending sets; the resolved active-set state must name that next exercise, not the skipped one.

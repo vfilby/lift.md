@@ -5,8 +5,8 @@ import SwiftUI
 struct LiveWorkoutsLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
-            // Lock screen / banner UI
-            lockScreenView(context: context)
+            // Lock screen / banner / watch Smart Stack UI
+            LiveWorkoutContentView(context: context)
                 .activityBackgroundTint(.black.opacity(0.8))
                 .activitySystemActionForegroundColor(.white)
 
@@ -39,12 +39,164 @@ struct LiveWorkoutsLiveActivity: Widget {
             }
             .widgetURL(URL(string: "liftmark://workout"))
         }
+        .supplementalActivityFamilies([.small])
     }
 
-    // MARK: - Lock Screen View
+    // MARK: - Dynamic Island Expanded
 
     @ViewBuilder
-    private func lockScreenView(context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
+    private func expandedLeading(context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
+        let state = context.state
+
+        if state.isRestTimer {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Rest")
+                    .font(.lmHeadline)
+                if let nextName = state.nextExerciseName {
+                    Text("Next: \(nextName)")
+                        .font(.lmCaption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(state.exerciseName)
+                    .font(.lmHeadline)
+                    .lineLimit(1)
+                if !state.weightReps.isEmpty {
+                    Text(state.setInfo.isEmpty ? state.weightReps : "\(state.setInfo) \u{2022} \(state.weightReps)")
+                        .font(.lmCaption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func expandedTrailing(context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
+        let state = context.state
+
+        if let timerEnd = state.timerEndDate {
+            Text(timerEnd, style: .timer)
+                .font(.lmTitle3.monospacedDigit().bold())
+                .foregroundStyle(timerEnd > Date() ? .green : .red)
+        } else {
+            Text("\(Int(state.progress * 100))%")
+                .font(.lmTitle3.bold())
+        }
+    }
+
+    @ViewBuilder
+    private func expandedBottom(context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
+        let state = context.state
+
+        if state.isRestTimer, let detail = state.nextSetDetail {
+            Text(detail)
+                .font(.lmCaption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        } else if !state.isRestTimer, let nextName = state.nextExerciseName {
+            Text("Next: \(nextName)")
+                .font(.lmCaption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+}
+
+// MARK: - Lock Screen / Smart Stack Content
+
+struct LiveWorkoutContentView: View {
+    @Environment(\.activityFamily) private var activityFamily
+
+    let context: ActivityViewContext<WorkoutActivityAttributes>
+
+    var body: some View {
+        switch activityFamily {
+        case .small:
+            smartStackView
+        case .medium:
+            lockScreenView
+        @unknown default:
+            lockScreenView
+        }
+    }
+
+    // MARK: Apple Watch Smart Stack (small family)
+
+    // System fonts only: the watch renders this view on-device and the custom
+    // fonts bundled in the widget extension are not available there.
+    @ViewBuilder
+    private var smartStackView: some View {
+        let state = context.state
+
+        if state.isRestTimer {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Rest")
+                        .font(.headline)
+                    Spacer()
+                    if let timerEnd = state.timerEndDate {
+                        Text(timerEnd, style: .timer)
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(timerEnd > Date() ? .green : .red)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+
+                if let nextName = state.nextExerciseName {
+                    Text("Next: \(nextName)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if let detail = state.nextSetDetail {
+                        Text(detail)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(state.exerciseName)
+                        .font(.headline)
+                        .lineLimit(1)
+                    Spacer()
+                    if !state.setInfo.isEmpty {
+                        Text(state.setInfo)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if !state.weightReps.isEmpty {
+                    Text(state.weightReps)
+                        .font(.title3.monospacedDigit().bold())
+                }
+
+                HStack(alignment: .firstTextBaseline) {
+                    if let nextName = state.nextExerciseName {
+                        Text("Next: \(nextName)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Text("\(Int(state.progress * 100))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    // MARK: Lock screen / banner (medium family)
+
+    @ViewBuilder
+    private var lockScreenView: some View {
         let state = context.state
 
         if state.isRestTimer {
@@ -117,68 +269,6 @@ struct LiveWorkoutsLiveActivity: Widget {
                     .tint(.blue)
             }
             .padding()
-        }
-    }
-
-    // MARK: - Dynamic Island Expanded
-
-    @ViewBuilder
-    private func expandedLeading(context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
-        let state = context.state
-
-        if state.isRestTimer {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Rest")
-                    .font(.lmHeadline)
-                if let nextName = state.nextExerciseName {
-                    Text("Next: \(nextName)")
-                        .font(.lmCaption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(state.exerciseName)
-                    .font(.lmHeadline)
-                    .lineLimit(1)
-                if !state.weightReps.isEmpty {
-                    Text(state.setInfo.isEmpty ? state.weightReps : "\(state.setInfo) \u{2022} \(state.weightReps)")
-                        .font(.lmCaption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func expandedTrailing(context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
-        let state = context.state
-
-        if let timerEnd = state.timerEndDate {
-            Text(timerEnd, style: .timer)
-                .font(.lmTitle3.monospacedDigit().bold())
-                .foregroundStyle(timerEnd > Date() ? .green : .red)
-        } else {
-            Text("\(Int(state.progress * 100))%")
-                .font(.lmTitle3.bold())
-        }
-    }
-
-    @ViewBuilder
-    private func expandedBottom(context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
-        let state = context.state
-
-        if state.isRestTimer, let detail = state.nextSetDetail {
-            Text(detail)
-                .font(.lmCaption2.monospacedDigit())
-                .foregroundStyle(.secondary)
-        } else if !state.isRestTimer, let nextName = state.nextExerciseName {
-            Text("Next: \(nextName)")
-                .font(.lmCaption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
         }
     }
 }
