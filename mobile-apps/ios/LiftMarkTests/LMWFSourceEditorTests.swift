@@ -35,7 +35,7 @@ final class LMWFSourceEditorTests: XCTestCase {
 
     // MARK: - The reported scenario: section child stays H3
 
-    func testEditingSectionChildPreservesHeaderLevels() {
+    func testEditingSectionChildPreservesHeaderLevels() throws {
         let source = """
         # Full Body
 
@@ -56,7 +56,7 @@ final class LMWFSourceEditorTests: XCTestCase {
         edited.sets[0].targetReps = 15
 
         let out = LMWFSourceEditor.replacingExercise(orderIndex: edited.orderIndex, in: source, with: [edited])
-        let spliced = try! XCTUnwrap(out)
+        let spliced = try XCTUnwrap(out)
 
         // The bug signature: the child must NOT be flattened to `##`.
         XCTAssertTrue(hasLine(spliced, "### Band Side Step"), "child header level H3 must be preserved")
@@ -80,7 +80,7 @@ final class LMWFSourceEditorTests: XCTestCase {
 
     // MARK: - Non-standard workout header level
 
-    func testEditingExercisePreservesNonStandardWorkoutLevel() {
+    func testEditingExercisePreservesNonStandardWorkoutLevel() throws {
         // Workout at H2 → exercises at H3. An edit must keep the H3 exercises.
         let source = """
         ## Push Day
@@ -96,7 +96,7 @@ final class LMWFSourceEditorTests: XCTestCase {
         var edited = exercise(plan, named: "Bench Press")
         edited.sets[0].targetReps = 8
 
-        let spliced = try! XCTUnwrap(
+        let spliced = try XCTUnwrap(
             LMWFSourceEditor.replacingExercise(orderIndex: edited.orderIndex, in: source, with: [edited])
         )
 
@@ -108,7 +108,7 @@ final class LMWFSourceEditorTests: XCTestCase {
 
     // MARK: - Superset block with non-adjacent child levels
 
-    func testEditingSupersetPreservesNestedLevels() {
+    func testEditingSupersetPreservesNestedLevels() throws {
         // Superset children at H4 while the parent is H2 (a legal level skip).
         let source = """
         # Day
@@ -133,7 +133,7 @@ final class LMWFSourceEditorTests: XCTestCase {
         curl.sets[0].targetReps = 10
 
         let block = [parent, curl, children[1]]
-        let spliced = try! XCTUnwrap(
+        let spliced = try XCTUnwrap(
             LMWFSourceEditor.replacingExercise(orderIndex: parent.orderIndex, in: source, with: block)
         )
 
@@ -153,7 +153,7 @@ final class LMWFSourceEditorTests: XCTestCase {
 
     // MARK: - Splicing leaves other blocks byte-for-byte
 
-    func testSpliceOnlyTouchesTargetBlock() {
+    func testSpliceOnlyTouchesTargetBlock() throws {
         let source = """
         # Full Body
 
@@ -173,7 +173,7 @@ final class LMWFSourceEditorTests: XCTestCase {
         var edited = exercise(plan, named: "Band Side Step")
         edited.sets[0].targetReps = 15
 
-        let spliced = try! XCTUnwrap(
+        let spliced = try XCTUnwrap(
             LMWFSourceEditor.replacingExercise(orderIndex: edited.orderIndex, in: source, with: [edited])
         )
 
@@ -184,7 +184,7 @@ final class LMWFSourceEditorTests: XCTestCase {
 
     // MARK: - Renames follow the header text, not stale groupName
 
-    func testRenamingSupersetEmitsNewHeaderText() {
+    func testRenamingSupersetEmitsNewHeaderText() throws {
         let source = """
         # Day
 
@@ -202,7 +202,7 @@ final class LMWFSourceEditorTests: XCTestCase {
         // Simulate a rename: the sheet updates exerciseName but groupName lags.
         parent.exerciseName = "Superset: Biceps"
 
-        let spliced = try! XCTUnwrap(
+        let spliced = try XCTUnwrap(
             LMWFSourceEditor.replacingExercise(orderIndex: parent.orderIndex, in: source, with: [parent] + children)
         )
 
