@@ -144,6 +144,35 @@ export async function attachBuildToGroup(buildId, groupId) {
   });
 }
 
+// TestFlight "What to Test" lives on betaBuildLocalizations (one row per locale
+// per build). Create the locale row if it doesn't exist yet, otherwise patch
+// whatsNew on the existing one.
+export async function setBetaBuildNotes(buildId, whatsNew, locale = 'en-US') {
+  const existing = await ascFetch(
+    `/builds/${buildId}/betaBuildLocalizations?fields[betaBuildLocalizations]=locale,whatsNew&limit=50`,
+  );
+  const row = (existing.data || []).find((l) => l.attributes?.locale === locale);
+  if (row) {
+    await ascFetch(`/betaBuildLocalizations/${row.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        data: { type: 'betaBuildLocalizations', id: row.id, attributes: { whatsNew } },
+      }),
+    });
+  } else {
+    await ascFetch('/betaBuildLocalizations', {
+      method: 'POST',
+      body: JSON.stringify({
+        data: {
+          type: 'betaBuildLocalizations',
+          attributes: { locale, whatsNew },
+          relationships: { build: { data: { type: 'builds', id: buildId } } },
+        },
+      }),
+    });
+  }
+}
+
 export async function submitForBetaReview(buildId) {
   await ascFetch('/betaAppReviewSubmissions', {
     method: 'POST',

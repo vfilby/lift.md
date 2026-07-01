@@ -8,10 +8,7 @@
 //   1. In the Beta group, not yet in the Pre-flight group
 //   2. Build number > newest already in the Pre-flight group (downgrade guard)
 //   3. Build age ≥ SOAK_HOURS
-//   4. Build number not in BLOCKED_BUILDS (from block-promotion/build-N git tags).
-//      These tags can be created manually, or automatically by the nightly UI
-//      suite (swift-nightly.yml) when it fails on the code that produced the build;
-//      a subsequent green nightly on the same commit removes the tag.
+//   4. Build number not in BLOCKED_BUILDS (from block-promotion/build-N git tags)
 //   5. Sentry session count for the build's release ≥ MIN_SESSIONS
 //   6. Sentry crash-free session rate ≥ MIN_CRASH_FREE_RATE
 //   7. Sentry unresolved error/fatal issues for the release ≤ MAX_UNRESOLVED_ISSUES
@@ -28,6 +25,7 @@
 //   DRY_RUN ('true' evaluates without promoting)
 //   ASC_* (via asc-client)
 
+import { writeFileSync } from 'node:fs';
 import {
   required,
   getAppId,
@@ -35,7 +33,34 @@ import {
   listBuildsInGroup,
   attachBuildToGroup,
   submitForBetaReview,
+  setBetaBuildNotes,
 } from './asc-client.mjs';
+import { resolveVersionRef, generateNotes } from './changelog.mjs';
+
+// Roll up "What to Test" across every build accumulated since the last build in
+// Pre-flight. The promoted build's upload-time notes only cover its own one-build
+// delta; testers promoting weekly want the whole span. Range is bounded by deploy
+// tags (deploy/<version>) so it works from the promotion job's checkout, which is
+// not necessarily at the promoted build's commit. Returns notes, or null when the
+// span can't be resolved or has no tester-facing commits (caller keeps existing).
+function rollupNotes(prevPreflightVersion, promotedVersion) {
+  if (!prevPreflightVersion) {
+    console.log('No prior Pre-flight build; keeping the build\'s upload-time notes.');
+    return null;
+  }
+  const lowerRef = resolveVersionRef(prevPreflightVersion);
+  const upperRef = resolveVersionRef(promotedVersion);
+  if (!lowerRef) {
+    console.log(`No deploy tag for previous Pre-flight version ${prevPreflightVersion}; keeping upload-time notes.`);
+    return null;
+  }
+  if (!upperRef) {
+    console.log(`No deploy tag for promoted version ${promotedVersion}; keeping upload-time notes.`);
+    return null;
+  }
+  console.log(`Rollup "What to Test" range: ${lowerRef}..${upperRef}`);
+  return generateNotes(lowerRef, upperRef);
+}
 
 let _sentryProjectId;
 async function sentryProjectId(org, projectSlug, token) {
@@ -105,6 +130,19 @@ function parseBlocked(csv) {
   return new Set((csv || '').split(',').map((s) => s.trim()).filter(Boolean));
 }
 
+// Additive: when SUMMARY_FILE is set, write a machine-readable JSON summary of the
+// evaluation so callers (e.g. the preview-notification workflow) can build a clean
+// message without scraping logs. No-op when unset, so the real promotion is unchanged.
+function writeSummary(obj) {
+  const path = process.env.SUMMARY_FILE;
+  if (!path) return;
+  try {
+    writeFileSync(path, JSON.stringify(obj, null, 2));
+  } catch (err) {
+    console.warn(`::warning::Failed to write SUMMARY_FILE: ${err.message}`);
+  }
+}
+
 async function main() {
   const bundleId = required('APP_BUNDLE_ID');
   const sourceName = required('SOURCE_GROUP_NAME');
@@ -124,10 +162,11 @@ async function main() {
   const sourceBuilds = await listBuildsInGroup(appId, sourceName);
   const targetBuilds = await listBuildsInGroup(appId, targetName);
   const targetBuildIds = new Set(targetBuilds.map((b) => b.id));
-  const maxTargetBuildNumber = targetBuilds.reduce(
-    (max, b) => Math.max(max, Number(b.buildNumber) || 0),
-    0,
+  const latestTarget = targetBuilds.reduce(
+    (best, b) => (!best || (Number(b.buildNumber) || 0) > (Number(best.buildNumber) || 0) ? b : best),
+    null,
   );
+  const maxTargetBuildNumber = latestTarget ? Number(latestTarget.buildNumber) || 0 : 0;
 
   sourceBuilds.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 
@@ -162,6 +201,13 @@ async function main() {
   }
 
   console.log('## Evaluation');
+  const evaluation = results.map((r) => ({
+    build: r.build.buildNumber,
+    version: r.build.version,
+    ageHours: Number(r.ageHours.toFixed(1)),
+    eligible: r.reasons.length === 0,
+    reasons: r.reasons,
+  }));
   for (const r of results) {
     const tag = r.reasons.length === 0 ? 'ELIGIBLE' : 'skip';
     console.log(`- [${tag}] build ${r.build.buildNumber} (${r.build.version}), age ${r.ageHours.toFixed(1)}h${r.reasons.length ? ' — ' + r.reasons.join('; ') : ''}`);
@@ -170,15 +216,49 @@ async function main() {
   const eligible = results.find((r) => r.reasons.length === 0);
   if (!eligible) {
     console.log('No eligible build to promote.');
+    writeSummary({
+      eligible: false,
+      soakHours,
+      targetGroup: targetName,
+      currentTargetBuild: maxTargetBuildNumber || null,
+      evaluation,
+    });
     return;
   }
 
+  const notes = rollupNotes(latestTarget?.version, eligible.build.version);
+
+  writeSummary({
+    eligible: true,
+    soakHours,
+    targetGroup: targetName,
+    currentTargetBuild: maxTargetBuildNumber || null,
+    build: eligible.build.buildNumber,
+    version: eligible.build.version,
+    notes: notes || null,
+    evaluation,
+  });
+
   if (dryRun) {
     console.log(`DRY RUN: would promote build ${eligible.build.buildNumber} to ${targetName}`);
+    if (notes) console.log(`DRY RUN: would set rollup "What to Test":\n${notes}`);
+    else console.log('DRY RUN: no rollup notes; build would keep its upload-time "What to Test".');
     return;
   }
 
   await attachBuildToGroup(eligible.build.id, targetGroupId);
+  // Cosmetic and best-effort: a notes failure must not strand a promoted build
+  // un-submitted, so swallow it and proceed to Beta App Review.
+  if (notes) {
+    try {
+      await setBetaBuildNotes(eligible.build.id, notes);
+      console.log(`Set rollup "What to Test" on build ${eligible.build.buildNumber}.`);
+    } catch (err) {
+      console.warn(`::warning::Failed to set rollup "What to Test": ${err.message}`);
+    }
+  } else {
+    console.log('No rollup notes; keeping the build\'s upload-time "What to Test".');
+  }
   await submitForBetaReview(eligible.build.id);
   console.log(`Promoted build ${eligible.build.buildNumber} to ${targetName} and submitted for Beta App Review`);
 }
