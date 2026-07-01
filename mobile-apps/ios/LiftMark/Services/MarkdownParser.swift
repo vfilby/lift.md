@@ -114,7 +114,8 @@ enum MarkdownParser {
             success: true,
             data: workout,
             errors: [],
-            warnings: context.warnings.map { "Line \($0.line): \($0.message)" }
+            warnings: context.warnings.map { "Line \($0.line): \($0.message)" },
+            exerciseSpans: context.spans
         )
     }
 
@@ -370,6 +371,7 @@ enum MarkdownParser {
         workoutPlanId: String,
         orderIndex: Int
     ) -> ExerciseBlockResult {
+        let blockStartIndex = context.currentIndex
         let headerLine = context.lines[context.currentIndex]
         guard let headerLevel = headerLine.headerLevel, let exerciseName = headerLine.headerText else {
             context.currentIndex += 1
@@ -421,6 +423,13 @@ enum MarkdownParser {
                 code: "NO_SETS"
             ))
         }
+
+        context.spans[orderIndex] = LMWFSourceSpan(
+            startLine: headerLine.lineNumber,
+            endLine: context.blockEndLine(startIndex: blockStartIndex, stopIndex: context.currentIndex),
+            headerLevel: headerLevel,
+            childHeaderLevel: nil
+        )
 
         let exercise = PlannedExercise(
             id: exerciseId,
@@ -480,6 +489,7 @@ enum MarkdownParser {
         groupName: String,
         isSuperset: Bool
     ) -> [PlannedExercise] {
+        let blockStartIndex = context.currentIndex
         let headerLine = context.lines[context.currentIndex]
         let parentId = generateId()
         let groupType: GroupType = isSuperset ? .superset : .section
@@ -547,6 +557,13 @@ enum MarkdownParser {
                 context.currentIndex += 1
             }
         }
+
+        context.spans[orderIndex] = LMWFSourceSpan(
+            startLine: headerLine.lineNumber,
+            endLine: context.blockEndLine(startIndex: blockStartIndex, stopIndex: context.currentIndex),
+            headerLevel: headerLine.headerLevel!,
+            childHeaderLevel: childExerciseLevel
+        )
 
         return [parentExercise] + childExercises
     }

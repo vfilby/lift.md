@@ -308,10 +308,22 @@ struct WorkoutDetailView: View {
                         currentPlan.exercises[i].orderIndex = i
                     }
                 }
-                if currentPlan.sourceMarkdown != nil {
-                    currentPlan.sourceMarkdown = regenerateMarkdown(from: currentPlan)
+                // Persist the edit by splicing only this exercise's block back
+                // into the original markdown, preserving every other block's
+                // header level and formatting. Regenerating the whole document
+                // flattened all headers to `##` (GH #264). When the plan has no
+                // stored markdown, or the block can't be located, fall back to a
+                // plain model update and leave `sourceMarkdown` untouched.
+                if let source = currentPlan.sourceMarkdown,
+                   let spliced = LMWFSourceEditor.replacingExercise(
+                    orderIndex: exercise.orderIndex,
+                    in: source,
+                    with: updatedExercises
+                   ) {
+                    planStore.updatePlanMarkdown(id: currentPlan.id, newMarkdown: spliced)
+                } else {
+                    planStore.updatePlan(currentPlan)
                 }
-                planStore.updatePlan(currentPlan)
             }
         }
     }
@@ -452,71 +464,4 @@ struct WorkoutDetailView: View {
         planStore.reprocessPlan(id: plan.id, fromMarkdown: markdown)
     }
 
-    // MARK: - Regenerate Markdown
-
-    private func regenerateMarkdown(from plan: WorkoutPlan) -> String {
-        var lines: [String] = []
-        lines.append("# \(plan.name)")
-        if !plan.tags.isEmpty {
-            lines.append("@tags: \(plan.tags.joined(separator: ", "))")
-        }
-        if let unit = plan.defaultWeightUnit {
-            lines.append("@units: \(unit.rawValue)")
-        }
-        if let desc = plan.description, !desc.isEmpty {
-            lines.append(desc)
-        }
-        lines.append("")
-        for exercise in plan.exercises {
-            if exercise.groupType == .section && exercise.sets.isEmpty {
-                lines.append("## \(exercise.exerciseName)")
-                lines.append("")
-                continue
-            }
-            if exercise.groupType == .superset && exercise.sets.isEmpty {
-                lines.append("## \(exercise.exerciseName)")
-                lines.append("")
-                continue
-            }
-            lines.append("## \(exercise.exerciseName)")
-            if let equip = exercise.equipmentType, !equip.isEmpty {
-                lines.append("@type: \(equip)")
-            }
-            if let notes = exercise.notes, !notes.isEmpty {
-                lines.append(notes)
-            }
-            for set in exercise.sets {
-                let target = set.entries.first?.target
-                var parts: [String] = []
-                if let w = target?.weight?.value {
-                    let wStr = w.formattedWeight
-                    parts.append(wStr)
-                    if let unit = target?.weight?.unit {
-                        parts.append(unit.rawValue)
-                    }
-                }
-                if let r = target?.reps {
-                    parts.append("x \(r)")
-                }
-                if let t = target?.time {
-                    parts.append("\(t)s")
-                }
-                if let rpe = target?.rpe {
-                    parts.append("@rpe: \(rpe)")
-                }
-                if let rest = set.restSeconds, rest > 0 {
-                    parts.append("@rest: \(rest)s")
-                }
-                if set.isDropset {
-                    parts.append("@dropset")
-                }
-                if set.isPerSide {
-                    parts.append("@perside")
-                }
-                lines.append("- \(parts.joined(separator: " "))")
-            }
-            lines.append("")
-        }
-        return lines.joined(separator: "\n")
-    }
 }
