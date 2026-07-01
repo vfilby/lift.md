@@ -1,31 +1,33 @@
-name: '[iOS] Promote Beta → Pre-flight'
+name: '[iOS] Pre-flight promote preview (notify)'
+
+# Runs the Beta → Pre-flight eligibility gate in DRY-RUN ~9h before the real
+# promotion (promote-preflight.yml, Tue 12:00 UTC) and sends a Pushover preview of
+# which build is likely to promote and what changed — so there is time to push a
+# block-promotion/build-<N> tag before it ships.
+#
+# Scheduled Tue 03:00 UTC = Mon 8:00 PM PDT (7:00 PM PST). Keep the gate inputs
+# (SOAK_HOURS / MIN_* / MAX_*) identical to promote-preflight.yml so the preview
+# reflects the real decision; if you change them there, change them here too.
 
 on:
   schedule:
-    - cron: '0 12 * * 2'
+    - cron: '0 3 * * 2'
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Evaluate eligibility but do not promote'
-        required: false
-        default: 'false'
-        type: choice
-        options: ['true', 'false']
 
 concurrency:
-  group: promote-preflight
+  group: promote-preflight-preview
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  evaluate-and-promote:
-    name: Evaluate Beta builds and promote latest eligible to Pre-flight
+  preview:
+    name: Preview the next Pre-flight promotion and notify via Pushover
     runs-on: ubuntu-latest
     steps:
       # Full history + tags: the rollup "What to Test" walks git log between the
-      # deploy/<version> tags of the last Pre-flight build and the promoted build.
+      # deploy/<version> tags, same as the real promotion job.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -52,7 +54,7 @@ jobs:
           echo "blocked=${BLOCKED}" >> "$GITHUB_OUTPUT"
           echo "Blocked builds: ${BLOCKED:-(none)}"
 
-      - name: Evaluate and promote
+      - name: Evaluate eligibility (dry run) and write summary
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -68,8 +70,18 @@ jobs:
           MIN_CRASH_FREE_RATE: '0.99'
           MAX_UNRESOLVED_ISSUES: '0'
           BLOCKED_BUILDS: ${{ steps.blocks.outputs.blocked }}
-          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          DRY_RUN: 'true'
+          SUMMARY_FILE: ${{ runner.temp }}/preflight-preview.json
         run: node .github/scripts/promote-preflight.mjs
+
+      - name: Send Pushover preview
+        env:
+          SUMMARY_FILE: ${{ runner.temp }}/preflight-preview.json
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
+          LEAD_HOURS: '9'
+          PROMOTE_WHEN: 'Tue 12:00 UTC'
+        run: node .github/scripts/pushover-preflight-preview.mjs
 
       - name: Cleanup
         if: always()
