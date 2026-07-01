@@ -114,6 +114,13 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "ux-improvements")
     }
 
+    /// GH #264: editing a plan exercise must splice only that block into
+    /// `sourceMarkdown`, not regenerate the whole plan and flatten section
+    /// header levels (which broke the markdown and blocked re-saving).
+    func testEditPlanPreservesStructure() throws {
+        runner.runScenario(named: "edit-plan-preserves-structure")
+    }
+
     func testDatabaseBackup() throws {
         runner.runScenario(named: "database-backup")
     }

@@ -30,7 +30,7 @@ Display full details of a workout plan template — exercises, sets, tags, metad
 | YouTube link | `youtube-link-{exerciseName}` | Link |
 | Edit markdown button | `edit-plan-markdown-button` | Button |
 | Reprocess button | `reprocess-plan-button` | Button |
-| Exercise edit button | `edit-plan-exercise-{exerciseId}` | Button |
+| Exercise edit button | `edit-plan-exercise-{exerciseName}` | Button |
 
 ## User Interactions
 - **Tap share button (header)** → exports the plan's original LMWF markdown (`sourceMarkdown`) to a `plan-{sanitized-name}.md` file in the cache directory via `exportPlanAsMarkdown(plan)`, then presents the iOS share sheet (`UIActivityViewController`) for that file URL using the shared `.shareSheet(item:)` modifier. The user can then save it to Files, AirDrop it, or share it into another app.
@@ -42,7 +42,10 @@ Display full details of a workout plan template — exercises, sets, tags, metad
   - **Critical**: After tapping "Start Workout", the app MUST navigate to the Active Workout screen (`/workout/active`) and display the workout exercises with their sets. The active workout screen must be fully functional — showing exercise names, set targets (weight, reps, time), and input controls. If the session is created but navigation fails or the active workout screen does not appear, this is a blocking bug.
 - **Tap "Edit"** → opens Edit Plan Markdown sheet pre-populated with `sourceMarkdown`. User can edit the markdown text with real-time parse validation (same as import flow). Save updates `sourceMarkdown` and reprocesses the plan. Cancel discards changes.
 - **Tap "Reprocess"** → confirmation alert → re-parses plan from original `sourceMarkdown` (no editing)
-- **Tap pencil icon on exercise card** → opens Edit Exercise sheet (same Form/Markdown dual-tab sheet as active workout) pre-populated with the exercise's data. Save updates the exercise within the plan. Changes are persisted to the plan's `sourceMarkdown` by regenerating it.
+- **Tap pencil icon on exercise card** → opens Edit Exercise sheet (same Form/Markdown dual-tab sheet as active workout) pre-populated with the exercise's data. Save updates the exercise within the plan.
+  - **Critical (GH #264)**: Persisting an exercise edit MUST NOT regenerate the whole plan from the model. It splices **only the edited exercise's block** back into the plan's `sourceMarkdown` and re-parses that spliced text (`LMWFSourceEditor.replacingExercise` → `updatePlanMarkdown`). Everything the user did not edit — other exercises, section/superset **header levels**, blank lines, comments, and unknown `@metadata` — is preserved verbatim. Regenerating the entire document (the old behavior) flattened every header to `##`, so `## Warmup` / `### Band Side Step` collapsed to two `##` headers, breaking the section nesting and producing a parse error the user then had to hand-repair. An exercise edit must be equivalent to replacing that one section of the source markdown with the user's edited version, at its original header level.
+  - Superset edits splice the entire superset block (parent header + all child headers) at their original levels; section-child edits splice just that child's block. The header level(s) come from the source itself, so non-standard nesting (e.g. a superset whose children skip a level) round-trips unchanged.
+  - If the edited exercise cannot be located in `sourceMarkdown` (e.g. a legacy plan with no stored markdown), the model change is still persisted but `sourceMarkdown` is left untouched rather than regenerated.
 - **Tap YouTube icon** on exercise name → opens YouTube search for that exercise
 
 ## Navigation
@@ -72,7 +75,7 @@ Display full details of a workout plan template — exercises, sets, tags, metad
 
 ### Exercise Cards
 - Numbered with section-colored index
-- Exercise name (left) with pencil edit icon (`edit-plan-exercise-{exerciseId}`) in the top-right corner (36x36 tap target, `.body` font)
+- Exercise name (left) with pencil edit icon (`edit-plan-exercise-{exerciseName}`) in the top-right corner (36x36 tap target, `.body` font)
 - Equipment type (if set)
 - Notes (italic, if present)
 - Sets listed with all applicable fields

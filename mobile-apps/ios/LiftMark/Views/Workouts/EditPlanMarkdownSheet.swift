@@ -52,6 +52,7 @@ struct EditPlanMarkdownSheet: View {
                     .padding(.horizontal)
                     .padding(.vertical, LiftMarkTheme.spacingSM)
                     .background(LiftMarkTheme.destructive.opacity(0.1))
+                    .accessibilityIdentifier("edit-plan-markdown-error")
                 }
 
                 // Parse success

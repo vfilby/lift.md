@@ -1,0 +1,84 @@
+name: "Edit Plan Exercise - Preserves Section Header Levels"
+
+# GH #264: editing a single exercise used to regenerate the whole plan and
+# flatten every header to `##`, so a `## Warmup` section with `### Band Side
+# Step` children collapsed into sibling `##` headers. Reopening the raw markdown
+# editor then showed a parse error the user had to hand-repair. This scenario
+# drives the real tap-to-save path and asserts the plan markdown stays valid.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+  # Import a plan whose Warmup section nests exercises one level deeper (###).
+  - action: waitFor
+    target: "button-import-workout"
+    timeout: 5000
+  - action: tap
+    target: "button-import-workout"
+  - action: waitFor
+    target: "input-markdown"
+    timeout: 10000
+  - action: replaceText
+    target: "input-markdown"
+    fixture: "edit-header-levels.md"
+  - action: tap
+    target: "button-import"
+  - action: waitForText
+    text: "OK"
+    timeout: 10000
+  - action: tapText
+    text: "OK"
+  - action: waitForText
+    text: "Edit Header Levels Plan"
+    timeout: 10000
+
+tests:
+  - name: "editing a section-child exercise keeps the plan markdown valid"
+    steps:
+      - action: tapText
+        text: "Edit Header Levels Plan"
+      - action: waitFor
+        target: "workout-detail-view"
+        timeout: 5000
+      - action: waitForText
+        text: "Band Side Step"
+        timeout: 5000
+      # Open the section child's edit sheet (name-based id).
+      - action: tap
+        target: "edit-plan-exercise-Band Side Step"
+      - action: waitFor
+        target: "edit-plan-exercise-form"
+        timeout: 5000
+      # A real edit via a button tap (no fragile text entry): add a set.
+      - action: tap
+        target: "edit-plan-exercise-add-set"
+      - action: tap
+        target: "edit-plan-exercise-save"
+      - action: waitFor
+        target: "workout-detail-view"
+        timeout: 5000
+      # Reopen the raw markdown editor. Under the old bug the section child had
+      # been flattened to the section's level, so this parse failed.
+      - action: tap
+        target: "edit-plan-markdown-button"
+      - action: waitFor
+        target: "edit-plan-markdown-editor"
+        timeout: 5000
+      # No parse error, and the success banner (a valid parse) is shown.
+      - action: expect
+        target: "edit-plan-markdown-error"
+        assertion: "notToExist"
+      - action: waitForText
+        text: "exercises,"
+        timeout: 5000
+      - action: tap
+        target: "edit-plan-cancel-button"
