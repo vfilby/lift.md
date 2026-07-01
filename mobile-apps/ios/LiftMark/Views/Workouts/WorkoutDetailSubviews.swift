@@ -185,7 +185,10 @@ struct PlanExerciseCard: View {
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("edit-plan-exercise-\(exercise.id)")
+                // Name-based so UI tests can target a specific exercise's edit
+                // button (the id is a random UUID). Mirrors `youtube-link-<name>`
+                // below.
+                .accessibilityIdentifier("edit-plan-exercise-\(exercise.exerciseName)")
             }
 
             // Sets

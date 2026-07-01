@@ -113,7 +113,11 @@ jobs:
       build_number: ${{ steps.version.outputs.build_number }}
       marketing_version: ${{ steps.version.outputs.marketing_version }}
     steps:
+      # fetch-depth: 0 so the "What to Test" changelog step can read the full
+      # commit range between the previous release tag and HEAD.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
@@ -222,6 +226,7 @@ jobs:
           echo "Previous deploy: $LATEST → next: $MARKETING (build $BUILD)"
           echo "marketing_version=$MARKETING" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "previous_version=$LATEST" >> "$GITHUB_OUTPUT"
           echo "APP_VERSION=$MARKETING" >> $GITHUB_ENV
           echo "APP_BUILD=$BUILD" >> $GITHUB_ENV
 
@@ -274,6 +279,30 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "deploy/${MARKETING_VERSION}" "${{ github.sha }}"
           git push origin "deploy/${MARKETING_VERSION}"
+
+      - name: Setup Node
+        if: success()
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      # Generate a TestFlight "What to Test" from the feat/fix commits since the
+      # previous release and attach it to the build we just uploaded. Runs after
+      # the tag push (so the deploy is already recorded) but before Cleanup wipes
+      # the ASC key. Non-fatal: the script swallows its own errors.
+      - name: Set TestFlight "What to Test" notes
+        if: success()
+        working-directory: ${{ github.workspace }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: ~/.private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          APP_BUNDLE_ID: com.eff3.liftmark.native-ios
+          APP_VERSION: ${{ steps.version.outputs.marketing_version }}
+          APP_BUILD: ${{ steps.version.outputs.build_number }}
+          PREVIOUS_VERSION: ${{ steps.version.outputs.previous_version }}
+          MAX_WAIT_SECONDS: '1200'
+        run: node .github/scripts/set-beta-notes.mjs
 
       - name: Cleanup
         if: always()
