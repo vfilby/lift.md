@@ -75,14 +75,27 @@ DDB_ENDPOINT=http://localhost:8000 \
 ```
 
 The suite is gated on `DDB_ENDPOINT` + `SMTP_HOST` (the same `describe.skip`
-pattern as every other live-integration test). Under plain `npm test` —
-including the CI `validate (test)` job, which exports neither var — the
-suite self-skips. It therefore adds **no** new CI job and **no** new
-service dependency: it runs under the existing `npm test` whenever a
-developer has the local stack up, and is a no-op everywhere else. It uses
-a unique email per run and cleans up the outbox row + PAT it creates, so
-it is robust against the sequential / shared-state Vitest config
-(`fileParallelism: false`).
+pattern as every other live-integration test). This gate is shared by the
+**entire** integration tier — every test under `tests/repositories/`,
+`tests/middleware/`, `tests/routes/`, plus `flow.test.ts` itself — so the
+gate decides whether the whole tier runs, not just Layer 1.
+
+That gate is satisfied in CI by a dedicated **`integration`** job (see
+*Pipeline integration* below) that brings up DDB Local + Mailpit and exports
+`DDB_ENDPOINT` + `SMTP_HOST` before `npx vitest run`. This is **load-bearing**:
+the plain `validate (test)` job exports neither var, so under it the
+integration tier self-skips — `validate (test)` alone runs only the ~190
+pure-unit tests and silently skips the ~219 integration tests (54% of the
+suite), including every IDOR / scope / token-rotation / dedup / tier-gate
+contract the *Division of labour* section below names as Vitest-owned.
+Without the `integration` job those contracts would gate **nothing**,
+contradicting the "Vitest hard-gates prod" guarantee. The `integration` job
+is what makes that guarantee true.
+
+Locally a developer gets the same coverage by running the suite with the
+stack up (`make dev-up` first). The suite uses a unique email per run and
+cleans up the outbox row + PAT it creates, so it is robust against the
+sequential / shared-state Vitest config (`fileParallelism: false`).
 
 ## Purpose
 
@@ -106,20 +119,30 @@ The validator deploy pipeline (`.github/workflows/validator-ci.yml`) is a
 linear chain, each stage a required predecessor of the next:
 
 ```
-validate (Vitest: typecheck + npm test)
+validate     (typecheck + unit-only `npm test`, no stack)
+integration  (Vitest FULL suite vs local DDB+Mailpit stack)  ← gates prod
   → build
-  → e2e-local   (Playwright vs local DDB+Mailpit stack)   ← gates prod
+  → e2e-local   (Playwright vs local DDB+Mailpit stack)      ← gates prod
   → deploy-beta
   → smoke-beta
-  → e2e-beta    (Playwright vs https://beta.getlift.md)    ← gates prod
+  → e2e-beta    (Playwright vs https://beta.getlift.md)       ← gates prod
   → deploy-prod
 ```
 
 `deploy-prod` needs `smoke-beta` AND `e2e-beta`; `deploy-beta` needs
-`e2e-local`; `e2e-local`/`e2e-beta` both need `build`, which needs
-`validate`. **Therefore Vitest, e2e-local, AND e2e-beta all hard-gate
-prod.** A contract pinned by any one of them cannot regress into a prod
-deploy. This is the load-bearing fact behind the division of labour below.
+`e2e-local` AND `integration`; `e2e-local`/`e2e-beta` both need `build`,
+which needs `validate`; `integration` needs only `changes` and runs in
+parallel with `build`. **Therefore Vitest (the full suite, via
+`integration`), e2e-local, AND e2e-beta all hard-gate prod.** A contract
+pinned by any one of them cannot regress into a prod deploy.
+
+This is load-bearing and easy to get wrong: the Vitest contracts hard-gate
+prod **only because** the `integration` job runs them against a live
+DDB+Mailpit stack. The `validate (test)` job runs the same `npx vitest run`
+without the stack, so it exercises only the ~190 pure-unit tests and skips
+the ~219 integration tests — it is a fast smoke, **not** the gate. The gate
+is `integration`. This is the load-bearing fact behind the division of
+labour below.
 
 ### Division of labour: Vitest owns logic, e2e owns topology
 
@@ -399,6 +422,17 @@ with redirect-following disabled so the redirect itself is observable:
 
 `validator-ci.yml`:
 
+- `integration` — runs on `pull_request` AND `push`. Needs: `changes`
+  (runs in parallel with `build`; does not need the website/lambda
+  bundles — the suite drives the Hono app in-process via `app.request()`).
+  Stands up DynamoDB Local + Mailpit from the repo `docker-compose.yml`
+  (the same `-sharedDb` reuse as `e2e-local`, NOT GHA `services:`),
+  bootstraps tables, then runs `npx vitest run` with `DDB_ENDPOINT` +
+  `SMTP_HOST` + the `DDB_TABLE_*` env exported so the full integration
+  tier executes (~409 tests, 0 skipped). Required check on the PR and a
+  predecessor of `deploy-beta`, so the Vitest contracts (Layer 1 +
+  every route/repository/middleware test) hard-gate prod. Without this
+  job those tests self-skip and gate nothing — see *Layer 1* above.
 - `e2e-local` — runs on `pull_request` AND `push`. Needs: `build`.
   Stands up DynamoDB Local + Mailpit as GHA service containers,
   bootstraps tables, starts the validator with `WEBSITE_DIST` pointing
