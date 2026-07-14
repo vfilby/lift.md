@@ -71,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         if: needs.changes.outputs.validator == 'true'
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.changes.outputs.validator == 'true'
         with:
           node-version: '20'
@@ -110,7 +110,7 @@ jobs:
     # `-sharedDb`; reuse it, exactly as e2e-local does.
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -172,7 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
@@ -233,7 +233,7 @@ jobs:
     # with `scripts/e2e-local.sh`.
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -356,7 +356,7 @@ jobs:
       CI: 'true'
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -436,7 +436,7 @@ jobs:
       AWS_REGION: us-west-2
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -513,7 +513,7 @@ jobs:
       CI: 'true'
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
