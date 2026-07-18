@@ -529,10 +529,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let exercise = makeExercise(id: "e1", sets: [makeSet(status: .completed)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             exercise,
-            expandedExercises: ["e1"],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [exercise]
+            context: .init(
+                expandedExercises: ["e1"],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [exercise])
         )
         XCTAssertFalse(result)
     }
@@ -541,10 +542,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let exercise = makeExercise(id: "e1", sets: [makeSet(status: .pending)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             exercise,
-            expandedExercises: [],
-            collapsedExercises: ["e1"],
-            lastInteractedExerciseId: nil,
-            allExercises: [exercise]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: ["e1"],
+                lastInteractedExerciseId: nil,
+                allExercises: [exercise])
         )
         XCTAssertTrue(result)
     }
@@ -557,10 +559,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let other = makeExercise(id: "e2", sets: [makeSet(status: .pending)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             exercise,
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [exercise, other]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [exercise, other])
         )
         XCTAssertTrue(result)
     }
@@ -573,10 +576,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let other = makeExercise(id: "e2", sets: [makeSet(status: .pending)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             exercise,
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [exercise, other]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [exercise, other])
         )
         XCTAssertTrue(result)
     }
@@ -585,10 +589,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let exercise = makeExercise(id: "e1", sets: [makeSet(status: .pending)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             exercise,
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [exercise]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [exercise])
         )
         XCTAssertFalse(result, "First exercise with pending sets should be expanded")
     }
@@ -598,10 +603,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let ex2 = makeExercise(id: "e2", sets: [makeSet(status: .pending)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             ex2,
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [ex1, ex2]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [ex1, ex2])
         )
         XCTAssertTrue(result, "Non-current exercise should be collapsed")
     }
@@ -611,10 +617,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let ex2 = makeExercise(id: "e2", sets: [makeSet(status: .pending)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             ex2,
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: "e2",
-            allExercises: [ex1, ex2]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: "e2",
+                allExercises: [ex1, ex2])
         )
         XCTAssertFalse(result, "Last interacted exercise with pending sets should stay expanded")
     }
@@ -624,10 +631,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let ex2 = makeExercise(id: "e2", sets: [makeSet(status: .completed)])
         let result = ActiveWorkoutViewModel.isExerciseCollapsed(
             ex2,
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: "e2",
-            allExercises: [ex1, ex2]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: "e2",
+                allExercises: [ex1, ex2])
         )
         // All done -> auto-collapse takes priority before lastInteracted check
         XCTAssertTrue(result)
@@ -641,10 +649,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
                      exerciseIndex: 1, displayNumber: 1)
         let result = ActiveWorkoutViewModel.isSupersetCollapsed(
             parent, children: [child],
-            expandedExercises: ["ss1"],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [parent, child.exercise]
+            context: .init(
+                expandedExercises: ["ss1"],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [parent, child.exercise])
         )
         XCTAssertFalse(result)
     }
@@ -655,10 +664,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
                      exerciseIndex: 1, displayNumber: 1)
         let result = ActiveWorkoutViewModel.isSupersetCollapsed(
             parent, children: [child],
-            expandedExercises: [],
-            collapsedExercises: ["ss1"],
-            lastInteractedExerciseId: nil,
-            allExercises: [parent, child.exercise]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: ["ss1"],
+                lastInteractedExerciseId: nil,
+                allExercises: [parent, child.exercise])
         )
         XCTAssertTrue(result)
     }
@@ -672,10 +682,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let other = makeExercise(id: "e3", sets: [makeSet(status: .pending)])
         let result = ActiveWorkoutViewModel.isSupersetCollapsed(
             parent, children: [child1, child2],
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [parent, child1.exercise, child2.exercise, other]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [parent, child1.exercise, child2.exercise, other])
         )
         XCTAssertTrue(result)
     }
@@ -688,10 +699,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
                       exerciseIndex: 2, displayNumber: 2)
         let result = ActiveWorkoutViewModel.isSupersetCollapsed(
             parent, children: [child1, child2],
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [parent, child1.exercise, child2.exercise]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [parent, child1.exercise, child2.exercise])
         )
         // c1 is the first pending exercise globally, so superset should be expanded
         XCTAssertFalse(result)
@@ -704,10 +716,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
                       exerciseIndex: 2, displayNumber: 2)
         let result = ActiveWorkoutViewModel.isSupersetCollapsed(
             parent, children: [child1],
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: "c1",
-            allExercises: [otherEx, parent, child1.exercise]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: "c1",
+                allExercises: [otherEx, parent, child1.exercise])
         )
         XCTAssertFalse(result)
     }
@@ -719,10 +732,11 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
                       exerciseIndex: 2, displayNumber: 2)
         let result = ActiveWorkoutViewModel.isSupersetCollapsed(
             parent, children: [child1],
-            expandedExercises: [],
-            collapsedExercises: [],
-            lastInteractedExerciseId: nil,
-            allExercises: [currentEx, parent, child1.exercise]
+            context: .init(
+                expandedExercises: [],
+                collapsedExercises: [],
+                lastInteractedExerciseId: nil,
+                allExercises: [currentEx, parent, child1.exercise])
         )
         XCTAssertTrue(result, "Superset not containing current exercise should collapse")
     }

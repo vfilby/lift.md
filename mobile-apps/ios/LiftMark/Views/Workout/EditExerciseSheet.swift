@@ -121,6 +121,247 @@ struct EditExerciseSheet: View {
         }
     }
 
+    private func addSet() {
+        let lastSet = editableSets.last
+        let newSet = EditableSetRow(
+            id: UUID().uuidString,
+            existingSetId: nil,
+            weightText: lastSet?.weightText ?? "",
+            repsText: lastSet?.repsText ?? "",
+            timeText: lastSet?.timeText ?? "",
+            restText: lastSet?.restText ?? "",
+            weightUnit: lastSet?.weightUnit,
+            status: .pending
+        )
+        editableSets.append(newSet)
+    }
+
+    private func deleteSets(at offsets: IndexSet) {
+        editableSets.remove(atOffsets: offsets)
+    }
+
+    private func moveSets(from source: IndexSet, to destination: Int) {
+        editableSets.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func saveExercise() {
+        var saveName = name
+        var saveNotes = notes
+        var saveEquipment = equipmentType
+        var saveSets = editableSets
+
+        if editMode == 1 {
+            guard let parsed = applyMarkdownEdits() else { return }
+            saveName = parsed.name
+            saveEquipment = parsed.equipment
+            saveNotes = parsed.notes
+            saveSets = parsed.sets
+        }
+
+        // TC-E14: reject weight-only sets (weight but no reps and no time) so
+        // the Form tab matches the Markdown tab / validator / spec. The
+        // Markdown path is already parser-validated above, but checking
+        // uniformly here keeps the rule in one place.
+        if let badIndex = saveSets.firstIndex(where: { $0.isWeightOnly }) {
+            let content = formatSetLine(saveSets[badIndex])
+            validationError = "Set \(badIndex + 1) — Incomplete set: \"\(content)\". "
+                + "Weight with unit requires reps (x 5) or time (x 60s)"
+            return
+        }
+        validationError = nil
+
+        onSave(
+            saveName,
+            saveNotes.isEmpty ? nil : saveNotes,
+            saveEquipment.isEmpty ? nil : saveEquipment,
+            buildSetChanges(from: saveSets)
+        )
+        dismiss()
+    }
+
+    /// Save-ready values parsed from the Markdown tab.
+    private struct ParsedExerciseEdits {
+        var name: String
+        var equipment: String
+        var notes: String
+        var sets: [EditableSetRow]
+    }
+
+    /// Parse the Markdown tab into save-ready values, or nil (setting
+    /// `validationError`) when parsing fails. The values are returned directly
+    /// rather than read back from @State because SwiftUI batches state
+    /// changes — writes here won't be visible until the next render.
+    private func applyMarkdownEdits() -> ParsedExerciseEdits? {
+        let wrappedMarkdown = "# Workout\n\(markdownText)"
+        let result = MarkdownParser.parseWorkout(wrappedMarkdown)
+        guard let plan = result.data, let parsedExercise = plan.exercises.first else {
+            validationError = result.errors.first ?? "Failed to parse markdown"
+            return nil
+        }
+        validationError = nil
+
+        let saveName = parsedExercise.exerciseName
+        let saveEquipment = parsedExercise.equipmentType ?? ""
+        let saveNotes = parsedExercise.notes ?? ""
+        let newSets = editableSetRows(from: parsedExercise)
+
+        // Also update @State for UI consistency
+        name = saveName
+        equipmentType = saveEquipment
+        notes = saveNotes
+        editableSets = newSets
+
+        return ParsedExerciseEdits(name: saveName, equipment: saveEquipment, notes: saveNotes, sets: newSets)
+    }
+
+    /// Diff the edited rows against the exercise's original sets into the
+    /// delete/update/add change list handed to `onSave`.
+    private func buildSetChanges(from saveSets: [EditableSetRow]) -> [EditExerciseSetChange] {
+        var changes: [EditExerciseSetChange] = []
+        let originalSetIds = Set(exercise.sets.map { $0.id })
+        let currentSetIds = Set(saveSets.compactMap { $0.existingSetId })
+
+        for originalId in originalSetIds where !currentSetIds.contains(originalId) {
+            changes.append(.delete(setId: originalId))
+        }
+
+        for setRow in saveSets {
+            let weight = Double(setRow.weightText)
+            let reps = Int(setRow.repsText)
+            let time = Int(setRow.timeText)
+            let rest: Int? = {
+                guard let restValue = Int(setRow.restText), restValue > 0 else { return nil }
+                return restValue
+            }()
+
+            if let existingId = setRow.existingSetId {
+                changes.append(.update(setId: existingId, weight: weight, reps: reps, time: time, rest: rest))
+            } else {
+                changes.append(.add(weight: weight, unit: setRow.weightUnit, reps: reps, time: time, rest: rest))
+            }
+        }
+        return changes
+    }
+
+    private func generateMarkdownFromForm() -> String {
+        var lines: [String] = []
+        lines.append("## \(name)")
+        if !equipmentType.isEmpty {
+            lines.append("@type: \(equipmentType)")
+        }
+        if !notes.isEmpty {
+            lines.append(notes)
+        }
+        for setRow in editableSets {
+            lines.append("- \(formatSetLine(setRow))")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func formatSetLine(_ setRow: EditableSetRow) -> String {
+        var parts: [String] = []
+        if !setRow.weightText.isEmpty {
+            parts.append(setRow.weightText)
+            if let unit = setRow.weightUnit {
+                parts.append(unit.rawValue)
+            }
+        }
+        if !setRow.repsText.isEmpty {
+            parts.append("x \(setRow.repsText)")
+        }
+        if !setRow.timeText.isEmpty {
+            parts.append("\(setRow.timeText)s")
+        }
+        var line = parts.isEmpty ? "x 1" : parts.joined(separator: " ")
+        if let rest = Int(setRow.restText), rest > 0 {
+            line += " @rest: \(rest)s"
+        }
+        return line
+    }
+
+    static func generateMarkdown(from exercise: SessionExercise) -> String {
+        var lines: [String] = []
+        lines.append("## \(exercise.exerciseName)")
+        if let equip = exercise.equipmentType, !equip.isEmpty {
+            lines.append("@type: \(equip)")
+        }
+        if let notes = exercise.notes, !notes.isEmpty {
+            lines.append(notes)
+        }
+        for set in exercise.sets {
+            let target = set.entries.first?.target
+            var parts: [String] = []
+            if let weight = target?.weight?.value {
+                parts.append(weight.formattedWeight)
+                if let unit = target?.weight?.unit {
+                    parts.append(unit.rawValue)
+                }
+            }
+            if let reps = target?.reps {
+                parts.append("x \(reps)")
+            }
+            if let time = target?.time {
+                parts.append("\(time)s")
+            }
+            var line = parts.joined(separator: " ")
+            if let rest = set.restSeconds, rest > 0 {
+                line += " @rest: \(rest)s"
+            }
+            lines.append("- \(line)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func parseMarkdownIntoForm() {
+        let wrappedMarkdown = "# Workout\n\(markdownText)"
+        let result = MarkdownParser.parseWorkout(wrappedMarkdown)
+        guard let plan = result.data, let parsedExercise = plan.exercises.first else {
+            validationError = result.errors.first ?? "Failed to parse markdown"
+            return
+        }
+        validationError = nil
+        name = parsedExercise.exerciseName
+        equipmentType = parsedExercise.equipmentType ?? ""
+        notes = parsedExercise.notes ?? ""
+        editableSets = editableSetRows(from: parsedExercise)
+    }
+
+    /// Build `EditableSetRow`s from a parsed exercise, preserving existing set IDs and
+    /// status by position so that edits update the same session sets instead of
+    /// replacing them wholesale.
+    private func editableSetRows(from parsedExercise: PlannedExercise) -> [EditableSetRow] {
+        var rows: [EditableSetRow] = []
+        for (i, parsedSet) in parsedExercise.sets.enumerated() {
+            let existingId: String? = i < exercise.sets.count ? exercise.sets[i].id : nil
+            let existingStatus: SetStatus = i < exercise.sets.count ? exercise.sets[i].status : .pending
+            let parsedTarget = parsedSet.entries.first?.target
+            let weightStr: String
+            if let weight = parsedTarget?.weight?.value {
+                weightStr = weight.formattedWeight
+            } else {
+                weightStr = ""
+            }
+            rows.append(EditableSetRow(
+                id: existingId ?? UUID().uuidString,
+                existingSetId: existingId,
+                weightText: weightStr,
+                repsText: parsedTarget?.reps.map { "\($0)" } ?? "",
+                timeText: parsedTarget?.time.map { "\($0)" } ?? "",
+                restText: parsedSet.restSeconds.map { "\($0)" } ?? "",
+                weightUnit: parsedTarget?.weight?.unit,
+                status: existingStatus
+            ))
+        }
+        return rows
+    }
+}
+
+// MARK: - Form & Markdown Tabs
+
+/// The Form and Markdown tab contents, in an extension so the
+/// `EditExerciseSheet` declaration stays within SwiftLint's
+/// type-body-length limit.
+extension EditExerciseSheet {
     private var formView: some View {
         Form {
             if let error = validationError {
@@ -251,216 +492,5 @@ struct EditExerciseSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier("edit-exercise-markdown-view")
-    }
-
-    private func addSet() {
-        let lastSet = editableSets.last
-        let newSet = EditableSetRow(
-            id: UUID().uuidString,
-            existingSetId: nil,
-            weightText: lastSet?.weightText ?? "",
-            repsText: lastSet?.repsText ?? "",
-            timeText: lastSet?.timeText ?? "",
-            restText: lastSet?.restText ?? "",
-            weightUnit: lastSet?.weightUnit,
-            status: .pending
-        )
-        editableSets.append(newSet)
-    }
-
-    private func deleteSets(at offsets: IndexSet) {
-        editableSets.remove(atOffsets: offsets)
-    }
-
-    private func moveSets(from source: IndexSet, to destination: Int) {
-        editableSets.move(fromOffsets: source, toOffset: destination)
-    }
-
-    private func saveExercise() {
-        // When in markdown mode, parse into local variables directly.
-        // We cannot rely on @State updates from parseMarkdownIntoForm() because
-        // SwiftUI batches state changes — they won't be visible until next render.
-        var saveName = name
-        var saveNotes = notes
-        var saveEquipment = equipmentType
-        var saveSets = editableSets
-
-        if editMode == 1 {
-            let wrappedMarkdown = "# Workout\n\(markdownText)"
-            let result = MarkdownParser.parseWorkout(wrappedMarkdown)
-            guard let plan = result.data, let parsedExercise = plan.exercises.first else {
-                validationError = result.errors.first ?? "Failed to parse markdown"
-                return
-            }
-            validationError = nil
-
-            saveName = parsedExercise.exerciseName
-            saveEquipment = parsedExercise.equipmentType ?? ""
-            saveNotes = parsedExercise.notes ?? ""
-            let newSets = editableSetRows(from: parsedExercise)
-            saveSets = newSets
-
-            // Also update @State for UI consistency
-            name = saveName
-            equipmentType = saveEquipment
-            notes = saveNotes
-            editableSets = newSets
-        }
-
-        // TC-E14: reject weight-only sets (weight but no reps and no time) so
-        // the Form tab matches the Markdown tab / validator / spec. The
-        // Markdown path is already parser-validated above, but checking
-        // uniformly here keeps the rule in one place.
-        if let badIndex = saveSets.firstIndex(where: { $0.isWeightOnly }) {
-            let content = formatSetLine(saveSets[badIndex])
-            validationError = "Set \(badIndex + 1) — Incomplete set: \"\(content)\". "
-                + "Weight with unit requires reps (x 5) or time (x 60s)"
-            return
-        }
-        validationError = nil
-
-        var changes: [EditExerciseSetChange] = []
-        let originalSetIds = Set(exercise.sets.map { $0.id })
-        let currentSetIds = Set(saveSets.compactMap { $0.existingSetId })
-
-        for originalId in originalSetIds where !currentSetIds.contains(originalId) {
-            changes.append(.delete(setId: originalId))
-        }
-
-        for setRow in saveSets {
-            let weight = Double(setRow.weightText)
-            let reps = Int(setRow.repsText)
-            let time = Int(setRow.timeText)
-            let rest: Int? = {
-                guard let restValue = Int(setRow.restText), restValue > 0 else { return nil }
-                return restValue
-            }()
-
-            if let existingId = setRow.existingSetId {
-                changes.append(.update(setId: existingId, weight: weight, reps: reps, time: time, rest: rest))
-            } else {
-                changes.append(.add(weight: weight, unit: setRow.weightUnit, reps: reps, time: time, rest: rest))
-            }
-        }
-
-        onSave(
-            saveName,
-            saveNotes.isEmpty ? nil : saveNotes,
-            saveEquipment.isEmpty ? nil : saveEquipment,
-            changes
-        )
-        dismiss()
-    }
-
-    private func generateMarkdownFromForm() -> String {
-        var lines: [String] = []
-        lines.append("## \(name)")
-        if !equipmentType.isEmpty {
-            lines.append("@type: \(equipmentType)")
-        }
-        if !notes.isEmpty {
-            lines.append(notes)
-        }
-        for setRow in editableSets {
-            lines.append("- \(formatSetLine(setRow))")
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    private func formatSetLine(_ setRow: EditableSetRow) -> String {
-        var parts: [String] = []
-        if !setRow.weightText.isEmpty {
-            parts.append(setRow.weightText)
-            if let unit = setRow.weightUnit {
-                parts.append(unit.rawValue)
-            }
-        }
-        if !setRow.repsText.isEmpty {
-            parts.append("x \(setRow.repsText)")
-        }
-        if !setRow.timeText.isEmpty {
-            parts.append("\(setRow.timeText)s")
-        }
-        var line = parts.isEmpty ? "x 1" : parts.joined(separator: " ")
-        if let rest = Int(setRow.restText), rest > 0 {
-            line += " @rest: \(rest)s"
-        }
-        return line
-    }
-
-    static func generateMarkdown(from exercise: SessionExercise) -> String {
-        var lines: [String] = []
-        lines.append("## \(exercise.exerciseName)")
-        if let equip = exercise.equipmentType, !equip.isEmpty {
-            lines.append("@type: \(equip)")
-        }
-        if let notes = exercise.notes, !notes.isEmpty {
-            lines.append(notes)
-        }
-        for set in exercise.sets {
-            let target = set.entries.first?.target
-            var parts: [String] = []
-            if let weight = target?.weight?.value {
-                parts.append(weight.formattedWeight)
-                if let unit = target?.weight?.unit {
-                    parts.append(unit.rawValue)
-                }
-            }
-            if let reps = target?.reps {
-                parts.append("x \(reps)")
-            }
-            if let time = target?.time {
-                parts.append("\(time)s")
-            }
-            var line = parts.joined(separator: " ")
-            if let rest = set.restSeconds, rest > 0 {
-                line += " @rest: \(rest)s"
-            }
-            lines.append("- \(line)")
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    private func parseMarkdownIntoForm() {
-        let wrappedMarkdown = "# Workout\n\(markdownText)"
-        let result = MarkdownParser.parseWorkout(wrappedMarkdown)
-        guard let plan = result.data, let parsedExercise = plan.exercises.first else {
-            validationError = result.errors.first ?? "Failed to parse markdown"
-            return
-        }
-        validationError = nil
-        name = parsedExercise.exerciseName
-        equipmentType = parsedExercise.equipmentType ?? ""
-        notes = parsedExercise.notes ?? ""
-        editableSets = editableSetRows(from: parsedExercise)
-    }
-
-    /// Build `EditableSetRow`s from a parsed exercise, preserving existing set IDs and
-    /// status by position so that edits update the same session sets instead of
-    /// replacing them wholesale.
-    private func editableSetRows(from parsedExercise: PlannedExercise) -> [EditableSetRow] {
-        var rows: [EditableSetRow] = []
-        for (i, parsedSet) in parsedExercise.sets.enumerated() {
-            let existingId: String? = i < exercise.sets.count ? exercise.sets[i].id : nil
-            let existingStatus: SetStatus = i < exercise.sets.count ? exercise.sets[i].status : .pending
-            let parsedTarget = parsedSet.entries.first?.target
-            let weightStr: String
-            if let weight = parsedTarget?.weight?.value {
-                weightStr = weight.formattedWeight
-            } else {
-                weightStr = ""
-            }
-            rows.append(EditableSetRow(
-                id: existingId ?? UUID().uuidString,
-                existingSetId: existingId,
-                weightText: weightStr,
-                repsText: parsedTarget?.reps.map { "\($0)" } ?? "",
-                timeText: parsedTarget?.time.map { "\($0)" } ?? "",
-                restText: parsedSet.restSeconds.map { "\($0)" } ?? "",
-                weightUnit: parsedTarget?.weight?.unit,
-                status: existingStatus
-            ))
-        }
-        return rows
     }
 }

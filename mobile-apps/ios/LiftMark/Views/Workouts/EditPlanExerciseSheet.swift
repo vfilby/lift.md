@@ -115,7 +115,11 @@ struct EditPlanExerciseSheet: View {
             }
         }
     }
+}
 
+// MARK: - Form & Markdown Views
+
+extension EditPlanExerciseSheet {
     private var formView: some View {
         Form {
             Section("Exercise") {
@@ -230,63 +234,40 @@ struct EditPlanExerciseSheet: View {
     private func moveSets(from source: IndexSet, to destination: Int) {
         editableSets.move(fromOffsets: source, toOffset: destination)
     }
+}
 
+// MARK: - Saving
+
+extension EditPlanExerciseSheet {
     private func saveExercise() {
         if isSuperset {
             saveSupersetFromMarkdown()
             return
         }
 
-        var saveName = name
-        var saveNotes = notes
-        var saveEquipment = equipmentType
-        var saveSets = editableSets
-
-        if editMode == 1 {
-            let wrappedMarkdown = "# Workout\n\(markdownText)"
-            let result = MarkdownParser.parseWorkout(wrappedMarkdown)
-            guard let plan = result.data, let parsedExercise = plan.exercises.first else {
-                markdownError = result.errors.first ?? "Failed to parse markdown"
-                return
-            }
-            markdownError = nil
-
-            saveName = parsedExercise.exerciseName
-            saveEquipment = parsedExercise.equipmentType ?? ""
-            saveNotes = parsedExercise.notes ?? ""
-
-            var newSets: [EditablePlanSetRow] = []
-            for (i, parsedSet) in parsedExercise.sets.enumerated() {
-                let existingId: String? = i < exercise.sets.count ? exercise.sets[i].id : nil
-                let parsedTarget = parsedSet.entries.first?.target
-                let weightVal = parsedTarget?.weight?.value
-                let weightStr: String = weightVal.map {
-                    $0.formattedWeight
-                } ?? ""
-                newSets.append(EditablePlanSetRow(
-                    id: existingId ?? UUID().uuidString,
-                    weightText: weightStr,
-                    repsText: parsedTarget?.reps.map { "\($0)" } ?? "",
-                    timeText: parsedTarget?.time.map { "\($0)" } ?? "",
-                    weightUnit: parsedTarget?.weight?.unit
-                ))
-            }
-            saveSets = newSets
-
-            name = saveName
-            equipmentType = saveEquipment
-            notes = saveNotes
-            editableSets = newSets
+        // Markdown-mode edits sync into the form state first (the same parse
+        // used when switching back to the Form tab), so both modes share one
+        // save path. A parse failure surfaces the error and aborts the save.
+        if editMode == 1 && !parseMarkdownIntoForm() {
+            return
         }
 
         // Build the updated PlannedExercise
         var updatedExercise = exercise
-        updatedExercise.exerciseName = saveName
-        updatedExercise.equipmentType = saveEquipment.isEmpty ? nil : saveEquipment
-        updatedExercise.notes = saveNotes.isEmpty ? nil : saveNotes
+        updatedExercise.exerciseName = name
+        updatedExercise.equipmentType = equipmentType.isEmpty ? nil : equipmentType
+        updatedExercise.notes = notes.isEmpty ? nil : notes
+        updatedExercise.sets = buildPlannedSets(from: editableSets)
 
+        onSave([updatedExercise])
+        dismiss()
+    }
+
+    /// Rebuild the planned sets from the editable rows, preserving an existing
+    /// set (matched by position + id) so stable ids survive the edit.
+    private func buildPlannedSets(from rows: [EditablePlanSetRow]) -> [PlannedSet] {
         var newPlannedSets: [PlannedSet] = []
-        for (index, setRow) in saveSets.enumerated() {
+        for (index, setRow) in rows.enumerated() {
             let weight = Double(setRow.weightText)
             let reps = Int(setRow.repsText)
             let time = Int(setRow.timeText)
@@ -306,10 +287,7 @@ struct EditPlanExerciseSheet: View {
             plannedSet.targetTime = time
             newPlannedSets.append(plannedSet)
         }
-        updatedExercise.sets = newPlannedSets
-
-        onSave([updatedExercise])
-        dismiss()
+        return newPlannedSets
     }
 
     /// Parse the user's superset markdown and emit the parent + all children as
@@ -355,7 +333,11 @@ struct EditPlanExerciseSheet: View {
         onSave([finalParent] + finalChildren)
         dismiss()
     }
+}
 
+// MARK: - Markdown Generation & Parsing
+
+extension EditPlanExerciseSheet {
     /// Build a `### Superset:\n#### child\n…` block with each child's notes
     /// and sets, suitable for round-tripping through the parser.
     private static func generateSupersetMarkdown(parent: PlannedExercise, children: [PlannedExercise]) -> String {
@@ -455,12 +437,16 @@ struct EditPlanExerciseSheet: View {
         return lines.joined(separator: "\n")
     }
 
-    private func parseMarkdownIntoForm() {
+    /// Parse the markdown editor's contents back into the form state.
+    /// Returns false (and surfaces the parse error) when the markdown is
+    /// invalid, leaving the form state untouched.
+    @discardableResult
+    private func parseMarkdownIntoForm() -> Bool {
         let wrappedMarkdown = "# Workout\n\(markdownText)"
         let result = MarkdownParser.parseWorkout(wrappedMarkdown)
         guard let plan = result.data, let parsedExercise = plan.exercises.first else {
             markdownError = result.errors.first ?? "Failed to parse markdown"
-            return
+            return false
         }
         markdownError = nil
         name = parsedExercise.exerciseName
@@ -484,5 +470,6 @@ struct EditPlanExerciseSheet: View {
             ))
         }
         editableSets = newSets
+        return true
     }
 }
