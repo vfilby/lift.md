@@ -190,7 +190,8 @@ struct InboxSectionView: View {
                 Text(item.summary.name)
                     .font(.lmHeadline)
                     .lineLimit(1)
-                Text("\(item.summary.exerciseCount) exercises • \(item.summary.setCount) sets • \(relativeStamp(item.createdAtServer))")
+                Text("\(item.summary.exerciseCount) exercises • \(item.summary.setCount) sets • "
+                    + "\(relativeStamp(item.createdAtServer))")
                     .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .lineLimit(1)

@@ -143,7 +143,8 @@ struct WorkoutExportService {
 
         // Read gyms directly from database
         let gyms: [[String: Any]] = (try? DatabaseManager.shared.database().read { db -> [[String: Any]] in
-            let tableExists = try Bool.fetchOne(db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='gyms'") ?? false
+            let tableExists = try Bool.fetchOne(
+                db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='gyms'") ?? false
             guard tableExists else { return [] }
 
             let rows = try Row.fetchAll(db, sql: "SELECT * FROM gyms")
@@ -160,7 +161,8 @@ struct WorkoutExportService {
         // Read settings (strip sensitive data)
         let settings: [String: Any] = (try? DatabaseManager.shared.database().read { db in
             // Check if settings table exists
-            let tableExists = try Bool.fetchOne(db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='settings'") ?? false
+            let tableExists = try Bool.fetchOne(
+                db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='settings'") ?? false
             guard tableExists else { return [:] as [String: Any] }
 
             guard let row = try Row.fetchOne(db, sql: "SELECT * FROM settings LIMIT 1") else {
@@ -214,7 +216,8 @@ struct WorkoutExportService {
     private func stripPlan(_ plan: WorkoutPlan) -> [String: Any] {
         var dict: [String: Any] = [
             "name": plan.name,
-            "exercises": plan.exercises.filter { !$0.sets.isEmpty || $0.groupType != nil }.map { stripPlannedExercise($0) }
+            "exercises": plan.exercises.filter { !$0.sets.isEmpty || $0.groupType != nil }
+                .map { stripPlannedExercise($0) }
         ]
         if let desc = plan.description { dict["description"] = desc }
         if !plan.tags.isEmpty { dict["tags"] = plan.tags }

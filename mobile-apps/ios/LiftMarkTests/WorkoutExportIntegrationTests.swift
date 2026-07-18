@@ -241,7 +241,8 @@ final class WorkoutExportIntegrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
 
         // Validate against JSON schema using Python tool
-        let schemaPath = findProjectRoot()?.appendingPathComponent("spec/data/schemas/liftmark-export-unified.schema.json")
+        let schemaPath = findProjectRoot()?
+            .appendingPathComponent("spec/data/schemas/liftmark-export-unified.schema.json")
         guard let schemaPath, FileManager.default.fileExists(atPath: schemaPath.path) else {
             // Skip if we can't find the schema (CI environment)
             return
@@ -272,10 +273,12 @@ final class WorkoutExportIntegrationTests: XCTestCase {
                                 XCTAssertNotNil(set["status"] as? String)
                                 // Verify booleans are actual booleans, not ints
                                 if let isDropset = set["isDropset"] {
-                                    XCTAssertTrue(isDropset is Bool, "isDropset should be Bool, got \(type(of: isDropset))")
+                                    XCTAssertTrue(isDropset is Bool,
+                                                  "isDropset should be Bool, got \(type(of: isDropset))")
                                 }
                                 if let isPerSide = set["isPerSide"] {
-                                    XCTAssertTrue(isPerSide is Bool, "isPerSide should be Bool, got \(type(of: isPerSide))")
+                                    XCTAssertTrue(isPerSide is Bool,
+                                                  "isPerSide should be Bool, got \(type(of: isPerSide))")
                                 }
                             }
                         }

@@ -313,7 +313,8 @@ struct EditExerciseSheet: View {
         // uniformly here keeps the rule in one place.
         if let badIndex = saveSets.firstIndex(where: { $0.isWeightOnly }) {
             let content = formatSetLine(saveSets[badIndex])
-            validationError = "Set \(badIndex + 1) — Incomplete set: \"\(content)\". Weight with unit requires reps (x 5) or time (x 60s)"
+            validationError = "Set \(badIndex + 1) — Incomplete set: \"\(content)\". "
+                + "Weight with unit requires reps (x 5) or time (x 60s)"
             return
         }
         validationError = nil

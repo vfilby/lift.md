@@ -488,7 +488,8 @@ final class SetMeasurementTests: XCTestCase {
         let setId = session.exercises[0].sets[0].id
 
         // Update targets
-        try sessionRepo.updateSessionSetTarget(setId, targetWeight: 235, targetReps: 3, targetTime: nil, restSeconds: nil)
+        try sessionRepo.updateSessionSetTarget(setId, targetWeight: 235, targetReps: 3, targetTime: nil,
+                                               restSeconds: nil)
 
         let fetched = try sessionRepo.getById(session.id)
         let fetchedSet = fetched!.exercises[0].sets[0]

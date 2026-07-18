@@ -124,7 +124,10 @@ extension CKRecordMapper {
             let fkTable = parentType == "planned" ? "template_sets" : "session_sets"
             let fkExists = try Row.fetchOne(db, sql: "SELECT 1 FROM \(fkTable) WHERE id = ?", arguments: [setId]) != nil
             if !fkExists && existing == nil {
-                Logger.shared.error(.sync, "[sync-merge] Skipping SetMeasurement \(measurementId): setId \(setId) not found in \(fkTable)")
+                Logger.shared.error(
+                    .sync,
+                    "[sync-merge] Skipping SetMeasurement \(measurementId): setId \(setId) not found in \(fkTable)"
+                )
                 return false
             }
 

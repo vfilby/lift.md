@@ -152,6 +152,7 @@ final class ExerciseHistoryRepositoryTests: XCTestCase {
     }
 
     private func makePlannedSet(weight: Double, reps: Int) -> PlannedSet {
-        PlannedSet(plannedExerciseId: "ex", orderIndex: 0, targetWeight: weight, targetWeightUnit: .lbs, targetReps: reps)
+        PlannedSet(plannedExerciseId: "ex", orderIndex: 0, targetWeight: weight, targetWeightUnit: .lbs,
+                   targetReps: reps)
     }
 }

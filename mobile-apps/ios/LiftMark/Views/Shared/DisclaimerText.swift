@@ -20,7 +20,8 @@ struct DisclaimerText: View {
 
             disclaimerSection(
                 title: "Younger Users",
-                body: "If you are under 18, we recommend working with a parent, guardian, or qualified fitness professional when performing strength training exercises."
+                body: "If you are under 18, we recommend working with a parent, guardian, "
+                    + "or qualified fitness professional when performing strength training exercises."
             )
         }
     }

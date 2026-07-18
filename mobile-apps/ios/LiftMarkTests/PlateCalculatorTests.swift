@@ -13,7 +13,8 @@ struct PlateCalculatorTests {
         func equipmentType() {
             #expect(PlateCalculator.isBarbellExercise(exerciseName: "Some Exercise", equipmentType: "Barbell") == true)
             #expect(PlateCalculator.isBarbellExercise(exerciseName: "Some Exercise", equipmentType: "barbell") == true)
-            #expect(PlateCalculator.isBarbellExercise(exerciseName: "Some Exercise", equipmentType: "Dumbbell") == false)
+            #expect(PlateCalculator.isBarbellExercise(exerciseName: "Some Exercise",
+                                                      equipmentType: "Dumbbell") == false)
         }
 
         @Test("identifies common barbell exercises by name")

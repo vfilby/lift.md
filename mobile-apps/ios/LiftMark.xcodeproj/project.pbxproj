@@ -76,6 +76,7 @@
 		48F69FDC6CCAB10B1D77DF37 /* CrashReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56FDA4E5D795A7517D503E44 /* CrashReporterTests.swift */; };
 		4B333178C382C074A6627C41 /* SessionRepository+Create.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB0A56E364FE14701AC12C4 /* SessionRepository+Create.swift */; };
 		4CD6102C78B59F3B307C768F /* InboxSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53C006491C4C71DC8A42454 /* InboxSectionView.swift */; };
+		4DC6673A898458C64ECE62E1 /* MarkdownParserTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEE12770F5439352D3BD23AC /* MarkdownParserTypes.swift */; };
 		4FDCABA6A6634A98A80BD8F2 /* InboxItemRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A93C9399CA16B146C3E734 /* InboxItemRepository.swift */; };
 		50650EE0BA8AC695493F03B6 /* V13Seed.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2742EAE0B278B7733538976 /* V13Seed.swift */; };
 		50B36ED3634D4244EB12525B /* LoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22FBBD1B7949397C1E5C8D9 /* LoggerTests.swift */; };
@@ -506,6 +507,7 @@
 		EAAF9A728BCBE8C842B01E9D /* SyncSessionGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSessionGuard.swift; sourceTree = "<group>"; };
 		EADAA4A9258171076A1B482F /* CKSyncEngineManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKSyncEngineManagerTests.swift; sourceTree = "<group>"; };
 		EC7055EA2B5CF16CA09CB3AA /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
+		EEE12770F5439352D3BD23AC /* MarkdownParserTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParserTypes.swift; sourceTree = "<group>"; };
 		F137B212FEE18D030DBC9C70 /* WorkoutPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPlan.swift; sourceTree = "<group>"; };
 		F2EE730B57432DA41F655940 /* ExerciseCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCardView.swift; sourceTree = "<group>"; };
 		F33E7AC1F974FF1C4952C4B7 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
@@ -642,6 +644,7 @@
 				4FD57CEFF5022DFA698C39EF /* Logger.swift */,
 				F60A15DD48ACEE99146D8D6B /* MarkdownParser.swift */,
 				777DBE3773D5EB279EFB7089 /* MarkdownParserHelpers.swift */,
+				EEE12770F5439352D3BD23AC /* MarkdownParserTypes.swift */,
 				D265C4177D34E4EE964C09C3 /* OutboxPusherService.swift */,
 				6CBE5F077F0F3EA293E45AE5 /* PlateCalculator.swift */,
 				654972C6C1759CA67F11DCA9 /* ProfileStore.swift */,
@@ -1307,6 +1310,7 @@
 				2E1CA553D0CCC9B858B8BB54 /* LoginView.swift in Sources */,
 				FE19F06AC07C5FCB0CFF1D48 /* MarkdownParser.swift in Sources */,
 				FBED23DE9EE9C17B723EDF8D /* MarkdownParserHelpers.swift in Sources */,
+				4DC6673A898458C64ECE62E1 /* MarkdownParserTypes.swift in Sources */,
 				55C41D670ADEC7A15EB4EFAA /* NavigationCoordinator.swift in Sources */,
 				EEC4CAC229BCFC6336C2AECE /* OnboardingView.swift in Sources */,
 				B7FFCD8C43EF830EDB879E0E /* OutboxPendingQueueRepository.swift in Sources */,

@@ -62,7 +62,9 @@ struct ExercisePickerView: View {
                         onSelect(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
                         dismiss()
                     } label: {
-                        Label("Add \"\(searchText.trimmingCharacters(in: .whitespacesAndNewlines))\"", systemImage: "plus.circle")
+                        Label(
+                            "Add \"\(searchText.trimmingCharacters(in: .whitespacesAndNewlines))\"",
+                            systemImage: "plus.circle")
                     }
                     .accessibilityIdentifier("exercise-picker-free-entry")
                 }

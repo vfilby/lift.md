@@ -66,7 +66,8 @@ enum SyncSessionGuard {
             // Log OUTSIDE the db read block to avoid reentrancy (Logger writes to the same DB)
             if let snapshot {
                 Logger.shared.debug(.sync,
-                    "[sync-guard] Snapshot: session=\(snapshot.sessionRow.id), exercises=\(snapshot.exerciseCount), sets=\(snapshot.setCount)")
+                    "[sync-guard] Snapshot: session=\(snapshot.sessionRow.id), " +
+                        "exercises=\(snapshot.exerciseCount), sets=\(snapshot.setCount)")
             } else {
                 Logger.shared.debug(.sync, "[sync-guard] No active session, skipping snapshot")
             }
@@ -114,7 +115,11 @@ enum SyncSessionGuard {
                 }
 
                 // Find current exercise IDs
-                let exerciseRows = try Row.fetchAll(db, sql: "SELECT id FROM session_exercises WHERE workout_session_id = ?", arguments: [snapshot.sessionRow.id])
+                let exerciseRows = try Row.fetchAll(
+                    db,
+                    sql: "SELECT id FROM session_exercises WHERE workout_session_id = ?",
+                    arguments: [snapshot.sessionRow.id]
+                )
                 let currentExIds = Set(exerciseRows.compactMap { $0["id"] as String? })
                 let missingExercises = snapshot.exerciseRows.filter { !currentExIds.contains($0.id) }
 
@@ -123,7 +128,11 @@ enum SyncSessionGuard {
                 var missingSets: [SessionSetRow] = []
                 if !snapshotExerciseIds.isEmpty {
                     let placeholders = snapshotExerciseIds.map { _ in "?" }.joined(separator: ",")
-                    let setRows = try Row.fetchAll(db, sql: "SELECT id FROM session_sets WHERE session_exercise_id IN (\(placeholders))", arguments: StatementArguments(snapshotExerciseIds))
+                    let setRows = try Row.fetchAll(
+                        db,
+                        sql: "SELECT id FROM session_sets WHERE session_exercise_id IN (\(placeholders))",
+                        arguments: StatementArguments(snapshotExerciseIds)
+                    )
                     let currentSetIds = Set(setRows.compactMap { $0["id"] as String? })
                     missingSets = snapshot.setRows.filter { !currentSetIds.contains($0.id) }
                 }
@@ -154,8 +163,13 @@ enum SyncSessionGuard {
             if result.missing {
                 if result.exerciseCount > 0 || result.setCount > 0 {
                     Logger.shared.error(.sync,
-                        "[sync-guard] DATA LOSS detected and RESTORED \(result.exerciseCount) exercises, \(result.setCount) sets")
-                    let dataLossError = NSError(domain: "LiftMark.SyncSessionGuard", code: 1, userInfo: [NSLocalizedDescriptionKey: "Data loss detected and restored"])
+                        "[sync-guard] DATA LOSS detected and RESTORED \(result.exerciseCount) exercises, " +
+                            "\(result.setCount) sets")
+                    let dataLossError = NSError(
+                        domain: "LiftMark.SyncSessionGuard",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Data loss detected and restored"]
+                    )
                     CrashReporter.shared.captureError(dataLossError, category: .sync, metadata: ["tag": "data_loss"])
                 }
                 return false

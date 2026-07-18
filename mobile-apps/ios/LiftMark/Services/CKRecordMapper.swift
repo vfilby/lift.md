@@ -236,7 +236,10 @@ final class CKRecordMapper {
     }
 
     func toCKRecord(_ s: UserSettingsRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let record = CKRecord(recordType: "UserSettings", recordID: CKRecord.ID(recordName: "user-settings", zoneID: zoneID))
+        let record = CKRecord(
+            recordType: "UserSettings",
+            recordID: CKRecord.ID(recordName: "user-settings", zoneID: zoneID)
+        )
         record["defaultWeightUnit"] = s.defaultWeightUnit as CKRecordValue
         record["enableWorkoutTimer"] = Int64(s.enableWorkoutTimer) as CKRecordValue
         record["autoStartRestTimer"] = Int64(s.autoStartRestTimer) as CKRecordValue
@@ -320,8 +323,10 @@ final class CKRecordMapper {
                 name: self.stringField(record, "name") ?? "Gym",
                 isDefault: Int(self.int64Field(record, "isDefault") ?? 0),
                 deletedAt: nil,
-                createdAt: self.dateToISO(self.dateField(record, "createdAt")) ?? existing?.createdAt ?? self.isoFormatter.string(from: Date()),
-                updatedAt: self.dateToISO(remoteUpdatedAt) ?? existing?.updatedAt ?? self.isoFormatter.string(from: Date())
+                createdAt: self.dateToISO(self.dateField(record, "createdAt")) ?? existing?.createdAt
+                    ?? self.isoFormatter.string(from: Date()),
+                updatedAt: self.dateToISO(remoteUpdatedAt) ?? existing?.updatedAt
+                    ?? self.isoFormatter.string(from: Date())
             )
             if existing != nil { try row.update(db) } else { try row.insert(db) }
             return true
@@ -347,8 +352,10 @@ final class CKRecordMapper {
                 isAvailable: Int(self.int64Field(record, "isAvailable") ?? 1),
                 lastCheckedAt: self.dateToISO(self.dateField(record, "lastCheckedAt")),
                 deletedAt: nil,
-                createdAt: self.dateToISO(self.dateField(record, "createdAt")) ?? existing?.createdAt ?? self.isoFormatter.string(from: Date()),
-                updatedAt: self.dateToISO(remoteUpdatedAt) ?? existing?.updatedAt ?? self.isoFormatter.string(from: Date()),
+                createdAt: self.dateToISO(self.dateField(record, "createdAt")) ?? existing?.createdAt
+                    ?? self.isoFormatter.string(from: Date()),
+                updatedAt: self.dateToISO(remoteUpdatedAt) ?? existing?.updatedAt
+                    ?? self.isoFormatter.string(from: Date()),
                 gymId: self.referenceId(record, "gymId")
             )
             if existing != nil { try row.update(db) } else { try row.insert(db) }
@@ -370,8 +377,10 @@ final class CKRecordMapper {
                 tags: self.stringField(record, "tags"),
                 defaultWeightUnit: self.stringField(record, "defaultWeightUnit"),
                 sourceMarkdown: self.stringField(record, "sourceMarkdown"),
-                createdAt: self.dateToISO(self.dateField(record, "createdAt")) ?? existing?.createdAt ?? self.isoFormatter.string(from: Date()),
-                updatedAt: self.dateToISO(remoteUpdatedAt) ?? existing?.updatedAt ?? self.isoFormatter.string(from: Date()),
+                createdAt: self.dateToISO(self.dateField(record, "createdAt")) ?? existing?.createdAt
+                    ?? self.isoFormatter.string(from: Date()),
+                updatedAt: self.dateToISO(remoteUpdatedAt) ?? existing?.updatedAt
+                    ?? self.isoFormatter.string(from: Date()),
                 isFavorite: Int(self.int64Field(record, "isFavorite") ?? 0)
             )
             if existing != nil { try row.update(db) } else { try row.insert(db) }
@@ -385,7 +394,10 @@ final class CKRecordMapper {
             let existing = try PlannedExerciseRow.fetchOne(db, key: record.recordID.recordName)
             let fk = self.referenceId(record, "workoutPlanId") ?? existing?.workoutTemplateId ?? ""
             if fk.isEmpty && existing == nil {
-                Logger.shared.error(.sync, "[sync-merge] Skipping PlannedExercise \(record.recordID.recordName): missing workoutPlanId FK")
+                Logger.shared.error(
+                    .sync,
+                    "[sync-merge] Skipping PlannedExercise \(record.recordID.recordName): missing workoutPlanId FK"
+                )
                 return false
             }
 
@@ -414,7 +426,10 @@ final class CKRecordMapper {
                     .filter(Column("order_index") == row.orderIndex)
                     .fetchOne(db)
                 if duplicate != nil {
-                    Logger.shared.warn(.sync, "Skipping duplicate exercise: \(row.exerciseName) at index \(row.orderIndex)")
+                    Logger.shared.warn(
+                        .sync,
+                        "Skipping duplicate exercise: \(row.exerciseName) at index \(row.orderIndex)"
+                    )
                     return false
                 }
                 try row.insert(db)
@@ -466,8 +481,13 @@ final class CKRecordMapper {
             }
 
             // Replace measurements from CK record fields (dual-read: old-format CKRecords)
-            try db.execute(sql: "DELETE FROM set_measurements WHERE set_id = ? AND parent_type = 'planned'", arguments: [setId])
-            try self.insertMeasurementsFromCKRecord(record, setId: setId, parentType: "planned", role: "target", now: now, in: db)
+            try db.execute(
+                sql: "DELETE FROM set_measurements WHERE set_id = ? AND parent_type = 'planned'",
+                arguments: [setId]
+            )
+            try self.insertMeasurementsFromCKRecord(
+                record, setId: setId, parentType: "planned", role: "target", now: now, in: db
+            )
 
             return true
         }
@@ -514,7 +534,10 @@ final class CKRecordMapper {
             let existing = try SessionExerciseRow.fetchOne(db, key: record.recordID.recordName)
             let fk = self.referenceId(record, "workoutSessionId") ?? existing?.workoutSessionId ?? ""
             if fk.isEmpty && existing == nil {
-                Logger.shared.error(.sync, "[sync-merge] Skipping SessionExercise \(record.recordID.recordName): missing workoutSessionId FK")
+                Logger.shared.error(
+                    .sync,
+                    "[sync-merge] Skipping SessionExercise \(record.recordID.recordName): missing workoutSessionId FK"
+                )
                 return false
             }
 
@@ -574,9 +597,16 @@ final class CKRecordMapper {
             if existing != nil { try row.update(db) } else { try row.insert(db) }
 
             // Replace measurements from CK record fields (dual-read: old-format CKRecords)
-            try db.execute(sql: "DELETE FROM set_measurements WHERE set_id = ? AND parent_type = 'session'", arguments: [setId])
-            try self.insertMeasurementsFromCKRecord(record, setId: setId, parentType: "session", role: "target", now: now, in: db)
-            try self.insertMeasurementsFromCKRecord(record, setId: setId, parentType: "session", role: "actual", now: now, in: db)
+            try db.execute(
+                sql: "DELETE FROM set_measurements WHERE set_id = ? AND parent_type = 'session'",
+                arguments: [setId]
+            )
+            try self.insertMeasurementsFromCKRecord(
+                record, setId: setId, parentType: "session", role: "target", now: now, in: db
+            )
+            try self.insertMeasurementsFromCKRecord(
+                record, setId: setId, parentType: "session", role: "actual", now: now, in: db
+            )
 
             return true
         }
@@ -594,25 +624,39 @@ final class CKRecordMapper {
                 let row = UserSettingsRow(
                     id: existing.id,
                     defaultWeightUnit: self.stringField(record, "defaultWeightUnit") ?? existing.defaultWeightUnit,
-                    enableWorkoutTimer: Int(self.int64Field(record, "enableWorkoutTimer") ?? Int64(existing.enableWorkoutTimer)),
-                    autoStartRestTimer: Int(self.int64Field(record, "autoStartRestTimer") ?? Int64(existing.autoStartRestTimer)),
+                    enableWorkoutTimer: Int(self.int64Field(record, "enableWorkoutTimer")
+                        ?? Int64(existing.enableWorkoutTimer)),
+                    autoStartRestTimer: Int(self.int64Field(record, "autoStartRestTimer")
+                        ?? Int64(existing.autoStartRestTimer)),
                     theme: self.stringField(record, "theme") ?? existing.theme,
-                    notificationsEnabled: Int(self.int64Field(record, "notificationsEnabled") ?? Int64(existing.notificationsEnabled)),
-                    customPromptAddition: self.stringField(record, "customPromptAddition") ?? existing.customPromptAddition,
+                    notificationsEnabled: Int(self.int64Field(record, "notificationsEnabled")
+                        ?? Int64(existing.notificationsEnabled)),
+                    customPromptAddition: self.stringField(record, "customPromptAddition")
+                        ?? existing.customPromptAddition,
                     anthropicApiKeyStatus: existing.anthropicApiKeyStatus, // Never sync
-                    healthkitEnabled: Int(self.int64Field(record, "healthKitEnabled") ?? Int64(existing.healthkitEnabled)),
-                    liveActivitiesEnabled: Int(self.int64Field(record, "liveActivitiesEnabled") ?? Int64(existing.liveActivitiesEnabled)),
+                    healthkitEnabled: Int(self.int64Field(record, "healthKitEnabled")
+                        ?? Int64(existing.healthkitEnabled)),
+                    liveActivitiesEnabled: Int(self.int64Field(record, "liveActivitiesEnabled")
+                        ?? Int64(existing.liveActivitiesEnabled)),
                     keepScreenAwake: Int(self.int64Field(record, "keepScreenAwake") ?? Int64(existing.keepScreenAwake)),
-                    showOpenInClaudeButton: Int(self.int64Field(record, "showOpenInClaudeButton") ?? Int64(existing.showOpenInClaudeButton)),
+                    showOpenInClaudeButton: Int(self.int64Field(record, "showOpenInClaudeButton")
+                        ?? Int64(existing.showOpenInClaudeButton)),
                     developerModeEnabled: existing.developerModeEnabled,
-                    countdownSoundsEnabled: Int(self.int64Field(record, "countdownSoundsEnabled") ?? Int64(existing.countdownSoundsEnabled)),
+                    countdownSoundsEnabled: Int(self.int64Field(record, "countdownSoundsEnabled")
+                        ?? Int64(existing.countdownSoundsEnabled)),
                     hasAcceptedDisclaimer: existing.hasAcceptedDisclaimer, // Never sync — local-only
-                    defaultTimerCountdown: Int(self.int64Field(record, "defaultTimerCountdown") ?? Int64(existing.defaultTimerCountdown)),
-                    defaultWeightStepLbs: self.doubleField(record, "defaultWeightStepLbs") ?? existing.defaultWeightStepLbs,
-                    aiPromptIncludeFormatPointer: Int(self.int64Field(record, "aiPromptIncludeFormatPointer") ?? Int64(existing.aiPromptIncludeFormatPointer)),
-                    aiPromptIncludeRecentWorkouts: Int(self.int64Field(record, "aiPromptIncludeRecentWorkouts") ?? Int64(existing.aiPromptIncludeRecentWorkouts)),
-                    aiPromptIncludeProgression: Int(self.int64Field(record, "aiPromptIncludeProgression") ?? Int64(existing.aiPromptIncludeProgression)),
-                    aiPromptIncludeEquipment: Int(self.int64Field(record, "aiPromptIncludeEquipment") ?? Int64(existing.aiPromptIncludeEquipment)),
+                    defaultTimerCountdown: Int(self.int64Field(record, "defaultTimerCountdown")
+                        ?? Int64(existing.defaultTimerCountdown)),
+                    defaultWeightStepLbs: self.doubleField(record, "defaultWeightStepLbs")
+                        ?? existing.defaultWeightStepLbs,
+                    aiPromptIncludeFormatPointer: Int(self.int64Field(record, "aiPromptIncludeFormatPointer")
+                        ?? Int64(existing.aiPromptIncludeFormatPointer)),
+                    aiPromptIncludeRecentWorkouts: Int(self.int64Field(record, "aiPromptIncludeRecentWorkouts")
+                        ?? Int64(existing.aiPromptIncludeRecentWorkouts)),
+                    aiPromptIncludeProgression: Int(self.int64Field(record, "aiPromptIncludeProgression")
+                        ?? Int64(existing.aiPromptIncludeProgression)),
+                    aiPromptIncludeEquipment: Int(self.int64Field(record, "aiPromptIncludeEquipment")
+                        ?? Int64(existing.aiPromptIncludeEquipment)),
                     homeTiles: self.stringField(record, "homeTiles") ?? existing.homeTiles,
                     createdAt: existing.createdAt,
                     updatedAt: updatedAt
@@ -776,18 +820,23 @@ final class CKRecordMapper {
         do {
             let dbQueue = try dbManager.database()
             return try dbQueue.read { db in
-                guard let sessionRow = try Row.fetchOne(db, sql: "SELECT id, workout_template_id FROM workout_sessions WHERE status = 'in_progress' LIMIT 1"),
+                guard let sessionRow = try Row.fetchOne(
+                    db,
+                    sql: "SELECT id, workout_template_id FROM workout_sessions WHERE status = 'in_progress' LIMIT 1"
+                ),
                       let sessionId: String = sessionRow["id"] else {
                     return .empty
                 }
 
-                let exerciseRows = try Row.fetchAll(db, sql: "SELECT id FROM session_exercises WHERE workout_session_id = ?", arguments: [sessionId])
+                let exSql = "SELECT id FROM session_exercises WHERE workout_session_id = ?"
+                let exerciseRows = try Row.fetchAll(db, sql: exSql, arguments: [sessionId])
                 let exerciseIds = Set(exerciseRows.compactMap { $0["id"] as String? })
 
                 var setIds = Set<String>()
                 if !exerciseIds.isEmpty {
                     let placeholders = exerciseIds.map { _ in "?" }.joined(separator: ",")
-                    let setRows = try Row.fetchAll(db, sql: "SELECT id FROM session_sets WHERE session_exercise_id IN (\(placeholders))", arguments: StatementArguments(Array(exerciseIds)))
+                    let setSql = "SELECT id FROM session_sets WHERE session_exercise_id IN (\(placeholders))"
+                    let setRows = try Row.fetchAll(db, sql: setSql, arguments: StatementArguments(Array(exerciseIds)))
                     setIds = Set(setRows.compactMap { $0["id"] as String? })
                 }
 
@@ -796,7 +845,8 @@ final class CKRecordMapper {
                 var plannedSetIds = Set<String>()
 
                 if let planId, !planId.isEmpty {
-                    let peRows = try Row.fetchAll(db, sql: "SELECT id FROM template_exercises WHERE workout_template_id = ?", arguments: [planId])
+                    let peSql = "SELECT id FROM template_exercises WHERE workout_template_id = ?"
+                    let peRows = try Row.fetchAll(db, sql: peSql, arguments: [planId])
                     plannedExerciseIds = Set(peRows.compactMap { $0["id"] as String? })
 
                     if !plannedExerciseIds.isEmpty {

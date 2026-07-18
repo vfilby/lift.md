@@ -61,7 +61,8 @@ final class GymStore {
                 try row.insert(db)
             }
             CKSyncEngineManager.notifySave(recordType: "Gym", recordID: gymId)
-            let newGym = Gym(id: gymId, name: name, isDefault: isDefault, deletedAt: nil, createdAt: now, updatedAt: now)
+            let newGym = Gym(
+                id: gymId, name: name, isDefault: isDefault, deletedAt: nil, createdAt: now, updatedAt: now)
             gyms.append(newGym)
             lastError = nil
         } catch {

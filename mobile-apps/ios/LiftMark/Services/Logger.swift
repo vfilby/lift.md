@@ -195,7 +195,8 @@ final class LogStore: @unchecked Sendable {
                     }
                     try db.execute(
                         sql: """
-                            INSERT INTO app_logs (id, timestamp, level, category, message, metadata, stack_trace, device_info)
+                            INSERT INTO app_logs (id, timestamp, level, category, message, metadata, \
+                        stack_trace, device_info)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         arguments: [

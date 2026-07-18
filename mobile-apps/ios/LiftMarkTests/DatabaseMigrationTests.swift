@@ -107,7 +107,8 @@ final class DatabaseMigrationTests: XCTestCase {
 
             // 9. anthropic_api_key column removed at v9 (DROP COLUMN)
             let userCols = try columnNames(db, table: "user_settings")
-            XCTAssertFalse(userCols.contains("anthropic_api_key"), "\(label): user_settings.anthropic_api_key should be dropped at v9")
+            XCTAssertFalse(userCols.contains("anthropic_api_key"),
+                           "\(label): user_settings.anthropic_api_key should be dropped at v9")
         }
     }
 
@@ -238,7 +239,8 @@ final class DatabaseMigrationTests: XCTestCase {
         try q.read { db in
             // v6 added session_sets.side — must survive v7/v8/v9/v10/v11/v12/v13
             XCTAssertTrue(try columnNames(db, table: "session_sets").contains("side"), "session_sets.side preserved")
-            let sides = try Row.fetchAll(db, sql: "SELECT side FROM session_sets WHERE side IS NOT NULL").map { $0["side"] as String }
+            let sides = try Row.fetchAll(db, sql: "SELECT side FROM session_sets WHERE side IS NOT NULL")
+                .map { $0["side"] as String }
             XCTAssertFalse(sides.isEmpty, "seeded side='left' row survives fan-out")
         }
     }
@@ -256,7 +258,8 @@ final class DatabaseMigrationTests: XCTestCase {
                 sql: "SELECT updated_at FROM workout_templates WHERE id = ?",
                 arguments: [DatabaseSeeds.templatePushId]
             )
-            XCTAssertEqual(updatedAt, DatabaseSeeds.ts3, "workout_templates.updated_at not overwritten by later migrations")
+            XCTAssertEqual(updatedAt, DatabaseSeeds.ts3,
+                           "workout_templates.updated_at not overwritten by later migrations")
 
             // sync_engine_state BLOB must be byte-identical.
             let blob = try Data.fetchOne(db, sql: "SELECT data FROM sync_engine_state LIMIT 1")

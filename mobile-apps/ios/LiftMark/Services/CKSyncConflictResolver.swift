@@ -80,20 +80,29 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                 handleServerRecordChanged(recordName: recordName, recordType: recordType, error: error)
 
             case .networkFailure, .networkUnavailable:
-                Logger.shared.warn(.sync, "[sync-engine] Network unavailable for \(recordType)/\(recordName) (CKError \(error.code.rawValue)), CKSyncEngine will retry")
+                Logger.shared.warn(.sync, "[sync-engine] Network unavailable for \(recordType)/\(recordName) " +
+                    "(CKError \(error.code.rawValue)), CKSyncEngine will retry")
                 // Transient — breadcrumb only, don't capture.
-                CrashReporter.shared.addBreadcrumb("sync.networkRetry", category: .sync, metadata: ["recordType": recordType, "errorCode": "\(error.code.rawValue)"])
+                CrashReporter.shared.addBreadcrumb("sync.networkRetry", category: .sync,
+                    metadata: ["recordType": recordType, "errorCode": "\(error.code.rawValue)"])
 
             case .quotaExceeded:
-                Logger.shared.error(.sync, "[sync-engine] iCloud quota exceeded for \(recordType)/\(recordName) (CKError \(error.code.rawValue))")
-                CrashReporter.shared.captureError(error, category: .sync, metadata: ["recordType": recordType, "errorCode": "\(error.code.rawValue)", "errorDomain": CKErrorDomain])
+                Logger.shared.error(.sync, "[sync-engine] iCloud quota exceeded for \(recordType)/\(recordName) " +
+                    "(CKError \(error.code.rawValue))")
+                CrashReporter.shared.captureError(error, category: .sync, metadata: [
+                    "recordType": recordType, "errorCode": "\(error.code.rawValue)", "errorDomain": CKErrorDomain
+                ])
 
             case .notAuthenticated:
-                Logger.shared.error(.sync, "[sync-engine] Not authenticated for \(recordType)/\(recordName) (CKError \(error.code.rawValue))")
-                CrashReporter.shared.captureError(error, category: .sync, metadata: ["recordType": recordType, "errorCode": "\(error.code.rawValue)", "errorDomain": CKErrorDomain])
+                Logger.shared.error(.sync, "[sync-engine] Not authenticated for \(recordType)/\(recordName) " +
+                    "(CKError \(error.code.rawValue))")
+                CrashReporter.shared.captureError(error, category: .sync, metadata: [
+                    "recordType": recordType, "errorCode": "\(error.code.rawValue)", "errorDomain": CKErrorDomain
+                ])
 
             case .unknownItem:
-                Logger.shared.warn(.sync, "[sync-engine] Unknown item \(recordType)/\(recordName) (CKError \(error.code.rawValue), parent likely deleted), removing from pending")
+                Logger.shared.warn(.sync, "[sync-engine] Unknown item \(recordType)/\(recordName) " +
+                    "(CKError \(error.code.rawValue), parent likely deleted), removing from pending")
                 let ckRecordID = record.recordID
                 engine?.state.remove(pendingRecordZoneChanges: [.saveRecord(ckRecordID)])
                 removePendingType(recordName)
@@ -170,8 +179,16 @@ final class CKSyncConflictResolver: @unchecked Sendable {
             do {
                 _ = try mapper.mergeIncoming(serverRecord)
             } catch {
-                Logger.shared.error(.sync, "[sync-engine] Failed to merge conflict for \(recordType)/\(recordName)", error: error)
-                CrashReporter.shared.captureError(error, category: .sync, metadata: ["recordType": recordType, "tag": "conflict-merge-failed"])
+                Logger.shared.error(
+                    .sync,
+                    "[sync-engine] Failed to merge conflict for \(recordType)/\(recordName)",
+                    error: error
+                )
+                CrashReporter.shared.captureError(
+                    error,
+                    category: .sync,
+                    metadata: ["recordType": recordType, "tag": "conflict-merge-failed"]
+                )
             }
 
             if mapper.serverRecordIsNewer(serverRecord) {
@@ -197,8 +214,20 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                 Logger.shared.info(.sync, "[sync-engine] Conflict: local wins for \(recordType)/\(recordName), re-uploading")
             }
         } else {
-            Logger.shared.error(.sync, "[sync-engine] serverRecordChanged for \(recordType)/\(recordName) but no serverRecord provided (CKError \(error.code.rawValue))")
-            CrashReporter.shared.captureError(error, category: .sync, metadata: ["recordType": recordType, "errorCode": "\(error.code.rawValue)", "tag": "missing-server-record"])
+            Logger.shared.error(
+                .sync,
+                "[sync-engine] serverRecordChanged for \(recordType)/\(recordName) " +
+                    "but no serverRecord provided (CKError \(error.code.rawValue))"
+            )
+            CrashReporter.shared.captureError(
+                error,
+                category: .sync,
+                metadata: [
+                    "recordType": recordType,
+                    "errorCode": "\(error.code.rawValue)",
+                    "tag": "missing-server-record"
+                ]
+            )
         }
     }
 
@@ -206,9 +235,14 @@ final class CKSyncConflictResolver: @unchecked Sendable {
         if let partialErrors = error.partialErrorsByItemID {
             for (itemID, itemError) in partialErrors {
                 let ckError = itemError as? CKError
-                let codeInfo = ckError.map { "CKError \($0.code.rawValue) (\(Self.errorCodeName($0.code)))" } ?? "non-CK error"
+                let codeInfo = ckError.map { "CKError \($0.code.rawValue) (\(Self.errorCodeName($0.code)))" }
+                    ?? "non-CK error"
                 let subRecordID = (itemID as? CKRecord.ID)?.recordName ?? "\(itemID)"
-                Logger.shared.error(.sync, "[sync-engine] Partial failure for \(recordType)/\(subRecordID): \(codeInfo) — \(itemError.localizedDescription)")
+                Logger.shared.error(
+                    .sync,
+                    "[sync-engine] Partial failure for \(recordType)/\(subRecordID): " +
+                        "\(codeInfo) — \(itemError.localizedDescription)"
+                )
                 var metadata: [String: String] = ["recordType": recordType, "tag": "partial-failure"]
                 if let ckError {
                     metadata["errorCode"] = "\(ckError.code.rawValue)"
@@ -216,9 +250,21 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                 }
                 CrashReporter.shared.captureError(itemError, category: .sync, metadata: metadata)
             }
-            CrashReporter.shared.captureError(error, category: .sync, metadata: ["recordType": recordType, "partialFailureCount": "\(partialErrors.count)", "tag": "partial-failure-rollup"])
+            CrashReporter.shared.captureError(
+                error,
+                category: .sync,
+                metadata: [
+                    "recordType": recordType,
+                    "partialFailureCount": "\(partialErrors.count)",
+                    "tag": "partial-failure-rollup"
+                ]
+            )
         } else {
-            Logger.shared.error(.sync, "[sync-engine] Partial failure for \(recordType)/\(recordName): CKError \(error.code.rawValue) — \(error.localizedDescription)")
+            Logger.shared.error(
+                .sync,
+                "[sync-engine] Partial failure for \(recordType)/\(recordName): " +
+                    "CKError \(error.code.rawValue) — \(error.localizedDescription)"
+            )
             CrashReporter.shared.captureError(
                 error,
                 category: .sync,

@@ -188,7 +188,8 @@ final class DatabaseManager: @unchecked Sendable {
             do {
                 try queue.close()
             } catch {
-                Logger.shared.error(.database, "DatabaseQueue.close() failed; falling back to ARC teardown", error: error)
+                Logger.shared.error(
+                    .database, "DatabaseQueue.close() failed; falling back to ARC teardown", error: error)
             }
         }
         dbQueue = nil

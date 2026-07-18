@@ -29,7 +29,8 @@ final class DatabaseMigrationCrossCheckTests: XCTestCase {
         return (snap, loaded)
     }
 
-    private func assertSeedMatchesLive(ddl: String, version: Int, file: StaticString = #filePath, line: UInt = #line) throws {
+    private func assertSeedMatchesLive(ddl: String, version: Int,
+                                       file: StaticString = #filePath, line: UInt = #line) throws {
         let (seed, seedLoaded) = try captureSeedSnapshot(ddl: ddl)
         defer { DatabaseSeedLoader.cleanup(seedLoaded) }
         let (live, liveLoaded) = try captureLiveSnapshot(upTo: version)

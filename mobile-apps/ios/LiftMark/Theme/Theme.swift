@@ -85,7 +85,8 @@ enum LiftMarkTheme {
     // fully rounded instead and do NOT use these tokens: buttons and badges/chips
     // are Capsule() / `.buttonBorderShape(.capsule)`. See spec/visual-spec.md.
 
-    static let cornerRadiusXS: CGFloat = 4   // small chrome: side labels, set-number badge, progress bars, inline info boxes
+    // small chrome: side labels, set-number badge, progress bars, inline info boxes
+    static let cornerRadiusXS: CGFloat = 4
     static let cornerRadiusSM: CGFloat = 8   // input fields, small containers
     static let cornerRadiusMD: CGFloat = 12  // cards (the standard card radius), modals
     static let cornerRadiusLG: CGFloat = 16  // large surfaces / full-width banners (e.g. error banner)
