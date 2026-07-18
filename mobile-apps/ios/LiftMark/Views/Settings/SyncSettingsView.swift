@@ -124,7 +124,8 @@ struct SyncSettingsView: View {
 
             // Sync Info Section (always visible)
             Section {
-                Text("iCloud Sync keeps your workout plans, session history, and settings in sync across all your devices signed into the same iCloud account.")
+                Text("iCloud Sync keeps your workout plans, session history, and settings "
+                    + "in sync across all your devices signed into the same iCloud account.")
                     .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .accessibilityIdentifier("sync-info-text")

@@ -507,7 +507,8 @@ struct ExerciseHistorySheetView: View {
     private var summaryStats: SummaryStats {
         let sessions = historyPoints.count
         let maxWeight = historyPoints.map(\.maxWeight).max() ?? 0
-        let avgReps = historyPoints.isEmpty ? 0 : historyPoints.map(\.avgReps).reduce(0, +) / Double(historyPoints.count)
+        let avgReps = historyPoints.isEmpty
+            ? 0 : historyPoints.map(\.avgReps).reduce(0, +) / Double(historyPoints.count)
         let totalVolume = historyPoints.map(\.totalVolume).reduce(0, +)
         return SummaryStats(sessions: sessions, maxWeight: maxWeight, avgReps: avgReps, totalVolume: totalVolume)
     }

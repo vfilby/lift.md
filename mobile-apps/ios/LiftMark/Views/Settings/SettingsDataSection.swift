@@ -191,7 +191,8 @@ struct DatabaseBackupModifiers: ViewModifier {
                 if importIsDatabase {
                     Text("This will replace all your workout data with the imported database. This cannot be undone.")
                 } else {
-                    Text("This will merge the imported data with your existing data. Duplicate plans and sessions will be skipped.")
+                    Text("This will merge the imported data with your existing data. "
+                        + "Duplicate plans and sessions will be skipped.")
                 }
             }
             .alert("Import Successful", isPresented: $showImportResult) {

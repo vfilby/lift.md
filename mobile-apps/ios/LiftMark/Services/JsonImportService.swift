@@ -130,7 +130,8 @@ struct JsonImportService {
         guard let name = data["name"] as? String else { return }
 
         // Check for duplicate by name
-        let existingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM workout_templates WHERE name = ?", arguments: [name]) ?? 0
+        let existingCount = try Int.fetchOne(
+            db, sql: "SELECT COUNT(*) FROM workout_templates WHERE name = ?", arguments: [name]) ?? 0
         if existingCount > 0 {
             result.plansSkipped += 1
             return
@@ -143,7 +144,8 @@ struct JsonImportService {
             .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
 
         try db.execute(sql: """
-            INSERT INTO workout_templates (id, name, description, tags, default_weight_unit, source_markdown, created_at, updated_at, is_favorite)
+            INSERT INTO workout_templates (id, name, description, tags, default_weight_unit, \
+            source_markdown, created_at, updated_at, is_favorite)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, arguments: [
                 planId,
@@ -167,7 +169,8 @@ struct JsonImportService {
                 exerciseIdMap[orderIndex] = exerciseId
 
                 try db.execute(sql: """
-                    INSERT INTO template_exercises (id, workout_template_id, exercise_name, order_index, notes, equipment_type, group_type, group_name, parent_exercise_id)
+                    INSERT INTO template_exercises (id, workout_template_id, exercise_name, order_index, notes, \
+                    equipment_type, group_type, group_name, parent_exercise_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, arguments: [
                         exerciseId,
@@ -217,7 +220,11 @@ struct JsonImportService {
               let date = data["date"] as? String else { return }
 
         // Check for duplicate by name + date
-        let existingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM workout_sessions WHERE name = ? AND date = ?", arguments: [name, date]) ?? 0
+        let existingCount = try Int.fetchOne(
+            db,
+            sql: "SELECT COUNT(*) FROM workout_sessions WHERE name = ? AND date = ?",
+            arguments: [name, date]
+        ) ?? 0
         if existingCount > 0 {
             result.sessionsSkipped += 1
             return
@@ -226,7 +233,8 @@ struct JsonImportService {
         let sessionId = UUID().uuidString
 
         try db.execute(sql: """
-            INSERT INTO workout_sessions (id, workout_template_id, name, date, start_time, end_time, duration, notes, status)
+            INSERT INTO workout_sessions (id, workout_template_id, name, date, start_time, end_time, duration, \
+            notes, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, arguments: [
                 sessionId,
@@ -246,7 +254,8 @@ struct JsonImportService {
                 let exerciseId = UUID().uuidString
 
                 try db.execute(sql: """
-                    INSERT INTO session_exercises (id, workout_session_id, exercise_name, order_index, notes, equipment_type, group_type, group_name, parent_exercise_id)
+                    INSERT INTO session_exercises (id, workout_session_id, exercise_name, order_index, notes, \
+                    equipment_type, group_type, group_name, parent_exercise_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, arguments: [
                         exerciseId,
@@ -303,7 +312,8 @@ struct JsonImportService {
         guard let name = data["name"] as? String else { return }
 
         // Check for duplicate by name
-        let existingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM gyms WHERE name = ?", arguments: [name]) ?? 0
+        let existingCount = try Int.fetchOne(
+            db, sql: "SELECT COUNT(*) FROM gyms WHERE name = ?", arguments: [name]) ?? 0
         if existingCount > 0 {
             result.gymsSkipped += 1
             return

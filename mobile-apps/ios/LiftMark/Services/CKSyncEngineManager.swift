@@ -157,7 +157,11 @@ final class CKSyncEngineManager: @unchecked Sendable {
             lock.unlock()
             if let lastSync,
                Date().timeIntervalSince(lastSync) < Self.minimumFetchInterval {
-                Logger.shared.debug(.sync, "[sync-engine] Skipping automatic fetch — last sync was \(Int(Date().timeIntervalSince(lastSync)))s ago (minimum \(Int(Self.minimumFetchInterval))s)")
+                Logger.shared.debug(
+                    .sync,
+                    "[sync-engine] Skipping automatic fetch — last sync was " +
+                        "\(Int(Date().timeIntervalSince(lastSync)))s ago (minimum \(Int(Self.minimumFetchInterval))s)"
+                )
                 return
             }
         }
@@ -216,7 +220,11 @@ final class CKSyncEngineManager: @unchecked Sendable {
     private func prepareRecoveryIfNeeded() {
         let current = UserDefaults.standard.integer(forKey: Self.fullUploadVersion)
         guard current < Self.currentFullUploadVersion else { return }
-        Logger.shared.info(.sync, "[sync-engine] Recovery v\(Self.currentFullUploadVersion): resetting engine state + system-fields cache (was v\(current))")
+        Logger.shared.info(
+            .sync,
+            "[sync-engine] Recovery v\(Self.currentFullUploadVersion): " +
+                "resetting engine state + system-fields cache (was v\(current))"
+        )
         CrashReporter.shared.addBreadcrumb("sync.recovery.v5.begin", category: .sync,
                                            metadata: ["fromVersion": "\(current)"])
         clearSyncEngineState()
@@ -240,7 +248,11 @@ final class CKSyncEngineManager: @unchecked Sendable {
         pendingRecoveryUpload = false
         lock.unlock()
         guard shouldRun else { return }
-        Logger.shared.info(.sync, "[sync-engine] Recovery v\(Self.currentFullUploadVersion): fetch complete, scheduling clean re-upload of local records")
+        Logger.shared.info(
+            .sync,
+            "[sync-engine] Recovery v\(Self.currentFullUploadVersion): " +
+                "fetch complete, scheduling clean re-upload of local records"
+        )
         scheduleFullUpload()
         UserDefaults.standard.set(Self.currentFullUploadVersion, forKey: Self.fullUploadVersion)
         CrashReporter.shared.addBreadcrumb("sync.recovery.v5.end", category: .sync)
@@ -282,7 +294,11 @@ final class CKSyncEngineManager: @unchecked Sendable {
         } catch {
             let ckError = error as? CKError
             if Self.isNonFatalZoneCreateError(ckError?.code) {
-                Logger.shared.info(.sync, "[sync-engine] Zone create non-fatal (\(ckError?.code.rawValue.description ?? "?")): \(error.localizedDescription)")
+                Logger.shared.info(
+                    .sync,
+                    "[sync-engine] Zone create non-fatal (\(ckError?.code.rawValue.description ?? "?")): " +
+                        "\(error.localizedDescription)"
+                )
             } else {
                 Logger.shared.error(.sync, "[sync-engine] Failed to create zone: \(error)")
                 var metadata: [String: String] = ["zoneName": zoneID.zoneName, "tag": "zone-create-failed"]
@@ -445,7 +461,10 @@ final class CKSyncEngineManager: @unchecked Sendable {
                         downloaded += 1
                         mergedThisPass += 1
                         changedTypes.insert(recordType)
-                        Logger.shared.debug(.sync, "[sync-engine] Merged \(recordType)/\(recordId)\(pass > 0 ? " (pass \(pass + 1))" : "")")
+                        Logger.shared.debug(
+                            .sync,
+                            "[sync-engine] Merged \(recordType)/\(recordId)\(pass > 0 ? " (pass \(pass + 1))" : "")"
+                        )
                     } else {
                         failedRecords.append(record)
                     }
@@ -458,13 +477,21 @@ final class CKSyncEngineManager: @unchecked Sendable {
 
             if mergedThisPass == 0 {
                 for record in pendingRecords {
-                    Logger.shared.debug(.sync, "[sync-engine] Skipped merge \(record.recordType)/\(record.recordID.recordName) — local is newer or unchanged")
+                    Logger.shared.debug(
+                        .sync,
+                        "[sync-engine] Skipped merge \(record.recordType)/\(record.recordID.recordName) " +
+                            "— local is newer or unchanged"
+                    )
                 }
                 break
             }
 
             if !pendingRecords.isEmpty {
-                Logger.shared.debug(.sync, "[sync-engine] Pass \(pass + 1) merged \(mergedThisPass), retrying \(pendingRecords.count) remaining")
+                Logger.shared.debug(
+                    .sync,
+                    "[sync-engine] Pass \(pass + 1) merged \(mergedThisPass), " +
+                        "retrying \(pendingRecords.count) remaining"
+                )
             }
         }
 
@@ -529,7 +556,11 @@ final class CKSyncEngineManager: @unchecked Sendable {
             self.lock.unlock()
         }, engine: engine)
 
-        Logger.shared.debug(.sync, "[sync-engine] Sent changes: \(result.uploaded) uploaded, \(result.conflicts) conflicts, \(event.failedRecordSaves.count) failed")
+        Logger.shared.debug(
+            .sync,
+            "[sync-engine] Sent changes: \(result.uploaded) uploaded, \(result.conflicts) conflicts, " +
+                "\(event.failedRecordSaves.count) failed"
+        )
 
         // Re-queue records that had local-wins conflicts — the cached server records
         // are ready with local values applied, but CKSyncEngine needs them re-added
@@ -559,7 +590,10 @@ final class CKSyncEngineManager: @unchecked Sendable {
     private func handleAccountChange(_ event: CKSyncEngine.Event.AccountChange) {
         switch event.changeType {
         case .switchAccounts:
-            Logger.shared.warn(.sync, "[sync-engine] CloudKit account switched — resetting upload state before syncing to new account")
+            Logger.shared.warn(
+                .sync,
+                "[sync-engine] CloudKit account switched — resetting upload state before syncing to new account"
+            )
             lock.lock()
             hasScheduledInitialUpload = true
             lock.unlock()
@@ -747,7 +781,10 @@ extension CKSyncEngineManager: CKSyncEngineDelegate {
                     for key in localRecord.allKeys() {
                         serverRecord[key] = localRecord[key]
                     }
-                    Logger.shared.debug(.sync, "[sync-engine] Re-uploading \(serverRecord.recordType)/\(recordName) with server changeTag")
+                    Logger.shared.debug(
+                        .sync,
+                        "[sync-engine] Re-uploading \(serverRecord.recordType)/\(recordName) with server changeTag"
+                    )
                     return serverRecord
                 }
                 return nil

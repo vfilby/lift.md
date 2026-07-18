@@ -78,7 +78,9 @@ enum ActiveWorkoutViewModel {
                     // Single-member superset is not a real superset — render the
                     // lone child as a standalone exercise, matching the plan view.
                     for child in children {
-                        items.append(.single(exercise: child.exercise, exerciseIndex: child.exerciseIndex, displayNumber: child.displayNumber))
+                        items.append(.single(
+                            exercise: child.exercise, exerciseIndex: child.exerciseIndex,
+                            displayNumber: child.displayNumber))
                     }
                 }
             } else if exercise.parentExerciseId != nil {
@@ -101,7 +103,8 @@ enum ActiveWorkoutViewModel {
                         var grandchildren: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)] = []
                         for (gIndex, grandchild) in exercises.enumerated()
                         where grandchild.parentExerciseId == child.id {
-                            grandchildren.append((exercise: grandchild, exerciseIndex: gIndex, displayNumber: displayNumber))
+                            grandchildren.append(
+                                (exercise: grandchild, exerciseIndex: gIndex, displayNumber: displayNumber))
                             displayNumber += 1
                             processedIds.insert(grandchild.id)
                         }
@@ -112,7 +115,9 @@ enum ActiveWorkoutViewModel {
                             // Single-member superset inside a section — render the
                             // lone grandchild standalone, matching the plan view.
                             for grandchild in grandchildren {
-                                items.append(.single(exercise: grandchild.exercise, exerciseIndex: grandchild.exerciseIndex, displayNumber: grandchild.displayNumber))
+                                items.append(.single(
+                                    exercise: grandchild.exercise, exerciseIndex: grandchild.exerciseIndex,
+                                    displayNumber: grandchild.displayNumber))
                             }
                         }
                     } else {
@@ -132,7 +137,10 @@ enum ActiveWorkoutViewModel {
 
     // MARK: - Live Activity
 
-    static func updateLiveActivity(session: WorkoutSession?, settings: UserSettings?, restTimer: (remainingSeconds: Int, nextExercise: SessionExercise?)? = nil) {
+    static func updateLiveActivity(
+        session: WorkoutSession?, settings: UserSettings?,
+        restTimer: (remainingSeconds: Int, nextExercise: SessionExercise?)? = nil
+    ) {
         guard settings?.liveActivitiesEnabled == true,
               LiveActivityService.shared.isAvailable(),
               let session else { return }
@@ -165,7 +173,9 @@ enum ActiveWorkoutViewModel {
         )
     }
 
-    static func endLiveActivity(settings: UserSettings?, message: String? = nil, subtitle: String? = nil, immediate: Bool = false) {
+    static func endLiveActivity(
+        settings: UserSettings?, message: String? = nil, subtitle: String? = nil, immediate: Bool = false
+    ) {
         guard settings?.liveActivitiesEnabled == true,
               LiveActivityService.shared.isAvailable() else { return }
         LiveActivityService.shared.endWorkoutActivity(message: message, subtitle: subtitle, immediate: immediate)

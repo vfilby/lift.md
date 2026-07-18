@@ -28,7 +28,8 @@ struct SessionNotesSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: LiftMarkTheme.spacingSM) {
-                Text("Capture how this workout felt — energy, form cues, soreness, anything worth remembering. Plain text.")
+                Text("Capture how this workout felt — energy, form cues, soreness, "
+                    + "anything worth remembering. Plain text.")
                     .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     .frame(maxWidth: .infinity, alignment: .leading)

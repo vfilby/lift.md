@@ -160,7 +160,8 @@ final class AnthropicService: @unchecked Sendable {
                   let text = firstBlock["text"] as? String else {
                 return GenerateWorkoutResult(
                     success: false, workout: nil,
-                    error: AnthropicError(message: "No workout generated. Please try again.", type: "empty_response", status: nil)
+                    error: AnthropicError(
+                        message: "No workout generated. Please try again.", type: "empty_response", status: nil)
                 )
             }
 

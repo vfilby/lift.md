@@ -35,7 +35,9 @@ struct SettingsView: View {
                     if let selectedSection {
                         iPadDetailContent(for: selectedSection, settings: settings)
                     } else {
-                        ContentUnavailableView("Select a Category", systemImage: "gear", description: Text("Choose a settings category from the sidebar."))
+                        ContentUnavailableView(
+                            "Select a Category", systemImage: "gear",
+                            description: Text("Choose a settings category from the sidebar."))
                     }
                 } compact: {
                     iPhoneLayout(settings: settings)

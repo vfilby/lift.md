@@ -25,7 +25,8 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
         case .workoutInbox:
             return "Pulls workouts pushed to your account (via Claude Code, etc.) into a local inbox on the Plans tab."
         case .useBetaApi:
-            return "Route account + sync API calls to the beta environment instead of prod. Toggling signs you out — tokens from one env don't work in the other."
+            return "Route account + sync API calls to the beta environment instead of prod. "
+                + "Toggling signs you out — tokens from one env don't work in the other."
         }
     }
 

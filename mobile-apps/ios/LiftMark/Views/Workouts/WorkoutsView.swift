@@ -61,7 +61,9 @@ struct WorkoutsView: View {
             if let selectedPlanId {
                 WorkoutDetailView(planId: selectedPlanId, isEmbedded: true)
             } else {
-                ContentUnavailableView("Select a Plan", systemImage: "doc.on.clipboard", description: Text("Choose a plan from the sidebar."))
+                ContentUnavailableView(
+                    "Select a Plan", systemImage: "doc.on.clipboard",
+                    description: Text("Choose a plan from the sidebar."))
             }
         } compact: {
             iPhoneLayout
@@ -160,7 +162,9 @@ struct WorkoutsView: View {
             selectedPlanId = plan.id
         } label: {
             planRowContent(plan: plan)
-                .background(selectedPlanId == plan.id ? LiftMarkTheme.primary.opacity(0.12) : LiftMarkTheme.secondaryBackground)
+                .background(selectedPlanId == plan.id
+                    ? LiftMarkTheme.primary.opacity(0.12)
+                    : LiftMarkTheme.secondaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
         }
         .buttonStyle(.plain)
@@ -173,7 +177,9 @@ struct WorkoutsView: View {
             Button {
                 planStore.toggleFavorite(id: plan.id)
             } label: {
-                Label(plan.isFavorite ? "Unfavorite" : "Favorite", systemImage: plan.isFavorite ? "heart.slash" : "heart")
+                Label(
+                    plan.isFavorite ? "Unfavorite" : "Favorite",
+                    systemImage: plan.isFavorite ? "heart.slash" : "heart")
             }
             Button(role: .destructive) {
                 planStore.deletePlan(id: plan.id)
@@ -333,7 +339,9 @@ struct WorkoutsView: View {
                     HStack(spacing: LiftMarkTheme.spacingSM) {
                         ZStack {
                             Circle()
-                                .stroke(selectedGymId == gym.id ? LiftMarkTheme.primary : LiftMarkTheme.tertiaryLabel, lineWidth: 2)
+                                .stroke(
+                                    selectedGymId == gym.id ? LiftMarkTheme.primary : LiftMarkTheme.tertiaryLabel,
+                                    lineWidth: 2)
                                 .frame(width: 20, height: 20)
                             if selectedGymId == gym.id {
                                 Circle()
@@ -479,7 +487,9 @@ struct WorkoutsView: View {
             Button {
                 planStore.toggleFavorite(id: plan.id)
             } label: {
-                Label(plan.isFavorite ? "Unfavorite" : "Favorite", systemImage: plan.isFavorite ? "heart.slash" : "heart")
+                Label(
+                    plan.isFavorite ? "Unfavorite" : "Favorite",
+                    systemImage: plan.isFavorite ? "heart.slash" : "heart")
             }
             Button(role: .destructive) {
                 planStore.deletePlan(id: plan.id)

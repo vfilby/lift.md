@@ -341,7 +341,8 @@ final class SessionRepositoryTests: XCTestCase {
             orderIndex: 0
         )
 
-        try repo.updateSessionExercise(exerciseId, name: "Hammer Curls", notes: "Slow eccentric", equipmentType: "dumbbell")
+        try repo.updateSessionExercise(exerciseId, name: "Hammer Curls", notes: "Slow eccentric",
+                                       equipmentType: "dumbbell")
 
         let fetched = try repo.getById(session.id)
         let exercise = fetched?.exercises.first { $0.id == exerciseId }

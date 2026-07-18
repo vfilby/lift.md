@@ -208,7 +208,10 @@ final class LMWFSourceEditorTests: XCTestCase {
 
         XCTAssertTrue(hasLine(spliced, "## Superset: Biceps"))
         XCTAssertFalse(hasLine(spliced, "## Superset: Arms"))
-        XCTAssertEqual(parse(spliced).exercises.first(where: { $0.groupType == .superset && $0.sets.isEmpty })?.exerciseName, "Superset: Biceps")
+        XCTAssertEqual(
+            parse(spliced).exercises.first(where: { $0.groupType == .superset && $0.sets.isEmpty })?.exerciseName,
+            "Superset: Biceps"
+        )
     }
 
     // MARK: - Parser span accuracy
@@ -233,10 +236,14 @@ final class LMWFSourceEditorTests: XCTestCase {
         XCTAssertTrue(result.success)
 
         // orderIndex layout: 0 = Warmup group, 1 = Band Side Step, 2 = Leg Swings, 3 = Bench Press
-        XCTAssertEqual(result.exerciseSpans[1], LMWFSourceSpan(startLine: 5, endLine: 6, headerLevel: 3, childHeaderLevel: nil))
-        XCTAssertEqual(result.exerciseSpans[2], LMWFSourceSpan(startLine: 8, endLine: 9, headerLevel: 3, childHeaderLevel: nil))
-        XCTAssertEqual(result.exerciseSpans[0], LMWFSourceSpan(startLine: 3, endLine: 9, headerLevel: 2, childHeaderLevel: 3))
-        XCTAssertEqual(result.exerciseSpans[3], LMWFSourceSpan(startLine: 11, endLine: 12, headerLevel: 2, childHeaderLevel: nil))
+        XCTAssertEqual(result.exerciseSpans[1],
+                       LMWFSourceSpan(startLine: 5, endLine: 6, headerLevel: 3, childHeaderLevel: nil))
+        XCTAssertEqual(result.exerciseSpans[2],
+                       LMWFSourceSpan(startLine: 8, endLine: 9, headerLevel: 3, childHeaderLevel: nil))
+        XCTAssertEqual(result.exerciseSpans[0],
+                       LMWFSourceSpan(startLine: 3, endLine: 9, headerLevel: 2, childHeaderLevel: 3))
+        XCTAssertEqual(result.exerciseSpans[3],
+                       LMWFSourceSpan(startLine: 11, endLine: 12, headerLevel: 2, childHeaderLevel: nil))
     }
 
     // MARK: - Legacy fallback

@@ -41,7 +41,9 @@ struct HistoryView: View {
             if let selectedSessionId {
                 HistoryDetailView(sessionId: selectedSessionId, isEmbedded: true)
             } else {
-                ContentUnavailableView("Select a Workout", systemImage: "dumbbell", description: Text("Choose a workout from the sidebar."))
+                ContentUnavailableView(
+                    "Select a Workout", systemImage: "dumbbell",
+                    description: Text("Choose a workout from the sidebar."))
             }
         } compact: {
             iPhoneLayout

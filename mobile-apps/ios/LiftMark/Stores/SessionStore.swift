@@ -123,7 +123,10 @@ final class SessionStore {
 
     // MARK: - Active Session Mutations
 
-    func completeSet(setId: String, actualWeight: Double?, actualWeightUnit: WeightUnit?, actualReps: Int?, actualTime: Int?, actualRpe: Int?) {
+    func completeSet(
+        setId: String, actualWeight: Double?, actualWeightUnit: WeightUnit?,
+        actualReps: Int?, actualTime: Int?, actualRpe: Int?
+    ) {
         do {
             let changes = try repository.updateSessionSet(
                 setId, actualWeight: actualWeight, actualWeightUnit: actualWeightUnit,
@@ -172,7 +175,9 @@ final class SessionStore {
 
     func updateSetTarget(setId: String, targetWeight: Double?, targetReps: Int?, targetTime: Int?, restSeconds: Int?) {
         do {
-            let changes = try repository.updateSessionSetTarget(setId, targetWeight: targetWeight, targetReps: targetReps, targetTime: targetTime, restSeconds: restSeconds)
+            let changes = try repository.updateSessionSetTarget(
+                setId, targetWeight: targetWeight, targetReps: targetReps,
+                targetTime: targetTime, restSeconds: restSeconds)
             SyncChange.notifyAll(changes)
             reloadActiveSession()
         } catch {
@@ -212,7 +217,10 @@ final class SessionStore {
         }
     }
 
-    func addSetToExercise(exerciseId: String, targetWeight: Double?, targetWeightUnit: WeightUnit?, targetReps: Int?, targetTime: Int?, restSeconds: Int?) {
+    func addSetToExercise(
+        exerciseId: String, targetWeight: Double?, targetWeightUnit: WeightUnit?,
+        targetReps: Int?, targetTime: Int?, restSeconds: Int?
+    ) {
         guard let session = activeSession,
               let exercise = session.exercises.first(where: { $0.id == exerciseId }) else { return }
         do {
@@ -276,7 +284,8 @@ final class SessionStore {
 
     func updateExercise(exerciseId: String, name: String, notes: String?, equipmentType: String?) {
         do {
-            let changes = try repository.updateSessionExercise(exerciseId, name: name, notes: notes, equipmentType: equipmentType)
+            let changes = try repository.updateSessionExercise(
+                exerciseId, name: name, notes: notes, equipmentType: equipmentType)
             SyncChange.notifyAll(changes)
             reloadActiveSession()
         } catch {

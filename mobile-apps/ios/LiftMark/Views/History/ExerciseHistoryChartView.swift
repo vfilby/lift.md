@@ -124,7 +124,8 @@ struct ExerciseHistoryChartView: View {
                 StatItem(
                     label: "Change",
                     value: String(format: "%+.0f%%", change),
-                    color: change > 0 ? LiftMarkTheme.success : change < 0 ? LiftMarkTheme.destructive : LiftMarkTheme.secondaryLabel
+                    color: change > 0 ? LiftMarkTheme.success
+                        : change < 0 ? LiftMarkTheme.destructive : LiftMarkTheme.secondaryLabel
                 )
             }
         }

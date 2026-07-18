@@ -145,10 +145,12 @@ final class WorkoutHighlightsServiceTests: XCTestCase {
     func testFindLastSessionWithExerciseFindsMatch() {
         let sessions = [
             makeSession(id: "s1", exercises: [
-                makeExercise(name: "Bench Press", sets: [makeSet(actualWeight: 225, actualReps: 5, unit: .lbs, status: .completed)])
+                makeExercise(name: "Bench Press",
+                             sets: [makeSet(actualWeight: 225, actualReps: 5, unit: .lbs, status: .completed)])
             ]),
             makeSession(id: "s2", exercises: [
-                makeExercise(name: "Squat", sets: [makeSet(actualWeight: 315, actualReps: 5, unit: .lbs, status: .completed)])
+                makeExercise(name: "Squat",
+                             sets: [makeSet(actualWeight: 315, actualReps: 5, unit: .lbs, status: .completed)])
             ])
         ]
         let result = service.findLastSessionWithExercise(sessions, exerciseName: "Bench Press", excludeSessionId: "s3")
@@ -158,7 +160,8 @@ final class WorkoutHighlightsServiceTests: XCTestCase {
     func testFindLastSessionWithExerciseExcludesCurrentSession() {
         let sessions = [
             makeSession(id: "s1", exercises: [
-                makeExercise(name: "Bench Press", sets: [makeSet(actualWeight: 225, actualReps: 5, unit: .lbs, status: .completed)])
+                makeExercise(name: "Bench Press",
+                             sets: [makeSet(actualWeight: 225, actualReps: 5, unit: .lbs, status: .completed)])
             ])
         ]
         let result = service.findLastSessionWithExercise(sessions, exerciseName: "Bench Press", excludeSessionId: "s1")
@@ -168,7 +171,8 @@ final class WorkoutHighlightsServiceTests: XCTestCase {
     func testFindLastSessionWithExerciseReturnsNilWhenNotFound() {
         let sessions = [
             makeSession(id: "s1", exercises: [
-                makeExercise(name: "Squat", sets: [makeSet(actualWeight: 315, actualReps: 5, unit: .lbs, status: .completed)])
+                makeExercise(name: "Squat",
+                             sets: [makeSet(actualWeight: 315, actualReps: 5, unit: .lbs, status: .completed)])
             ])
         ]
         let result = service.findLastSessionWithExercise(sessions, exerciseName: "Bench Press", excludeSessionId: "s2")
@@ -188,7 +192,8 @@ final class WorkoutHighlightsServiceTests: XCTestCase {
     // MARK: - createPRHighlight
 
     func testCreatePRHighlightWithPreviousWeight() {
-        let pr = ExercisePR(exerciseName: "Bench Press", newWeight: 225, newReps: 5, oldWeight: 215, oldReps: 5, unit: "lbs")
+        let pr = ExercisePR(exerciseName: "Bench Press", newWeight: 225, newReps: 5,
+                            oldWeight: 215, oldReps: 5, unit: "lbs")
         let highlight = service.createPRHighlight(pr)
         XCTAssertEqual(highlight.type, .pr)
         XCTAssertEqual(highlight.title, "New PR!")
@@ -198,7 +203,8 @@ final class WorkoutHighlightsServiceTests: XCTestCase {
     }
 
     func testCreatePRHighlightFirstPR() {
-        let pr = ExercisePR(exerciseName: "Squat", newWeight: 315, newReps: 5, oldWeight: nil, oldReps: nil, unit: "lbs")
+        let pr = ExercisePR(exerciseName: "Squat", newWeight: 315, newReps: 5,
+                            oldWeight: nil, oldReps: nil, unit: "lbs")
         let highlight = service.createPRHighlight(pr)
         XCTAssertEqual(highlight.title, "First PR!")
         XCTAssertTrue(highlight.message.contains("315"))
@@ -208,7 +214,8 @@ final class WorkoutHighlightsServiceTests: XCTestCase {
     // MARK: - createWeightIncreaseHighlight
 
     func testCreateWeightIncreaseHighlight() {
-        let increase = ExercisePR(exerciseName: "OHP", newWeight: 135, newReps: 5, oldWeight: 125, oldReps: 5, unit: "lbs")
+        let increase = ExercisePR(exerciseName: "OHP", newWeight: 135, newReps: 5,
+                                  oldWeight: 125, oldReps: 5, unit: "lbs")
         let highlight = service.createWeightIncreaseHighlight(increase)
         XCTAssertEqual(highlight.type, .weightIncrease)
         XCTAssertTrue(highlight.message.contains("135"))

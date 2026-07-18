@@ -58,7 +58,11 @@ struct ActiveWorkoutView: View {
                 finishWorkout()
             }
             Button("Discard", role: .destructive) {
-                ActiveWorkoutViewModel.endLiveActivity(settings: settingsStore.settings, message: "Workout Discarded", subtitle: "Workout not saved", immediate: true)
+                ActiveWorkoutViewModel.endLiveActivity(
+                    settings: settingsStore.settings,
+                    message: "Workout Discarded",
+                    subtitle: "Workout not saved",
+                    immediate: true)
                 sessionStore.cancelSession()
                 dismiss()
             }
@@ -140,9 +144,13 @@ struct ActiveWorkoutView: View {
                     for change in setChanges {
                         switch change {
                         case .update(let setId, let weight, let reps, let time, let rest):
-                            sessionStore.updateSetTarget(setId: setId, targetWeight: weight, targetReps: reps, targetTime: time, restSeconds: rest)
+                            sessionStore.updateSetTarget(
+                                setId: setId, targetWeight: weight, targetReps: reps,
+                                targetTime: time, restSeconds: rest)
                         case .add(let weight, let unit, let reps, let time, let rest):
-                            sessionStore.addSetToExercise(exerciseId: exercise.id, targetWeight: weight, targetWeightUnit: unit, targetReps: reps, targetTime: time, restSeconds: rest)
+                            sessionStore.addSetToExercise(
+                                exerciseId: exercise.id, targetWeight: weight, targetWeightUnit: unit,
+                                targetReps: reps, targetTime: time, restSeconds: rest)
                         case .delete(let setId):
                             sessionStore.deleteSet(setId: setId)
                         }
@@ -227,10 +235,13 @@ struct ActiveWorkoutView: View {
                                         toggleCollapse(exerciseId: exercise.id, currentlyCollapsed: collapsed)
                                     },
                                     onCompleteSet: { setIndex, weight, reps, elapsedTime in
-                                        completeSet(exerciseIndex: exerciseIndex, setIndex: setIndex, userWeight: weight, userReps: reps, elapsedTime: elapsedTime)
+                                        completeSet(
+                                            exerciseIndex: exerciseIndex, setIndex: setIndex,
+                                            userWeight: weight, userReps: reps, elapsedTime: elapsedTime)
                                     },
                                     onCompleteDropSet: { setIndex, entries in
-                                        completeDropSet(exerciseIndex: exerciseIndex, setIndex: setIndex, entries: entries)
+                                        completeDropSet(
+                                            exerciseIndex: exerciseIndex, setIndex: setIndex, entries: entries)
                                     },
                                     onSkipSet: { setIndex in
                                         skipSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
@@ -239,14 +250,18 @@ struct ActiveWorkoutView: View {
                                         editingExercise = exercise
                                     },
                                     onSaveSet: { setIndex, weight, reps, time in
-                                        saveEditedSet(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: weight, reps: reps, time: time)
+                                        saveEditedSet(
+                                            exerciseIndex: exerciseIndex, setIndex: setIndex,
+                                            weight: weight, reps: reps, time: time)
                                     },
                                     onUnlogSet: { setIndex in
                                         unlogSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
                                     },
                                     onDismissRest: {
                                         activeRestTimer = nil
-                                        ActiveWorkoutViewModel.updateLiveActivity(session: sessionStore.activeSession, settings: settingsStore.settings)
+                                        ActiveWorkoutViewModel.updateLiveActivity(
+                                            session: sessionStore.activeSession,
+                                            settings: settingsStore.settings)
                                     },
                                     restTimerGeneration: restTimerGeneration
                                 )
@@ -275,23 +290,30 @@ struct ActiveWorkoutView: View {
                                         toggleCollapse(exerciseId: parentExercise.id, currentlyCollapsed: collapsed)
                                     },
                                     onCompleteSet: { exerciseIndex, setIndex, weight, reps, elapsedTime in
-                                        completeSet(exerciseIndex: exerciseIndex, setIndex: setIndex, userWeight: weight, userReps: reps, elapsedTime: elapsedTime)
+                                        completeSet(
+                                            exerciseIndex: exerciseIndex, setIndex: setIndex,
+                                            userWeight: weight, userReps: reps, elapsedTime: elapsedTime)
                                     },
                                     onCompleteDropSet: { exerciseIndex, setIndex, entries in
-                                        completeDropSet(exerciseIndex: exerciseIndex, setIndex: setIndex, entries: entries)
+                                        completeDropSet(
+                                            exerciseIndex: exerciseIndex, setIndex: setIndex, entries: entries)
                                     },
                                     onSkipSet: { exerciseIndex, setIndex in
                                         skipSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
                                     },
                                     onSaveSet: { exerciseIndex, setIndex, weight, reps, time in
-                                        saveEditedSet(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: weight, reps: reps, time: time)
+                                        saveEditedSet(
+                                            exerciseIndex: exerciseIndex, setIndex: setIndex,
+                                            weight: weight, reps: reps, time: time)
                                     },
                                     onUnlogSet: { exerciseIndex, setIndex in
                                         unlogSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
                                     },
                                     onDismissRest: {
                                         activeRestTimer = nil
-                                        ActiveWorkoutViewModel.updateLiveActivity(session: sessionStore.activeSession, settings: settingsStore.settings)
+                                        ActiveWorkoutViewModel.updateLiveActivity(
+                                            session: sessionStore.activeSession,
+                                            settings: settingsStore.settings)
                                     },
                                     restTimerGeneration: restTimerGeneration
                                 )
@@ -371,7 +393,10 @@ struct ActiveWorkoutView: View {
         ActiveWorkoutViewModel.saveToHealthKitIfEnabled(completedSession, settings: settingsStore.settings)
     }
 
-    private func completeSet(exerciseIndex: Int, setIndex: Int, userWeight: Double? = nil, userReps: Int? = nil, elapsedTime: Int? = nil) {
+    private func completeSet(
+        exerciseIndex: Int, setIndex: Int,
+        userWeight: Double? = nil, userReps: Int? = nil, elapsedTime: Int? = nil
+    ) {
         guard let session, exerciseIndex < session.exercises.count else { return }
         let exercise = session.exercises[exerciseIndex]
         guard setIndex < exercise.sets.count else { return }
@@ -403,13 +428,20 @@ struct ActiveWorkoutView: View {
             restTimerGeneration += 1
             let updatedSession = sessionStore.activeSession
             let nextExercise = updatedSession?.exercises.first { ex in ex.sets.contains { $0.status == .pending } }
-            ActiveWorkoutViewModel.updateLiveActivity(session: sessionStore.activeSession, settings: settingsStore.settings, restTimer: (remainingSeconds: rest, nextExercise: nextExercise))
+            ActiveWorkoutViewModel.updateLiveActivity(
+                session: sessionStore.activeSession,
+                settings: settingsStore.settings,
+                restTimer: (remainingSeconds: rest, nextExercise: nextExercise))
         } else {
-            ActiveWorkoutViewModel.updateLiveActivity(session: sessionStore.activeSession, settings: settingsStore.settings)
+            ActiveWorkoutViewModel.updateLiveActivity(
+                session: sessionStore.activeSession, settings: settingsStore.settings)
         }
     }
 
-    private func completeDropSet(exerciseIndex: Int, setIndex: Int, entries: [(weight: Double?, weightUnit: WeightUnit?, reps: Int?)]) {
+    private func completeDropSet(
+        exerciseIndex: Int, setIndex: Int,
+        entries: [(weight: Double?, weightUnit: WeightUnit?, reps: Int?)]
+    ) {
         guard let session, exerciseIndex < session.exercises.count else { return }
         let exercise = session.exercises[exerciseIndex]
         guard setIndex < exercise.sets.count else { return }
@@ -429,9 +461,13 @@ struct ActiveWorkoutView: View {
             restTimerGeneration += 1
             let updatedSession = sessionStore.activeSession
             let nextExercise = updatedSession?.exercises.first { ex in ex.sets.contains { $0.status == .pending } }
-            ActiveWorkoutViewModel.updateLiveActivity(session: sessionStore.activeSession, settings: settingsStore.settings, restTimer: (remainingSeconds: rest, nextExercise: nextExercise))
+            ActiveWorkoutViewModel.updateLiveActivity(
+                session: sessionStore.activeSession,
+                settings: settingsStore.settings,
+                restTimer: (remainingSeconds: rest, nextExercise: nextExercise))
         } else {
-            ActiveWorkoutViewModel.updateLiveActivity(session: sessionStore.activeSession, settings: settingsStore.settings)
+            ActiveWorkoutViewModel.updateLiveActivity(
+                session: sessionStore.activeSession, settings: settingsStore.settings)
         }
     }
 
@@ -474,7 +510,8 @@ struct ActiveWorkoutView: View {
             actualWeight: weight,
             // Fall back to the user's default unit so a weight added to a
             // previously reps-only set (GH #194) is logged in their unit.
-            actualWeightUnit: setActual?.weight?.unit ?? setTarget?.weight?.unit ?? settingsStore.settings?.defaultWeightUnit,
+            actualWeightUnit: setActual?.weight?.unit ?? setTarget?.weight?.unit
+                ?? settingsStore.settings?.defaultWeightUnit,
             actualReps: reps,
             actualTime: time ?? setActual?.time ?? setTarget?.time,
             actualRpe: setActual?.rpe ?? setTarget?.rpe

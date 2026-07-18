@@ -90,7 +90,9 @@ final class DatabaseManagerTests: XCTestCase {
     func testLegacySchemaVersionTableIsDropped() throws {
         let db = try DatabaseManager.shared.database()
         let exists = try db.read { db in
-            (try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'")) ?? 0
+            (try Int.fetchOne(
+                db, sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
+            )) ?? 0
         }
         XCTAssertEqual(exists, 0, "schema_version should be dropped at v20")
     }
@@ -114,12 +116,15 @@ final class DatabaseManagerTests: XCTestCase {
         ]
 
         let actualTables: Set<String> = try db.read { db in
-            let rows = try Row.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+            let rows = try Row.fetchAll(
+                db, sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+            )
             return Set(rows.map { $0["name"] as String })
         }
 
         for table in expectedTables {
-            XCTAssertTrue(actualTables.contains(table), "Expected table '\(table)' to exist, but it was not found. Actual tables: \(actualTables)")
+            XCTAssertTrue(actualTables.contains(table),
+                          "Expected table '\(table)' to exist, but it was not found. Actual tables: \(actualTables)")
         }
     }
 
@@ -170,7 +175,9 @@ final class DatabaseManagerTests: XCTestCase {
     func testDefaultUserSettingsAreSeeded() throws {
         let db = try DatabaseManager.shared.database()
         let result = try db.read { db -> (weightUnit: String, theme: String, timerEnabled: Int)? in
-            guard let row = try Row.fetchOne(db, sql: "SELECT default_weight_unit, theme, enable_workout_timer FROM user_settings LIMIT 1") else {
+            guard let row = try Row.fetchOne(
+                db, sql: "SELECT default_weight_unit, theme, enable_workout_timer FROM user_settings LIMIT 1"
+            ) else {
                 return nil
             }
             return (
@@ -267,7 +274,8 @@ final class DatabaseManagerTests: XCTestCase {
             let rows = try Row.fetchAll(db, sql: "PRAGMA table_info(user_settings)")
             return rows.map { $0["name"] as String }
         }
-        XCTAssertTrue(columns.contains("default_timer_countdown"), "user_settings should have 'default_timer_countdown' column from V13 migration")
+        XCTAssertTrue(columns.contains("default_timer_countdown"),
+                      "user_settings should have 'default_timer_countdown' column from V13 migration")
     }
 
     func testDefaultTimerCountdownDefaultsToZero() throws {
@@ -287,7 +295,8 @@ final class DatabaseManagerTests: XCTestCase {
             XCTFail("Expected seeded settings row")
             return
         }
-        XCTAssertFalse(settings.defaultTimerCountdown, "Newly-seeded settings should have defaultTimerCountdown = false")
+        XCTAssertFalse(settings.defaultTimerCountdown,
+                       "Newly-seeded settings should have defaultTimerCountdown = false")
 
         // Flip to true and persist
         settings.defaultTimerCountdown = true
@@ -300,7 +309,9 @@ final class DatabaseManagerTests: XCTestCase {
 
     func testUpdatedAtColumnsExist() throws {
         let db = try DatabaseManager.shared.database()
-        let tablesWithUpdatedAt = ["workout_sessions", "session_exercises", "session_sets", "template_exercises", "template_sets"]
+        let tablesWithUpdatedAt = [
+            "workout_sessions", "session_exercises", "session_sets", "template_exercises", "template_sets"
+        ]
 
         for table in tablesWithUpdatedAt {
             let columns: [String] = try db.read { db in

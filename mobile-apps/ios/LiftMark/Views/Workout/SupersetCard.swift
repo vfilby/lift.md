@@ -121,7 +121,8 @@ struct SupersetCard: View {
                         Text(supersetTitle)
                             .font(.lmHeadline)
                             .foregroundStyle(allSetsCompleted ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
-                        Text(children.map { "\($0.displayNumber). \($0.exercise.exerciseName)" }.joined(separator: " + "))
+                        Text(children.map { "\($0.displayNumber). \($0.exercise.exerciseName)" }
+                            .joined(separator: " + "))
                             .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     }
@@ -139,7 +140,9 @@ struct SupersetCard: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isCollapsed ? "Expand superset, \(completedSetCount) of \(totalSetCount) sets done" : "Collapse superset")
+            .accessibilityLabel(isCollapsed
+                ? "Expand superset, \(completedSetCount) of \(totalSetCount) sets done"
+                : "Collapse superset")
             .accessibilityHint(isCollapsed ? "Shows all interleaved sets" : "Hides sets for this superset")
 
             if !isCollapsed {

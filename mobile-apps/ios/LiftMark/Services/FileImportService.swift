@@ -61,10 +61,13 @@ enum FileImportService {
                 return FileImportResult(success: false, markdown: nil, fileName: fileName, error: "File is empty.")
             }
             if fileSize > maxFileSize {
-                return FileImportResult(success: false, markdown: nil, fileName: fileName, error: "File is too large (max 1MB).")
+                return FileImportResult(
+                    success: false, markdown: nil, fileName: fileName, error: "File is too large (max 1MB).")
             }
         } catch {
-            return FileImportResult(success: false, markdown: nil, fileName: fileName, error: "Failed to check file size: \(error.localizedDescription)")
+            return FileImportResult(
+                success: false, markdown: nil, fileName: fileName,
+                error: "Failed to check file size: \(error.localizedDescription)")
         }
 
         // Read file content
@@ -77,7 +80,9 @@ enum FileImportService {
 
             return FileImportResult(success: true, markdown: content, fileName: fileName, error: nil)
         } catch {
-            return FileImportResult(success: false, markdown: nil, fileName: fileName, error: "Failed to read file: \(error.localizedDescription)")
+            return FileImportResult(
+                success: false, markdown: nil, fileName: fileName,
+                error: "Failed to read file: \(error.localizedDescription)")
         }
     }
 

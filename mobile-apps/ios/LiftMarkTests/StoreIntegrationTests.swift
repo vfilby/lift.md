@@ -89,7 +89,8 @@ final class SessionStoreTests: XCTestCase {
         let plan = WorkoutPlan(
             name: "Push Day",
             exercises: [PlannedExercise(workoutPlanId: "p", exerciseName: "Bench", orderIndex: 0, sets: [
-                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs, targetReps: 5)
+                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs,
+                           targetReps: 5)
             ])]
         )
         try planRepo.create(plan)
@@ -203,14 +204,16 @@ final class SessionStoreTests: XCTestCase {
         let plan = WorkoutPlan(
             name: "Test",
             exercises: [PlannedExercise(workoutPlanId: "p", exerciseName: "Bench", orderIndex: 0, sets: [
-                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs, targetReps: 5)
+                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs,
+                           targetReps: 5)
             ])]
         )
         try planRepo.create(plan)
         let session = store.startSession(from: plan)!
         let setId = session.exercises[0].sets[0].id
 
-        store.completeSet(setId: setId, actualWeight: 230, actualWeightUnit: .lbs, actualReps: 4, actualTime: nil, actualRpe: 9)
+        store.completeSet(setId: setId, actualWeight: 230, actualWeightUnit: .lbs, actualReps: 4, actualTime: nil,
+                          actualRpe: 9)
 
         XCTAssertEqual(store.activeSession?.exercises[0].sets[0].status, .completed)
         XCTAssertEqual(store.activeSession?.exercises[0].sets[0].actualWeight, 230)
@@ -220,7 +223,8 @@ final class SessionStoreTests: XCTestCase {
         let plan = WorkoutPlan(
             name: "Test",
             exercises: [PlannedExercise(workoutPlanId: "p", exerciseName: "Bench", orderIndex: 0, sets: [
-                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs, targetReps: 5)
+                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs,
+                           targetReps: 5)
             ])]
         )
         try planRepo.create(plan)
@@ -235,7 +239,8 @@ final class SessionStoreTests: XCTestCase {
         let plan = WorkoutPlan(
             name: "Test",
             exercises: [PlannedExercise(workoutPlanId: "p", exerciseName: "Bench", orderIndex: 0, sets: [
-                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs, targetReps: 5)
+                PlannedSet(plannedExerciseId: "e", orderIndex: 0, targetWeight: 225, targetWeightUnit: .lbs,
+                           targetReps: 5)
             ])]
         )
         try planRepo.create(plan)
@@ -265,7 +270,8 @@ final class SessionStoreTests: XCTestCase {
         let plan = WorkoutPlan(name: "Test")
         try planRepo.create(plan)
         _ = store.startSession(from: plan)
-        store.addExercise(exerciseName: "Curls", sets: [SessionSetDraft(weight: 40, unit: .lbs, reps: 12, time: nil, rest: nil)])
+        store.addExercise(exerciseName: "Curls",
+                          sets: [SessionSetDraft(weight: 40, unit: .lbs, reps: 12, time: nil, rest: nil)])
         let exId = store.activeSession!.exercises[0].id
 
         store.updateExercise(exerciseId: exId, name: "Hammer Curls", notes: "Slow", equipmentType: "dumbbell")

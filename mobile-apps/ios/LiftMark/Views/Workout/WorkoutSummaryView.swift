@@ -229,7 +229,9 @@ struct WorkoutSummaryView: View {
                     .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
                     .accessibilityIdentifier("workout-summary-completion")
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Completion: \(completedSets) completed, \(skippedSets) skipped, \(Int(completionRate * 100)) percent rate")
+                    .accessibilityLabel(
+                        "Completion: \(completedSets) completed, \(skippedSets) skipped, "
+                        + "\(Int(completionRate * 100)) percent rate")
 
                     // Notes card — prompts the user to add notes on the just-finished workout.
                     notesCard
@@ -243,7 +245,8 @@ struct WorkoutSummaryView: View {
                         if let exercises = session?.exercises {
                             let displayExercises = exercises.enumerated().filter { _, exercise in
                                 // Exclude section headers and superset parents (they have no sets)
-                                !((exercise.groupType == .section || exercise.groupType == .superset) && exercise.sets.isEmpty)
+                                !((exercise.groupType == .section || exercise.groupType == .superset)
+                                    && exercise.sets.isEmpty)
                             }
                             ForEach(Array(displayExercises.enumerated()), id: \.element.1.id) { outerIndex, pair in
                                 let (_, exercise) = pair
@@ -390,12 +393,14 @@ struct WorkoutSummaryView: View {
                 }
 
                 if maxWeight > previousMax && previousMax > 0 {
-                    let unit = exercise.sets.first?.entries.first?.actual?.weight?.unit ?? exercise.sets.first?.entries.first?.target?.weight?.unit ?? .lbs
+                    let unit = exercise.sets.first?.entries.first?.actual?.weight?.unit
+                        ?? exercise.sets.first?.entries.first?.target?.weight?.unit ?? .lbs
                     result.append(WorkoutHighlight(
                         type: .pr,
                         emoji: "🏆",
                         title: "PR: \(exercise.exerciseName)",
-                        message: "\(formatWeight(maxWeight)) \(unit.rawValue) (previous: \(formatWeight(previousMax)) \(unit.rawValue))"
+                        message: "\(formatWeight(maxWeight)) \(unit.rawValue) "
+                            + "(previous: \(formatWeight(previousMax)) \(unit.rawValue))"
                     ))
                 }
             }
@@ -542,7 +547,8 @@ private struct ExerciseSummaryRow: View {
                 .filter({ $0.status == .completed })
                 .compactMap({ $0.entries.first?.actual?.weight?.value })
                 .max() {
-                let unit = exercise.sets.first?.entries.first?.actual?.weight?.unit ?? exercise.sets.first?.entries.first?.target?.weight?.unit ?? .lbs
+                let unit = exercise.sets.first?.entries.first?.actual?.weight?.unit
+                    ?? exercise.sets.first?.entries.first?.target?.weight?.unit ?? .lbs
                 Text("\(formatWeight(bestWeight)) \(unit.rawValue)")
                     .font(.lmCaption.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)

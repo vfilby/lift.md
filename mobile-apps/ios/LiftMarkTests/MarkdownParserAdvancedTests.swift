@@ -459,7 +459,8 @@ final class MarkdownParserAdvancedTests: XCTestCase {
     }
 
     func testVeryLongExerciseName() {
-        let longName = "Single Arm Dumbbell Overhead Press With Rotation And Pause At The Top For Maximum Time Under Tension"
+        let longName = "Single Arm Dumbbell Overhead Press With Rotation And Pause At The Top"
+            + " For Maximum Time Under Tension"
         let markdown = """
         # Workout
         ## \(longName)

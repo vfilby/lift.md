@@ -13,13 +13,16 @@ enum MarkdownParser {
 
     // Set parsing patterns
     // Pattern 1: weight unit x reps/time (e.g., "225 lbs x 5", "45 lbs x 60s")
-    nonisolated(unsafe) static let setPattern1 = /(?i)^(\d+(?:\.\d+)?)\s*(lbs?|kgs?|kg|bw)?\s*(?:x|for)\s*(\d+|amrap)\s*(reps?|s|sec|m|min)?(?=\s|$)\s*(.*)$/
+    nonisolated(unsafe) static let setPattern1 =
+        /(?i)^(\d+(?:\.\d+)?)\s*(lbs?|kgs?|kg|bw)?\s*(?:x|for)\s*(\d+|amrap)\s*(reps?|s|sec|m|min)?(?=\s|$)\s*(.*)$/
     // Pattern 2: bodyweight x|for reps/time (e.g., "x 10", "bw x 12", "bw for 60s")
-    nonisolated(unsafe) static let setPattern2 = /(?i)^(?:(bw|x)\s*)?(?:x|for)\s*(\d+|amrap)\s*(reps?|s|sec|m|min)?(?=\s|$)\s*(.*)$/
+    nonisolated(unsafe) static let setPattern2 =
+        /(?i)^(?:(bw|x)\s*)?(?:x|for)\s*(\d+|amrap)\s*(reps?|s|sec|m|min)?(?=\s|$)\s*(.*)$/
     // Pattern 3: single number (e.g., "10" = bodyweight reps, "60s" = time)
     nonisolated(unsafe) static let setPattern3 = /(?i)^(\d+)\s*(s|sec|m|min)?(?=\s|$)\s*(.*)$/
     // Pattern 4: distance (e.g., "200 meters", "0.5 km", "1 mile", "3.1 mi")
-    nonisolated(unsafe) static let distancePattern = /(?i)^(\d+(?:\.\d+)?)\s*(meters|km|miles?|mi|feet|ft|yards?|yd)(?=\s|$)\s*(.*)$/
+    nonisolated(unsafe) static let distancePattern =
+        /(?i)^(\d+(?:\.\d+)?)\s*(meters|km|miles?|mi|feet|ft|yards?|yd)(?=\s|$)\s*(.*)$/
 
     // Modifier parsing patterns
     nonisolated(unsafe) static let modifierPattern = /^(\w+):\s*(.+)$/
@@ -277,7 +280,9 @@ enum MarkdownParser {
                 if line.metadataKey == "tags" {
                     tags = parseTagsMetadata(line.metadataValue ?? "")
                 } else if line.metadataKey == "units" {
-                    if let unit = parseUnitsMetadata(line.metadataValue ?? "", context: context, lineNumber: line.lineNumber) {
+                    if let unit = parseUnitsMetadata(
+                        line.metadataValue ?? "", context: context, lineNumber: line.lineNumber
+                    ) {
                         defaultWeightUnit = unit
                     }
                 }
@@ -407,7 +412,8 @@ enum MarkdownParser {
 
         // Auto-detect per-side keywords in exercise notes flag timed sets as isPerSide
         let perSideKeywords = ["per side", "per leg", "per arm", "each side", "each leg", "each arm", "each"]
-        if let notes = notes, perSideKeywords.contains(where: { notes.range(of: $0, options: .caseInsensitive) != nil }) {
+        if let notes = notes,
+           perSideKeywords.contains(where: { notes.range(of: $0, options: .caseInsensitive) != nil }) {
             sets = sets.map { set in
                 guard set.targetTime != nil, !set.isPerSide else { return set }
                 var modified = set
@@ -508,7 +514,9 @@ enum MarkdownParser {
         context.currentIndex += 1
 
         // Find the first child header level that contains exercises (sets)
-        let childExerciseLevel = findChildExerciseLevel(context, startIndex: context.currentIndex, parentLevel: headerLine.headerLevel!)
+        let childExerciseLevel = findChildExerciseLevel(
+            context, startIndex: context.currentIndex, parentLevel: headerLine.headerLevel!
+        )
 
         // Parse child exercises
         var childExercises: [PlannedExercise] = []
@@ -524,7 +532,9 @@ enum MarkdownParser {
 
             // Parse child exercise at the determined child level
             if let childLevel = childExerciseLevel, line.headerLevel == childLevel {
-                let result = parseExerciseBlock(context, workoutPlanId: workoutPlanId, orderIndex: orderIndex + childOrderIndex + 1)
+                let result = parseExerciseBlock(
+                    context, workoutPlanId: workoutPlanId, orderIndex: orderIndex + childOrderIndex + 1
+                )
                 switch result {
                 case .single(var exercise):
                     if exercise.parentExerciseId == nil {
@@ -569,7 +579,10 @@ enum MarkdownParser {
     }
 
     /// Parse exercise metadata (@type, freeform notes)
-    private static func parseExerciseMetadata(_ context: ParseContext, exerciseHeaderLevel: Int) -> (equipmentType: String?, notes: String?) {
+    private static func parseExerciseMetadata(
+        _ context: ParseContext,
+        exerciseHeaderLevel: Int
+    ) -> (equipmentType: String?, notes: String?) {
         var equipmentType: String?
         var noteLines: [String] = []
 
@@ -610,7 +623,11 @@ enum MarkdownParser {
     // MARK: - Set Parsing
 
     /// Parse all sets for an exercise
-    private static func parseSets(_ context: ParseContext, exerciseHeaderLevel: Int, exerciseId: String) -> [PlannedSet] {
+    private static func parseSets(
+        _ context: ParseContext,
+        exerciseHeaderLevel: Int,
+        exerciseId: String
+    ) -> [PlannedSet] {
         var sets: [PlannedSet] = []
         var orderIndex = 0
 
@@ -662,15 +679,21 @@ enum MarkdownParser {
         let modifierParts = Array(parts.dropFirst())
 
         // Parse modifiers and extract trailing text
-        let (modifiers, modifierTrailingText) = parseModifiersAndTrailingText(modifierParts, context: context, lineNumber: lineNumber)
+        let (modifiers, modifierTrailingText) = parseModifiersAndTrailingText(
+            modifierParts, context: context, lineNumber: lineNumber
+        )
 
         // Parse main set content
-        guard let (setResult, mainTrailingText) = parseMainSetContent(mainPart, context: context, lineNumber: lineNumber) else {
+        guard let (setResult, mainTrailingText) = parseMainSetContent(
+            mainPart, context: context, lineNumber: lineNumber
+        ) else {
             return nil
         }
 
         // Combine trailing text
-        let combined = [mainTrailingText, modifierTrailingText].compactMap { $0 }.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        let combined = [mainTrailingText, modifierTrailingText].compactMap { $0 }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
 
         // Merge modifiers into set
         var result = setResult
@@ -685,7 +708,8 @@ enum MarkdownParser {
         if result.time != nil && result.isPerSide != true {
             let perSideKeywords = ["per side", "per leg", "per arm", "each side", "each leg", "each arm", "each"]
             let textToCheck = combined
-            if !textToCheck.isEmpty, perSideKeywords.contains(where: { textToCheck.range(of: $0, options: .caseInsensitive) != nil }) {
+            if !textToCheck.isEmpty,
+               perSideKeywords.contains(where: { textToCheck.range(of: $0, options: .caseInsensitive) != nil }) {
                 result.isPerSide = true
                 // Strip the per-side keyword from notes since it's now conveyed by the flag
                 var cleaned = textToCheck
@@ -715,7 +739,8 @@ enum MarkdownParser {
         if trimmedLower == "amrap" {
             context.errors.append(ParseError(
                 line: lineNumber,
-                message: "Standalone \"AMRAP\" is not valid. AMRAP must be used with a weight (e.g., \"135 x AMRAP\" or \"bw x AMRAP\")",
+                message: "Standalone \"AMRAP\" is not valid. AMRAP must be used with a weight "
+                    + "(e.g., \"135 x AMRAP\" or \"bw x AMRAP\")",
                 code: "STANDALONE_AMRAP"
             ))
             return nil
@@ -738,7 +763,8 @@ enum MarkdownParser {
         // Failed to parse
         context.errors.append(ParseError(
             line: lineNumber,
-            message: "Invalid set format: \"\(content)\". Expected format: \"weight unit x reps\" or \"time\" or \"AMRAP\"",
+            message: "Invalid set format: \"\(content)\". Expected format: "
+                + "\"weight unit x reps\" or \"time\" or \"AMRAP\"",
             code: "INVALID_SET_FORMAT"
         ))
         return nil

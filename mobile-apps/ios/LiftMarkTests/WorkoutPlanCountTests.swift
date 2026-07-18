@@ -20,10 +20,23 @@ final class WorkoutPlanCountTests: XCTestCase {
     func testDisplayExerciseCountExcludesStructuralHeaders() {
         let exercises: [PlannedExercise] = [
             PlannedExercise(workoutPlanId: "p", exerciseName: "Warm-Up", orderIndex: 0, groupType: .section, sets: []),
-            PlannedExercise(workoutPlanId: "p", exerciseName: "Superset: Arms", orderIndex: 1, groupType: .superset, sets: []),
-            PlannedExercise(workoutPlanId: "p", exerciseName: "Tricep Pushdown", orderIndex: 2, groupType: .superset, parentExerciseId: "ss", sets: [set("c1", reps: 12), set("c1", reps: 12)]),
-            PlannedExercise(workoutPlanId: "p", exerciseName: "Curl", orderIndex: 3, groupType: .superset, parentExerciseId: "ss", sets: [set("c2", reps: 12), set("c2", reps: 12)]),
-            PlannedExercise(workoutPlanId: "p", exerciseName: "Squat", orderIndex: 4, sets: [set("e1", reps: 5), set("e1", reps: 5), set("e1", reps: 5)]),
+            PlannedExercise(
+                workoutPlanId: "p", exerciseName: "Superset: Arms", orderIndex: 1, groupType: .superset, sets: []
+            ),
+            PlannedExercise(
+                workoutPlanId: "p", exerciseName: "Tricep Pushdown", orderIndex: 2,
+                groupType: .superset, parentExerciseId: "ss",
+                sets: [set("c1", reps: 12), set("c1", reps: 12)]
+            ),
+            PlannedExercise(
+                workoutPlanId: "p", exerciseName: "Curl", orderIndex: 3,
+                groupType: .superset, parentExerciseId: "ss",
+                sets: [set("c2", reps: 12), set("c2", reps: 12)]
+            ),
+            PlannedExercise(
+                workoutPlanId: "p", exerciseName: "Squat", orderIndex: 4,
+                sets: [set("e1", reps: 5), set("e1", reps: 5), set("e1", reps: 5)]
+            ),
             PlannedExercise(workoutPlanId: "p", exerciseName: "Deadlift", orderIndex: 5, sets: [set("e2", reps: 5)]),
         ]
         let plan = WorkoutPlan(name: "Lower", exercises: exercises)
@@ -34,10 +47,19 @@ final class WorkoutPlanCountTests: XCTestCase {
     }
 
     func testIsStructuralHeaderPredicate() {
-        let section = PlannedExercise(workoutPlanId: "p", exerciseName: "Warm-Up", orderIndex: 0, groupType: .section, sets: [])
-        let supersetParent = PlannedExercise(workoutPlanId: "p", exerciseName: "Superset", orderIndex: 1, groupType: .superset, sets: [])
-        let supersetChild = PlannedExercise(workoutPlanId: "p", exerciseName: "Child", orderIndex: 2, groupType: .superset, parentExerciseId: "ss", sets: [set("c", reps: 8)])
-        let regular = PlannedExercise(workoutPlanId: "p", exerciseName: "Squat", orderIndex: 3, sets: [set("r", reps: 5)])
+        let section = PlannedExercise(
+            workoutPlanId: "p", exerciseName: "Warm-Up", orderIndex: 0, groupType: .section, sets: []
+        )
+        let supersetParent = PlannedExercise(
+            workoutPlanId: "p", exerciseName: "Superset", orderIndex: 1, groupType: .superset, sets: []
+        )
+        let supersetChild = PlannedExercise(
+            workoutPlanId: "p", exerciseName: "Child", orderIndex: 2, groupType: .superset,
+            parentExerciseId: "ss", sets: [set("c", reps: 8)]
+        )
+        let regular = PlannedExercise(
+            workoutPlanId: "p", exerciseName: "Squat", orderIndex: 3, sets: [set("r", reps: 5)]
+        )
 
         XCTAssertTrue(section.isStructuralHeader)
         XCTAssertTrue(supersetParent.isStructuralHeader)

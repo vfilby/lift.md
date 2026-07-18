@@ -171,7 +171,10 @@ struct HomeView: View {
                         // iPad: fixed two-column grid showing up to 4 plans so the
                         // grid fills evenly (2×2) instead of leaving a lone card on a
                         // second row (the awkward 2+1 wrap of an odd count).
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: LiftMarkTheme.spacingSM) {
+                        LazyVGrid(
+                            columns: [GridItem(.flexible()), GridItem(.flexible())],
+                            spacing: LiftMarkTheme.spacingSM
+                        ) {
                             ForEach(planStore.plans.prefix(4)) { plan in
                                 Button {
                                     navCoordinator.navigateToPlan(id: plan.id)
@@ -284,7 +287,8 @@ struct HomeView: View {
 
         var weights: [Double] = []
         for session in completedSessions {
-            for exercise in session.exercises where ExerciseDictionary.isSameExercise(exercise.exerciseName, exerciseName) {
+            for exercise in session.exercises
+            where ExerciseDictionary.isSameExercise(exercise.exerciseName, exerciseName) {
                 if let maxW = exercise.sets
                     .filter({ $0.status == .completed })
                     .compactMap({ $0.entries.first?.actual?.weight?.value })
@@ -447,7 +451,9 @@ private struct MaxLiftTile: View {
             onLongPress()
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(maxWeight != nil ? "\(exerciseName), \(formatWeight(maxWeight!)) \(unit.rawValue)" : "\(exerciseName), no data yet")
+        .accessibilityLabel(maxWeight != nil
+            ? "\(exerciseName), \(formatWeight(maxWeight!)) \(unit.rawValue)"
+            : "\(exerciseName), no data yet")
         .accessibilityHint("Long press to change exercise")
     }
 
@@ -497,6 +503,8 @@ private struct WorkoutPlanCard: View {
         .background(LiftMarkTheme.secondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(plan.name)\(plan.isFavorite ? ", favorite" : ""), \(plan.displayExerciseCount) exercises\(!plan.tags.isEmpty ? ", " + plan.tags.prefix(2).joined(separator: ", ") : "")")
+        .accessibilityLabel(
+            "\(plan.name)\(plan.isFavorite ? ", favorite" : ""), \(plan.displayExerciseCount) exercises"
+            + "\(!plan.tags.isEmpty ? ", " + plan.tags.prefix(2).joined(separator: ", ") : "")")
     }
 }

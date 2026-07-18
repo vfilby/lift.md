@@ -53,7 +53,8 @@ enum HealthKitService {
     /// Save a completed workout session to Apple Health.
     static func saveWorkout(_ session: WorkoutSession) async -> HealthKitSaveResult {
         guard isHealthKitAvailable() else {
-            return HealthKitSaveResult(success: false, healthKitId: nil, error: "HealthKit is not available on this device")
+            return HealthKitSaveResult(
+                success: false, healthKitId: nil, error: "HealthKit is not available on this device")
         }
 
         do {

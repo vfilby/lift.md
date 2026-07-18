@@ -114,7 +114,9 @@ enum PlateCalculator {
         }
 
         let plateStrings = breakdown.plates.map { weight, count in
-            count == 1 ? "\(formatNumber(weight))\(breakdown.unit)" : "\(count)\u{00D7}\(formatNumber(weight))\(breakdown.unit)"
+            count == 1
+                ? "\(formatNumber(weight))\(breakdown.unit)"
+                : "\(count)\u{00D7}\(formatNumber(weight))\(breakdown.unit)"
         }
 
         let result = plateStrings.joined(separator: " + ")
@@ -134,7 +136,8 @@ enum PlateCalculator {
         }
 
         let unitSingular = breakdown.unit == "lbs" ? "lb" : "kg"
-        return "\(formatNumber(breakdown.barWeight))\(unitSingular) bar + \(formatNumber(breakdown.weightPerSide))\(breakdown.unit) per side"
+        return "\(formatNumber(breakdown.barWeight))\(unitSingular) bar "
+            + "+ \(formatNumber(breakdown.weightPerSide))\(breakdown.unit) per side"
     }
 
     // MARK: - Private

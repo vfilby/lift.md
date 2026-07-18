@@ -60,7 +60,9 @@ final class EquipmentStore {
                 try row.insert(db)
             }
             CKSyncEngineManager.notifySave(recordType: "GymEquipment", recordID: equipmentId)
-            let newEquipment = GymEquipment(id: equipmentId, gymId: gymId, name: name, isAvailable: true, lastCheckedAt: nil, createdAt: now, updatedAt: now)
+            let newEquipment = GymEquipment(
+                id: equipmentId, gymId: gymId, name: name, isAvailable: true,
+                lastCheckedAt: nil, createdAt: now, updatedAt: now)
             equipment.append(newEquipment)
             lastError = nil
         } catch {
@@ -90,7 +92,8 @@ final class EquipmentStore {
             let now = ISO8601DateFormatter().string(from: Date())
             try dbQueue.write { db in
                 try db.execute(
-                    sql: "UPDATE gym_equipment SET is_available = CASE WHEN is_available = 1 THEN 0 ELSE 1 END, last_checked_at = ? WHERE id = ?",
+                    sql: "UPDATE gym_equipment SET is_available = CASE WHEN is_available = 1 THEN 0 ELSE 1 END, "
+                        + "last_checked_at = ? WHERE id = ?",
                     arguments: [now, id]
                 )
             }

@@ -163,7 +163,7 @@ struct SetRowView: View {
             }
         }
         .frame(width: 28)
-        .accessibilityLabel("Set \(setNumber), \(set.status == .completed ? "completed" : set.status == .skipped ? "skipped" : set.status == .failed ? "failed" : isCurrent ? "current" : "pending")")
+        .accessibilityLabel("Set \(setNumber), \(setStatusDescription)")
     }
 
     // MARK: - Current Set (Editable)
@@ -421,7 +421,8 @@ struct SetRowView: View {
                             (weight: Double(weightText), weightUnit: weightUnit, reps: Int(repsText))
                         ]
                         for drop in dropEntries {
-                            allEntries.append((weight: Double(drop.weight), weightUnit: weightUnit, reps: Int(drop.reps)))
+                            allEntries.append(
+                                (weight: Double(drop.weight), weightUnit: weightUnit, reps: Int(drop.reps)))
                         }
                         callback(allEntries)
                     } else {
@@ -967,5 +968,16 @@ struct SetRowView: View {
         let m = seconds / 60
         let s = seconds % 60
         return m > 0 ? String(format: "%d:%02d", m, s) : "\(s)s"
+    }
+}
+
+private extension SetRowView {
+    var setStatusDescription: String {
+        switch set.status {
+        case .completed: return "completed"
+        case .skipped: return "skipped"
+        case .failed: return "failed"
+        case .pending: return isCurrent ? "current" : "pending"
+        }
     }
 }

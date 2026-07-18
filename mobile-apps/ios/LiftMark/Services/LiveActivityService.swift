@@ -79,7 +79,8 @@ final class LiveActivityService: @unchecked Sendable {
                 do {
                     let state: WorkoutActivityAttributes.ContentState
                     if let exercise {
-                        state = buildActiveSetState(session: session, exercise: exercise, setIndex: setIndex, progress: progress)
+                        state = buildActiveSetState(
+                            session: session, exercise: exercise, setIndex: setIndex, progress: progress)
                     } else {
                         state = WorkoutActivityAttributes.ContentState(
                             isRestTimer: false,

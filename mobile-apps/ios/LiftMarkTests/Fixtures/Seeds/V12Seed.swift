@@ -161,18 +161,30 @@ extension DatabaseSeeds {
     INSERT INTO set_measurements
       (id, set_id, parent_type, role, kind, value, unit, group_index, updated_at)
     VALUES
-      ('dddddddd-dddd-dddd-dddd-000000000001', '\#(sesSet1)', 'session', 'target', 'weight',   135.0, 'lbs', 0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000002', '\#(sesSet1)', 'session', 'target', 'reps',      5.0, NULL,  0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000003', '\#(sesSet1)', 'session', 'target', 'time',     60.0, 's',   0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000004', '\#(sesSet1)', 'session', 'target', 'distance',  1.0, 'km',  0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000005', '\#(sesSet1)', 'session', 'target', 'rpe',       8.0, NULL,  0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000006', '\#(sesSet1)', 'session', 'actual', 'weight',   60.0, 'kg',  0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000007', '\#(sesSet1)', 'session', 'actual', 'reps',      5.0, NULL,  0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000008', '\#(sesSet1)', 'session', 'actual', 'time',     60.0, 's',   0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-000000000009', '\#(sesSet1)', 'session', 'actual', 'distance',  1.0, 'km',  0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-00000000000a', '\#(sesSet1)', 'session', 'actual', 'rpe',       9.0, NULL,  0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-00000000000b', '\#(tplSet1)', 'planned', 'target', 'weight',  135.0, 'lbs', 0, '\#(ts1)'),
-      ('dddddddd-dddd-dddd-dddd-00000000000c', '\#(tplSet1)', 'planned', 'target', 'reps',     5.0, NULL,  0, '\#(ts1)');
+      ('dddddddd-dddd-dddd-dddd-000000000001', '\#(sesSet1)',
+       'session', 'target', 'weight',   135.0, 'lbs', 0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000002', '\#(sesSet1)',
+       'session', 'target', 'reps',      5.0, NULL,  0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000003', '\#(sesSet1)',
+       'session', 'target', 'time',     60.0, 's',   0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000004', '\#(sesSet1)',
+       'session', 'target', 'distance',  1.0, 'km',  0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000005', '\#(sesSet1)',
+       'session', 'target', 'rpe',       8.0, NULL,  0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000006', '\#(sesSet1)',
+       'session', 'actual', 'weight',   60.0, 'kg',  0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000007', '\#(sesSet1)',
+       'session', 'actual', 'reps',      5.0, NULL,  0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000008', '\#(sesSet1)',
+       'session', 'actual', 'time',     60.0, 's',   0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-000000000009', '\#(sesSet1)',
+       'session', 'actual', 'distance',  1.0, 'km',  0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-00000000000a', '\#(sesSet1)',
+       'session', 'actual', 'rpe',       9.0, NULL,  0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-00000000000b', '\#(tplSet1)',
+       'planned', 'target', 'weight',  135.0, 'lbs', 0, '\#(ts1)'),
+      ('dddddddd-dddd-dddd-dddd-00000000000c', '\#(tplSet1)',
+       'planned', 'target', 'reps',     5.0, NULL,  0, '\#(ts1)');
 
     INSERT INTO sync_metadata (id, device_id, created_at, updated_at)
     VALUES ('\#(syncMetaId)', 'device-ABC', '\#(ts1)', '\#(ts1)');
