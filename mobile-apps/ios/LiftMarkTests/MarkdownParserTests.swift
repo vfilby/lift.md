@@ -564,8 +564,8 @@ final class MarkdownParserTests: XCTestCase {
         XCTAssertTrue(result.success || !result.errors.isEmpty)
     }
 
-    func testParsesClaudeGeneratedPushDayWorkout() {
-        let markdown = """
+    /// Full Claude-generated push-day plan exercised by testParsesClaudeGeneratedPushDayWorkout.
+    private let claudeGeneratedPushDayMarkdown = """
         # Push Day - Compound Focus
         @tags: push, chest, shoulders, triceps
         @units: lbs
@@ -644,7 +644,9 @@ final class MarkdownParserTests: XCTestCase {
         ### Child's Pose
         - 60s
         """
-        let result = MarkdownParser.parseWorkout(markdown)
+
+    func testParsesClaudeGeneratedPushDayWorkout() {
+        let result = MarkdownParser.parseWorkout(claudeGeneratedPushDayMarkdown)
 
         if result.success {
             XCTAssertNotNil(result.data?.exercises)

@@ -23,7 +23,7 @@ final class JsonImportServiceTests: XCTestCase {
     // MARK: - Valid Import
 
     func testImportValidUnifiedJson() throws {
-        let url = try createTempJsonFile(content: validUnifiedJson())
+        let url = try createTempJsonFile(content: validUnifiedJson)
 
         let result = try service.importUnifiedJson(from: url)
 
@@ -158,7 +158,7 @@ final class JsonImportServiceTests: XCTestCase {
     // MARK: - Duplicate Detection
 
     func testImportSameDataTwiceSkipsDuplicates() throws {
-        let url = try createTempJsonFile(content: validUnifiedJson())
+        let url = try createTempJsonFile(content: validUnifiedJson)
 
         let result1 = try service.importUnifiedJson(from: url)
         XCTAssertEqual(result1.plansImported, 1)
@@ -318,7 +318,7 @@ final class JsonImportServiceTests: XCTestCase {
     // MARK: - validateJsonFile
 
     func testValidateJsonFileReturnsTrueForValidFile() throws {
-        let url = try createTempJsonFile(content: validUnifiedJson())
+        let url = try createTempJsonFile(content: validUnifiedJson)
         XCTAssertTrue(service.validateJsonFile(at: url))
     }
 
@@ -413,8 +413,8 @@ final class JsonImportServiceTests: XCTestCase {
         return fileURL
     }
 
-    private func validUnifiedJson() -> String {
-        return """
+    /// Spec-compliant unified-export JSON fixture (one plan, one session, one gym).
+    private let validUnifiedJson = """
         {
             "formatVersion": "1.0",
             "exportedAt": "2026-03-01T00:00:00Z",
@@ -485,5 +485,4 @@ final class JsonImportServiceTests: XCTestCase {
             ]
         }
         """
-    }
 }

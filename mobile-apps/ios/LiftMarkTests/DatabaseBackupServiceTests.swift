@@ -97,11 +97,7 @@ final class DatabaseBackupServiceTests: XCTestCase {
         try? FileManager.default.removeItem(at: rawMainCopy)
         try FileManager.default.copyItem(at: livePath, to: rawMainCopy)
         defer { try? FileManager.default.removeItem(at: rawMainCopy) }
-        let rawQueue = try DatabaseQueue(path: rawMainCopy.path)
-        let inRawMain = try rawQueue.read { database in
-            try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM gyms WHERE id = ?", arguments: [markerId]) ?? 0
-        }
-        try rawQueue.close()
+        let inRawMain = try countGyms(withId: markerId, inDatabaseAt: rawMainCopy.path)
         XCTAssertEqual(inRawMain, 0,
                        "Precondition: marker should be WAL-resident, absent from the main db file alone")
 
@@ -120,11 +116,7 @@ final class DatabaseBackupServiceTests: XCTestCase {
                        "Export must not leave a -shm sidecar")
 
         // The exported file must contain the WAL-resident row.
-        let exportedQueue = try DatabaseQueue(path: exportURL.path)
-        let inExport = try exportedQueue.read { database in
-            try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM gyms WHERE id = ?", arguments: [markerId]) ?? 0
-        }
-        try exportedQueue.close()
+        let inExport = try countGyms(withId: markerId, inDatabaseAt: exportURL.path)
         XCTAssertEqual(inExport, 1, "Exported backup is missing a WAL-resident write — data loss bug")
 
         // And the export is a valid, importable database.
@@ -206,5 +198,17 @@ final class DatabaseBackupServiceTests: XCTestCase {
 
         let importFailed = BackupError.importFailed("test reason")
         XCTAssertTrue(importFailed.localizedDescription.contains("test reason"))
+    }
+
+    // MARK: - Helpers
+
+    /// Opens the SQLite file at `path` and counts `gyms` rows with the given id.
+    private func countGyms(withId gymId: String, inDatabaseAt path: String) throws -> Int {
+        let queue = try DatabaseQueue(path: path)
+        let count = try queue.read { database in
+            try Int.fetchOne(database, sql: "SELECT COUNT(*) FROM gyms WHERE id = ?", arguments: [gymId]) ?? 0
+        }
+        try queue.close()
+        return count
     }
 }

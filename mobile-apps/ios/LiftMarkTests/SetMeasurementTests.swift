@@ -358,33 +358,7 @@ final class SetMeasurementTests: XCTestCase {
     // MARK: - SessionRepository round-trip (measurements persisted in DB)
 
     func testSessionRepositoryRoundTripMeasurements() throws {
-        let plan = WorkoutPlan(
-            name: "Measurement Test",
-            exercises: [
-                PlannedExercise(
-                    workoutPlanId: "plan-1",
-                    exerciseName: "Bench Press",
-                    orderIndex: 0,
-                    sets: [
-                        PlannedSet(
-                            plannedExerciseId: "pex-1",
-                            orderIndex: 0,
-                            targetWeight: 225,
-                            targetWeightUnit: .lbs,
-                            targetReps: 5,
-                            targetRpe: 8
-                        ),
-                        PlannedSet(
-                            plannedExerciseId: "pex-1",
-                            orderIndex: 1,
-                            targetWeight: 225,
-                            targetWeightUnit: .lbs,
-                            targetReps: 5
-                        )
-                    ]
-                )
-            ]
-        )
+        let plan = makeMeasurementTestPlan()
         try planRepo.create(plan)
 
         // Create session from plan
@@ -593,6 +567,37 @@ final class SetMeasurementTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// One-exercise plan with two target sets (the first also has a target RPE).
+    private func makeMeasurementTestPlan() -> WorkoutPlan {
+        WorkoutPlan(
+            name: "Measurement Test",
+            exercises: [
+                PlannedExercise(
+                    workoutPlanId: "plan-1",
+                    exerciseName: "Bench Press",
+                    orderIndex: 0,
+                    sets: [
+                        PlannedSet(
+                            plannedExerciseId: "pex-1",
+                            orderIndex: 0,
+                            targetWeight: 225,
+                            targetWeightUnit: .lbs,
+                            targetReps: 5,
+                            targetRpe: 8
+                        ),
+                        PlannedSet(
+                            plannedExerciseId: "pex-1",
+                            orderIndex: 1,
+                            targetWeight: 225,
+                            targetWeightUnit: .lbs,
+                            targetReps: 5
+                        )
+                    ]
+                )
+            ]
+        )
+    }
 
     /// Create a SetMeasurementRow for in-memory testing (no DB).
     private func makeRow(
