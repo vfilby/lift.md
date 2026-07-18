@@ -24,60 +24,69 @@ struct SettingsRepository {
 
     func update(_ settings: UserSettings) throws {
         let dbQueue = try dbManager.database()
+        let arguments = Self.updateArguments(for: settings)
+        try dbQueue.write { db in
+            try db.execute(sql: Self.updateSQL, arguments: arguments)
+        }
+    }
+
+    private static let updateSQL = """
+        UPDATE user_settings SET
+            default_weight_unit = ?,
+            enable_workout_timer = ?,
+            auto_start_rest_timer = ?,
+            theme = ?,
+            notifications_enabled = ?,
+            custom_prompt_addition = ?,
+            anthropic_api_key_status = ?,
+            healthkit_enabled = ?,
+            live_activities_enabled = ?,
+            keep_screen_awake = ?,
+            show_open_in_claude_button = ?,
+            developer_mode_enabled = ?,
+            countdown_sounds_enabled = ?,
+            has_accepted_disclaimer = ?,
+            default_timer_countdown = ?,
+            default_weight_step_lbs = ?,
+            ai_prompt_include_format_pointer = ?,
+            ai_prompt_include_recent_workouts = ?,
+            ai_prompt_include_progression = ?,
+            ai_prompt_include_equipment = ?,
+            home_tiles = ?,
+            updated_at = ?
+        WHERE id = ?
+    """
+
+    /// Builds the positional arguments for `updateSQL` — order must match the
+    /// SET clause column order exactly.
+    private static func updateArguments(for settings: UserSettings) -> StatementArguments {
         let now = ISO8601DateFormatter().string(from: Date())
         let homeTilesJSON = settings.homeTiles.flatMap { try? String(data: JSONEncoder().encode($0), encoding: .utf8) }
-        try dbQueue.write { db in
-            try db.execute(sql: """
-                UPDATE user_settings SET
-                    default_weight_unit = ?,
-                    enable_workout_timer = ?,
-                    auto_start_rest_timer = ?,
-                    theme = ?,
-                    notifications_enabled = ?,
-                    custom_prompt_addition = ?,
-                    anthropic_api_key_status = ?,
-                    healthkit_enabled = ?,
-                    live_activities_enabled = ?,
-                    keep_screen_awake = ?,
-                    show_open_in_claude_button = ?,
-                    developer_mode_enabled = ?,
-                    countdown_sounds_enabled = ?,
-                    has_accepted_disclaimer = ?,
-                    default_timer_countdown = ?,
-                    default_weight_step_lbs = ?,
-                    ai_prompt_include_format_pointer = ?,
-                    ai_prompt_include_recent_workouts = ?,
-                    ai_prompt_include_progression = ?,
-                    ai_prompt_include_equipment = ?,
-                    home_tiles = ?,
-                    updated_at = ?
-                WHERE id = ?
-            """, arguments: [
-                settings.defaultWeightUnit.rawValue,
-                settings.enableWorkoutTimer ? 1 : 0,
-                settings.autoStartRestTimer ? 1 : 0,
-                settings.theme.rawValue,
-                settings.notificationsEnabled ? 1 : 0,
-                settings.customPromptAddition,
-                settings.anthropicApiKeyStatus?.rawValue,
-                settings.healthKitEnabled ? 1 : 0,
-                settings.liveActivitiesEnabled ? 1 : 0,
-                settings.keepScreenAwake ? 1 : 0,
-                settings.showOpenInClaudeButton ? 1 : 0,
-                settings.developerModeEnabled ? 1 : 0,
-                settings.countdownSoundsEnabled ? 1 : 0,
-                settings.hasAcceptedDisclaimer ? 1 : 0,
-                settings.defaultTimerCountdown ? 1 : 0,
-                settings.defaultWeightStepLbs,
-                settings.aiPromptIncludeFormatPointer ? 1 : 0,
-                settings.aiPromptIncludeRecentWorkouts ? 1 : 0,
-                settings.aiPromptIncludeProgression ? 1 : 0,
-                settings.aiPromptIncludeEquipment ? 1 : 0,
-                homeTilesJSON,
-                now,
-                settings.id
-            ])
-        }
+        return [
+            settings.defaultWeightUnit.rawValue,
+            settings.enableWorkoutTimer ? 1 : 0,
+            settings.autoStartRestTimer ? 1 : 0,
+            settings.theme.rawValue,
+            settings.notificationsEnabled ? 1 : 0,
+            settings.customPromptAddition,
+            settings.anthropicApiKeyStatus?.rawValue,
+            settings.healthKitEnabled ? 1 : 0,
+            settings.liveActivitiesEnabled ? 1 : 0,
+            settings.keepScreenAwake ? 1 : 0,
+            settings.showOpenInClaudeButton ? 1 : 0,
+            settings.developerModeEnabled ? 1 : 0,
+            settings.countdownSoundsEnabled ? 1 : 0,
+            settings.hasAcceptedDisclaimer ? 1 : 0,
+            settings.defaultTimerCountdown ? 1 : 0,
+            settings.defaultWeightStepLbs,
+            settings.aiPromptIncludeFormatPointer ? 1 : 0,
+            settings.aiPromptIncludeRecentWorkouts ? 1 : 0,
+            settings.aiPromptIncludeProgression ? 1 : 0,
+            settings.aiPromptIncludeEquipment ? 1 : 0,
+            homeTilesJSON,
+            now,
+            settings.id
+        ]
     }
 
     // MARK: - Assembly

@@ -61,23 +61,27 @@ struct ExerciseHistoryRepository {
                 ORDER BY ws.date DESC
             """, arguments: [exerciseName])
 
-            return rows.compactMap { row -> ExerciseHistoryPoint? in
-                guard let date: String = row["date"],
-                      let workoutName: String = row["workout_name"] else { return nil }
-                return ExerciseHistoryPoint(
-                    date: date,
-                    startTime: row["start_time"],
-                    workoutName: workoutName,
-                    maxWeight: row["max_weight"] ?? 0,
-                    avgReps: row["avg_reps"] ?? 0,
-                    totalVolume: row["total_volume"] ?? 0,
-                    setsCount: row["sets_count"] ?? 0,
-                    avgTime: row["avg_time"] ?? 0,
-                    maxTime: row["max_time"] ?? 0,
-                    unit: WeightUnit(rawValue: row["unit"] ?? "lbs") ?? .lbs
-                )
-            }
+            return rows.compactMap { Self.historyPoint(from: $0) }
         }
+    }
+
+    /// Maps a row from the aggregated history query (shared by `getHistory`
+    /// and `getHistoryNormalized`) to an `ExerciseHistoryPoint`.
+    private static func historyPoint(from row: Row) -> ExerciseHistoryPoint? {
+        guard let date: String = row["date"],
+              let workoutName: String = row["workout_name"] else { return nil }
+        return ExerciseHistoryPoint(
+            date: date,
+            startTime: row["start_time"],
+            workoutName: workoutName,
+            maxWeight: row["max_weight"] ?? 0,
+            avgReps: row["avg_reps"] ?? 0,
+            totalVolume: row["total_volume"] ?? 0,
+            setsCount: row["sets_count"] ?? 0,
+            avgTime: row["avg_time"] ?? 0,
+            maxTime: row["max_time"] ?? 0,
+            unit: WeightUnit(rawValue: row["unit"] ?? "lbs") ?? .lbs
+        )
     }
 
     /// Get history data points for an exercise, matching all known aliases.
@@ -121,22 +125,7 @@ struct ExerciseHistoryRepository {
                 ORDER BY ws.date DESC
             """, arguments: StatementArguments(aliases))
 
-            return rows.compactMap { row -> ExerciseHistoryPoint? in
-                guard let date: String = row["date"],
-                      let workoutName: String = row["workout_name"] else { return nil }
-                return ExerciseHistoryPoint(
-                    date: date,
-                    startTime: row["start_time"],
-                    workoutName: workoutName,
-                    maxWeight: row["max_weight"] ?? 0,
-                    avgReps: row["avg_reps"] ?? 0,
-                    totalVolume: row["total_volume"] ?? 0,
-                    setsCount: row["sets_count"] ?? 0,
-                    avgTime: row["avg_time"] ?? 0,
-                    maxTime: row["max_time"] ?? 0,
-                    unit: WeightUnit(rawValue: row["unit"] ?? "lbs") ?? .lbs
-                )
-            }
+            return rows.compactMap { Self.historyPoint(from: $0) }
         }
     }
 
