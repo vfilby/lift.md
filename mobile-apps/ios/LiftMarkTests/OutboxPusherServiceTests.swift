@@ -4,8 +4,9 @@ import GRDB
 
 /// Tests for the GH #143 loud-failure + recovery behavior of the outbox
 /// pusher: an auth failure must log to the device log, capture to Sentry once
-/// per flush cycle, surface an observable `lastError`, and — critically —
-/// leave the queued completions in place so they can drain after re-auth.
+/// per build (breadcrumbs on repeat flush cycles — Sentry LIFTMARK-IOS-P),
+/// surface an observable `lastError`, and — critically — leave the queued
+/// completions in place so they can drain after re-auth.
 @MainActor
 final class OutboxPusherServiceTests: XCTestCase {
 
@@ -29,6 +30,9 @@ final class OutboxPusherServiceTests: XCTestCase {
         queue = OutboxPendingQueueRepository()
         planRepo = WorkoutPlanRepository()
         sessionRepo = SessionRepository()
+        // The once-per-build capture throttle persists in UserDefaults.standard;
+        // reset it so every test's first auth-failure capture actually fires.
+        CrashReporter.resetOncePerBuildThrottle()
     }
 
     private func ensureAppLogsTableExists() {
@@ -52,6 +56,8 @@ final class OutboxPusherServiceTests: XCTestCase {
 
     override func tearDown() async throws {
         CrashReporter.captureErrorRecorder = nil
+        CrashReporter.breadcrumbRecorder = nil
+        CrashReporter.resetOncePerBuildThrottle()
         tokenStore.clear()
         DatabaseManager.shared.deleteDatabase()
         tokenStore = nil
@@ -370,6 +376,40 @@ final class OutboxPusherServiceTests: XCTestCase {
         XCTAssertEqual(mockAPI.sentPaths, ["/v1/workouts/outbox"], "Forced flush must push the parked item")
         XCTAssertEqual(try queue.count(), 0, "Forced flush must drain the queue past the backoff")
         XCTAssertEqual(pusher.pendingCount, 0)
+    }
+
+    /// Sentry LIFTMARK-IOS-P: a persistently signed-out device re-hits the
+    /// auth failure on every foreground flush and emitted 700+ identical
+    /// events. The Sentry capture must fire once per build — the second
+    /// signed-out flush emits a breadcrumb, not a second capture, while the
+    /// device log and observable state still update every cycle.
+    func testRepeatedAuthFailureCapturesOncePerBuild() async throws {
+        try queue.enqueue(clientSessionId: "sess-1")
+
+        var captureCount = 0
+        var breadcrumbs: [(String, [String: String])] = []
+        CrashReporter.captureErrorRecorder = { _, _, _ in captureCount += 1 }
+        CrashReporter.breadcrumbRecorder = { message, _, metadata in
+            breadcrumbs.append((message, metadata))
+        }
+
+        let auth = makeUnauthenticatedStore()
+        let pusher = OutboxPusherService(authStore: auth, apiClient: mockAPI, queue: queue)
+
+        await pusher.flushIfAuthenticated()
+        XCTAssertEqual(captureCount, 1, "First auth-failure flush must capture to Sentry")
+        XCTAssertTrue(breadcrumbs.isEmpty)
+
+        await pusher.flushIfAuthenticated()
+        XCTAssertEqual(captureCount, 1, "Repeat auth failure on the same build must NOT re-capture")
+        XCTAssertEqual(breadcrumbs.count, 1, "Repeat auth failure must drop to a breadcrumb")
+        XCTAssertEqual(breadcrumbs.first?.0, "outbox.authFailure.repeat")
+        XCTAssertEqual(breadcrumbs.first?.1["partialFailureCount"], "1")
+
+        // The observable state still reflects the stranded row every cycle.
+        XCTAssertNotNil(pusher.lastError)
+        XCTAssertEqual(pusher.pendingCount, 1)
+        XCTAssertEqual(try queue.count(), 1, "Queue must survive repeated auth failures")
     }
 
     func testFlushWhileSignedOutWithEmptyQueueStaysQuiet() async throws {

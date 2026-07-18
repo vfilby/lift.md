@@ -59,4 +59,28 @@ final class CrashReporterTests: XCTestCase {
         CrashReporter.shared.setEnabled(true)
         XCTAssertTrue(defaults.bool(forKey: CrashReporter.crashReportingEnabledKey))
     }
+
+    // MARK: - Once-per-build capture throttling (spec/services/sentry.md)
+
+    func test_shouldCapture_throttlesRepeatsWithinABuild() {
+        CrashReporter.resetOncePerBuildThrottle()
+        defer { CrashReporter.resetOncePerBuildThrottle() }
+
+        XCTAssertTrue(CrashReporter.shouldCapture(key: "outbox-auth-failure", build: "100"),
+                      "First sighting of a key on a build must capture")
+        XCTAssertFalse(CrashReporter.shouldCapture(key: "outbox-auth-failure", build: "100"),
+                       "Repeat of the same key on the same build must be throttled")
+        XCTAssertTrue(CrashReporter.shouldCapture(key: "ck-fail-12-UserSettings", build: "100"),
+                      "A different key on the same build is independent")
+    }
+
+    func test_shouldCapture_resetsWhenBuildChanges() {
+        CrashReporter.resetOncePerBuildThrottle()
+        defer { CrashReporter.resetOncePerBuildThrottle() }
+
+        XCTAssertTrue(CrashReporter.shouldCapture(key: "outbox-auth-failure", build: "100"))
+        XCTAssertTrue(CrashReporter.shouldCapture(key: "outbox-auth-failure", build: "101"),
+                      "A new build must re-capture an already-known key")
+        XCTAssertFalse(CrashReporter.shouldCapture(key: "outbox-auth-failure", build: "101"))
+    }
 }
