@@ -9,25 +9,25 @@ import Foundation
 /// always produce a human-readable date.
 enum SessionDateDisplay {
     private static let fullDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EEEE, MMMM d, yyyy"
-        return f
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d, yyyy"
+        return formatter
     }()
 
     private static let shortTimeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.timeStyle = .short
-        return f
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
     }()
 
     /// Parses the `date` field, which is a calendar date ("yyyy-MM-dd") with no zone.
     private static let dateOnlyFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
     }()
 
     /// Full weekday/month/day/year line, e.g. "Tuesday, June 2, 2026".

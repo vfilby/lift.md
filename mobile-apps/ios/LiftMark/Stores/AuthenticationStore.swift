@@ -83,8 +83,8 @@ enum JWTDecoder {
         return try? decoder.decode(Payload.self, from: data)
     }
 
-    private static func base64URLDecode(_ s: String) -> Data? {
-        var base64 = s.replacingOccurrences(of: "-", with: "+")
+    private static func base64URLDecode(_ string: String) -> Data? {
+        var base64 = string.replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
         let pad = base64.count % 4
         if pad > 0 {

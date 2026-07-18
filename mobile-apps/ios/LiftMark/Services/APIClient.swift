@@ -98,14 +98,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let plain = ISO8601DateFormatter()
         plain.formatOptions = [.withInternetDateTime]
-        decoder.dateDecodingStrategy = .custom { d in
-            let s = try d.singleValueContainer().decode(String.self)
-            if let date = fractional.date(from: s) ?? plain.date(from: s) {
+        decoder.dateDecodingStrategy = .custom { dateDecoder in
+            let string = try dateDecoder.singleValueContainer().decode(String.self)
+            if let date = fractional.date(from: string) ?? plain.date(from: string) {
                 return date
             }
             throw DecodingError.dataCorruptedError(
-                in: try d.singleValueContainer(),
-                debugDescription: "Not an ISO8601 date: \(s)"
+                in: try dateDecoder.singleValueContainer(),
+                debugDescription: "Not an ISO8601 date: \(string)"
             )
         }
         self.decoder = decoder

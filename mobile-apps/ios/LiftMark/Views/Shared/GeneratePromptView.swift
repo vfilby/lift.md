@@ -198,19 +198,19 @@ struct GeneratePromptView: View {
     // MARK: - Prompt Building
 
     private var builtPrompt: String {
-        let s = settings
+        let snapshot = settings
         let context = WorkoutGenerationContext(
-            defaultWeightUnit: s?.defaultWeightUnit ?? .lbs,
-            customPromptAddition: s?.customPromptAddition,
+            defaultWeightUnit: snapshot?.defaultWeightUnit ?? .lbs,
+            customPromptAddition: snapshot?.customPromptAddition,
             recentWorkouts: recentWorkouts,
             progression: progression,
             availableEquipment: equipment.filter { $0.isAvailable }.map(\.name),
             currentGym: selectedGym?.name,
             toggles: AIPromptToggles(
-                includeFormatPointer: s?.aiPromptIncludeFormatPointer ?? true,
-                includeRecentWorkouts: s?.aiPromptIncludeRecentWorkouts ?? true,
-                includeProgression: s?.aiPromptIncludeProgression ?? true,
-                includeEquipment: s?.aiPromptIncludeEquipment ?? true
+                includeFormatPointer: snapshot?.aiPromptIncludeFormatPointer ?? true,
+                includeRecentWorkouts: snapshot?.aiPromptIncludeRecentWorkouts ?? true,
+                includeProgression: snapshot?.aiPromptIncludeProgression ?? true,
+                includeEquipment: snapshot?.aiPromptIncludeEquipment ?? true
             )
         )
         let params = WorkoutGenerationParams(

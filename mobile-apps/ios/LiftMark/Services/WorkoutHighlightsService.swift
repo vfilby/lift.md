@@ -178,8 +178,8 @@ struct WorkoutHighlightsService {
             return streak
         }
 
-        for s in sortedSessions {
-            guard let currentDate = dateFormatter.date(from: String(s.date.prefix(10))) else { continue }
+        for priorSession in sortedSessions {
+            guard let currentDate = dateFormatter.date(from: String(priorSession.date.prefix(10))) else { continue }
 
             let daysDiff = Calendar.current.dateComponents([.day], from: currentDate, to: lastDate).day ?? 0
 

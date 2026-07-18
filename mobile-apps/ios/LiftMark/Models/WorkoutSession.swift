@@ -225,9 +225,9 @@ struct SessionSet: Identifiable, Codable, Hashable {
     var targetWeightUnit: WeightUnit? {
         get { entries.first?.target?.weight?.unit }
         set {
-            guard var w = entries.first?.target?.weight else { return }
-            w.unit = newValue ?? .lbs
-            entries[0].target?.weight = w
+            guard var weight = entries.first?.target?.weight else { return }
+            weight.unit = newValue ?? .lbs
+            entries[0].target?.weight = weight
         }
     }
 
@@ -257,9 +257,9 @@ struct SessionSet: Identifiable, Codable, Hashable {
     var targetDistanceUnit: DistanceUnit? {
         get { entries.first?.target?.distance?.unit }
         set {
-            guard var d = entries.first?.target?.distance else { return }
-            d.unit = newValue ?? .meters
-            entries[0].target?.distance = d
+            guard var distance = entries.first?.target?.distance else { return }
+            distance.unit = newValue ?? .meters
+            entries[0].target?.distance = distance
         }
     }
 
@@ -285,9 +285,9 @@ struct SessionSet: Identifiable, Codable, Hashable {
     var actualWeightUnit: WeightUnit? {
         get { entries.first?.actual?.weight?.unit }
         set {
-            guard var w = entries.first?.actual?.weight else { return }
-            w.unit = newValue ?? .lbs
-            entries[0].actual?.weight = w
+            guard var weight = entries.first?.actual?.weight else { return }
+            weight.unit = newValue ?? .lbs
+            entries[0].actual?.weight = weight
         }
     }
 
@@ -317,9 +317,9 @@ struct SessionSet: Identifiable, Codable, Hashable {
     var actualDistanceUnit: DistanceUnit? {
         get { entries.first?.actual?.distance?.unit }
         set {
-            guard var d = entries.first?.actual?.distance else { return }
-            d.unit = newValue ?? .meters
-            entries[0].actual?.distance = d
+            guard var distance = entries.first?.actual?.distance else { return }
+            distance.unit = newValue ?? .meters
+            entries[0].actual?.distance = distance
         }
     }
 

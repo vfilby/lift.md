@@ -324,8 +324,8 @@ final class ActiveWorkoutViewModelTests: XCTestCase {
         let items = ActiveWorkoutViewModel.buildDisplayItems(from: [parent, child1, child2])
         XCTAssertEqual(items.count, 1)
 
-        if case .superset(let p, let children) = items[0] {
-            XCTAssertEqual(p.id, parentId)
+        if case .superset(let parentItem, let children) = items[0] {
+            XCTAssertEqual(parentItem.id, parentId)
             XCTAssertEqual(children.count, 2)
             XCTAssertEqual(children[0].exercise.exerciseName, "Bench Press")
             XCTAssertEqual(children[0].displayNumber, 1)

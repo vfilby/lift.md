@@ -86,8 +86,8 @@ struct RestTimerTick: Equatable {
     /// For overrun display, callers prefix with `+`.
     static func formatMMSS(_ seconds: Int) -> String {
         let clamped = max(0, seconds)
-        let m = clamped / 60
-        let s = clamped % 60
-        return String(format: "%d:%02d", m, s)
+        let minutes = clamped / 60
+        let secs = clamped % 60
+        return String(format: "%d:%02d", minutes, secs)
     }
 }

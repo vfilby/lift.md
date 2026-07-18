@@ -203,8 +203,8 @@ enum ActiveWorkoutViewModel {
         let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let hasWorkoutHeader = trimmed.split(separator: "\n").contains { line in
-            let t = line.trimmingCharacters(in: .whitespaces)
-            return t.hasPrefix("# ") || t == "#"
+            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+            return trimmedLine.hasPrefix("# ") || trimmedLine == "#"
         }
         let source = hasWorkoutHeader ? markdown : "# Workout\n" + markdown
         let result = MarkdownParser.parseWorkout(source)

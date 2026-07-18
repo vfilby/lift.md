@@ -25,9 +25,9 @@ final class DatabaseMigrationTests: XCTestCase {
         throws -> (DatabaseSeedLoader.LoadedSeed, DatabaseQueue)
     {
         let loaded = try DatabaseSeedLoader.load(ddl: ddl, data: data)
-        let q = try DatabaseSeedLoader.openQueue(at: loaded.path)
-        try DatabaseSeedLoader.migrate(q, upTo: targetIdentifier)
-        return (loaded, q)
+        let queue = try DatabaseSeedLoader.openQueue(at: loaded.path)
+        try DatabaseSeedLoader.migrate(queue, upTo: targetIdentifier)
+        return (loaded, queue)
     }
 
     private func listTables(_ db: Database) throws -> [String] {
@@ -61,8 +61,8 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - Universal assertions (§6a)
 
     /// Applies the universal post-migration assertions to a just-migrated DB.
-    private func assertUniversalInvariants(_ q: DatabaseQueue, label: String) throws {
-        try q.read { db in
+    private func assertUniversalInvariants(_ queue: DatabaseQueue, label: String) throws {
+        try queue.read { db in
             // 1. Legacy schema_version table is dropped at head (v20).
             let schemaVersionTables = try Int.fetchOne(
                 db,
@@ -101,8 +101,8 @@ final class DatabaseMigrationTests: XCTestCase {
 
             // 8. Tables removed at v9 must not exist
             let tables = Set(try listTables(db))
-            for t in MigrationGoldenShapes.tablesRemovedAtV9 {
-                XCTAssertFalse(tables.contains(t), "\(label): table \(t) should be removed at v9")
+            for table in MigrationGoldenShapes.tablesRemovedAtV9 {
+                XCTAssertFalse(tables.contains(table), "\(label): table \(table) should be removed at v9")
             }
 
             // 9. anthropic_api_key column removed at v9 (DROP COLUMN)
@@ -115,17 +115,17 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - v1 seed: full chain 1 → 13
 
     func testV1Seed_migratesToHead_universalInvariants() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v1→13")
+        try assertUniversalInvariants(queue, label: "v1→13")
     }
 
     /// Row count preservation: v1 has 8 template_sets + 6 session_sets. After the v12 fan-out,
     /// the set rows themselves survive (data is reshaped into `set_measurements`, not deleted).
     func testV1Seed_preservesSetRowCounts() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try q.read { db in
+        try queue.read { db in
             XCTAssertEqual(try count(db, table: "template_sets"), 8, "template_sets rows preserved")
             XCTAssertEqual(try count(db, table: "session_sets"), 6, "session_sets rows preserved")
             XCTAssertEqual(try count(db, table: "workout_sessions"), 2, "sessions preserved")
@@ -135,9 +135,9 @@ final class DatabaseMigrationTests: XCTestCase {
 
     /// ID preservation: every seeded ID (template, session, set) is still present post-migration.
     func testV1Seed_preservesIdentifiers() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try q.read { db in
+        try queue.read { db in
             let exists: (String, String) throws -> Bool = { tbl, id in
                 (try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(tbl) WHERE id = ?", arguments: [id])) == 1
             }
@@ -155,9 +155,9 @@ final class DatabaseMigrationTests: XCTestCase {
     /// **session_sets.is_amrap is forced to 0** (see the v12 migration — the template copy selects the
     /// column unchanged, the session copy substitutes the literal `0`). We pin both halves.
     func testV1Seed_v12DroppedFieldsAndIsAmrapAsymmetry() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try q.read { db in
+        try queue.read { db in
             // Template side: tplSet5 had is_amrap=1 at seed; v12 preserves it.
             let tplAmrap = try Int.fetchOne(
                 db,
@@ -182,9 +182,9 @@ final class DatabaseMigrationTests: XCTestCase {
     /// v12 fan-out: every non-NULL measurement column in the seed becomes ≥1 `set_measurements` row.
     /// v1 seed has mostly-populated rows — assert lower bound on fan-out counts per parent_type.
     func testV1Seed_v12FanoutProducesExpectedMeasurements() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v1DDL, data: DatabaseSeeds.v1Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try q.read { db in
+        try queue.read { db in
             let plannedCount = try count(db, table: "set_measurements", where: "parent_type = 'planned'")
             let sessionCount = try count(db, table: "set_measurements", where: "parent_type = 'session'")
             // 8 template_sets with varying populated fields → at least 1 measurement each.
@@ -206,10 +206,10 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - v4 seeds: default-gym behavior pinning
 
     func testV4ZeroDefaults_migratesToHead() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v4DDL, data: DatabaseSeeds.v4DataZeroDefaults)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v4DDL, data: DatabaseSeeds.v4DataZeroDefaults)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v4-zero→13")
-        try q.read { db in
+        try assertUniversalInvariants(queue, label: "v4-zero→13")
+        try queue.read { db in
             // Pin current behavior: forward chain from v4 does NOT re-run the default-gym fix-up.
             // Both non-deleted gyms stay at is_default=0.
             let defaults = try count(db, table: "gyms", where: "is_default = 1 AND deleted_at IS NULL")
@@ -219,10 +219,10 @@ final class DatabaseMigrationTests: XCTestCase {
     }
 
     func testV4TwoDefaults_migratesToHead() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v4DDL, data: DatabaseSeeds.v4DataTwoDefaults)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v4DDL, data: DatabaseSeeds.v4DataTwoDefaults)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v4-two→13")
-        try q.read { db in
+        try assertUniversalInvariants(queue, label: "v4-two→13")
+        try queue.read { db in
             // Pin current behavior: forward chain from v4 does NOT re-run the default-gym fix-up,
             // so BOTH gyms that were is_default=1 at seed stay at is_default=1.
             let defaults = try count(db, table: "gyms", where: "is_default = 1 AND deleted_at IS NULL")
@@ -233,10 +233,10 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - v7 seed: per-side + soft-delete preservation
 
     func testV7Seed_migratesToHead_preservesSideAndDeletedAt() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v7DDL, data: DatabaseSeeds.v7Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v7DDL, data: DatabaseSeeds.v7Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v7→13")
-        try q.read { db in
+        try assertUniversalInvariants(queue, label: "v7→13")
+        try queue.read { db in
             // v6 added session_sets.side — must survive v7/v8/v9/v10/v11/v12/v13
             XCTAssertTrue(try columnNames(db, table: "session_sets").contains("side"), "session_sets.side preserved")
             let sides = try Row.fetchAll(db, sql: "SELECT side FROM session_sets WHERE side IS NOT NULL")
@@ -248,10 +248,10 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - v8 seed: updated_at + sync_engine_state BLOB not overwritten
 
     func testV8Seed_migratesToHead_preservesUpdatedAtAndSyncBlob() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v8DDL, data: DatabaseSeeds.v8Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v8DDL, data: DatabaseSeeds.v8Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v8→13")
-        try q.read { db in
+        try assertUniversalInvariants(queue, label: "v8→13")
+        try queue.read { db in
             // v8 seed uses a distinctive updated_at=ts3; forward migrations must not stamp over it.
             let updatedAt = try String.fetchOne(
                 db,
@@ -270,10 +270,10 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - v11 seed: composite UNIQUE (gym_id, name)
 
     func testV11Seed_migratesToHead_preservesSameNameDifferentGym() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v11DDL, data: DatabaseSeeds.v11Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v11DDL, data: DatabaseSeeds.v11Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v11→13")
-        try q.read { db in
+        try assertUniversalInvariants(queue, label: "v11→13")
+        try queue.read { db in
             // v11 replaced the global UNIQUE(name) with composite UNIQUE(gym_id, name).
             // Seed has two "Barbell" rows at different gyms — both must survive.
             let barbellCount = try count(db, table: "gym_equipment", where: "name = 'Barbell'")
@@ -284,10 +284,10 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - v12 seed: fan-out already done — no new rows
 
     func testV12Seed_migratesToHead_noNewMeasurements() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v12DDL, data: DatabaseSeeds.v12Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v12DDL, data: DatabaseSeeds.v12Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v12→13")
-        try q.read { db in
+        try assertUniversalInvariants(queue, label: "v12→13")
+        try queue.read { db in
             // v12 data is already post-fan-out; migrating 12→13 must not touch set_measurements.
             XCTAssertEqual(try count(db, table: "set_measurements"), 12, "v12 seed measurement count preserved")
         }
@@ -296,10 +296,10 @@ final class DatabaseMigrationTests: XCTestCase {
     // MARK: - v13 seed: no-op
 
     func testV13Seed_migratesToHead_addsWeightStepAndAIPromptColumns() throws {
-        let (loaded, q) = try loadAndMigrate(ddl: DatabaseSeeds.v13DDL, data: DatabaseSeeds.v13Data)
+        let (loaded, queue) = try loadAndMigrate(ddl: DatabaseSeeds.v13DDL, data: DatabaseSeeds.v13Data)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        try assertUniversalInvariants(q, label: "v13→head")
-        try q.read { db in
+        try assertUniversalInvariants(queue, label: "v13→head")
+        try queue.read { db in
             XCTAssertEqual(try count(db, table: "workout_templates"), 1)
             XCTAssertEqual(try count(db, table: "gyms"), 1)
             // v14 adds default_weight_step_lbs with default 2.5 — existing user_settings row

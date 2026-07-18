@@ -39,11 +39,11 @@ struct ActiveExerciseCard: View {
             let hasReps = (actual?.reps ?? target?.reps) != nil
 
             if !hasReps {
-                if let t = actual?.time ?? target?.time {
-                    return formatTimeSummary(t)
+                if let time = actual?.time ?? target?.time {
+                    return formatTimeSummary(time)
                 }
-                if let d = actual?.distance ?? target?.distance {
-                    return "\(formatDistance(d.value)) \(d.unit.rawValue)"
+                if let distance = actual?.distance ?? target?.distance {
+                    return "\(formatDistance(distance.value)) \(distance.unit.rawValue)"
                 }
             }
         }
@@ -51,9 +51,9 @@ struct ActiveExerciseCard: View {
     }
 
     private func formatTimeSummary(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return m > 0 ? String(format: "%d:%02d", m, s) : "\(s)s"
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return minutes > 0 ? String(format: "%d:%02d", minutes, secs) : "\(secs)s"
     }
 
     private func formatDistance(_ value: Double) -> String {

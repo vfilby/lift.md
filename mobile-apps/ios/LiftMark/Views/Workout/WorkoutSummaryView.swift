@@ -435,10 +435,10 @@ struct WorkoutSummaryView: View {
         else { return nil }
 
         let completedWeekStarts: Set<Date> = Set(
-            sessionStore.sessions.compactMap { s -> Date? in
-                guard s.status == .completed,
-                      let d = formatter.date(from: s.date),
-                      let wk = calendar.dateInterval(of: .weekOfYear, for: d)?.start
+            sessionStore.sessions.compactMap { candidate -> Date? in
+                guard candidate.status == .completed,
+                      let date = formatter.date(from: candidate.date),
+                      let wk = calendar.dateInterval(of: .weekOfYear, for: date)?.start
                 else { return nil }
                 return wk
             }
@@ -466,8 +466,8 @@ struct WorkoutSummaryView: View {
         }
     }
 
-    private func formatWeight(_ w: Double) -> String {
-        w.formattedWeight
+    private func formatWeight(_ weight: Double) -> String {
+        weight.formattedWeight
     }
 
     private func formatVolume(_ volume: Double) -> String {
@@ -557,7 +557,7 @@ private struct ExerciseSummaryRow: View {
         .padding(.vertical, LiftMarkTheme.spacingXS)
     }
 
-    private func formatWeight(_ w: Double) -> String {
-        w.formattedWeight
+    private func formatWeight(_ weight: Double) -> String {
+        weight.formattedWeight
     }
 }

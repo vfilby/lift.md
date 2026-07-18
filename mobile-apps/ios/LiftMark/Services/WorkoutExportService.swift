@@ -169,12 +169,12 @@ struct WorkoutExportService {
                 return [:] as [String: Any]
             }
             var dict: [String: Any] = [:]
-            if let v = row["default_weight_unit"] as? String { dict["defaultWeightUnit"] = v }
-            if let v = row["enable_workout_timer"] as? Int { dict["enableWorkoutTimer"] = v == 1 }
-            if let v = row["auto_start_rest_timer"] as? Int { dict["autoStartRestTimer"] = v == 1 }
-            if let v = row["theme"] as? String { dict["theme"] = v }
-            if let v = row["keep_screen_awake"] as? Int { dict["keepScreenAwake"] = v == 1 }
-            if let v = row["custom_prompt_addition"] as? String { dict["customPromptAddition"] = v }
+            if let unit = row["default_weight_unit"] as? String { dict["defaultWeightUnit"] = unit }
+            if let flag = row["enable_workout_timer"] as? Int { dict["enableWorkoutTimer"] = flag == 1 }
+            if let flag = row["auto_start_rest_timer"] as? Int { dict["autoStartRestTimer"] = flag == 1 }
+            if let theme = row["theme"] as? String { dict["theme"] = theme }
+            if let flag = row["keep_screen_awake"] as? Int { dict["keepScreenAwake"] = flag == 1 }
+            if let prompt = row["custom_prompt_addition"] as? String { dict["customPromptAddition"] = prompt }
             return dict
         }) ?? [:]
 
@@ -249,13 +249,13 @@ struct WorkoutExportService {
             "isPerSide": set.isPerSide,
             "isAmrap": set.isAmrap
         ]
-        if let v = target?.weight?.value { dict["targetWeight"] = v }
-        if let v = target?.weight?.unit { dict["targetWeightUnit"] = v.rawValue }
-        if let v = target?.reps { dict["targetReps"] = v }
-        if let v = target?.time { dict["targetTime"] = v }
-        if let v = target?.rpe { dict["targetRpe"] = v }
-        if let v = set.restSeconds { dict["restSeconds"] = v }
-        if let v = set.notes { dict["notes"] = v }
+        if let weight = target?.weight?.value { dict["targetWeight"] = weight }
+        if let unit = target?.weight?.unit { dict["targetWeightUnit"] = unit.rawValue }
+        if let reps = target?.reps { dict["targetReps"] = reps }
+        if let time = target?.time { dict["targetTime"] = time }
+        if let rpe = target?.rpe { dict["targetRpe"] = rpe }
+        if let rest = set.restSeconds { dict["restSeconds"] = rest }
+        if let notes = set.notes { dict["notes"] = notes }
         return dict
     }
 
@@ -297,19 +297,19 @@ struct WorkoutExportService {
             "isDropset": set.isDropset,
             "isPerSide": set.isPerSide
         ]
-        if let v = target?.weight?.value { dict["targetWeight"] = v }
-        if let v = target?.weight?.unit { dict["targetWeightUnit"] = v.rawValue }
-        if let v = target?.reps { dict["targetReps"] = v }
-        if let v = target?.time { dict["targetTime"] = v }
-        if let v = target?.rpe { dict["targetRpe"] = v }
-        if let v = set.restSeconds { dict["restSeconds"] = v }
-        if let v = actual?.weight?.value { dict["actualWeight"] = v }
-        if let v = actual?.weight?.unit { dict["actualWeightUnit"] = v.rawValue }
-        if let v = actual?.reps { dict["actualReps"] = v }
-        if let v = actual?.time { dict["actualTime"] = v }
-        if let v = actual?.rpe { dict["actualRpe"] = v }
-        if let v = set.completedAt { dict["completedAt"] = v }
-        if let v = set.notes { dict["notes"] = v }
+        if let weight = target?.weight?.value { dict["targetWeight"] = weight }
+        if let unit = target?.weight?.unit { dict["targetWeightUnit"] = unit.rawValue }
+        if let reps = target?.reps { dict["targetReps"] = reps }
+        if let time = target?.time { dict["targetTime"] = time }
+        if let rpe = target?.rpe { dict["targetRpe"] = rpe }
+        if let rest = set.restSeconds { dict["restSeconds"] = rest }
+        if let weight = actual?.weight?.value { dict["actualWeight"] = weight }
+        if let unit = actual?.weight?.unit { dict["actualWeightUnit"] = unit.rawValue }
+        if let reps = actual?.reps { dict["actualReps"] = reps }
+        if let time = actual?.time { dict["actualTime"] = time }
+        if let rpe = actual?.rpe { dict["actualRpe"] = rpe }
+        if let completedAt = set.completedAt { dict["completedAt"] = completedAt }
+        if let notes = set.notes { dict["notes"] = notes }
         return dict
     }
 }
