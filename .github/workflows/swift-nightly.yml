@@ -53,6 +53,7 @@ jobs:
 
       - name: Install XcodeGen
         run: |
+          brew untap aws/tap || true
           brew install xcodegen
           INSTALLED=$(xcodegen --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           MINIMUM="2.45.3"
