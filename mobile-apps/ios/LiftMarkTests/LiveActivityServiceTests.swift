@@ -55,7 +55,7 @@ final class LiveActivityServiceTests: XCTestCase {
 
     func testFormatRepsWithTargetTime() {
         let set = makeSet(targetTime: 30)
-        XCTAssertEqual(service.formatReps(set), "30s")
+        XCTAssertEqual(service.formatReps(set), "0:30")
     }
 
     func testFormatRepsWithNilSet() {
@@ -180,7 +180,7 @@ final class LiveActivityServiceTests: XCTestCase {
             makeSet(targetTime: 60, status: .pending)
         ])
         let detail = service.nextExerciseSetDetail(exercise)
-        XCTAssertEqual(detail, "BW \u{00D7} 60s")
+        XCTAssertEqual(detail, "BW \u{00D7} 1:00")
     }
 
     // MARK: - resolveContentState: cursor advance on skip (#144)

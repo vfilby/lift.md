@@ -358,7 +358,7 @@ final class LiveActivityService: @unchecked Sendable {
         if let reps = target?.reps {
             return String(reps)
         } else if let time = target?.time {
-            return "\(time)s"
+            return DurationFormat.mmss(time)
         }
         return "?"
     }

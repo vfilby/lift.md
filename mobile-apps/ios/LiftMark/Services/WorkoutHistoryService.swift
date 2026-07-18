@@ -75,7 +75,7 @@ struct WorkoutHistoryService {
         let time = actual?.time ?? target?.time
 
         if let time, reps == nil {
-            return "\(time)s"
+            return DurationFormat.mmss(time)
         }
 
         if let reps {

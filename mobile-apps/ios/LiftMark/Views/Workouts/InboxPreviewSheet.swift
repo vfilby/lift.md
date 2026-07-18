@@ -231,12 +231,7 @@ struct InboxPreviewSheet: View {
     }
 
     private func formatDuration(_ seconds: Int) -> String {
-        if seconds >= 60 {
-            let m = seconds / 60
-            let s = seconds % 60
-            return s == 0 ? "\(m)m" : "\(m)m \(s)s"
-        }
-        return "\(seconds)s"
+        DurationFormat.mmss(seconds)
     }
 
     @ViewBuilder

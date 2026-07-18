@@ -90,9 +90,9 @@ Each set row MUST display all data that was parsed from the workout plan. The fo
 | Set number | Numeric index | "Set 1", "Set 2" | Always |
 | Weight | Numeric value + unit | "135 lbs", "60 kg" | When `targetWeight` is set |
 | Reps | "x" + count | "x 5", "x 12" | When `targetReps` is set |
-| Time | Duration format | "60s", "1:30" | When `targetTime` is set |
+| Time | Duration in M:SS | "1:00", "1:30" | When `targetTime` is set |
 | RPE | "@RPE" + value | "@RPE 8" | When `targetRpe` is set |
-| Rest | Rest duration | "90s rest" | When `restSeconds` is set |
+| Rest | Rest duration in M:SS | "1:30 rest" | When `restSeconds` is set |
 | Tempo | Tempo notation | "3-0-1-0" | When `tempo` is set |
 | Drop set | Badge | "Drop" | When `isDropset` is true |
 | Per side | Badge | "/side" | When `isPerSide` is true |

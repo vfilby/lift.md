@@ -80,56 +80,16 @@ struct SetRowView: View {
                 repsText = "\(r)"
             }
             if let t = target?.time ?? actual?.time {
-                timeText = formatTimeText(t)
+                timeText = DurationFormat.mmss(t)
             }
         }
     }
 
-    /// True when the current set's target/actual time is large enough that
-    /// rendering as raw seconds is awkward. Drives both label and field width.
-    private var useMinuteTimeFormat: Bool {
-        let t = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
-        return t >= 90
-    }
-
-    private var timeFieldLabel: String {
-        useMinuteTimeFormat ? "Time (m:ss)" : "Time (s)"
-    }
-
-    private var timeFieldWidth: CGFloat {
-        useMinuteTimeFormat ? 88 : 72
-    }
-
-    /// Step size for +/- buttons. Coarser steps in minute mode so users
+    /// Step size for +/- buttons. Coarser steps for long holds so users
     /// aren't tapping 12 times to add a minute.
     private var timeStepSeconds: Int {
-        useMinuteTimeFormat ? 30 : 5
-    }
-
-    /// Format `seconds` for the editable text field. Uses `m:ss` when the
-    /// underlying target is long enough that seconds-only would overflow.
-    private func formatTimeText(_ seconds: Int) -> String {
-        if seconds >= 90 {
-            let m = seconds / 60
-            let s = seconds % 60
-            return String(format: "%d:%02d", m, s)
-        }
-        return "\(seconds)"
-    }
-
-    /// Parse text back to seconds, accepting raw seconds ("180") or m:ss
-    /// ("3:00"). Returns nil for unparseable input.
-    private func parseTimeText(_ text: String) -> Int? {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if trimmed.contains(":") {
-            let parts = trimmed.split(separator: ":")
-            guard parts.count == 2,
-                  let m = Int(parts[0]),
-                  let s = Int(parts[1]),
-                  s >= 0, s < 60 else { return nil }
-            return m * 60 + s
-        }
-        return Int(trimmed)
+        let t = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
+        return t >= 90 ? 30 : 5
     }
 
     // MARK: - Set Number Indicator
@@ -269,7 +229,7 @@ struct SetRowView: View {
                 // Time input — for all timed exercises (including weighted-timed)
                 if set.entries.first?.target?.time != nil {
                     VStack(alignment: .center, spacing: 2) {
-                        Text(timeFieldLabel)
+                        Text("Time (m:ss)")
                             .font(.lmCaption2)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         HStack(spacing: 2) {
@@ -283,12 +243,12 @@ struct SetRowView: View {
 
                             TextField("--", text: $timeText)
                                 #if os(iOS)
-                                .keyboardType(useMinuteTimeFormat ? .numbersAndPunctuation : .numberPad)
+                                .keyboardType(.numbersAndPunctuation)
                                 #endif
                                 .font(.lmTitle3.monospacedDigit())
                                 .multilineTextAlignment(.center)
                                 .textFieldStyle(.roundedBorder)
-                                .frame(width: timeFieldWidth)
+                                .frame(width: 88)
 
                             Button { adjustTime(by: timeStepSeconds) } label: {
                                 Image(systemName: "plus.circle")
@@ -425,7 +385,7 @@ struct SetRowView: View {
                         }
                         callback(allEntries)
                     } else {
-                        onComplete(Double(weightText), Int(repsText), parseTimeText(timeText))
+                        onComplete(Double(weightText), Int(repsText), DurationFormat.parse(timeText))
                     }
                 } label: {
                     HStack(spacing: 6) {
@@ -474,7 +434,7 @@ struct SetRowView: View {
                         repsText = "\(r)"
                     }
                     if let t = actual?.time ?? target?.time {
-                        timeText = formatTimeText(t)
+                        timeText = DurationFormat.mmss(t)
                     }
                 }
             } label: {
@@ -518,7 +478,7 @@ struct SetRowView: View {
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
                             if let t = target?.time {
-                                Text(formatTime(t))
+                                Text(DurationFormat.mmss(t))
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
@@ -590,17 +550,17 @@ struct SetRowView: View {
             // Time input — editable for timed sets in inline edit
             if set.entries.first?.actual?.time != nil || set.entries.first?.target?.time != nil {
                 VStack(alignment: .center, spacing: 2) {
-                    Text(timeFieldLabel)
+                    Text("Time (m:ss)")
                         .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     TextField("--", text: $timeText)
                         #if os(iOS)
-                        .keyboardType(useMinuteTimeFormat ? .numbersAndPunctuation : .numberPad)
+                        .keyboardType(.numbersAndPunctuation)
                         #endif
                         .font(.lmBody.monospacedDigit())
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: timeFieldWidth)
+                        .frame(width: 88)
                         .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
                 }
             }
@@ -640,7 +600,7 @@ struct SetRowView: View {
 
             // Update button
             Button {
-                onSave(Double(weightText), Int(repsText), parseTimeText(timeText))
+                onSave(Double(weightText), Int(repsText), DurationFormat.parse(timeText))
                 isEditing = false
             } label: {
                 Image(systemName: "checkmark")
@@ -826,7 +786,7 @@ struct SetRowView: View {
                     .foregroundStyle(LiftMarkTheme.success)
             }
             if let t = actual?.time {
-                Text(formatTime(t))
+                Text(DurationFormat.mmss(t))
                     .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }
@@ -937,11 +897,10 @@ struct SetRowView: View {
         repsText = "\(max(0, current + delta))"
     }
 
-    /// Adjusts the main time field by the given delta, clamped to 0. Output
-    /// formatting honors the current minute/seconds display mode.
+    /// Adjusts the main time field by the given delta, clamped to 0.
     private func adjustTime(by delta: Int) {
-        let current = parseTimeText(timeText) ?? 0
-        timeText = formatTimeText(max(0, current + delta))
+        let current = DurationFormat.parse(timeText) ?? 0
+        timeText = DurationFormat.mmss(max(0, current + delta))
     }
 
     /// Adjusts a drop entry's reps field by the given delta, clamped to 0.
@@ -961,11 +920,5 @@ struct SetRowView: View {
 
     private func formatWeight(_ w: Double) -> String {
         w.formattedWeight
-    }
-
-    private func formatTime(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return m > 0 ? String(format: "%d:%02d", m, s) : "\(s)s"
     }
 }
