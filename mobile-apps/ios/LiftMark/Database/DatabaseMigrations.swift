@@ -1,3 +1,8 @@
+// Length rules are disabled for this file: it is an append-only registry —
+// every schema change adds a migration that can never be moved out or
+// rewritten, so it grows without bound by design.
+// swiftlint:disable file_length
+
 import Foundation
 import GRDB
 
@@ -11,13 +16,7 @@ import GRDB
 /// `v20_drop_legacy_schema_version` drops the now-unused `schema_version` table.
 ///
 /// See spec/services/migrator.md.
-///
-/// Length rules are disabled for this file: it is an append-only registry —
-/// every schema change adds a migration that can never be moved out or
-/// rewritten, so it grows without bound by design.
-// swiftlint:disable file_length
-// swiftlint:disable:next type_body_length
-enum DatabaseMigrations {
+enum DatabaseMigrations { // swiftlint:disable:this type_body_length
 
     /// Canonical migration identifiers, in order. This is a wire-level contract:
     /// identifiers must never be reordered or renamed after first ship (GRDB persists
