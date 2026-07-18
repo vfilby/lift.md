@@ -54,7 +54,7 @@ enum SessionLMWFEncoder {
             if processed.contains(exercise.id) { continue }
 
             // Group parent? Collect children from the same list.
-            if let gt = exercise.groupType, exercise.sets.isEmpty, (gt == .section || gt == .superset) {
+            if let gt = exercise.groupType, exercise.sets.isEmpty, gt == .section || gt == .superset {
                 let children = exercises.filter { $0.parentExerciseId == exercise.id }
                 processed.insert(exercise.id)
                 for c in children { processed.insert(c.id) }

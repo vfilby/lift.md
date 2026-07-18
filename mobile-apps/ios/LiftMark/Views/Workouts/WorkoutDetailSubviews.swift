@@ -281,7 +281,7 @@ struct PlanSupersetCard: View {
     /// Edit a single member exercise.
     var onEditChild: (PlannedExercise) -> Void = { _ in }
     /// Edit the superset grouping itself (the parent).
-    var onEdit: (() -> Void)? = nil
+    var onEdit: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {

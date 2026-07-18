@@ -10,10 +10,6 @@ final class DatabaseBackupServiceTests: XCTestCase {
         _ = try? DatabaseManager.shared.database()
     }
 
-    override func tearDown() {
-        super.tearDown()
-    }
-
     // MARK: - Export
 
     func testExportProducesFile() throws {

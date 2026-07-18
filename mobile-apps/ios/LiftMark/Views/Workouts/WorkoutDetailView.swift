@@ -69,11 +69,9 @@ struct WorkoutDetailView: View {
             if exercise.groupType == .superset && exercise.sets.isEmpty {
                 // Superset parent — gather children
                 var children: [PlannedExercise] = []
-                for child in exercises {
-                    if child.parentExerciseId == exercise.id {
-                        children.append(child)
-                        processedIds.insert(child.id)
-                    }
+                for child in exercises where child.parentExerciseId == exercise.id {
+                    children.append(child)
+                    processedIds.insert(child.id)
                 }
                 processedIds.insert(exercise.id)
                 if SupersetGrouping.isRealSuperset(childCount: children.count) {
@@ -99,11 +97,9 @@ struct WorkoutDetailView: View {
                     guard child.parentExerciseId == exercise.id else { continue }
                     if child.groupType == .superset && child.sets.isEmpty {
                         var grandchildren: [PlannedExercise] = []
-                        for grandchild in exercises {
-                            if grandchild.parentExerciseId == child.id {
-                                grandchildren.append(grandchild)
-                                processedIds.insert(grandchild.id)
-                            }
+                        for grandchild in exercises where grandchild.parentExerciseId == child.id {
+                            grandchildren.append(grandchild)
+                            processedIds.insert(grandchild.id)
                         }
                         processedIds.insert(child.id)
                         if SupersetGrouping.isRealSuperset(childCount: grandchildren.count) {
@@ -183,7 +179,7 @@ struct WorkoutDetailView: View {
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
                             // Exercises by section
-                            ForEach(Array(exerciseSections.enumerated()), id: \.offset) { sectionIndex, section in
+                            ForEach(Array(exerciseSections.enumerated()), id: \.offset) { _, section in
                                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
                                     // Section header divider
                                     if let sectionName = section.name {

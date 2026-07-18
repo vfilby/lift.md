@@ -172,12 +172,10 @@ struct HistoryDetailView: View {
                 currentSectionName = exercise.groupName ?? exercise.exerciseName
                 processedIds.insert(exercise.id)
                 // Gather children
-                for child in exercises {
-                    if child.parentExerciseId == exercise.id {
-                        currentExercises.append((exercise: child, displayNumber: displayNumber))
-                        displayNumber += 1
-                        processedIds.insert(child.id)
-                    }
+                for child in exercises where child.parentExerciseId == exercise.id {
+                    currentExercises.append((exercise: child, displayNumber: displayNumber))
+                    displayNumber += 1
+                    processedIds.insert(child.id)
                 }
             } else if exercise.parentExerciseId != nil {
                 // Skip orphan children already handled
@@ -185,12 +183,10 @@ struct HistoryDetailView: View {
             } else if exercise.groupType == .superset && exercise.sets.isEmpty {
                 // Superset parent — skip but include children
                 processedIds.insert(exercise.id)
-                for child in exercises {
-                    if child.parentExerciseId == exercise.id {
-                        currentExercises.append((exercise: child, displayNumber: displayNumber))
-                        displayNumber += 1
-                        processedIds.insert(child.id)
-                    }
+                for child in exercises where child.parentExerciseId == exercise.id {
+                    currentExercises.append((exercise: child, displayNumber: displayNumber))
+                    displayNumber += 1
+                    processedIds.insert(child.id)
                 }
             } else {
                 currentExercises.append((exercise: exercise, displayNumber: displayNumber))
@@ -501,12 +497,19 @@ struct ExerciseHistorySheetView: View {
     @State private var historyPoints: [ExerciseHistoryPoint] = []
     @State private var isLoading = true
 
-    private var summaryStats: (sessions: Int, maxWeight: Double, avgReps: Double, totalVolume: Double) {
+    private struct SummaryStats {
+        let sessions: Int
+        let maxWeight: Double
+        let avgReps: Double
+        let totalVolume: Double
+    }
+
+    private var summaryStats: SummaryStats {
         let sessions = historyPoints.count
         let maxWeight = historyPoints.map(\.maxWeight).max() ?? 0
         let avgReps = historyPoints.isEmpty ? 0 : historyPoints.map(\.avgReps).reduce(0, +) / Double(historyPoints.count)
         let totalVolume = historyPoints.map(\.totalVolume).reduce(0, +)
-        return (sessions, maxWeight, avgReps, totalVolume)
+        return SummaryStats(sessions: sessions, maxWeight: maxWeight, avgReps: avgReps, totalVolume: totalVolume)
     }
 
     var body: some View {

@@ -240,4 +240,3 @@ final class InboxPollerService {
         return true
     }
 }
-

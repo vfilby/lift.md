@@ -22,11 +22,11 @@ struct SetRowView: View {
     let exerciseName: String
     let equipmentType: String?
     let onComplete: (Double?, Int?, Int?) -> Void
-    var onCompleteDropSet: ((_ entries: [(weight: Double?, weightUnit: WeightUnit?, reps: Int?)]) -> Void)? = nil
+    var onCompleteDropSet: ((_ entries: [(weight: Double?, weightUnit: WeightUnit?, reps: Int?)]) -> Void)?
     let onSkip: () -> Void
     let onSave: (Double?, Int?, Int?) -> Void
-    var onUnlog: (() -> Void)? = nil
-    var onWeightChanged: ((String) -> Void)? = nil
+    var onUnlog: (() -> Void)?
+    var onWeightChanged: ((String) -> Void)?
 
     @State private var weightText: String = ""
     @State private var repsText: String = ""

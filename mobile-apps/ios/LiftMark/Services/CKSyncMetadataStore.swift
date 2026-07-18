@@ -37,7 +37,7 @@ final class CKSyncMetadataStore: @unchecked Sendable {
             let dbQueue = try DatabaseManager.shared.database()
             return try dbQueue.read { db in
                 let row = try Row.fetchOne(db, sql: "SELECT last_sync_date, last_uploaded, last_downloaded, last_conflicts FROM sync_metadata LIMIT 1")
-                guard let row, let _: String = row["last_sync_date"] else { return nil }
+                guard let row, (row["last_sync_date"] as String?) != nil else { return nil }
                 return LastSyncStats(
                     uploaded: row["last_uploaded"] ?? 0,
                     downloaded: row["last_downloaded"] ?? 0,
