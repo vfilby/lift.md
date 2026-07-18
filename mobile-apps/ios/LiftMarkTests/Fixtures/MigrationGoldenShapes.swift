@@ -67,12 +67,4 @@ enum MigrationGoldenShapes {
     /// These must NOT exist at head.
     static let tablesRemovedAtV9: [String] = ["sync_queue", "sync_conflicts"]
 
-    /// Describes one pre-v12 `template_sets` / `session_sets` row and the `set_measurements`
-    /// rows its v12 fan-out should produce. Used by the v1-seed targeted test.
-    struct FanoutExpectation {
-        let setId: String
-        let parentType: String         // "planned" | "session"
-        /// role × kind × value × unit
-        let expected: [(role: String, kind: String, value: Double, unit: String?)]
-    }
 }

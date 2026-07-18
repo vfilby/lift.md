@@ -15,7 +15,7 @@ final class SyncStatusStore {
 
     // nonisolated(unsafe) so the nonisolated deinit can remove the observer. The token is
     // only written once in init and read once in deinit, so there is no concurrent access.
-    @ObservationIgnored private nonisolated(unsafe) var observer: NSObjectProtocol?
+    @ObservationIgnored nonisolated(unsafe) private var observer: NSObjectProtocol?
 
     init() {
         observer = NotificationCenter.default.addObserver(

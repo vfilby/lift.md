@@ -132,7 +132,7 @@ struct EditPlanExerciseSheet: View {
             }
 
             Section {
-                ForEach(Array(editableSets.enumerated()), id: \.element.id) { index, setRow in
+                ForEach(Array(editableSets.enumerated()), id: \.element.id) { index, _ in
                     HStack(spacing: LiftMarkTheme.spacingSM) {
                         Text("Set \(index + 1)")
                             .font(.lmSubheadline)

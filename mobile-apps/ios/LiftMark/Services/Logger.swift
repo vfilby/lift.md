@@ -406,7 +406,7 @@ private extension Logging.Logger.MetadataValue {
 
 enum LiftMarkLogging {
     private static let bootstrapLock = NSLock()
-    private nonisolated(unsafe) static var didBootstrap = false
+    nonisolated(unsafe) private static var didBootstrap = false
 
     /// Install `SQLiteLogHandler` as the process-wide swift-log backend.
     ///

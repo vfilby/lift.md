@@ -40,7 +40,7 @@ final class SyncSessionGuardTests: XCTestCase {
     }
 
     func testSnapshotReturnsNilWhenNoActiveSession() throws {
-        let _ = try DatabaseManager.shared.database()
+        _ = try DatabaseManager.shared.database()
 
         let snapshot = SyncSessionGuard.takeSnapshot()
         XCTAssertNil(snapshot)

@@ -66,12 +66,10 @@ enum ActiveWorkoutViewModel {
             if exercise.groupType == .superset && exercise.sets.isEmpty {
                 // Gather children
                 var children: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)] = []
-                for (childIndex, child) in exercises.enumerated() {
-                    if child.parentExerciseId == exercise.id {
-                        children.append((exercise: child, exerciseIndex: childIndex, displayNumber: displayNumber))
-                        displayNumber += 1
-                        processedIds.insert(child.id)
-                    }
+                for (childIndex, child) in exercises.enumerated() where child.parentExerciseId == exercise.id {
+                    children.append((exercise: child, exerciseIndex: childIndex, displayNumber: displayNumber))
+                    displayNumber += 1
+                    processedIds.insert(child.id)
                 }
                 processedIds.insert(exercise.id)
                 if SupersetGrouping.isRealSuperset(childCount: children.count) {
@@ -101,12 +99,11 @@ enum ActiveWorkoutViewModel {
                     guard child.parentExerciseId == exercise.id else { continue }
                     if child.groupType == .superset && child.sets.isEmpty {
                         var grandchildren: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)] = []
-                        for (gIndex, grandchild) in exercises.enumerated() {
-                            if grandchild.parentExerciseId == child.id {
-                                grandchildren.append((exercise: grandchild, exerciseIndex: gIndex, displayNumber: displayNumber))
-                                displayNumber += 1
-                                processedIds.insert(grandchild.id)
-                            }
+                        for (gIndex, grandchild) in exercises.enumerated()
+                        where grandchild.parentExerciseId == child.id {
+                            grandchildren.append((exercise: grandchild, exerciseIndex: gIndex, displayNumber: displayNumber))
+                            displayNumber += 1
+                            processedIds.insert(grandchild.id)
                         }
                         processedIds.insert(child.id)
                         if SupersetGrouping.isRealSuperset(childCount: grandchildren.count) {

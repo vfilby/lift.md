@@ -282,7 +282,7 @@ enum WorkoutGenerationService {
                     warnings.append("Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): weight specified without unit")
                 }
 
-                if let rpe = target?.rpe, (rpe < 1 || rpe > 10) {
+                if let rpe = target?.rpe, rpe < 1 || rpe > 10 {
                     issues.append("Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): RPE must be between 1 and 10")
                 }
             }
