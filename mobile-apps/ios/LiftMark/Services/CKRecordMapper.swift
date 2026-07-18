@@ -38,15 +38,15 @@ final class CKRecordMapper {
     // MARK: - Date Helpers
 
     let isoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
 
     private let isoFormatterNoFrac: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
     }()
 
     func parseDate(_ str: String?) -> Date? {
@@ -157,8 +157,8 @@ final class CKRecordMapper {
         let record = CKRecord(recordType: "Gym", recordID: CKRecord.ID(recordName: gym.id, zoneID: zoneID))
         record["name"] = gym.name as CKRecordValue
         record["isDefault"] = Int64(gym.isDefault) as CKRecordValue
-        if let d = parseDate(gym.createdAt) { record["createdAt"] = d as CKRecordValue }
-        if let d = parseDate(gym.updatedAt) { record["updatedAt"] = d as CKRecordValue }
+        if let date = parseDate(gym.createdAt) { record["createdAt"] = date as CKRecordValue }
+        if let date = parseDate(gym.updatedAt) { record["updatedAt"] = date as CKRecordValue }
         return record
     }
 
@@ -169,9 +169,9 @@ final class CKRecordMapper {
         if let gymId = eq.gymId {
             record["gymId"] = makeReference(recordName: gymId, zoneID: zoneID) as CKRecordValue
         }
-        if let d = parseDate(eq.lastCheckedAt) { record["lastCheckedAt"] = d as CKRecordValue }
-        if let d = parseDate(eq.createdAt) { record["createdAt"] = d as CKRecordValue }
-        if let d = parseDate(eq.updatedAt) { record["updatedAt"] = d as CKRecordValue }
+        if let date = parseDate(eq.lastCheckedAt) { record["lastCheckedAt"] = date as CKRecordValue }
+        if let date = parseDate(eq.createdAt) { record["createdAt"] = date as CKRecordValue }
+        if let date = parseDate(eq.updatedAt) { record["updatedAt"] = date as CKRecordValue }
         return record
     }
 
@@ -179,12 +179,12 @@ final class CKRecordMapper {
         let record = CKRecord(recordType: "WorkoutPlan", recordID: CKRecord.ID(recordName: plan.id, zoneID: zoneID))
         record["name"] = plan.name as CKRecordValue
         record["isFavorite"] = Int64(plan.isFavorite) as CKRecordValue
-        if let d = plan.description { record["planDescription"] = d as CKRecordValue }
-        if let t = plan.tags { record["tags"] = t as CKRecordValue }
-        if let u = plan.defaultWeightUnit { record["defaultWeightUnit"] = u as CKRecordValue }
-        if let m = plan.sourceMarkdown { record["sourceMarkdown"] = m as CKRecordValue }
-        if let d = parseDate(plan.createdAt) { record["createdAt"] = d as CKRecordValue }
-        if let d = parseDate(plan.updatedAt) { record["updatedAt"] = d as CKRecordValue }
+        if let description = plan.description { record["planDescription"] = description as CKRecordValue }
+        if let tags = plan.tags { record["tags"] = tags as CKRecordValue }
+        if let unit = plan.defaultWeightUnit { record["defaultWeightUnit"] = unit as CKRecordValue }
+        if let markdown = plan.sourceMarkdown { record["sourceMarkdown"] = markdown as CKRecordValue }
+        if let date = parseDate(plan.createdAt) { record["createdAt"] = date as CKRecordValue }
+        if let date = parseDate(plan.updatedAt) { record["updatedAt"] = date as CKRecordValue }
         return record
     }
 
@@ -193,14 +193,14 @@ final class CKRecordMapper {
         record["workoutPlanId"] = makeReference(recordName: ex.workoutTemplateId, zoneID: zoneID) as CKRecordValue
         record["exerciseName"] = ex.exerciseName as CKRecordValue
         record["orderIndex"] = Int64(ex.orderIndex) as CKRecordValue
-        if let n = ex.notes { record["notes"] = n as CKRecordValue }
-        if let e = ex.equipmentType { record["equipmentType"] = e as CKRecordValue }
-        if let g = ex.groupType { record["groupType"] = g as CKRecordValue }
-        if let g = ex.groupName { record["groupName"] = g as CKRecordValue }
-        if let p = ex.parentExerciseId {
-            record["parentExerciseId"] = makeReference(recordName: p, zoneID: zoneID) as CKRecordValue
+        if let notes = ex.notes { record["notes"] = notes as CKRecordValue }
+        if let equipmentType = ex.equipmentType { record["equipmentType"] = equipmentType as CKRecordValue }
+        if let groupType = ex.groupType { record["groupType"] = groupType as CKRecordValue }
+        if let groupName = ex.groupName { record["groupName"] = groupName as CKRecordValue }
+        if let parentId = ex.parentExerciseId {
+            record["parentExerciseId"] = makeReference(recordName: parentId, zoneID: zoneID) as CKRecordValue
         }
-        if let d = parseDate(ex.updatedAt) { record["updatedAt"] = d as CKRecordValue }
+        if let date = parseDate(ex.updatedAt) { record["updatedAt"] = date as CKRecordValue }
         return record
     }
 
@@ -210,11 +210,11 @@ final class CKRecordMapper {
         record["date"] = session.date as CKRecordValue
         record["status"] = session.status as CKRecordValue
         if let pid = session.workoutTemplateId { record["workoutPlanId"] = pid as CKRecordValue }
-        if let d = parseDate(session.startTime) { record["startTime"] = d as CKRecordValue }
-        if let d = parseDate(session.endTime) { record["endTime"] = d as CKRecordValue }
+        if let date = parseDate(session.startTime) { record["startTime"] = date as CKRecordValue }
+        if let date = parseDate(session.endTime) { record["endTime"] = date as CKRecordValue }
         if let dur = session.duration { record["duration"] = Int64(dur) as CKRecordValue }
-        if let n = session.notes { record["notes"] = n as CKRecordValue }
-        if let d = parseDate(session.updatedAt) { record["updatedAt"] = d as CKRecordValue }
+        if let notes = session.notes { record["notes"] = notes as CKRecordValue }
+        if let date = parseDate(session.updatedAt) { record["updatedAt"] = date as CKRecordValue }
         return record
     }
 
@@ -224,41 +224,43 @@ final class CKRecordMapper {
         record["exerciseName"] = se.exerciseName as CKRecordValue
         record["orderIndex"] = Int64(se.orderIndex) as CKRecordValue
         record["status"] = se.status as CKRecordValue
-        if let n = se.notes { record["notes"] = n as CKRecordValue }
-        if let e = se.equipmentType { record["equipmentType"] = e as CKRecordValue }
-        if let g = se.groupType { record["groupType"] = g as CKRecordValue }
-        if let g = se.groupName { record["groupName"] = g as CKRecordValue }
-        if let p = se.parentExerciseId {
-            record["parentExerciseId"] = makeReference(recordName: p, zoneID: zoneID) as CKRecordValue
+        if let notes = se.notes { record["notes"] = notes as CKRecordValue }
+        if let equipmentType = se.equipmentType { record["equipmentType"] = equipmentType as CKRecordValue }
+        if let groupType = se.groupType { record["groupType"] = groupType as CKRecordValue }
+        if let groupName = se.groupName { record["groupName"] = groupName as CKRecordValue }
+        if let parentId = se.parentExerciseId {
+            record["parentExerciseId"] = makeReference(recordName: parentId, zoneID: zoneID) as CKRecordValue
         }
-        if let d = parseDate(se.updatedAt) { record["updatedAt"] = d as CKRecordValue }
+        if let date = parseDate(se.updatedAt) { record["updatedAt"] = date as CKRecordValue }
         return record
     }
 
-    func toCKRecord(_ s: UserSettingsRow, zoneID: CKRecordZone.ID) -> CKRecord {
+    func toCKRecord(_ settings: UserSettingsRow, zoneID: CKRecordZone.ID) -> CKRecord {
         let record = CKRecord(
             recordType: "UserSettings",
             recordID: CKRecord.ID(recordName: "user-settings", zoneID: zoneID)
         )
-        record["defaultWeightUnit"] = s.defaultWeightUnit as CKRecordValue
-        record["enableWorkoutTimer"] = Int64(s.enableWorkoutTimer) as CKRecordValue
-        record["autoStartRestTimer"] = Int64(s.autoStartRestTimer) as CKRecordValue
-        record["theme"] = s.theme as CKRecordValue
-        record["notificationsEnabled"] = Int64(s.notificationsEnabled) as CKRecordValue
-        record["healthKitEnabled"] = Int64(s.healthkitEnabled) as CKRecordValue
-        record["liveActivitiesEnabled"] = Int64(s.liveActivitiesEnabled) as CKRecordValue
-        record["keepScreenAwake"] = Int64(s.keepScreenAwake) as CKRecordValue
-        record["showOpenInClaudeButton"] = Int64(s.showOpenInClaudeButton) as CKRecordValue
-        record["countdownSoundsEnabled"] = Int64(s.countdownSoundsEnabled) as CKRecordValue
-        record["defaultTimerCountdown"] = Int64(s.defaultTimerCountdown) as CKRecordValue
-        record["defaultWeightStepLbs"] = s.defaultWeightStepLbs as CKRecordValue
-        record["aiPromptIncludeFormatPointer"] = Int64(s.aiPromptIncludeFormatPointer) as CKRecordValue
-        record["aiPromptIncludeRecentWorkouts"] = Int64(s.aiPromptIncludeRecentWorkouts) as CKRecordValue
-        record["aiPromptIncludeProgression"] = Int64(s.aiPromptIncludeProgression) as CKRecordValue
-        record["aiPromptIncludeEquipment"] = Int64(s.aiPromptIncludeEquipment) as CKRecordValue
-        if let c = s.customPromptAddition { record["customPromptAddition"] = c as CKRecordValue }
-        if let h = s.homeTiles { record["homeTiles"] = h as CKRecordValue }
-        if let d = parseDate(s.updatedAt) { record["updatedAt"] = d as CKRecordValue }
+        record["defaultWeightUnit"] = settings.defaultWeightUnit as CKRecordValue
+        record["enableWorkoutTimer"] = Int64(settings.enableWorkoutTimer) as CKRecordValue
+        record["autoStartRestTimer"] = Int64(settings.autoStartRestTimer) as CKRecordValue
+        record["theme"] = settings.theme as CKRecordValue
+        record["notificationsEnabled"] = Int64(settings.notificationsEnabled) as CKRecordValue
+        record["healthKitEnabled"] = Int64(settings.healthkitEnabled) as CKRecordValue
+        record["liveActivitiesEnabled"] = Int64(settings.liveActivitiesEnabled) as CKRecordValue
+        record["keepScreenAwake"] = Int64(settings.keepScreenAwake) as CKRecordValue
+        record["showOpenInClaudeButton"] = Int64(settings.showOpenInClaudeButton) as CKRecordValue
+        record["countdownSoundsEnabled"] = Int64(settings.countdownSoundsEnabled) as CKRecordValue
+        record["defaultTimerCountdown"] = Int64(settings.defaultTimerCountdown) as CKRecordValue
+        record["defaultWeightStepLbs"] = settings.defaultWeightStepLbs as CKRecordValue
+        record["aiPromptIncludeFormatPointer"] = Int64(settings.aiPromptIncludeFormatPointer) as CKRecordValue
+        record["aiPromptIncludeRecentWorkouts"] = Int64(settings.aiPromptIncludeRecentWorkouts) as CKRecordValue
+        record["aiPromptIncludeProgression"] = Int64(settings.aiPromptIncludeProgression) as CKRecordValue
+        record["aiPromptIncludeEquipment"] = Int64(settings.aiPromptIncludeEquipment) as CKRecordValue
+        if let addition = settings.customPromptAddition {
+            record["customPromptAddition"] = addition as CKRecordValue
+        }
+        if let tiles = settings.homeTiles { record["homeTiles"] = tiles as CKRecordValue }
+        if let date = parseDate(settings.updatedAt) { record["updatedAt"] = date as CKRecordValue }
         // Never sync anthropicApiKey
         return record
     }

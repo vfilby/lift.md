@@ -39,8 +39,8 @@ struct EditableSetRow: Identifiable {
             id: set.id,
             existingSetId: set.id,
             weightText: {
-                if let w = target?.weight?.value {
-                    return w.formattedWeight
+                if let weight = target?.weight?.value {
+                    return weight.formattedWeight
                 }
                 return ""
             }(),
@@ -332,8 +332,8 @@ struct EditExerciseSheet: View {
             let reps = Int(setRow.repsText)
             let time = Int(setRow.timeText)
             let rest: Int? = {
-                guard let r = Int(setRow.restText), r > 0 else { return nil }
-                return r
+                guard let restValue = Int(setRow.restText), restValue > 0 else { return nil }
+                return restValue
             }()
 
             if let existingId = setRow.existingSetId {
@@ -400,18 +400,17 @@ struct EditExerciseSheet: View {
         for set in exercise.sets {
             let target = set.entries.first?.target
             var parts: [String] = []
-            if let w = target?.weight?.value {
-                let wStr = w.formattedWeight
-                parts.append(wStr)
+            if let weight = target?.weight?.value {
+                parts.append(weight.formattedWeight)
                 if let unit = target?.weight?.unit {
                     parts.append(unit.rawValue)
                 }
             }
-            if let r = target?.reps {
-                parts.append("x \(r)")
+            if let reps = target?.reps {
+                parts.append("x \(reps)")
             }
-            if let t = target?.time {
-                parts.append("\(t)s")
+            if let time = target?.time {
+                parts.append("\(time)s")
             }
             var line = parts.joined(separator: " ")
             if let rest = set.restSeconds, rest > 0 {
@@ -446,8 +445,8 @@ struct EditExerciseSheet: View {
             let existingStatus: SetStatus = i < exercise.sets.count ? exercise.sets[i].status : .pending
             let parsedTarget = parsedSet.entries.first?.target
             let weightStr: String
-            if let w = parsedTarget?.weight?.value {
-                weightStr = w.formattedWeight
+            if let weight = parsedTarget?.weight?.value {
+                weightStr = weight.formattedWeight
             } else {
                 weightStr = ""
             }

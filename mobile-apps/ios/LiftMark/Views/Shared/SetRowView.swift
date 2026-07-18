@@ -72,15 +72,15 @@ struct SetRowView: View {
         .onAppear {
             let target = set.entries.first?.target
             let actual = set.entries.first?.actual
-            if let w = target?.weight?.value ?? actual?.weight?.value {
-                weightText = formatWeight(w)
+            if let weight = target?.weight?.value ?? actual?.weight?.value {
+                weightText = formatWeight(weight)
                 onWeightChanged?(weightText)
             }
-            if let r = target?.reps ?? actual?.reps {
-                repsText = "\(r)"
+            if let reps = target?.reps ?? actual?.reps {
+                repsText = "\(reps)"
             }
-            if let t = target?.time ?? actual?.time {
-                timeText = formatTimeText(t)
+            if let time = target?.time ?? actual?.time {
+                timeText = formatTimeText(time)
             }
         }
     }
@@ -88,8 +88,8 @@ struct SetRowView: View {
     /// True when the current set's target/actual time is large enough that
     /// rendering as raw seconds is awkward. Drives both label and field width.
     private var useMinuteTimeFormat: Bool {
-        let t = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
-        return t >= 90
+        let time = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
+        return time >= 90
     }
 
     private var timeFieldLabel: String {
@@ -110,9 +110,9 @@ struct SetRowView: View {
     /// underlying target is long enough that seconds-only would overflow.
     private func formatTimeText(_ seconds: Int) -> String {
         if seconds >= 90 {
-            let m = seconds / 60
-            let s = seconds % 60
-            return String(format: "%d:%02d", m, s)
+            let minutes = seconds / 60
+            let secs = seconds % 60
+            return String(format: "%d:%02d", minutes, secs)
         }
         return "\(seconds)"
     }
@@ -124,10 +124,10 @@ struct SetRowView: View {
         if trimmed.contains(":") {
             let parts = trimmed.split(separator: ":")
             guard parts.count == 2,
-                  let m = Int(parts[0]),
-                  let s = Int(parts[1]),
-                  s >= 0, s < 60 else { return nil }
-            return m * 60 + s
+                  let minutes = Int(parts[0]),
+                  let seconds = Int(parts[1]),
+                  seconds >= 0, seconds < 60 else { return nil }
+            return minutes * 60 + seconds
         }
         return Int(trimmed)
     }
@@ -199,7 +199,7 @@ struct SetRowView: View {
             // Top row: indicator + inputs + skip
             HStack(alignment: .textFieldCenter, spacing: LiftMarkTheme.spacingSM) {
                 setIndicator
-                    .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                    .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
 
                 // Side label for per-side sets (Left/Right)
                 if let side = set.side {
@@ -211,7 +211,7 @@ struct SetRowView: View {
                         .padding(.vertical, 2)
                         .background(LiftMarkTheme.primary.opacity(0.1))
                         .clipShape(Capsule())
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                 }
 
                 // Weight input — shown for weighted exercises, or when the user
@@ -250,7 +250,7 @@ struct SetRowView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Increase weight by \(formatWeight(weightStepIncrement))")
                         }
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                     }
 
                     // Show × separator only when reps follow (not for weighted-timed sets)
@@ -258,12 +258,12 @@ struct SetRowView: View {
                         Text("×")
                             .font(.lmCallout)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                            .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                     }
                 } else {
                     // Reps-only / bodyweight set: offer to add a weight inline.
                     addWeightButton
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                 }
 
                 // Time input — for all timed exercises (including weighted-timed)
@@ -298,7 +298,7 @@ struct SetRowView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Increase time by \(timeStepSeconds) seconds")
                         }
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                     }
                 }
 
@@ -334,7 +334,7 @@ struct SetRowView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Increase reps by 1")
                         }
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                     }
                 }
 
@@ -353,7 +353,7 @@ struct SetRowView: View {
                 .accessibilityIdentifier("set-skip-button")
                 .accessibilityLabel("Skip set \(setNumber)")
                 .accessibilityHint("Marks this set as skipped")
-                .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
             }
 
             // Drop set entries (additional drops, groupIndex > 0)
@@ -468,14 +468,14 @@ struct SetRowView: View {
                     // Initialize edit fields with current values
                     let target = set.entries.first?.target
                     let actual = set.entries.first?.actual
-                    if let w = actual?.weight?.value ?? target?.weight?.value {
-                        weightText = formatWeight(w)
+                    if let weight = actual?.weight?.value ?? target?.weight?.value {
+                        weightText = formatWeight(weight)
                     }
-                    if let r = actual?.reps ?? target?.reps {
-                        repsText = "\(r)"
+                    if let reps = actual?.reps ?? target?.reps {
+                        repsText = "\(reps)"
                     }
-                    if let t = actual?.time ?? target?.time {
-                        timeText = formatTimeText(t)
+                    if let time = actual?.time ?? target?.time {
+                        timeText = formatTimeText(time)
                     }
                 }
             } label: {
@@ -488,13 +488,13 @@ struct SetRowView: View {
                         } else if set.status == .skipped {
                             // Show target values + "-- Skipped"
                             let target = set.entries.first?.target
-                            if let w = target?.weight?.value, let u = target?.weight?.unit {
-                                Text("\(formatWeight(w)) \(u.rawValue)")
+                            if let weight = target?.weight?.value, let unit = target?.weight?.unit {
+                                Text("\(formatWeight(weight)) \(unit.rawValue)")
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.warning)
                             }
-                            if let r = target?.reps {
-                                Text("\u{00D7} \(r)")
+                            if let reps = target?.reps {
+                                Text("\u{00D7} \(reps)")
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.warning)
                             }
@@ -508,18 +508,18 @@ struct SetRowView: View {
                         } else {
                             // Pending - show targets
                             let target = set.entries.first?.target
-                            if let w = target?.weight?.value, let u = target?.weight?.unit {
-                                Text("\(formatWeight(w)) \(u.rawValue)")
+                            if let weight = target?.weight?.value, let unit = target?.weight?.unit {
+                                Text("\(formatWeight(weight)) \(unit.rawValue)")
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
-                            if let r = target?.reps {
-                                Text("\u{00D7} \(r)")
+                            if let reps = target?.reps {
+                                Text("\u{00D7} \(reps)")
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
-                            if let t = target?.time {
-                                Text(formatTime(t))
+                            if let time = target?.time {
+                                Text(formatTime(time))
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
@@ -553,7 +553,7 @@ struct SetRowView: View {
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 80)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                 }
 
                 // Show × separator only for non-timed sets (weighted reps)
@@ -561,13 +561,13 @@ struct SetRowView: View {
                     Text("×")
                         .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                 }
             } else {
                 // Reps-only / bodyweight set logged without a weight: let the
                 // user add one while editing (GH #194).
                 addWeightButton
-                    .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                    .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
             }
 
             // Reps field — only for non-timed sets
@@ -584,7 +584,7 @@ struct SetRowView: View {
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 60)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                 }
             }
 
@@ -602,7 +602,7 @@ struct SetRowView: View {
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: timeFieldWidth)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+                        .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                 }
             }
 
@@ -637,7 +637,7 @@ struct SetRowView: View {
             }
             .accessibilityLabel("More set actions")
             .accessibilityHint("Mark as skipped or clear the log for this set")
-            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+            .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
 
             // Update button
             Button {
@@ -654,7 +654,7 @@ struct SetRowView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Save changes")
             .accessibilityHint("Updates this set with the edited values")
-            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+            .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
 
             // Cancel button
             Button {
@@ -671,7 +671,7 @@ struct SetRowView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Cancel editing")
-            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
+            .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
         }
     }
 
@@ -788,13 +788,13 @@ struct SetRowView: View {
                             .foregroundStyle(LiftMarkTheme.success.opacity(0.6))
                     }
                     HStack(spacing: 2) {
-                        if let w = entry.actual?.weight?.value {
-                            Text(formatWeight(w))
+                        if let weight = entry.actual?.weight?.value {
+                            Text(formatWeight(weight))
                                 .font(.lmSubheadline.monospacedDigit())
                                 .foregroundStyle(LiftMarkTheme.success)
                         }
-                        if let r = entry.actual?.reps {
-                            Text("\u{00D7}\(r)")
+                        if let reps = entry.actual?.reps {
+                            Text("\u{00D7}\(reps)")
                                 .font(.lmSubheadline.monospacedDigit())
                                 .foregroundStyle(LiftMarkTheme.success)
                         }
@@ -816,18 +816,18 @@ struct SetRowView: View {
     private var normalCompletedContent: some View {
         HStack(spacing: LiftMarkTheme.spacingSM) {
             let actual = set.entries.first?.actual
-            if let w = actual?.weight?.value, let u = actual?.weight?.unit {
-                Text("\(formatWeight(w)) \(u.rawValue)")
+            if let weight = actual?.weight?.value, let unit = actual?.weight?.unit {
+                Text("\(formatWeight(weight)) \(unit.rawValue)")
                     .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }
-            if let r = actual?.reps {
-                Text("\u{00D7} \(r)")
+            if let reps = actual?.reps {
+                Text("\u{00D7} \(reps)")
                     .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }
-            if let t = actual?.time {
-                Text(formatTime(t))
+            if let time = actual?.time {
+                Text(formatTime(time))
                     .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }
@@ -901,12 +901,12 @@ struct SetRowView: View {
     private var targetHint: String? {
         let target = set.entries.first?.target
         var parts: [String] = []
-        if let w = target?.weight?.value {
+        if let weight = target?.weight?.value {
             let unit = target?.weight?.unit.rawValue ?? ""
-            parts.append("\(formatWeight(w)) \(unit)")
+            parts.append("\(formatWeight(weight)) \(unit)")
         }
-        if let r = target?.reps {
-            parts.append("× \(r)")
+        if let reps = target?.reps {
+            parts.append("× \(reps)")
         }
         guard !parts.isEmpty else { return nil }
         return "Target: \(parts.joined(separator: " "))"
@@ -960,14 +960,14 @@ struct SetRowView: View {
         dropEntries[index].weight = formatWeight(newWeight)
     }
 
-    private func formatWeight(_ w: Double) -> String {
-        w.formattedWeight
+    private func formatWeight(_ weight: Double) -> String {
+        weight.formattedWeight
     }
 
     private func formatTime(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return m > 0 ? String(format: "%d:%02d", m, s) : "\(s)s"
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return minutes > 0 ? String(format: "%d:%02d", minutes, secs) : "\(secs)s"
     }
 }
 

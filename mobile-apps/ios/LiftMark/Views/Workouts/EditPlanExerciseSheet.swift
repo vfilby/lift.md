@@ -14,8 +14,8 @@ struct EditablePlanSetRow: Identifiable {
         return EditablePlanSetRow(
             id: set.id,
             weightText: {
-                if let w = target?.weight?.value {
-                    return w.formattedWeight
+                if let weight = target?.weight?.value {
+                    return weight.formattedWeight
                 }
                 return ""
             }(),
@@ -344,11 +344,11 @@ struct EditPlanExerciseSheet: View {
         finalParent.groupName = exercise.groupName
 
         let finalChildren = parsedChildren.map { child -> PlannedExercise in
-            var c = child
-            c.parentExerciseId = finalParent.id
-            c.groupType = .superset
-            c.groupName = finalParent.groupName
-            return c
+            var linkedChild = child
+            linkedChild.parentExerciseId = finalParent.id
+            linkedChild.groupType = .superset
+            linkedChild.groupName = finalParent.groupName
+            return linkedChild
         }
 
         markdownError = nil
@@ -376,18 +376,17 @@ struct EditPlanExerciseSheet: View {
             for set in child.sets {
                 let target = set.entries.first?.target
                 var parts: [String] = []
-                if let w = target?.weight?.value {
-                    let wStr = w.formattedWeight
-                    parts.append(wStr)
+                if let weight = target?.weight?.value {
+                    parts.append(weight.formattedWeight)
                     if let unit = target?.weight?.unit {
                         parts.append(unit.rawValue)
                     }
                 }
-                if let r = target?.reps {
-                    parts.append("x \(r)")
+                if let reps = target?.reps {
+                    parts.append("x \(reps)")
                 }
-                if let t = target?.time {
-                    parts.append("\(t)s")
+                if let time = target?.time {
+                    parts.append("\(time)s")
                 }
                 lines.append("- \(parts.joined(separator: " "))")
             }
@@ -439,18 +438,17 @@ struct EditPlanExerciseSheet: View {
         for set in exercise.sets {
             let target = set.entries.first?.target
             var parts: [String] = []
-            if let w = target?.weight?.value {
-                let wStr = w.formattedWeight
-                parts.append(wStr)
+            if let weight = target?.weight?.value {
+                parts.append(weight.formattedWeight)
                 if let unit = target?.weight?.unit {
                     parts.append(unit.rawValue)
                 }
             }
-            if let r = target?.reps {
-                parts.append("x \(r)")
+            if let reps = target?.reps {
+                parts.append("x \(reps)")
             }
-            if let t = target?.time {
-                parts.append("\(t)s")
+            if let time = target?.time {
+                parts.append("\(time)s")
             }
             lines.append("- \(parts.joined(separator: " "))")
         }

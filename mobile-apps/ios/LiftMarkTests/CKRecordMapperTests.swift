@@ -11,9 +11,9 @@ final class CKRecordMapperTests: XCTestCase {
     private let zoneID = CKRecordZone.ID(zoneName: "TestZone", ownerName: CKCurrentUserDefaultName)
 
     private let isoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
 
     override func setUp() {
@@ -189,7 +189,7 @@ final class CKRecordMapperTests: XCTestCase {
         ]
         try db.write { db in
             try original.insert(db)
-            for m in measurements { try m.insert(db) }
+            for measurement in measurements { try measurement.insert(db) }
         }
 
         let record = mapper.toCKRecord(original, measurements: measurements, zoneID: zoneID)
@@ -325,7 +325,7 @@ final class CKRecordMapperTests: XCTestCase {
         let measurements = makeSessionSetMeasurements(ts: ts)
         try db.write { db in
             try original.insert(db)
-            for m in measurements { try m.insert(db) }
+            for measurement in measurements { try measurement.insert(db) }
         }
 
         let record = mapper.toCKRecord(original, measurements: measurements, zoneID: zoneID)

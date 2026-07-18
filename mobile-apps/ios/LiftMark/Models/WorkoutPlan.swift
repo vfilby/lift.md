@@ -210,9 +210,9 @@ struct PlannedSet: Identifiable, Codable, Hashable {
     var targetWeightUnit: WeightUnit? {
         get { entries.first?.target?.weight?.unit }
         set {
-            guard var w = entries.first?.target?.weight else { return }
-            w.unit = newValue ?? .lbs
-            entries[0].target?.weight = w
+            guard var weight = entries.first?.target?.weight else { return }
+            weight.unit = newValue ?? .lbs
+            entries[0].target?.weight = weight
         }
     }
 
@@ -242,9 +242,9 @@ struct PlannedSet: Identifiable, Codable, Hashable {
     var targetDistanceUnit: DistanceUnit? {
         get { entries.first?.target?.distance?.unit }
         set {
-            guard var d = entries.first?.target?.distance else { return }
-            d.unit = newValue ?? .meters
-            entries[0].target?.distance = d
+            guard var distance = entries.first?.target?.distance else { return }
+            distance.unit = newValue ?? .meters
+            entries[0].target?.distance = distance
         }
     }
 

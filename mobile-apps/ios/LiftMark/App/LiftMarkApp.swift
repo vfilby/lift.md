@@ -137,8 +137,8 @@ struct LiftMarkApp: App {
         let args = ProcessInfo.processInfo.arguments
         if let idx = args.firstIndex(of: "--seed-outbox-pending"),
            idx + 1 < args.count,
-           let n = Int(args[idx + 1]) {
-            pusher.seedPendingForTesting(count: n)
+           let pendingCount = Int(args[idx + 1]) {
+            pusher.seedPendingForTesting(count: pendingCount)
         }
         if args.contains("--seed-session-expired") {
             auth.seedSessionExpiredForTesting()

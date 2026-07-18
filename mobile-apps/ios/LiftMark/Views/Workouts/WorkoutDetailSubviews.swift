@@ -64,14 +64,14 @@ func planSetDetailString(_ set: PlannedSet) -> String {
     return detail
 }
 
-func planFormatWeight(_ w: Double) -> String {
-    w.formattedWeight
+func planFormatWeight(_ weight: Double) -> String {
+    weight.formattedWeight
 }
 
 func planFormatTime(_ seconds: Int) -> String {
-    let m = seconds / 60
-    let s = seconds % 60
-    return m > 0 ? String(format: "%d:%02d", m, s) : "\(s)s"
+    let minutes = seconds / 60
+    let secs = seconds % 60
+    return minutes > 0 ? String(format: "%d:%02d", minutes, secs) : "\(secs)s"
 }
 
 // MARK: - Stat Card

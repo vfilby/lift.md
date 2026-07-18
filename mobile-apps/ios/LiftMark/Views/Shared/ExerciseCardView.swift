@@ -162,13 +162,13 @@ private struct SetDisplayRow: View {
         }
     }
 
-    private func formatWeight(_ w: Double) -> String {
-        w.formattedWeight
+    private func formatWeight(_ weight: Double) -> String {
+        weight.formattedWeight
     }
 
     private func formatTime(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return m > 0 ? "\(m):\(String(format: "%02d", s))" : "\(s)s"
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return minutes > 0 ? "\(minutes):\(String(format: "%02d", secs))" : "\(secs)s"
     }
 }

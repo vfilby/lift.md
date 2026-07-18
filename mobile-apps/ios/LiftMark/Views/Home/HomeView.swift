@@ -457,8 +457,8 @@ private struct MaxLiftTile: View {
         .accessibilityHint("Long press to change exercise")
     }
 
-    private func formatWeight(_ w: Double) -> String {
-        w.formattedWeight
+    private func formatWeight(_ weight: Double) -> String {
+        weight.formattedWeight
     }
 }
 

@@ -414,10 +414,10 @@ final class CKSyncEngineManager: @unchecked Sendable {
         var downloaded = 0
 
         // Sort modifications by dependency order (parents before children)
-        let sortedModifications = event.modifications.sorted { a, b in
-            let aIndex = Self.mergeOrder.firstIndex(of: a.record.recordType) ?? Int.max
-            let bIndex = Self.mergeOrder.firstIndex(of: b.record.recordType) ?? Int.max
-            return aIndex < bIndex
+        let sortedModifications = event.modifications.sorted { lhs, rhs in
+            let lhsIndex = Self.mergeOrder.firstIndex(of: lhs.record.recordType) ?? Int.max
+            let rhsIndex = Self.mergeOrder.firstIndex(of: rhs.record.recordType) ?? Int.max
+            return lhsIndex < rhsIndex
         }
 
         // Multi-pass merge: retry until all records are merged or no progress is made.

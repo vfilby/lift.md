@@ -173,11 +173,11 @@ struct WorkoutHistoryService {
             ExerciseDictionary.getDefinition(name)?.category != "compound"
         }
 
-        let sortByFreq: (String, String) -> Bool = { a, b in
-            let fa = frequency[a] ?? 0
-            let fb = frequency[b] ?? 0
-            if fa != fb { return fa > fb }
-            return a < b
+        let sortByFreq: (String, String) -> Bool = { lhs, rhs in
+            let lhsFreq = frequency[lhs] ?? 0
+            let rhsFreq = frequency[rhs] ?? 0
+            if lhsFreq != rhsFreq { return lhsFreq > rhsFreq }
+            return lhs < rhs
         }
 
         var selected = Array(compounds.sorted(by: sortByFreq).prefix(topN))

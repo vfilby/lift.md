@@ -353,9 +353,9 @@ struct SQLiteLogHandler: LogHandler {
     ) {
         // Merge handler-level metadata with call-site metadata.
         var merged: [String: String] = [:]
-        for (k, v) in self.metadata { merged[k] = v.stringValue }
+        for (key, value) in self.metadata { merged[key] = value.stringValue }
         if let metadata {
-            for (k, v) in metadata { merged[k] = v.stringValue }
+            for (key, value) in metadata { merged[key] = value.stringValue }
         }
         merged["source"] = source
         merged["file"] = (file as NSString).lastPathComponent
@@ -395,10 +395,10 @@ struct SQLiteLogHandler: LogHandler {
 private extension Logging.Logger.MetadataValue {
     var stringValue: String {
         switch self {
-        case .string(let s):          return s
-        case .stringConvertible(let c): return c.description
-        case .dictionary(let d):      return String(describing: d)
-        case .array(let a):           return String(describing: a)
+        case .string(let string): return string
+        case .stringConvertible(let convertible): return convertible.description
+        case .dictionary(let dictionary): return String(describing: dictionary)
+        case .array(let array): return String(describing: array)
         }
     }
 }
@@ -463,7 +463,7 @@ final class Logger: @unchecked Sendable {
     private func metadata(from dict: [String: String]?) -> Logging.Logger.Metadata? {
         guard let dict, !dict.isEmpty else { return nil }
         var out: Logging.Logger.Metadata = [:]
-        for (k, v) in dict { out[k] = .string(v) }
+        for (key, value) in dict { out[key] = .string(value) }
         return out
     }
 

@@ -57,7 +57,7 @@ enum SessionLMWFEncoder {
             if let gt = exercise.groupType, exercise.sets.isEmpty, gt == .section || gt == .superset {
                 let children = exercises.filter { $0.parentExerciseId == exercise.id }
                 processed.insert(exercise.id)
-                for c in children { processed.insert(c.id) }
+                for child in children { processed.insert(child.id) }
                 if gt == .section {
                     result.append(.section(parent: exercise, children: children))
                 } else {

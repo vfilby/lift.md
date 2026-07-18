@@ -183,8 +183,8 @@ final class SessionRepositoryTests: XCTestCase {
         let plan = makePlan()
         try planRepo.create(plan)
         for _ in 0..<5 {
-            let (s, _) = try repo.createFromPlan(plan)
-            try repo.complete(s.id)
+            let (session, _) = try repo.createFromPlan(plan)
+            try repo.complete(session.id)
         }
 
         let recent = try repo.getRecentSessions(3)

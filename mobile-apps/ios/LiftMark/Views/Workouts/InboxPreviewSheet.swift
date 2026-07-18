@@ -209,9 +209,9 @@ struct InboxPreviewSheet: View {
             return formatDuration(time)
         }
         var parts: [String] = []
-        if let w = set.targetWeight {
+        if let weight = set.targetWeight {
             let unit = set.targetWeightUnit ?? defaultUnit
-            let weightStr = w == w.rounded() ? String(Int(w)) : String(w)
+            let weightStr = weight == weight.rounded() ? String(Int(weight)) : String(weight)
             let unitStr = unit.map { " \($0.rawValue)" } ?? ""
             parts.append(weightStr + unitStr)
         }
@@ -232,9 +232,9 @@ struct InboxPreviewSheet: View {
 
     private func formatDuration(_ seconds: Int) -> String {
         if seconds >= 60 {
-            let m = seconds / 60
-            let s = seconds % 60
-            return s == 0 ? "\(m)m" : "\(m)m \(s)s"
+            let minutes = seconds / 60
+            let secs = seconds % 60
+            return secs == 0 ? "\(minutes)m" : "\(minutes)m \(secs)s"
         }
         return "\(seconds)s"
     }
