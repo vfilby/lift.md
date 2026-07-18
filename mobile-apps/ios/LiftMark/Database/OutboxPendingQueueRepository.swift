@@ -144,9 +144,9 @@ struct OutboxPendingQueueRepository {
     // than holding a static. Cost is negligible at our call volume; matches
     // the InboxItemRepository convention.
     private static func formatter() -> ISO8601DateFormatter {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+        let result = ISO8601DateFormatter()
+        result.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return result
     }
 
     private static func assemble(_ row: Row) -> OutboxPendingItem? {
@@ -172,7 +172,7 @@ struct OutboxPendingQueueRepository {
     private static func parseDate(_ str: String) -> Date? {
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = fractional.date(from: str) { return d }
+        if let date = fractional.date(from: str) { return date }
         let plain = ISO8601DateFormatter()
         plain.formatOptions = [.withInternetDateTime]
         return plain.date(from: str)

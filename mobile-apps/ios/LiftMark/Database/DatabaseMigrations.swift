@@ -11,6 +11,12 @@ import GRDB
 /// `v20_drop_legacy_schema_version` drops the now-unused `schema_version` table.
 ///
 /// See spec/services/migrator.md.
+///
+/// Length rules are disabled for this file: it is an append-only registry —
+/// every schema change adds a migration that can never be moved out or
+/// rewritten, so it grows without bound by design.
+// swiftlint:disable file_length
+// swiftlint:disable:next type_body_length
 enum DatabaseMigrations {
 
     /// Canonical migration identifiers, in order. This is a wire-level contract:
@@ -40,9 +46,9 @@ enum DatabaseMigrations {
     ]
 
     static var migrator: DatabaseMigrator {
-        var m = DatabaseMigrator()
+        var migrator = DatabaseMigrator()
 
-        m.registerMigration("v1_bootstrap") { db in
+        migrator.registerMigration("v1_bootstrap") { db in
             // v1_bootstrap — full schema as of the original v1 schema.
 
             // Template tables
@@ -311,17 +317,17 @@ enum DatabaseMigrations {
             }
         }
 
-        m.registerMigration("v2_sync_metadata_stats") { db in
+        migrator.registerMigration("v2_sync_metadata_stats") { db in
             try db.execute(sql: "ALTER TABLE sync_metadata ADD COLUMN last_uploaded INTEGER DEFAULT 0")
             try db.execute(sql: "ALTER TABLE sync_metadata ADD COLUMN last_downloaded INTEGER DEFAULT 0")
             try db.execute(sql: "ALTER TABLE sync_metadata ADD COLUMN last_conflicts INTEGER DEFAULT 0")
         }
 
-        m.registerMigration("v3_developer_mode") { db in
+        migrator.registerMigration("v3_developer_mode") { db in
             try db.execute(sql: "ALTER TABLE user_settings ADD COLUMN developer_mode_enabled INTEGER DEFAULT 0")
         }
 
-        m.registerMigration("v4_soft_delete_gyms") { db in
+        migrator.registerMigration("v4_soft_delete_gyms") { db in
             try db.execute(sql: "ALTER TABLE gyms ADD COLUMN deleted_at TEXT")
             try db.execute(sql: "ALTER TABLE gym_equipment ADD COLUMN deleted_at TEXT")
 
@@ -341,19 +347,19 @@ enum DatabaseMigrations {
             }
         }
 
-        m.registerMigration("v5_countdown_sounds") { db in
+        migrator.registerMigration("v5_countdown_sounds") { db in
             try db.execute(sql: "ALTER TABLE user_settings ADD COLUMN countdown_sounds_enabled INTEGER DEFAULT 1")
         }
 
-        m.registerMigration("v6_session_set_side") { db in
+        migrator.registerMigration("v6_session_set_side") { db in
             try db.execute(sql: "ALTER TABLE session_sets ADD COLUMN side TEXT")
         }
 
-        m.registerMigration("v7_accepted_disclaimer") { db in
+        migrator.registerMigration("v7_accepted_disclaimer") { db in
             try db.execute(sql: "ALTER TABLE user_settings ADD COLUMN has_accepted_disclaimer INTEGER DEFAULT 0")
         }
 
-        m.registerMigration("v8_updated_at_cksync") { db in
+        migrator.registerMigration("v8_updated_at_cksync") { db in
             try db.execute(sql: "ALTER TABLE workout_sessions ADD COLUMN updated_at TEXT")
             try db.execute(sql: "ALTER TABLE session_exercises ADD COLUMN updated_at TEXT")
             try db.execute(sql: "ALTER TABLE session_sets ADD COLUMN updated_at TEXT")
@@ -402,7 +408,7 @@ enum DatabaseMigrations {
             """)
         }
 
-        m.registerMigration("v9_api_key_fk_indexes") { db in
+        migrator.registerMigration("v9_api_key_fk_indexes") { db in
             try db.execute(sql: "UPDATE user_settings SET anthropic_api_key = NULL")
             try db.execute(sql: "ALTER TABLE user_settings DROP COLUMN anthropic_api_key")
 
@@ -473,7 +479,7 @@ enum DatabaseMigrations {
             try db.execute(sql: "DROP TABLE IF EXISTS sync_conflicts")
         }
 
-        m.registerMigration("v10_distance_columns") { db in
+        migrator.registerMigration("v10_distance_columns") { db in
             try db.execute(sql: "ALTER TABLE template_sets ADD COLUMN target_distance REAL")
             try db.execute(sql: "ALTER TABLE template_sets ADD COLUMN target_distance_unit TEXT")
 
@@ -483,7 +489,7 @@ enum DatabaseMigrations {
             try db.execute(sql: "ALTER TABLE session_sets ADD COLUMN actual_distance_unit TEXT")
         }
 
-        m.registerMigration("v11_gym_unique_fk_indexes") { db in
+        migrator.registerMigration("v11_gym_unique_fk_indexes") { db in
             try db.execute(sql: """
                 CREATE INDEX IF NOT EXISTS idx_session_exercises_parent
                 ON session_exercises(parent_exercise_id)
@@ -526,7 +532,7 @@ enum DatabaseMigrations {
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_gym_equipment_gym ON gym_equipment(gym_id)")
         }
 
-        m.registerMigration("v12_set_measurements") { db in
+        migrator.registerMigration("v12_set_measurements") { db in
             // set_measurements table + indexes
             try db.execute(sql: """
                 CREATE TABLE set_measurements (
@@ -640,21 +646,21 @@ enum DatabaseMigrations {
                 """)
         }
 
-        m.registerMigration("v13_default_timer_countdown") { db in
+        migrator.registerMigration("v13_default_timer_countdown") { db in
             try db.execute(sql: """
                 ALTER TABLE user_settings
                 ADD COLUMN default_timer_countdown INTEGER DEFAULT 0
                 """)
         }
 
-        m.registerMigration("v14_default_weight_step_lbs") { db in
+        migrator.registerMigration("v14_default_weight_step_lbs") { db in
             try db.execute(sql: """
                 ALTER TABLE user_settings
                 ADD COLUMN default_weight_step_lbs REAL DEFAULT 2.5
                 """)
         }
 
-        m.registerMigration("v15_ai_prompt_toggles") { db in
+        migrator.registerMigration("v15_ai_prompt_toggles") { db in
             try db.execute(sql: """
                 ALTER TABLE user_settings
                 ADD COLUMN ai_prompt_include_format_pointer INTEGER DEFAULT 1
@@ -673,7 +679,7 @@ enum DatabaseMigrations {
                 """)
         }
 
-        m.registerMigration("v16_workout_inbox") { db in
+        migrator.registerMigration("v16_workout_inbox") { db in
             try db.execute(sql: """
                 CREATE TABLE workout_inbox (
                     inbox_id              TEXT PRIMARY KEY NOT NULL,
@@ -689,7 +695,7 @@ enum DatabaseMigrations {
                 """)
         }
 
-        m.registerMigration("v17_outbox_pending_queue") { db in
+        migrator.registerMigration("v17_outbox_pending_queue") { db in
             try db.execute(sql: """
                 CREATE TABLE outbox_pending_queue (
                     client_session_id   TEXT PRIMARY KEY NOT NULL,
@@ -707,7 +713,7 @@ enum DatabaseMigrations {
         // recreating with lmwf_text + metadata only is clean and equivalent.
         // lmwf_text is now the single source of truth; the list summary is
         // derived in memory by parsing it on load.
-        m.registerMigration("v18_workout_inbox_drop_preparse") { db in
+        migrator.registerMigration("v18_workout_inbox_drop_preparse") { db in
             try db.execute(sql: "DROP TABLE IF EXISTS workout_inbox")
             try db.execute(sql: """
                 CREATE TABLE workout_inbox (
@@ -727,7 +733,7 @@ enum DatabaseMigrations {
         // otherwise updates carry a nil change tag and CloudKit rejects them with
         // `serverRecordChanged`, producing a permanent conflict loop.
         // See spec/services/cloudkit-sync.md.
-        m.registerMigration("v19_ck_record_metadata") { db in
+        migrator.registerMigration("v19_ck_record_metadata") { db in
             try db.execute(sql: """
                 CREATE TABLE ck_record_metadata (
                     record_name   TEXT PRIMARY KEY NOT NULL,
@@ -743,13 +749,15 @@ enum DatabaseMigrations {
         // in `schema_version`; GRDB's `grdb_migrations` is now the sole bookkeeping.
         // `IF EXISTS` keeps this a no-op on fresh installs (which never create it).
         // See spec/services/migrator.md §6.
-        m.registerMigration("v20_drop_legacy_schema_version") { db in
+        migrator.registerMigration("v20_drop_legacy_schema_version") { db in
             try db.execute(sql: "DROP TABLE IF EXISTS schema_version")
         }
 
-        return m
+        return migrator
     }
 
+    // Frozen v12 migration helper — mirrors the set_measurements column list.
+    // swiftlint:disable:next function_parameter_count
     private static func insertMeasurementV12(
         _ db: Database,
         setId: String,
@@ -803,6 +811,8 @@ enum DatabaseMigrations {
         }
     }
 
+    // Frozen v12 migration helper.
+    // swiftlint:disable:next function_parameter_count
     private static func insertMeasurementsV12(
         _ db: Database,
         row: Row,

@@ -126,16 +126,16 @@ struct InboxItemRepository {
     // ISO8601DateFormatter isn't Sendable, so we build per-call instances
     // rather than holding a static. Cost is negligible at our call volume.
     private static func makeFormatter(fractional: Bool) -> ISO8601DateFormatter {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = fractional
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = fractional
             ? [.withInternetDateTime, .withFractionalSeconds]
             : [.withInternetDateTime]
-        return f
+        return formatter
     }
 
-    static func parseDate(_ s: String) -> Date {
-        makeFormatter(fractional: true).date(from: s)
-            ?? makeFormatter(fractional: false).date(from: s)
+    static func parseDate(_ string: String) -> Date {
+        makeFormatter(fractional: true).date(from: string)
+            ?? makeFormatter(fractional: false).date(from: string)
             ?? Date()
     }
 
