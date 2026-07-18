@@ -78,24 +78,31 @@ struct SchemaSnapshot: Equatable {
             if seedTable == liveTable { continue }
 
             if seedTable.columns != liveTable.columns {
-                let aCols = Set(seedTable.columns.map(\.name))
-                let bCols = Set(liveTable.columns.map(\.name))
-                let addedInSeed = aCols.subtracting(bCols).sorted()
-                let addedInLive = bCols.subtracting(aCols).sorted()
-                if !addedInSeed.isEmpty { out.append("  [\(name)] columns only in seed: \(addedInSeed)") }
-                if !addedInLive.isEmpty { out.append("  [\(name)] columns only in live: \(addedInLive)") }
-                for colName in aCols.intersection(bCols).sorted() {
-                    let ac = seedTable.columns.first { $0.name == colName }!
-                    let bc = liveTable.columns.first { $0.name == colName }!
-                    if ac != bc {
-                        out.append("  [\(name).\(colName)] seed=\(ac) live=\(bc)")
-                    }
-                }
+                out.append(contentsOf: columnDiffLines(tableName: name, seed: seedTable, live: liveTable))
             }
             if seedTable.indexes != liveTable.indexes {
                 out.append("  [\(name)] indexes seed=\(seedTable.indexes) live=\(liveTable.indexes)")
             }
         }
         return out.joined(separator: "\n")
+    }
+
+    /// Diff lines for one table whose columns differ between seed and live.
+    private func columnDiffLines(tableName name: String, seed seedTable: Table, live liveTable: Table) -> [String] {
+        var out: [String] = []
+        let aCols = Set(seedTable.columns.map(\.name))
+        let bCols = Set(liveTable.columns.map(\.name))
+        let addedInSeed = aCols.subtracting(bCols).sorted()
+        let addedInLive = bCols.subtracting(aCols).sorted()
+        if !addedInSeed.isEmpty { out.append("  [\(name)] columns only in seed: \(addedInSeed)") }
+        if !addedInLive.isEmpty { out.append("  [\(name)] columns only in live: \(addedInLive)") }
+        for colName in aCols.intersection(bCols).sorted() {
+            let ac = seedTable.columns.first { $0.name == colName }!
+            let bc = liveTable.columns.first { $0.name == colName }!
+            if ac != bc {
+                out.append("  [\(name).\(colName)] seed=\(ac) live=\(bc)")
+            }
+        }
+        return out
     }
 }
