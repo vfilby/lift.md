@@ -123,9 +123,11 @@ final class SessionStore {
 
     // MARK: - Active Session Mutations
 
+    /// `actualRpe` defaults to nil (RPE is an optional measurement most sets
+    /// don't record); all other actuals must be passed explicitly.
     func completeSet(
         setId: String, actualWeight: Double?, actualWeightUnit: WeightUnit?,
-        actualReps: Int?, actualTime: Int?, actualRpe: Int?
+        actualReps: Int?, actualTime: Int?, actualRpe: Int? = nil
     ) {
         do {
             let changes = try repository.updateSessionSet(
@@ -217,9 +219,11 @@ final class SessionStore {
         }
     }
 
+    /// `restSeconds` defaults to nil (no rest timer); all other targets must
+    /// be passed explicitly.
     func addSetToExercise(
         exerciseId: String, targetWeight: Double?, targetWeightUnit: WeightUnit?,
-        targetReps: Int?, targetTime: Int?, restSeconds: Int?
+        targetReps: Int?, targetTime: Int?, restSeconds: Int? = nil
     ) {
         guard let session = activeSession,
               let exercise = session.exercises.first(where: { $0.id == exerciseId }) else { return }

@@ -84,91 +84,101 @@ struct SettingsView: View {
     private func iPadDetailContent(for section: SettingsSection, settings: UserSettings) -> some View {
         switch section {
         case .general:
-            List {
-                // Account is gated on the workout-inbox flag for now —
-                // sign-in is currently only useful for the inbox. When
-                // another auth-requiring feature ships (billing, etc.),
-                // shift this gate to an `anyAuthFeatureEnabled` predicate.
-                if featureFlags.isEnabled(.workoutInbox) {
-                    Section("Account") {
-                        SettingsAccountSection(showingLogin: $showingLogin)
-                    }
-                }
-                Section("Appearance") {
-                    AppearancePicker(selection: appearanceBinding(settings: settings))
-                        .accessibilityIdentifier("picker-theme")
-                }
-                Section("iCloud Sync") {
-                    syncNavigationLink
-                }
-                Section("Health & Activities") {
-                    SettingsHealthKitSection(healthKitAuthStatus: $healthKitAuthStatus)
-                    SettingsLiveActivitiesSection(liveActivitiesEnabled: $liveActivitiesEnabled)
-                }
-            }
-        case .appearance:
-            List {
-                Section(section.rawValue) {
-                    AppearancePicker(selection: appearanceBinding(settings: settings))
-                        .accessibilityIdentifier("picker-theme")
-                }
-            }
+            generalDetailList(settings: settings)
         case .workout:
             WorkoutSettingsView()
-        case .gyms:
-            List {
-                Section(section.rawValue) {
-                    SettingsGymSection()
-                }
-            }
         case .integrations:
-            List {
-                Section("iCloud Sync") {
-                    syncNavigationLink
-                }
-                Section("Health & Activities") {
-                    SettingsHealthKitSection(healthKitAuthStatus: $healthKitAuthStatus)
-                    SettingsLiveActivitiesSection(liveActivitiesEnabled: $liveActivitiesEnabled)
-                }
-            }
-        case .ai:
-            List {
-                Section(section.rawValue) {
-                    SettingsAISection()
-                }
-            }
-        case .data:
-            List {
-                Section(section.rawValue) {
-                    SettingsDataSection()
-                }
-            }
-        case .privacy:
-            List {
-                Section(section.rawValue) {
-                    SettingsPrivacySection()
-                }
-            }
+            integrationsDetailList
         case .developer:
-            List {
-                Section(section.rawValue) {
-                    SettingsDeveloperSection()
-                }
-                Section("Feature Flags") {
-                    SettingsFeatureFlagsSection()
+            developerDetailList
+        case .about:
+            aboutDetailList
+        case .appearance, .gyms, .ai, .data, .privacy:
+            singleSectionDetailList(for: section, settings: settings)
+        }
+    }
+
+    private func generalDetailList(settings: UserSettings) -> some View {
+        List {
+            // Account is gated on the workout-inbox flag for now —
+            // sign-in is currently only useful for the inbox. When
+            // another auth-requiring feature ships (billing, etc.),
+            // shift this gate to an `anyAuthFeatureEnabled` predicate.
+            if featureFlags.isEnabled(.workoutInbox) {
+                Section("Account") {
+                    SettingsAccountSection(showingLogin: $showingLogin)
                 }
             }
-        case .about:
-            List {
-                Section(section.rawValue) {
-                    SettingsAboutSection()
-                }
-                Section {
-                    Text("lift.md")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .font(.lmFootnote)
-                        .foregroundStyle(.secondary)
-                        .listRowBackground(Color.clear)
+            Section("Appearance") {
+                AppearancePicker(selection: appearanceBinding(settings: settings))
+                    .accessibilityIdentifier("picker-theme")
+            }
+            Section("iCloud Sync") {
+                syncNavigationLink
+            }
+            Section("Health & Activities") {
+                SettingsHealthKitSection(healthKitAuthStatus: $healthKitAuthStatus)
+                SettingsLiveActivitiesSection(liveActivitiesEnabled: $liveActivitiesEnabled)
+            }
+        }
+    }
+
+    private var integrationsDetailList: some View {
+        List {
+            Section("iCloud Sync") {
+                syncNavigationLink
+            }
+            Section("Health & Activities") {
+                SettingsHealthKitSection(healthKitAuthStatus: $healthKitAuthStatus)
+                SettingsLiveActivitiesSection(liveActivitiesEnabled: $liveActivitiesEnabled)
+            }
+        }
+    }
+
+    private var developerDetailList: some View {
+        List {
+            Section(SettingsSection.developer.rawValue) {
+                SettingsDeveloperSection()
+            }
+            Section("Feature Flags") {
+                SettingsFeatureFlagsSection()
+            }
+        }
+    }
+
+    private var aboutDetailList: some View {
+        List {
+            Section(SettingsSection.about.rawValue) {
+                SettingsAboutSection()
+            }
+            footerSection
+        }
+    }
+
+    /// Detail list for the sections that are a single titled section wrapping
+    /// one subview. Only routed the simple cases from `iPadDetailContent`;
+    /// the compound sections (general, integrations, developer, about) and
+    /// full-screen workout settings have dedicated builders above.
+    @ViewBuilder
+    private func singleSectionDetailList(for section: SettingsSection, settings: UserSettings) -> some View {
+        List {
+            Section(section.rawValue) {
+                switch section {
+                case .appearance:
+                    AppearancePicker(selection: appearanceBinding(settings: settings))
+                        .accessibilityIdentifier("picker-theme")
+                case .gyms:
+                    SettingsGymSection()
+                case .ai:
+                    SettingsAISection()
+                case .data:
+                    SettingsDataSection()
+                case .privacy:
+                    SettingsPrivacySection()
+                default:
+                    // Unreachable: compound cases are routed to dedicated
+                    // builders in `iPadDetailContent`.
+                    EmptyView()
                 }
             }
         }
@@ -234,17 +244,21 @@ struct SettingsView: View {
                 SettingsAboutSection()
             }
 
-            Section {
-                Text("lift.md")
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .font(.lmFootnote)
-                    .foregroundStyle(.secondary)
-                    .listRowBackground(Color.clear)
-            }
+            footerSection
         }
     }
 
     // MARK: - Shared Helpers
+
+    private var footerSection: some View {
+        Section {
+            Text("lift.md")
+                .frame(maxWidth: .infinity, alignment: .center)
+                .font(.lmFootnote)
+                .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
+        }
+    }
 
     private var syncNavigationLink: some View {
         NavigationLink(value: AppDestination.syncSettings) {

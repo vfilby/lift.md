@@ -64,72 +64,86 @@ enum ActiveWorkoutViewModel {
 
             // Check if this is a superset parent (groupType == .superset with no sets)
             if exercise.groupType == .superset && exercise.sets.isEmpty {
-                // Gather children
-                var children: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)] = []
-                for (childIndex, child) in exercises.enumerated() where child.parentExerciseId == exercise.id {
-                    children.append((exercise: child, exerciseIndex: childIndex, displayNumber: displayNumber))
-                    displayNumber += 1
-                    processedIds.insert(child.id)
-                }
+                let children = gatherChildren(
+                    of: exercise.id, in: exercises,
+                    displayNumber: &displayNumber, processedIds: &processedIds)
                 processedIds.insert(exercise.id)
-                if SupersetGrouping.isRealSuperset(childCount: children.count) {
-                    items.append(.superset(parent: exercise, children: children))
-                } else {
-                    // Single-member superset is not a real superset — render the
-                    // lone child as a standalone exercise, matching the plan view.
-                    for child in children {
-                        items.append(.single(
-                            exercise: child.exercise, exerciseIndex: child.exerciseIndex,
-                            displayNumber: child.displayNumber))
-                    }
-                }
+                items.append(contentsOf: supersetItems(parent: exercise, children: children))
             } else if exercise.parentExerciseId != nil {
                 // Skip orphan children (already handled by superset parent)
                 continue
             } else if exercise.groupType == .section && exercise.sets.isEmpty {
-                // Section header — emit section divider then gather children. A
-                // child that is itself a superset parent must recurse so the
-                // grandchildren render inside SupersetCard; otherwise the
-                // superset parent (which has no sets) shows as an empty single
-                // card and the grandchildren are dropped as orphans.
-                processedIds.insert(exercise.id)
-                let sectionName = exercise.groupName ?? exercise.exerciseName
-                if !sectionName.isEmpty {
-                    items.append(.section(name: sectionName))
-                }
-                for (childIndex, child) in exercises.enumerated() {
-                    guard child.parentExerciseId == exercise.id else { continue }
-                    if child.groupType == .superset && child.sets.isEmpty {
-                        var grandchildren: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)] = []
-                        for (gIndex, grandchild) in exercises.enumerated()
-                        where grandchild.parentExerciseId == child.id {
-                            grandchildren.append(
-                                (exercise: grandchild, exerciseIndex: gIndex, displayNumber: displayNumber))
-                            displayNumber += 1
-                            processedIds.insert(grandchild.id)
-                        }
-                        processedIds.insert(child.id)
-                        if SupersetGrouping.isRealSuperset(childCount: grandchildren.count) {
-                            items.append(.superset(parent: child, children: grandchildren))
-                        } else {
-                            // Single-member superset inside a section — render the
-                            // lone grandchild standalone, matching the plan view.
-                            for grandchild in grandchildren {
-                                items.append(.single(
-                                    exercise: grandchild.exercise, exerciseIndex: grandchild.exerciseIndex,
-                                    displayNumber: grandchild.displayNumber))
-                            }
-                        }
-                    } else {
-                        items.append(.single(exercise: child, exerciseIndex: childIndex, displayNumber: displayNumber))
-                        displayNumber += 1
-                        processedIds.insert(child.id)
-                    }
-                }
+                items.append(contentsOf: sectionItems(
+                    section: exercise, exercises: exercises,
+                    displayNumber: &displayNumber, processedIds: &processedIds))
             } else {
                 items.append(.single(exercise: exercise, exerciseIndex: index, displayNumber: displayNumber))
                 displayNumber += 1
                 processedIds.insert(exercise.id)
+            }
+        }
+        return items
+    }
+
+    /// Gathers the direct children of `parentId`, assigning display numbers in
+    /// order and marking each as processed.
+    private static func gatherChildren(
+        of parentId: String, in exercises: [SessionExercise],
+        displayNumber: inout Int, processedIds: inout Set<String>
+    ) -> [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)] {
+        var children: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)] = []
+        for (childIndex, child) in exercises.enumerated() where child.parentExerciseId == parentId {
+            children.append((exercise: child, exerciseIndex: childIndex, displayNumber: displayNumber))
+            displayNumber += 1
+            processedIds.insert(child.id)
+        }
+        return children
+    }
+
+    /// A real (multi-member) superset renders as one grouped card; a
+    /// single-member superset is not a real superset — render the lone child
+    /// as a standalone exercise, matching the plan view.
+    private static func supersetItems(
+        parent: SessionExercise,
+        children: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)]
+    ) -> [ExerciseDisplayItem] {
+        if SupersetGrouping.isRealSuperset(childCount: children.count) {
+            return [.superset(parent: parent, children: children)]
+        }
+        return children.map { child in
+            .single(
+                exercise: child.exercise, exerciseIndex: child.exerciseIndex,
+                displayNumber: child.displayNumber)
+        }
+    }
+
+    /// Section header — emit section divider then gather children. A child
+    /// that is itself a superset parent must recurse so the grandchildren
+    /// render inside SupersetCard; otherwise the superset parent (which has
+    /// no sets) shows as an empty single card and the grandchildren are
+    /// dropped as orphans.
+    private static func sectionItems(
+        section: SessionExercise, exercises: [SessionExercise],
+        displayNumber: inout Int, processedIds: inout Set<String>
+    ) -> [ExerciseDisplayItem] {
+        var items: [ExerciseDisplayItem] = []
+        processedIds.insert(section.id)
+        let sectionName = section.groupName ?? section.exerciseName
+        if !sectionName.isEmpty {
+            items.append(.section(name: sectionName))
+        }
+        for (childIndex, child) in exercises.enumerated() {
+            guard child.parentExerciseId == section.id else { continue }
+            if child.groupType == .superset && child.sets.isEmpty {
+                let grandchildren = gatherChildren(
+                    of: child.id, in: exercises,
+                    displayNumber: &displayNumber, processedIds: &processedIds)
+                processedIds.insert(child.id)
+                items.append(contentsOf: supersetItems(parent: child, children: grandchildren))
+            } else {
+                items.append(.single(exercise: child, exerciseIndex: childIndex, displayNumber: displayNumber))
+                displayNumber += 1
+                processedIds.insert(child.id)
             }
         }
         return items
@@ -227,24 +241,29 @@ enum ActiveWorkoutViewModel {
 
     // MARK: - Collapse Logic
 
-    static func isExerciseCollapsed(
-        _ exercise: SessionExercise,
-        expandedExercises: Set<String>,
-        collapsedExercises: Set<String>,
-        lastInteractedExerciseId: String?,
-        allExercises: [SessionExercise]?
-    ) -> Bool {
-        if expandedExercises.contains(exercise.id) { return false }
-        if collapsedExercises.contains(exercise.id) { return true }
+    /// The UI collapse state the collapse-decision helpers evaluate against:
+    /// the user's explicit expand/collapse overrides, the last exercise they
+    /// interacted with, and the full exercise list (for "current exercise"
+    /// detection).
+    struct CollapseContext {
+        var expandedExercises: Set<String>
+        var collapsedExercises: Set<String>
+        var lastInteractedExerciseId: String?
+        var allExercises: [SessionExercise]?
+    }
+
+    static func isExerciseCollapsed(_ exercise: SessionExercise, context: CollapseContext) -> Bool {
+        if context.expandedExercises.contains(exercise.id) { return false }
+        if context.collapsedExercises.contains(exercise.id) { return true }
 
         let allDone = exercise.sets.allSatisfy { $0.status == .completed || $0.status == .skipped }
         if allDone { return true }
 
         let isCurrentExercise: Bool = {
-            if let lastId = lastInteractedExerciseId, lastId == exercise.id {
+            if let lastId = context.lastInteractedExerciseId, lastId == exercise.id {
                 return exercise.sets.contains { $0.status == .pending }
             }
-            guard let exercises = allExercises else { return false }
+            guard let exercises = context.allExercises else { return false }
             return exercises.first(where: { $0.sets.contains { $0.status == .pending } })?.id == exercise.id
         }()
 
@@ -255,13 +274,10 @@ enum ActiveWorkoutViewModel {
     static func isSupersetCollapsed(
         _ parent: SessionExercise,
         children: [(exercise: SessionExercise, exerciseIndex: Int, displayNumber: Int)],
-        expandedExercises: Set<String>,
-        collapsedExercises: Set<String>,
-        lastInteractedExerciseId: String?,
-        allExercises: [SessionExercise]?
+        context: CollapseContext
     ) -> Bool {
-        if expandedExercises.contains(parent.id) { return false }
-        if collapsedExercises.contains(parent.id) { return true }
+        if context.expandedExercises.contains(parent.id) { return false }
+        if context.collapsedExercises.contains(parent.id) { return true }
 
         let allDone = children.allSatisfy { child in
             child.exercise.sets.allSatisfy { $0.status == .completed || $0.status == .skipped }
@@ -269,14 +285,14 @@ enum ActiveWorkoutViewModel {
         if allDone { return true }
 
         let isCurrentSuperset = children.contains { child in
-            if let lastId = lastInteractedExerciseId, lastId == child.exercise.id {
+            if let lastId = context.lastInteractedExerciseId, lastId == child.exercise.id {
                 return child.exercise.sets.contains { $0.status == .pending }
             }
             return false
         }
         if isCurrentSuperset { return false }
 
-        guard let exercises = allExercises else { return true }
+        guard let exercises = context.allExercises else { return true }
         let firstPendingId = exercises.first(where: { $0.sets.contains { $0.status == .pending } })?.id
         if children.contains(where: { $0.exercise.id == firstPendingId }) { return false }
 
