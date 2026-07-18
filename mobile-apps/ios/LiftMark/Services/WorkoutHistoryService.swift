@@ -147,6 +147,28 @@ struct WorkoutHistoryService {
     func formatProgression(sessions: [WorkoutSession], topN: Int = 5) -> String {
         guard !sessions.isEmpty else { return "" }
 
+        let (trajectoriesByName, frequency) = collectTrajectories(from: sessions)
+        guard !frequency.isEmpty else { return "" }
+
+        let selected = selectTopExercises(frequency: frequency, topN: topN)
+        guard !selected.isEmpty else { return "" }
+
+        var lines = ["Recent progression (top \(selected.count) by frequency):"]
+        for name in selected {
+            let trajectory = trajectoriesByName[name] ?? []
+            // Take up to 3 most-recent, reverse to oldest→newest.
+            let recent = trajectory.prefix(3).reversed().joined(separator: "→")
+            guard !recent.isEmpty else { continue }
+            lines.append("- \(abbreviateExerciseName(name)): \(recent)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Walk the sessions (most-recent first) and collect, per canonical exercise name,
+    /// the top completed-set summary of each appearance plus an appearance count.
+    private func collectTrajectories(
+        from sessions: [WorkoutSession]
+    ) -> (trajectories: [String: [String]], frequency: [String: Int]) {
         // Canonical name → ordered list of completed set summaries (most recent first).
         var trajectoriesByName: [String: [String]] = [:]
         var frequency: [String: Int] = [:]
@@ -164,8 +186,12 @@ struct WorkoutHistoryService {
             }
         }
 
-        guard !frequency.isEmpty else { return "" }
+        return (trajectoriesByName, frequency)
+    }
 
+    /// Pick up to `topN` exercise names, preferring compounds by frequency and
+    /// padding with the most-frequent remaining exercises when needed.
+    private func selectTopExercises(frequency: [String: Int], topN: Int) -> [String] {
         let compounds = frequency.keys.filter { name in
             ExerciseDictionary.getDefinition(name)?.category == "compound"
         }
@@ -185,17 +211,6 @@ struct WorkoutHistoryService {
             let pad = nonCompounds.sorted(by: sortByFreq).prefix(topN - selected.count)
             selected.append(contentsOf: pad)
         }
-
-        guard !selected.isEmpty else { return "" }
-
-        var lines = ["Recent progression (top \(selected.count) by frequency):"]
-        for name in selected {
-            let trajectory = trajectoriesByName[name] ?? []
-            // Take up to 3 most-recent, reverse to oldest→newest.
-            let recent = trajectory.prefix(3).reversed().joined(separator: "→")
-            guard !recent.isEmpty else { continue }
-            lines.append("- \(abbreviateExerciseName(name)): \(recent)")
-        }
-        return lines.joined(separator: "\n")
+        return selected
     }
 }

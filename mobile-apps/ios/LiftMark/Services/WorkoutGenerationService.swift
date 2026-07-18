@@ -267,39 +267,7 @@ enum WorkoutGenerationService {
 
         // Exercise validation
         for (idx, exercise) in workout.exercises.enumerated() {
-            if exercise.exerciseName.trimmingCharacters(in: .whitespaces).isEmpty {
-                issues.append("Exercise \(idx + 1) is missing a name")
-            }
-
-            if exercise.sets.isEmpty {
-                warnings.append("Exercise \"\(exercise.exerciseName)\" has no sets")
-            }
-
-            // Set validation
-            for (setIdx, set) in exercise.sets.enumerated() {
-                let target = set.entries.first?.target
-                let hasWeight = target?.weight?.value != nil
-                let hasReps = target?.reps != nil
-                let hasTime = target?.time != nil
-
-                if !hasWeight && !hasReps && !hasTime {
-                    issues.append(
-                        "Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): must specify weight, reps, or time"
-                    )
-                }
-
-                if hasWeight && target?.weight?.unit == nil {
-                    warnings.append(
-                        "Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): weight specified without unit"
-                    )
-                }
-
-                if let rpe = target?.rpe, rpe < 1 || rpe > 10 {
-                    issues.append(
-                        "Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): RPE must be between 1 and 10"
-                    )
-                }
-            }
+            validateExercise(exercise, index: idx, issues: &issues, warnings: &warnings)
         }
 
         // Quality warnings
@@ -316,6 +284,53 @@ enum WorkoutGenerationService {
             issues: issues,
             warnings: warnings
         )
+    }
+
+    /// Validate a single exercise (name, set presence, and each set's targets).
+    private static func validateExercise(
+        _ exercise: PlannedExercise, index: Int, issues: inout [String], warnings: inout [String]
+    ) {
+        if exercise.exerciseName.trimmingCharacters(in: .whitespaces).isEmpty {
+            issues.append("Exercise \(index + 1) is missing a name")
+        }
+
+        if exercise.sets.isEmpty {
+            warnings.append("Exercise \"\(exercise.exerciseName)\" has no sets")
+        }
+
+        // Set validation
+        for (setIdx, set) in exercise.sets.enumerated() {
+            validateSet(set, setIdx: setIdx, exerciseName: exercise.exerciseName,
+                        issues: &issues, warnings: &warnings)
+        }
+    }
+
+    /// Validate a single set's target values (measurement presence, unit, RPE range).
+    private static func validateSet(
+        _ set: PlannedSet, setIdx: Int, exerciseName: String, issues: inout [String], warnings: inout [String]
+    ) {
+        let target = set.entries.first?.target
+        let hasWeight = target?.weight?.value != nil
+        let hasReps = target?.reps != nil
+        let hasTime = target?.time != nil
+
+        if !hasWeight && !hasReps && !hasTime {
+            issues.append(
+                "Exercise \"\(exerciseName)\", set \(setIdx + 1): must specify weight, reps, or time"
+            )
+        }
+
+        if hasWeight && target?.weight?.unit == nil {
+            warnings.append(
+                "Exercise \"\(exerciseName)\", set \(setIdx + 1): weight specified without unit"
+            )
+        }
+
+        if let rpe = target?.rpe, rpe < 1 || rpe > 10 {
+            issues.append(
+                "Exercise \"\(exerciseName)\", set \(setIdx + 1): RPE must be between 1 and 10"
+            )
+        }
     }
 }
 
