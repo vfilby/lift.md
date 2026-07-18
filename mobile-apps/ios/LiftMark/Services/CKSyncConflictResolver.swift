@@ -122,10 +122,11 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                     "errorDomain": CKErrorDomain,
                     "tag": "schema-drift-suspected"
                 ]
-                Self.captureOncePerBuild(
+                CrashReporter.shared.captureErrorOncePerBuild(
                     key: "ck-reject-\(error.code.rawValue)-\(recordType)",
                     error: error,
                     breadcrumb: "sync.schemaDrift.repeat",
+                    category: .sync,
                     metadata: metadata
                 )
 
@@ -144,10 +145,11 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                     "errorCode": "\(error.code.rawValue)",
                     "errorDomain": CKErrorDomain
                 ]
-                Self.captureOncePerBuild(
+                CrashReporter.shared.captureErrorOncePerBuild(
                     key: "ck-fail-\(error.code.rawValue)-\(recordType)",
                     error: error,
                     breadcrumb: "sync.saveFailed.repeat",
+                    category: .sync,
                     metadata: metadata
                 )
             }
@@ -270,46 +272,4 @@ final class CKSyncConflictResolver: @unchecked Sendable {
         errorCodeNames[code] ?? "unknown(\(code.rawValue))"
     }
 
-    // MARK: - Capture throttling
-
-    /// Persistent set of (build, key) tuples we've already reported. Same
-    /// schema-drift fields would otherwise re-fire every sync cycle on every
-    /// affected device, so we capture the full error once per build then drop
-    /// to a breadcrumb. Resets when the build number changes so a new release
-    /// gets fresh signal even for an already-known offender.
-    private static let capturedKeysDefault = "ck-sync-captured-keys"
-    private static let capturedBuildDefault = "ck-sync-captured-build"
-    private static let capturedKeysLock = NSLock()
-
-    private static func captureOncePerBuild(
-        key: String,
-        error: Error,
-        breadcrumb: String,
-        metadata: [String: String]
-    ) {
-        let defaults = UserDefaults.standard
-        let currentBuild = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
-
-        capturedKeysLock.lock()
-        let storedBuild = defaults.string(forKey: capturedBuildDefault)
-        var captured: Set<String>
-        if storedBuild == currentBuild {
-            captured = Set(defaults.stringArray(forKey: capturedKeysDefault) ?? [])
-        } else {
-            captured = []
-            defaults.set(currentBuild, forKey: capturedBuildDefault)
-        }
-        let alreadyCaptured = captured.contains(key)
-        if !alreadyCaptured {
-            captured.insert(key)
-            defaults.set(Array(captured), forKey: capturedKeysDefault)
-        }
-        capturedKeysLock.unlock()
-
-        if alreadyCaptured {
-            CrashReporter.shared.addBreadcrumb(breadcrumb, category: .sync, metadata: metadata)
-        } else {
-            CrashReporter.shared.captureError(error, category: .sync, metadata: metadata)
-        }
-    }
 }

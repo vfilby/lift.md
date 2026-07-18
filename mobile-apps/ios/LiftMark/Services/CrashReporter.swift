@@ -51,6 +51,10 @@ final class CrashReporter: @unchecked Sendable {
     /// without standing up the real SentrySDK.
     nonisolated(unsafe) static var captureErrorRecorder: ((Error, LogCategory, [String: String]) -> Void)?
 
+    /// Test seam — when set, every `addBreadcrumb` invocation is recorded here
+    /// regardless of whether Sentry is initialized. Only set from unit tests.
+    nonisolated(unsafe) static var breadcrumbRecorder: ((String, LogCategory, [String: String]) -> Void)?
+
     private init() {
         // Default master toggle to true on first launch.
         if UserDefaults.standard.object(forKey: Self.crashReportingEnabledKey) == nil {
@@ -158,7 +162,68 @@ final class CrashReporter: @unchecked Sendable {
         }
     }
 
+    /// Capture a chronic-condition error at most once per build per device.
+    ///
+    /// Some failure conditions re-fire on every sync/flush cycle until an
+    /// external fix lands (a schema promotion, the user re-authenticating).
+    /// The first call with `key` on the current build performs a full
+    /// `captureError`; repeats on the same build emit `breadcrumb` instead so
+    /// the condition still annotates any other event the device sends. The
+    /// seen-key set resets when the build number changes, so every release
+    /// re-captures once per affected device and the Sentry issue stays alive
+    /// for as long as any device is still affected.
+    /// See spec/services/sentry.md "Once-per-build capture throttling".
+    func captureErrorOncePerBuild(
+        key: String,
+        error: Error,
+        breadcrumb: String,
+        category: LogCategory,
+        metadata: [String: String]? = nil
+    ) {
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+        if Self.shouldCapture(key: key, build: build) {
+            captureError(error, category: category, metadata: metadata)
+        } else {
+            addBreadcrumb(breadcrumb, category: category, metadata: metadata)
+        }
+    }
+
+    private static let capturedOnceKeysDefault = "sentry-captured-once-keys"
+    private static let capturedOnceBuildDefault = "sentry-captured-once-build"
+    private static let capturedOnceLock = NSLock()
+
+    /// Returns true the first time `key` is seen for `build`, recording it.
+    /// Internal (not private) so the throttle logic is unit-testable without
+    /// varying the real bundle build number.
+    static func shouldCapture(key: String, build: String) -> Bool {
+        let defaults = UserDefaults.standard
+        capturedOnceLock.lock()
+        defer { capturedOnceLock.unlock() }
+
+        var captured: Set<String>
+        if defaults.string(forKey: capturedOnceBuildDefault) == build {
+            captured = Set(defaults.stringArray(forKey: capturedOnceKeysDefault) ?? [])
+        } else {
+            captured = []
+            defaults.set(build, forKey: capturedOnceBuildDefault)
+        }
+        guard !captured.contains(key) else { return false }
+        captured.insert(key)
+        defaults.set(Array(captured), forKey: capturedOnceKeysDefault)
+        return true
+    }
+
+    /// Test seam — clears the once-per-build throttle state so each test
+    /// starts fresh (the state persists in UserDefaults.standard).
+    static func resetOncePerBuildThrottle() {
+        capturedOnceLock.lock()
+        defer { capturedOnceLock.unlock() }
+        UserDefaults.standard.removeObject(forKey: capturedOnceKeysDefault)
+        UserDefaults.standard.removeObject(forKey: capturedOnceBuildDefault)
+    }
+
     func addBreadcrumb(_ message: String, category: LogCategory, metadata: [String: String]? = nil) {
+        Self.breadcrumbRecorder?(message, category, metadata ?? [:])
         guard isStarted, Self.isCrashReportingEnabled else { return }
         let crumb = Breadcrumb()
         crumb.message = message

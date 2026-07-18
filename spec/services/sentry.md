@@ -141,6 +141,20 @@ High-priority sites (must capture):
 Low-priority sites (breadcrumb only, no capture):
 - Transient `.networkFailure` / `.networkUnavailable` — CKSyncEngine will retry; capturing creates noise
 
+### Once-per-build capture throttling
+
+Some failure conditions are *chronic per device* rather than per-occurrence interesting: the same device re-hits the identical condition every sync/flush cycle until an external fix lands (a schema promotion, the user re-authenticating). Capturing each occurrence burns event quota without adding signal — Sentry LIFTMARK-IOS-P accumulated 700+ identical `outbox_auth_failure` events from one signed-out device, one per foreground flush.
+
+`CrashReporter.captureErrorOncePerBuild(key:error:breadcrumb:category:metadata:)` is the shared throttle for these sites:
+
+- The first call with a given `key` on a given build number performs a full `captureError`; subsequent calls with the same key on the same build emit `breadcrumb` instead (so the condition still annotates any *other* event the device sends).
+- The seen-key set persists in `UserDefaults` and **resets when the build number changes**, so every new release re-captures once per affected device — the Sentry issue stays alive for as long as any device is still affected, and release-over-release recurrence remains visible.
+- The decision logic lives in the internal, pure-testable `CrashReporter.shouldCapture(key:build:)`.
+
+Throttled sites:
+- `CKSyncConflictResolver` schema-drift (key: `ck-reject-<code>-<recordType>`) and catch-all CK save failures (key: `ck-fail-<code>-<recordType>`)
+- `OutboxPusherService` auth-failure reporting (key: `outbox-auth-failure`) — see [workout-outbox.md](workout-outbox.md#auth-failure-handling-during-flush)
+
 ## Dependencies
 
 - `sentry-cocoa` via SPM, pinned to a `from:` version in `project.yml` → `packages:`.
@@ -156,6 +170,7 @@ Unit tests in `LiftMarkTests/CrashReporterTests.swift`:
 4. `start()` is idempotent — second call is a no-op.
 5. `captureParseError` with the opt-in setting **off** does not forward `rawContent` to the SDK (verified via an injected test-seam that records what the wrapper would have sent).
 6. `captureParseError` with the opt-in setting **on** forwards `rawContent` truncated to 16 KB with a `…[truncated]` marker.
+7. `shouldCapture(key:build:)` returns `true` the first time a key is seen on a build, `false` for repeats on the same build, and `true` again when the build number changes (throttle resets per release).
 
 Manual verification (documented, not automated):
 1. Build against a test Sentry project.
