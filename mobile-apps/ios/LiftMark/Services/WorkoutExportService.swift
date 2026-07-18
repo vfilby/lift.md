@@ -241,19 +241,13 @@ struct WorkoutExportService {
     }
 
     private func stripPlannedSet(_ set: PlannedSet) -> [String: Any] {
-        let target = set.entries.first?.target
-
         var dict: [String: Any] = [
             "orderIndex": set.orderIndex,
             "isDropset": set.isDropset,
             "isPerSide": set.isPerSide,
             "isAmrap": set.isAmrap
         ]
-        if let weight = target?.weight?.value { dict["targetWeight"] = weight }
-        if let unit = target?.weight?.unit { dict["targetWeightUnit"] = unit.rawValue }
-        if let reps = target?.reps { dict["targetReps"] = reps }
-        if let time = target?.time { dict["targetTime"] = time }
-        if let rpe = target?.rpe { dict["targetRpe"] = rpe }
+        addMeasurements(set.entries.first?.target, keys: .targetKeys, into: &dict)
         if let rest = set.restSeconds { dict["restSeconds"] = rest }
         if let notes = set.notes { dict["notes"] = notes }
         return dict
@@ -288,8 +282,7 @@ struct WorkoutExportService {
     }
 
     private func stripSet(_ set: SessionSet) -> [String: Any] {
-        let target = set.entries.first?.target
-        let actual = set.entries.first?.actual
+        let entry = set.entries.first
 
         var dict: [String: Any] = [
             "orderIndex": set.orderIndex,
@@ -297,19 +290,22 @@ struct WorkoutExportService {
             "isDropset": set.isDropset,
             "isPerSide": set.isPerSide
         ]
-        if let weight = target?.weight?.value { dict["targetWeight"] = weight }
-        if let unit = target?.weight?.unit { dict["targetWeightUnit"] = unit.rawValue }
-        if let reps = target?.reps { dict["targetReps"] = reps }
-        if let time = target?.time { dict["targetTime"] = time }
-        if let rpe = target?.rpe { dict["targetRpe"] = rpe }
+        addMeasurements(entry?.target, keys: .targetKeys, into: &dict)
         if let rest = set.restSeconds { dict["restSeconds"] = rest }
-        if let weight = actual?.weight?.value { dict["actualWeight"] = weight }
-        if let unit = actual?.weight?.unit { dict["actualWeightUnit"] = unit.rawValue }
-        if let reps = actual?.reps { dict["actualReps"] = reps }
-        if let time = actual?.time { dict["actualTime"] = time }
-        if let rpe = actual?.rpe { dict["actualRpe"] = rpe }
+        addMeasurements(entry?.actual, keys: .actualKeys, into: &dict)
         if let completedAt = set.completedAt { dict["completedAt"] = completedAt }
         if let notes = set.notes { dict["notes"] = notes }
         return dict
+    }
+
+    /// Merge one role's measurement values (weight/reps/time/rpe) into an export
+    /// dictionary under the JSON keys named by `keys` (target* or actual*).
+    private func addMeasurements(_ values: EntryValues?, keys: MeasurementKeyMap, into dict: inout [String: Any]) {
+        guard let values else { return }
+        if let weight = values.weight?.value { dict[keys.weightKey] = weight }
+        if let unit = values.weight?.unit { dict[keys.weightUnitKey] = unit.rawValue }
+        if let reps = values.reps { dict[keys.repsKey] = reps }
+        if let time = values.time { dict[keys.timeKey] = time }
+        if let rpe = values.rpe { dict[keys.rpeKey] = rpe }
     }
 }

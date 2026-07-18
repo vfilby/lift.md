@@ -161,58 +161,70 @@ struct JsonImportService {
 
         // Import exercises
         if let exercises = data["exercises"] as? [[String: Any]] {
-            // First pass: create exercises and track ID mapping for parent references
-            var exerciseIdMap: [Int: String] = [:] // orderIndex -> new ID
-            for exerciseData in exercises {
-                let exerciseId = UUID().uuidString
-                let orderIndex = exerciseData["orderIndex"] as? Int ?? 0
-                exerciseIdMap[orderIndex] = exerciseId
-
-                try db.execute(sql: """
-                    INSERT INTO template_exercises (id, workout_template_id, exercise_name, order_index, notes, \
-                    equipment_type, group_type, group_name, parent_exercise_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, arguments: [
-                        exerciseId,
-                        planId,
-                        exerciseData["exerciseName"] as? String ?? "Unknown",
-                        orderIndex,
-                        exerciseData["notes"] as? String,
-                        exerciseData["equipmentType"] as? String,
-                        exerciseData["groupType"] as? String,
-                        exerciseData["groupName"] as? String,
-                        nil as String? // parent resolved in second pass
-                    ])
-
-                // Import sets
-                if let sets = exerciseData["sets"] as? [[String: Any]] {
-                    for setData in sets {
-                        let setId = UUID().uuidString
-                        try db.execute(sql: """
-                            INSERT INTO template_sets (id, template_exercise_id, order_index,
-                                rest_seconds, is_dropset, is_per_side, is_amrap, notes, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, arguments: [
-                                setId,
-                                exerciseId,
-                                setData["orderIndex"] as? Int ?? 0,
-                                setData["restSeconds"] as? Int,
-                                (setData["isDropset"] as? Bool) == true ? 1 : 0,
-                                (setData["isPerSide"] as? Bool) == true ? 1 : 0,
-                                (setData["isAmrap"] as? Bool) == true ? 1 : 0,
-                                setData["notes"] as? String,
-                                now
-                            ])
-
-                        // Insert target measurements into set_measurements
-                        let context = MeasurementContext(setId: setId, parentType: "planned", role: "target")
-                        try insertMeasurementsFromJson(setData, into: db, context: context, keyMap: .targetKeys)
-                    }
-                }
-            }
+            try importPlanExercises(exercises, planId: planId, now: now, into: db)
         }
 
         result.plansImported += 1
+    }
+
+    private func importPlanExercises(
+        _ exercises: [[String: Any]], planId: String, now: String, into db: Database
+    ) throws {
+        // First pass: create exercises and track ID mapping for parent references
+        var exerciseIdMap: [Int: String] = [:] // orderIndex -> new ID
+        for exerciseData in exercises {
+            let exerciseId = UUID().uuidString
+            let orderIndex = exerciseData["orderIndex"] as? Int ?? 0
+            exerciseIdMap[orderIndex] = exerciseId
+
+            try db.execute(sql: """
+                INSERT INTO template_exercises (id, workout_template_id, exercise_name, order_index, notes, \
+                equipment_type, group_type, group_name, parent_exercise_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, arguments: [
+                    exerciseId,
+                    planId,
+                    exerciseData["exerciseName"] as? String ?? "Unknown",
+                    orderIndex,
+                    exerciseData["notes"] as? String,
+                    exerciseData["equipmentType"] as? String,
+                    exerciseData["groupType"] as? String,
+                    exerciseData["groupName"] as? String,
+                    nil as String? // parent resolved in second pass
+                ])
+
+            // Import sets
+            if let sets = exerciseData["sets"] as? [[String: Any]] {
+                try importPlanSets(sets, exerciseId: exerciseId, now: now, into: db)
+            }
+        }
+    }
+
+    private func importPlanSets(
+        _ sets: [[String: Any]], exerciseId: String, now: String, into db: Database
+    ) throws {
+        for setData in sets {
+            let setId = UUID().uuidString
+            try db.execute(sql: """
+                INSERT INTO template_sets (id, template_exercise_id, order_index,
+                    rest_seconds, is_dropset, is_per_side, is_amrap, notes, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, arguments: [
+                    setId,
+                    exerciseId,
+                    setData["orderIndex"] as? Int ?? 0,
+                    setData["restSeconds"] as? Int,
+                    (setData["isDropset"] as? Bool) == true ? 1 : 0,
+                    (setData["isPerSide"] as? Bool) == true ? 1 : 0,
+                    (setData["isAmrap"] as? Bool) == true ? 1 : 0,
+                    setData["notes"] as? String,
+                    now
+                ])
+
+            // Insert target measurements into set_measurements
+            let context = MeasurementContext(setId: setId, parentType: "planned", role: "target")
+            try insertMeasurementsFromJson(setData, into: db, context: context, keyMap: .targetKeys)
+        }
     }
 
     private func importSession(_ data: [String: Any], into db: Database, result: inout ImportResult) throws {
@@ -250,62 +262,74 @@ struct JsonImportService {
 
         // Import exercises
         if let exercises = data["exercises"] as? [[String: Any]] {
-            for exerciseData in exercises {
-                let exerciseId = UUID().uuidString
-
-                try db.execute(sql: """
-                    INSERT INTO session_exercises (id, workout_session_id, exercise_name, order_index, notes, \
-                    equipment_type, group_type, group_name, parent_exercise_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, arguments: [
-                        exerciseId,
-                        sessionId,
-                        exerciseData["exerciseName"] as? String ?? "Unknown",
-                        exerciseData["orderIndex"] as? Int ?? 0,
-                        exerciseData["notes"] as? String,
-                        exerciseData["equipmentType"] as? String,
-                        exerciseData["groupType"] as? String,
-                        exerciseData["groupName"] as? String,
-                        nil as String?
-                    ])
-
-                // Import sets
-                if let sets = exerciseData["sets"] as? [[String: Any]] {
-                    for setData in sets {
-                        let setId = UUID().uuidString
-                        try db.execute(sql: """
-                            INSERT INTO session_sets (id, session_exercise_id, order_index,
-                                rest_seconds, completed_at, status, notes, is_dropset, is_per_side,
-                                is_amrap, side, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, arguments: [
-                                setId,
-                                exerciseId,
-                                setData["orderIndex"] as? Int ?? 0,
-                                setData["restSeconds"] as? Int,
-                                setData["completedAt"] as? String,
-                                setData["status"] as? String ?? "completed",
-                                setData["notes"] as? String,
-                                (setData["isDropset"] as? Bool) == true ? 1 : 0,
-                                (setData["isPerSide"] as? Bool) == true ? 1 : 0,
-                                (setData["isAmrap"] as? Bool) == true ? 1 : 0,
-                                setData["side"] as? String,
-                                ISO8601DateFormatter().string(from: Date())
-                            ])
-
-                        // Insert target measurements into set_measurements
-                        let targetCtx = MeasurementContext(setId: setId, parentType: "session", role: "target")
-                        try insertMeasurementsFromJson(setData, into: db, context: targetCtx, keyMap: .targetKeys)
-
-                        // Insert actual measurements into set_measurements
-                        let actualCtx = MeasurementContext(setId: setId, parentType: "session", role: "actual")
-                        try insertMeasurementsFromJson(setData, into: db, context: actualCtx, keyMap: .actualKeys)
-                    }
-                }
-            }
+            try importSessionExercises(exercises, sessionId: sessionId, into: db)
         }
 
         result.sessionsImported += 1
+    }
+
+    private func importSessionExercises(
+        _ exercises: [[String: Any]], sessionId: String, into db: Database
+    ) throws {
+        for exerciseData in exercises {
+            let exerciseId = UUID().uuidString
+
+            try db.execute(sql: """
+                INSERT INTO session_exercises (id, workout_session_id, exercise_name, order_index, notes, \
+                equipment_type, group_type, group_name, parent_exercise_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, arguments: [
+                    exerciseId,
+                    sessionId,
+                    exerciseData["exerciseName"] as? String ?? "Unknown",
+                    exerciseData["orderIndex"] as? Int ?? 0,
+                    exerciseData["notes"] as? String,
+                    exerciseData["equipmentType"] as? String,
+                    exerciseData["groupType"] as? String,
+                    exerciseData["groupName"] as? String,
+                    nil as String?
+                ])
+
+            // Import sets
+            if let sets = exerciseData["sets"] as? [[String: Any]] {
+                try importSessionSets(sets, exerciseId: exerciseId, into: db)
+            }
+        }
+    }
+
+    private func importSessionSets(
+        _ sets: [[String: Any]], exerciseId: String, into db: Database
+    ) throws {
+        for setData in sets {
+            let setId = UUID().uuidString
+            try db.execute(sql: """
+                INSERT INTO session_sets (id, session_exercise_id, order_index,
+                    rest_seconds, completed_at, status, notes, is_dropset, is_per_side,
+                    is_amrap, side, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, arguments: [
+                    setId,
+                    exerciseId,
+                    setData["orderIndex"] as? Int ?? 0,
+                    setData["restSeconds"] as? Int,
+                    setData["completedAt"] as? String,
+                    setData["status"] as? String ?? "completed",
+                    setData["notes"] as? String,
+                    (setData["isDropset"] as? Bool) == true ? 1 : 0,
+                    (setData["isPerSide"] as? Bool) == true ? 1 : 0,
+                    (setData["isAmrap"] as? Bool) == true ? 1 : 0,
+                    setData["side"] as? String,
+                    ISO8601DateFormatter().string(from: Date())
+                ])
+
+            // Insert target measurements into set_measurements
+            let targetCtx = MeasurementContext(setId: setId, parentType: "session", role: "target")
+            try insertMeasurementsFromJson(setData, into: db, context: targetCtx, keyMap: .targetKeys)
+
+            // Insert actual measurements into set_measurements
+            let actualCtx = MeasurementContext(setId: setId, parentType: "session", role: "actual")
+            try insertMeasurementsFromJson(setData, into: db, context: actualCtx, keyMap: .actualKeys)
+        }
     }
 
     private func importGym(_ data: [String: Any], into db: Database, result: inout ImportResult) throws {
@@ -344,28 +368,22 @@ struct JsonImportService {
     ) throws {
         if let weight = setData[keyMap.weightKey] as? Double {
             let unit = setData[keyMap.weightUnitKey] as? String
-            try insertMeasurement(into: db, setId: context.setId, parentType: context.parentType,
-                                  role: context.role, kind: "weight", value: weight, unit: unit)
+            try insertMeasurement(into: db, context: context, kind: "weight", value: weight, unit: unit)
         }
         if let reps = setData[keyMap.repsKey] as? Int {
-            try insertMeasurement(into: db, setId: context.setId, parentType: context.parentType,
-                                  role: context.role, kind: "reps", value: Double(reps), unit: nil)
+            try insertMeasurement(into: db, context: context, kind: "reps", value: Double(reps), unit: nil)
         }
         if let time = setData[keyMap.timeKey] as? Int {
-            try insertMeasurement(into: db, setId: context.setId, parentType: context.parentType,
-                                  role: context.role, kind: "time", value: Double(time), unit: "s")
+            try insertMeasurement(into: db, context: context, kind: "time", value: Double(time), unit: "s")
         }
         if let rpe = setData[keyMap.rpeKey] as? Int {
-            try insertMeasurement(into: db, setId: context.setId, parentType: context.parentType,
-                                  role: context.role, kind: "rpe", value: Double(rpe), unit: nil)
+            try insertMeasurement(into: db, context: context, kind: "rpe", value: Double(rpe), unit: nil)
         }
     }
 
     private func insertMeasurement(
         into db: Database,
-        setId: String,
-        parentType: String,
-        role: String,
+        context: MeasurementContext,
         kind: String,
         value: Double,
         unit: String?
@@ -375,7 +393,7 @@ struct JsonImportService {
                 INSERT INTO set_measurements (id, set_id, parent_type, role, kind, value, unit, group_index, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
                 """,
-            arguments: [UUID().uuidString, setId, parentType, role, kind, value, unit,
+            arguments: [UUID().uuidString, context.setId, context.parentType, context.role, kind, value, unit,
                         ISO8601DateFormatter().string(from: Date())]
         )
     }
