@@ -45,8 +45,8 @@ jobs:
           # every command about untrusted taps. We don't use it — drop it.
           brew untap aws/tap || true
           brew install swiftlint
-          # Baseline holds pre-existing violations; only new ones are reported.
-          swiftlint lint --baseline .swiftlint-baseline.json --reporter github-actions-logging
+          # The baseline was burned down to zero (GH #351); lint runs clean.
+          swiftlint lint --strict --reporter github-actions-logging
 
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
