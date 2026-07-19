@@ -94,80 +94,10 @@ final class InboxPollerService {
         lastError = nil
         defer { isPolling = false }
 
-        let listResponse: InboxListResponse
-        do {
-            listResponse = try await authStore.withAuthorizedRequest { token in
-                try await self.apiClient.send(
-                    // No `status` filter — every live row is part of the inbox
-                    // until the user imports/discards it. Filtering to
-                    // `status=pending` is what hid acked items forever (#164).
-                    path: "/v1/workouts",
-                    method: "GET",
-                    body: Optional<EmptyBody>.none,
-                    accessToken: token
-                ) as InboxListResponse
-            }
-        } catch {
-            Logger.shared.error(.network, "inbox list failed", error: error)
-            lastError = "Could not reach the lift.md server."
-            return
-        }
+        guard let listResponse = await fetchInboxListing() else { return }
 
-        var upserted = 0
-        var skipped = 0
-        var failures = 0
-
-        for item in listResponse.items {
-            // Already cached → skip the detail download. Inbox rows are
-            // immutable (a push always mints a new inbox_id), so there's
-            // nothing to refresh; only genuinely new items cost a round-trip.
-            if (try? inboxRepository.exists(id: item.inboxId)) == true {
-                skipped += 1
-                continue
-            }
-            do {
-                let didUpsert = try await fetchAndStore(inboxId: item.inboxId)
-                if didUpsert {
-                    upserted += 1
-                }
-            } catch {
-                failures += 1
-                Logger.shared.error(
-                    .network,
-                    "inbox upsert failed for \(item.inboxId)",
-                    error: error
-                )
-            }
-        }
-
-        // Reconcile deletions: drop local rows the server no longer lists.
-        // The loop above is add-only; without this, a row imported/discarded
-        // elsewhere — or stranded locally when a promote's delete lost a race
-        // with an in-flight poll re-adding it — lingers in the inbox forever
-        // even though it's gone server-side (the reported "imported AND still
-        // in the inbox" bug). The server is the source of truth, so any local
-        // id absent from the listing has been consumed and should be pruned.
-        //
-        // Only safe on a COMPLETE listing. A truncated page (nextCursor != nil)
-        // doesn't reveal the full server set, so pruning then could delete live
-        // rows we simply didn't see on this page — skip reconciliation that
-        // cycle rather than risk it. (The poll fetches a single page; see spec.)
-        var pruned = 0
-        if listResponse.nextCursor == nil {
-            let serverIds = Set(listResponse.items.map { $0.inboxId })
-            let localIds = (try? inboxRepository.allIds()) ?? []
-            for staleId in localIds where !serverIds.contains(staleId) {
-                do {
-                    try inboxRepository.delete(id: staleId)
-                    pruned += 1
-                } catch {
-                    Logger.shared.warn(
-                        .database,
-                        "inbox prune failed for \(staleId): \(error)"
-                    )
-                }
-            }
-        }
+        let (upserted, skipped, failures) = await downloadNewItems(listResponse.items)
+        let pruned = pruneStaleItems(listResponse: listResponse)
 
         lastSyncedAt = Date()
         pendingCount = (try? inboxRepository.count()) ?? pendingCount
@@ -206,6 +136,93 @@ final class InboxPollerService {
     static let inboxDidChange = Notification.Name("InboxPollerService.inboxDidChange")
 
     // MARK: - Private
+
+    /// Fetch one page of the server-side inbox listing. On failure, logs, sets
+    /// `lastError`, and returns nil so the poll cycle ends without touching
+    /// local state.
+    private func fetchInboxListing() async -> InboxListResponse? {
+        do {
+            return try await authStore.withAuthorizedRequest { token in
+                try await self.apiClient.send(
+                    // No `status` filter — every live row is part of the inbox
+                    // until the user imports/discards it. Filtering to
+                    // `status=pending` is what hid acked items forever (#164).
+                    path: "/v1/workouts",
+                    method: "GET",
+                    body: Optional<EmptyBody>.none,
+                    accessToken: token
+                ) as InboxListResponse
+            }
+        } catch {
+            Logger.shared.error(.network, "inbox list failed", error: error)
+            lastError = "Could not reach the lift.md server."
+            return nil
+        }
+    }
+
+    /// Download and store the listed items that aren't already cached locally.
+    private func downloadNewItems(_ items: [InboxListItem]) async -> (upserted: Int, skipped: Int, failures: Int) {
+        var upserted = 0
+        var skipped = 0
+        var failures = 0
+
+        for item in items {
+            // Already cached → skip the detail download. Inbox rows are
+            // immutable (a push always mints a new inbox_id), so there's
+            // nothing to refresh; only genuinely new items cost a round-trip.
+            if (try? inboxRepository.exists(id: item.inboxId)) == true {
+                skipped += 1
+                continue
+            }
+            do {
+                let didUpsert = try await fetchAndStore(inboxId: item.inboxId)
+                if didUpsert {
+                    upserted += 1
+                }
+            } catch {
+                failures += 1
+                Logger.shared.error(
+                    .network,
+                    "inbox upsert failed for \(item.inboxId)",
+                    error: error
+                )
+            }
+        }
+
+        return (upserted, skipped, failures)
+    }
+
+    /// Reconcile deletions: drop local rows the server no longer lists.
+    /// The download loop is add-only; without this, a row imported/discarded
+    /// elsewhere — or stranded locally when a promote's delete lost a race
+    /// with an in-flight poll re-adding it — lingers in the inbox forever
+    /// even though it's gone server-side (the reported "imported AND still
+    /// in the inbox" bug). The server is the source of truth, so any local
+    /// id absent from the listing has been consumed and should be pruned.
+    ///
+    /// Only safe on a COMPLETE listing. A truncated page (nextCursor != nil)
+    /// doesn't reveal the full server set, so pruning then could delete live
+    /// rows we simply didn't see on this page — skip reconciliation that
+    /// cycle rather than risk it. (The poll fetches a single page; see spec.)
+    private func pruneStaleItems(listResponse: InboxListResponse) -> Int {
+        guard listResponse.nextCursor == nil else { return 0 }
+
+        var pruned = 0
+        let serverIds = Set(listResponse.items.map { $0.inboxId })
+        let localIds = (try? inboxRepository.allIds()) ?? []
+        for staleId in localIds where !serverIds.contains(staleId) {
+            do {
+                try inboxRepository.delete(id: staleId)
+                pruned += 1
+            } catch {
+                Logger.shared.warn(
+                    .database,
+                    "inbox prune failed for \(staleId): \(error)"
+                )
+            }
+        }
+        return pruned
+    }
 
     private func fetchAndStore(inboxId: String) async throws -> Bool {
         let detail = try await authStore.withAuthorizedRequest { token in
