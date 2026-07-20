@@ -29,7 +29,7 @@ extension SetRowView {
                         repsText = "\(reps)"
                     }
                     if let time = actual?.time ?? target?.time {
-                        timeText = formatTimeText(time)
+                        timeText = DurationFormat.mmss(time)
                     }
                 }
             } label: {
@@ -73,7 +73,7 @@ extension SetRowView {
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
                             if let time = target?.time {
-                                Text(formatTime(time))
+                                Text(DurationFormat.mmss(time))
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             }
@@ -145,17 +145,17 @@ extension SetRowView {
             // Time input — editable for timed sets in inline edit
             if set.entries.first?.actual?.time != nil || set.entries.first?.target?.time != nil {
                 VStack(alignment: .center, spacing: 2) {
-                    Text(timeFieldLabel)
+                    Text("Time (m:ss)")
                         .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     TextField("--", text: $timeText)
                         #if os(iOS)
-                        .keyboardType(useMinuteTimeFormat ? .numbersAndPunctuation : .numberPad)
+                        .keyboardType(.numbersAndPunctuation)
                         #endif
                         .font(.lmBody.monospacedDigit())
                         .multilineTextAlignment(.center)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: timeFieldWidth)
+                        .frame(width: 88)
                         .alignmentGuide(.textFieldCenter) { dims in dims[VerticalAlignment.center] }
                 }
             }
@@ -195,7 +195,7 @@ extension SetRowView {
 
             // Update button
             Button {
-                onSave(Double(weightText), Int(repsText), parseTimeText(timeText))
+                onSave(Double(weightText), Int(repsText), DurationFormat.parse(timeText))
                 isEditing = false
             } label: {
                 Image(systemName: "checkmark")
@@ -283,7 +283,7 @@ extension SetRowView {
                     .foregroundStyle(LiftMarkTheme.success)
             }
             if let time = actual?.time {
-                Text(formatTime(time))
+                Text(DurationFormat.mmss(time))
                     .font(.lmSubheadline.monospacedDigit())
                     .foregroundStyle(LiftMarkTheme.success)
             }

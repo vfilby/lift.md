@@ -85,9 +85,6 @@ struct RestTimerTick: Equatable {
     /// Format a non-negative second count as `M:SS`.
     /// For overrun display, callers prefix with `+`.
     static func formatMMSS(_ seconds: Int) -> String {
-        let clamped = max(0, seconds)
-        let minutes = clamped / 60
-        let secs = clamped % 60
-        return String(format: "%d:%02d", minutes, secs)
+        DurationFormat.mmss(seconds)
     }
 }

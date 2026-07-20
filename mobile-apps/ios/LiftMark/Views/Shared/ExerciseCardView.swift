@@ -148,7 +148,7 @@ private struct SetDisplayRow: View {
                 }
 
                 if let rest = set.restSeconds, rest > 0 {
-                    Text("\(rest)s rest")
+                    Text("\(DurationFormat.mmss(rest)) rest")
                         .font(.lmCaption2)
                         .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                 }
@@ -167,8 +167,6 @@ private struct SetDisplayRow: View {
     }
 
     private func formatTime(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let secs = seconds % 60
-        return minutes > 0 ? "\(minutes):\(String(format: "%02d", secs))" : "\(secs)s"
+        DurationFormat.mmss(seconds)
     }
 }

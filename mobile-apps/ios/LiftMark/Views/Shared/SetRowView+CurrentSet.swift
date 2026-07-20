@@ -106,7 +106,7 @@ extension SetRowView {
                 // Time input — for all timed exercises (including weighted-timed)
                 if set.entries.first?.target?.time != nil {
                     VStack(alignment: .center, spacing: 2) {
-                        Text(timeFieldLabel)
+                        Text("Time (m:ss)")
                             .font(.lmCaption2)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         HStack(spacing: 2) {
@@ -120,12 +120,12 @@ extension SetRowView {
 
                             TextField("--", text: $timeText)
                                 #if os(iOS)
-                                .keyboardType(useMinuteTimeFormat ? .numbersAndPunctuation : .numberPad)
+                                .keyboardType(.numbersAndPunctuation)
                                 #endif
                                 .font(.lmTitle3.monospacedDigit())
                                 .multilineTextAlignment(.center)
                                 .textFieldStyle(.roundedBorder)
-                                .frame(width: timeFieldWidth)
+                                .frame(width: 88)
 
                             Button { adjustTime(by: timeStepSeconds) } label: {
                                 Image(systemName: "plus.circle")
@@ -263,7 +263,7 @@ extension SetRowView {
                         }
                         callback(allEntries)
                     } else {
-                        onComplete(Double(weightText), Int(repsText), parseTimeText(timeText))
+                        onComplete(Double(weightText), Int(repsText), DurationFormat.parse(timeText))
                     }
                 } label: {
                     HStack(spacing: 6) {

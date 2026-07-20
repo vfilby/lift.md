@@ -84,56 +84,16 @@ struct SetRowView: View {
                 repsText = "\(reps)"
             }
             if let time = target?.time ?? actual?.time {
-                timeText = formatTimeText(time)
+                timeText = DurationFormat.mmss(time)
             }
         }
     }
 
-    /// True when the current set's target/actual time is large enough that
-    /// rendering as raw seconds is awkward. Drives both label and field width.
-    var useMinuteTimeFormat: Bool {
-        let time = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
-        return time >= 90
-    }
-
-    var timeFieldLabel: String {
-        useMinuteTimeFormat ? "Time (m:ss)" : "Time (s)"
-    }
-
-    var timeFieldWidth: CGFloat {
-        useMinuteTimeFormat ? 88 : 72
-    }
-
-    /// Step size for +/- buttons. Coarser steps in minute mode so users
+    /// Step size for +/- buttons. Coarser steps for long holds so users
     /// aren't tapping 12 times to add a minute.
     var timeStepSeconds: Int {
-        useMinuteTimeFormat ? 30 : 5
-    }
-
-    /// Format `seconds` for the editable text field. Uses `m:ss` when the
-    /// underlying target is long enough that seconds-only would overflow.
-    func formatTimeText(_ seconds: Int) -> String {
-        if seconds >= 90 {
-            let minutes = seconds / 60
-            let secs = seconds % 60
-            return String(format: "%d:%02d", minutes, secs)
-        }
-        return "\(seconds)"
-    }
-
-    /// Parse text back to seconds, accepting raw seconds ("180") or m:ss
-    /// ("3:00"). Returns nil for unparseable input.
-    func parseTimeText(_ text: String) -> Int? {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if trimmed.contains(":") {
-            let parts = trimmed.split(separator: ":")
-            guard parts.count == 2,
-                  let minutes = Int(parts[0]),
-                  let seconds = Int(parts[1]),
-                  seconds >= 0, seconds < 60 else { return nil }
-            return minutes * 60 + seconds
-        }
-        return Int(trimmed)
+        let time = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
+        return time >= 90 ? 30 : 5
     }
 
     // MARK: - Set Number Indicator
@@ -241,21 +201,14 @@ struct SetRowView: View {
         repsText = "\(max(0, current + delta))"
     }
 
-    /// Adjusts the main time field by the given delta, clamped to 0. Output
-    /// formatting honors the current minute/seconds display mode.
+    /// Adjusts the main time field by the given delta, clamped to 0.
     func adjustTime(by delta: Int) {
-        let current = parseTimeText(timeText) ?? 0
-        timeText = formatTimeText(max(0, current + delta))
+        let current = DurationFormat.parse(timeText) ?? 0
+        timeText = DurationFormat.mmss(max(0, current + delta))
     }
 
     func formatWeight(_ weight: Double) -> String {
         weight.formattedWeight
-    }
-
-    func formatTime(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let secs = seconds % 60
-        return minutes > 0 ? String(format: "%d:%02d", minutes, secs) : "\(secs)s"
     }
 }
 

@@ -51,9 +51,7 @@ struct ActiveExerciseCard: View {
     }
 
     private func formatTimeSummary(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let secs = seconds % 60
-        return minutes > 0 ? String(format: "%d:%02d", minutes, secs) : "\(secs)s"
+        DurationFormat.mmss(seconds)
     }
 
     private func formatDistance(_ value: Double) -> String {
@@ -228,7 +226,7 @@ struct ActiveExerciseCard: View {
                                 .fill(LiftMarkTheme.tertiaryLabel.opacity(0.3))
                                 .frame(height: 1)
                                 .accessibilityHidden(true)
-                            Text("Rest \(rest)s")
+                            Text("Rest \(DurationFormat.mmss(rest))")
                                 .font(.lmCaption2)
                                 .foregroundStyle(LiftMarkTheme.tertiaryLabel)
                             Rectangle()

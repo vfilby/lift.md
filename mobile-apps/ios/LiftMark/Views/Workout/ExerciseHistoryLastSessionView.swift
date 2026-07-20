@@ -69,7 +69,7 @@ struct ExerciseHistoryLastSessionView: View {
                                 Text("Max Time")
                                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                 Spacer()
-                                Text("\(Int(session.maxTime))s")
+                                Text(DurationFormat.mmss(Int(session.maxTime)))
                             }
                             .font(.lmSubheadline)
                         }

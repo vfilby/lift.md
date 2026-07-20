@@ -176,7 +176,7 @@ struct ExerciseHistoryChartView: View {
             }
             return "\(Int(value))"
         case .reps: return String(format: "%.1f", value)
-        case .time: return "\(Int(value))s"
+        case .time: return DurationFormat.mmss(Int(value))
         }
     }
 

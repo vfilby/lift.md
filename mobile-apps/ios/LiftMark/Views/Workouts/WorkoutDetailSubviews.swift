@@ -175,7 +175,7 @@ func planSetDetailString(_ set: PlannedSet) -> String {
     }
 
     if let rest = set.restSeconds, rest > 0 {
-        detail += " · Rest \(rest)s"
+        detail += " · Rest \(planFormatTime(rest))"
     }
 
     return detail
@@ -186,9 +186,7 @@ func planFormatWeight(_ weight: Double) -> String {
 }
 
 func planFormatTime(_ seconds: Int) -> String {
-    let minutes = seconds / 60
-    let secs = seconds % 60
-    return minutes > 0 ? String(format: "%d:%02d", minutes, secs) : "\(secs)s"
+    DurationFormat.mmss(seconds)
 }
 
 // MARK: - Stat Card

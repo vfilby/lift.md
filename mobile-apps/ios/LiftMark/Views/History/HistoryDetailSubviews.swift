@@ -47,7 +47,7 @@ extension HistoryDetailView {
                             .foregroundStyle(.secondary)
                     }
                     if let time = actual?.time ?? target?.time {
-                        Text("\(time)s")
+                        Text(DurationFormat.mmss(time))
                             .font(.lmSubheadline)
                     }
                 }

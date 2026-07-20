@@ -266,7 +266,7 @@ Renders individual sets with multiple visual states:
   - **Stepper buttons**: Input fields are flanked by minus/plus stepper buttons (`minus.circle` / `plus.circle` icons) for quick adjustment during workouts. All values are clamped to a minimum of 0. Stepper buttons use `.secondaryLabel` color and `.callout` font size for reps/time, `.body` for weight.
     - **Weight**: +/-5 for lbs, +/-2.5 for kg (unit-aware). Applied to main weight field and drop set weight fields.
     - **Reps**: +/-1 per tap. Applied to main reps field and drop set reps fields.
-    - **Time**: +/-5 seconds per tap. Applied to timed exercise input fields.
+    - **Time**: +/-5 seconds per tap for targets under 90 seconds; +/-30 seconds per tap for targets of 90 seconds or more (coarser steps so long holds don't need a dozen taps). Applied to timed exercise input fields.
   - **Target hint**: When a target exists, a "Target: 185 lbs x 5" hint line is always present in the layout to reserve its vertical space. It is only visible (opacity 1) when the user has changed weight or reps from the target values; otherwise it is hidden (opacity 0). This prevents the "Complete Set" button from jumping when the hint appears or disappears.
 - **Up Next preview**: Compact single-line with "UP NEXT" label
 - **Completed**: Green background, shows actual values (weight + reps), "Tap to edit"
@@ -279,17 +279,25 @@ Renders individual sets with multiple visual states:
 
 Set rows must display contextually appropriate fields based on exercise type:
 - **Weighted sets** (`targetWeight` exists, `targetTime` nil): show weight field with unit (lbs/kg) and reps field
-- **Timed sets** (`targetTime` exists, no `targetWeight`): show editable time input field labeled as "time" (in seconds), not "weight". The user can adjust the target time before starting the timer.
+- **Timed sets** (`targetTime` exists, no `targetWeight`): show editable time input field labeled "Time (m:ss)", not "weight". The field value is displayed in `M:SS` (e.g. "1:15" for 75 seconds); typed input accepts either `M:SS` ("1:15") or raw seconds ("75" — normalized back to "1:15" on the next stepper tap or edit). The user can adjust the target time before starting the timer.
 - **Weighted timed sets** (`targetWeight` AND `targetTime` exist, no `targetReps`): show weight input field with unit AND editable time input field. No reps field. Complete button hidden — timer Done button completes the set. The user-edited weight from the input field must be saved as `actualWeight` when the timer completes. The user-edited time is used as the new target for the timer.
 - **Bodyweight rep sets** (no `targetWeight`, `targetReps` exists): show reps only, no weight field
 
 | Set State | Weight Display | Reps Display | Time Display |
 |-----------|---------------|-------------|-------------|
-| Pending | Target weight + unit (e.g., "135 lbs") | Target reps (e.g., "x 5") | Target time (e.g., "60s") |
+| Pending | Target weight + unit (e.g., "135 lbs") | Target reps (e.g., "x 5") | Target time in M:SS (e.g., "1:00") |
 | Current | Pre-filled in weight input field | Pre-filled in reps input field | Pre-filled in editable time input field |
 | Current (weighted-timed) | Pre-filled weight input field + unit | — (no reps) | Pre-filled in editable time input field (completed via timer) |
-| Completed | Actual weight + unit | Actual reps | Actual time |
+| Completed | Actual weight + unit | Actual reps | Actual time in M:SS |
 | Skipped | "Skipped" label (no weight/reps) | — | — |
+
+### Duration Display Consistency
+
+All user-facing durations MUST render as `M:SS` (e.g. "0:45", "1:15") via the shared `DurationFormat.mmss` helper, matching the exercise and rest timers. This covers: the timed-set input field, pending/completed set rows, exercise card set summaries, rest placeholders, workout detail plan rows, inbox preview, history views and charts, and Live Activity set details. Raw-seconds display (e.g. "75", "60s") in any of these surfaces is a bug.
+
+Exception — LMWF source syntax is not display: previews of LMWF lines (e.g. `- 30s @rest: 60s` in the exercise edit sheets), LMWF serialization, and parser warnings keep the format's `Ns` notation. The edit-sheet Form-tab time/rest inputs stay in raw seconds because they author LMWF values and sit directly above the `Ns` source preview.
+
+`DurationFormat` MUST have unit tests covering formatting (including zero, sub-minute, minute boundary, and negative clamping) and input parsing (`M:SS` and raw seconds, rejecting malformed input).
 
 ### Rest Timer inline
 - Shows after the last completed set when rest is needed
@@ -297,4 +305,4 @@ Set rows must display contextually appropriate fields based on exercise type:
 - Suggestion: "Rest: Xs" with Start/Skip buttons
 
 ### Rest Placeholder
-- Between pending sets that have rest seconds: faint "--- Rest Xs ---" divider
+- Between pending sets that have rest seconds: faint "--- Rest M:SS ---" divider (e.g. "Rest 1:30")

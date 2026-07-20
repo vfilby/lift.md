@@ -19,7 +19,7 @@ final class WorkoutHistoryServiceTests: XCTestCase {
 
     func testFormatSetCompactTimeOnly() {
         let set = makeSessionSet(actualTime: 60)
-        XCTAssertEqual(service.formatSetCompact(set), "60s")
+        XCTAssertEqual(service.formatSetCompact(set), "1:00")
     }
 
     func testFormatSetCompactFallsBackToTargetValues() {
