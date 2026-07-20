@@ -494,25 +494,39 @@ class ActionAdapter {
     /// which fails LMWF header validation, disables the Import button, and
     /// strands the import (observed in nightly testHistoryExport/testPlanExport
     /// as "Timed out waiting for text 'OK'"). We wait for the keyboard to
-    /// settle, then verify the field holds exactly the intended text and retry
-    /// once on mismatch.
+    /// settle, then verify the field holds the intended text and retry once on
+    /// mismatch. On a final mismatch the best-effort text is left in place —
+    /// never a cleared field.
     func robustReplaceText(_ el: XCUIElement, with text: String) {
         el.tap()
         // Let the keyboard come up so the first keystroke keeps its modifier.
         _ = app.keyboards.firstMatch.waitForExistence(timeout: UITestTiming.scaled(5))
 
-        for attempt in 0..<2 {
+        for attempt in 1...2 {
             el.typeKey("a", modifierFlags: .command)
             el.typeText(text)
-            if (el.value as? String) == text { return }
+            if fieldHoldsIntendedText(el, text) { return }
 
             // Mismatch — typically a dropped ⌘ left a stray leading char.
-            // Clear the field and try once more before giving up.
-            NSLog("[robustReplaceText] field value mismatch on attempt \(attempt + 1); clearing and retrying")
+            NSLog("[robustReplaceText] field value mismatch on attempt \(attempt)")
+            guard attempt < 2 else { break }
+            // Clear and try once more. Only between attempts — clearing after
+            // the last one would guarantee an empty field.
             el.tap()
             el.typeKey("a", modifierFlags: .command)
             el.typeText(XCUIKeyboardKey.delete.rawValue)
         }
+    }
+
+    /// Secure fields (password inputs) read back one bullet per character, so
+    /// plaintext comparison can never succeed there — compare length instead,
+    /// which still catches the dropped-⌘ flake (the stray "a" adds a char).
+    private func fieldHoldsIntendedText(_ el: XCUIElement, _ text: String) -> Bool {
+        guard let value = el.value as? String else { return false }
+        if el.elementType == .secureTextField {
+            return value.count == text.count
+        }
+        return value == text
     }
 
     private func executeTypeText(_ action: TestAction) throws {
