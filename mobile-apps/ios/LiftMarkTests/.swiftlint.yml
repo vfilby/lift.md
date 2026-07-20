@@ -1,0 +1,14 @@
+# Deliberate per-target relaxation for the unit-test target (GH #350).
+#
+# Test suites accrete: a cohesive suite for one subsystem legitimately grows
+# past the app-code size limits, and splitting it by line count (rather than
+# by topic) hurts discoverability. So the two whole-file/whole-type size
+# rules are off here.
+#
+# Everything else still applies — individual test functions must stay short
+# and simple (function_body_length, cyclomatic_complexity), names must be
+# real words (identifier_name), and lines must wrap (line_length) — so test
+# *code* quality is still enforced; only suite *size* is exempt.
+disabled_rules:
+  - file_length
+  - type_body_length

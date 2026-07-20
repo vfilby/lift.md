@@ -85,7 +85,8 @@ enum LiftMarkTheme {
     // fully rounded instead and do NOT use these tokens: buttons and badges/chips
     // are Capsule() / `.buttonBorderShape(.capsule)`. See spec/visual-spec.md.
 
-    static let cornerRadiusXS: CGFloat = 4   // small chrome: side labels, set-number badge, progress bars, inline info boxes
+    // small chrome: side labels, set-number badge, progress bars, inline info boxes
+    static let cornerRadiusXS: CGFloat = 4
     static let cornerRadiusSM: CGFloat = 8   // input fields, small containers
     static let cornerRadiusMD: CGFloat = 12  // cards (the standard card radius), modals
     static let cornerRadiusLG: CGFloat = 16  // large surfaces / full-width banners (e.g. error banner)
@@ -98,21 +99,21 @@ extension Color {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
+        let alpha, red, green, blue: UInt64
         switch hex.count {
         case 6:
-            (a, r, g, b) = (255, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+            (alpha, red, green, blue) = (255, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
         case 8:
-            (a, r, g, b) = ((int >> 24) & 0xFF, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+            (alpha, red, green, blue) = ((int >> 24) & 0xFF, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
         default:
-            (a, r, g, b) = (255, 0, 0, 0)
+            (alpha, red, green, blue) = (255, 0, 0, 0)
         }
         self.init(
             .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
+            red: Double(red) / 255,
+            green: Double(green) / 255,
+            blue: Double(blue) / 255,
+            opacity: Double(alpha) / 255
         )
     }
 }

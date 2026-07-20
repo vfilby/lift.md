@@ -73,29 +73,36 @@ struct SchemaSnapshot: Equatable {
         if !onlyOther.isEmpty { out.append("  Tables only in live: \(onlyOther)") }
 
         for name in selfNames.intersection(otherNames).sorted() {
-            let a = tables.first { $0.name == name }!
-            let b = other.tables.first { $0.name == name }!
-            if a == b { continue }
+            let seedTable = tables.first { $0.name == name }!
+            let liveTable = other.tables.first { $0.name == name }!
+            if seedTable == liveTable { continue }
 
-            if a.columns != b.columns {
-                let aCols = Set(a.columns.map(\.name))
-                let bCols = Set(b.columns.map(\.name))
-                let addedInSeed = aCols.subtracting(bCols).sorted()
-                let addedInLive = bCols.subtracting(aCols).sorted()
-                if !addedInSeed.isEmpty { out.append("  [\(name)] columns only in seed: \(addedInSeed)") }
-                if !addedInLive.isEmpty { out.append("  [\(name)] columns only in live: \(addedInLive)") }
-                for colName in aCols.intersection(bCols).sorted() {
-                    let ac = a.columns.first { $0.name == colName }!
-                    let bc = b.columns.first { $0.name == colName }!
-                    if ac != bc {
-                        out.append("  [\(name).\(colName)] seed=\(ac) live=\(bc)")
-                    }
-                }
+            if seedTable.columns != liveTable.columns {
+                out.append(contentsOf: columnDiffLines(tableName: name, seed: seedTable, live: liveTable))
             }
-            if a.indexes != b.indexes {
-                out.append("  [\(name)] indexes seed=\(a.indexes) live=\(b.indexes)")
+            if seedTable.indexes != liveTable.indexes {
+                out.append("  [\(name)] indexes seed=\(seedTable.indexes) live=\(liveTable.indexes)")
             }
         }
         return out.joined(separator: "\n")
+    }
+
+    /// Diff lines for one table whose columns differ between seed and live.
+    private func columnDiffLines(tableName name: String, seed seedTable: Table, live liveTable: Table) -> [String] {
+        var out: [String] = []
+        let aCols = Set(seedTable.columns.map(\.name))
+        let bCols = Set(liveTable.columns.map(\.name))
+        let addedInSeed = aCols.subtracting(bCols).sorted()
+        let addedInLive = bCols.subtracting(aCols).sorted()
+        if !addedInSeed.isEmpty { out.append("  [\(name)] columns only in seed: \(addedInSeed)") }
+        if !addedInLive.isEmpty { out.append("  [\(name)] columns only in live: \(addedInLive)") }
+        for colName in aCols.intersection(bCols).sorted() {
+            let ac = seedTable.columns.first { $0.name == colName }!
+            let bc = liveTable.columns.first { $0.name == colName }!
+            if ac != bc {
+                out.append("  [\(name).\(colName)] seed=\(ac) live=\(bc)")
+            }
+        }
+        return out
     }
 }

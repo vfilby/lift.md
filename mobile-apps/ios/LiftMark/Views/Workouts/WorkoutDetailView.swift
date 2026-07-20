@@ -19,131 +19,17 @@ struct WorkoutDetailView: View {
         planStore.getPlan(id: planId)
     }
 
-    /// Group exercises by section (warmup, cooldown, default) then build display items
+    /// Group exercises by section (warmup, cooldown, default) then build
+    /// display items. The grouping logic lives in `PlanDisplayBuilder`.
     private var exerciseSections: [ExerciseDisplaySection] {
         guard let plan else { return [] }
-        var sections: [ExerciseDisplaySection] = []
-        var currentSectionName: String?
-        var currentExercises: [PlannedExercise] = []
-
-        for exercise in plan.exercises {
-            let sectionName: String?
-            if exercise.groupType == .section {
-                sectionName = exercise.groupName
-            } else if exercise.parentExerciseId != nil {
-                // Children of sections/supersets stay in the current section
-                sectionName = currentSectionName
-            } else {
-                sectionName = nil
-            }
-
-            if sectionName != currentSectionName {
-                if !currentExercises.isEmpty {
-                    sections.append(ExerciseDisplaySection(
-                        name: currentSectionName,
-                        items: buildPlanDisplayItems(from: currentExercises)
-                    ))
-                }
-                currentSectionName = sectionName
-                currentExercises = []
-            }
-            currentExercises.append(exercise)
-        }
-        if !currentExercises.isEmpty {
-            sections.append(ExerciseDisplaySection(
-                name: currentSectionName,
-                items: buildPlanDisplayItems(from: currentExercises)
-            ))
-        }
-        return sections
-    }
-
-    /// Build display items from a flat list of exercises, grouping supersets
-    private func buildPlanDisplayItems(from exercises: [PlannedExercise]) -> [PlanDisplayItem] {
-        var items: [PlanDisplayItem] = []
-        var processedIds = Set<String>()
-
-        for exercise in exercises {
-            if processedIds.contains(exercise.id) { continue }
-
-            if exercise.groupType == .superset && exercise.sets.isEmpty {
-                // Superset parent — gather children
-                var children: [PlannedExercise] = []
-                for child in exercises {
-                    if child.parentExerciseId == exercise.id {
-                        children.append(child)
-                        processedIds.insert(child.id)
-                    }
-                }
-                processedIds.insert(exercise.id)
-                if SupersetGrouping.isRealSuperset(childCount: children.count) {
-                    items.append(.superset(parent: exercise, children: children))
-                } else {
-                    // Single-member superset is not a real superset — render the
-                    // lone child as a standalone exercise (no SUPERSET badge),
-                    // matching the active workout view.
-                    for child in children {
-                        items.append(.single(exercise: child))
-                    }
-                }
-            } else if exercise.parentExerciseId != nil {
-                // Skip orphan children already handled
-                continue
-            } else if exercise.groupType == .section && exercise.sets.isEmpty {
-                // Section header — gather children. A child that is itself a
-                // superset parent must recurse so grandchildren render inside
-                // PlanSupersetCard; otherwise the superset parent (no sets)
-                // shows as an empty single card and grandchildren are dropped.
-                processedIds.insert(exercise.id)
-                for child in exercises {
-                    guard child.parentExerciseId == exercise.id else { continue }
-                    if child.groupType == .superset && child.sets.isEmpty {
-                        var grandchildren: [PlannedExercise] = []
-                        for grandchild in exercises {
-                            if grandchild.parentExerciseId == child.id {
-                                grandchildren.append(grandchild)
-                                processedIds.insert(grandchild.id)
-                            }
-                        }
-                        processedIds.insert(child.id)
-                        if SupersetGrouping.isRealSuperset(childCount: grandchildren.count) {
-                            items.append(.superset(parent: child, children: grandchildren))
-                        } else {
-                            // Single-member superset inside a section — render the
-                            // lone grandchild standalone, matching the active view.
-                            for grandchild in grandchildren {
-                                items.append(.single(exercise: grandchild))
-                            }
-                        }
-                    } else {
-                        items.append(.single(exercise: child))
-                        processedIds.insert(child.id)
-                    }
-                }
-            } else {
-                items.append(.single(exercise: exercise))
-                processedIds.insert(exercise.id)
-            }
-        }
-        return items
+        return PlanDisplayBuilder.sections(for: plan)
     }
 
     /// Count exercises excluding structural headers (empty section/superset
     /// rows). Shared with the plan list, inbox, and import via `WorkoutPlan`.
     private var exerciseCount: Int {
         plan?.displayExerciseCount ?? 0
-    }
-
-    /// Global exercise index (1-based) for numbering, excluding structural headers
-    private func globalExerciseIndex(for exercise: PlannedExercise) -> Int {
-        guard let plan else { return 1 }
-        var index = 0
-        for ex in plan.exercises {
-            if ex.isStructuralHeader { continue }
-            index += 1
-            if ex.id == exercise.id { return index }
-        }
-        return 1
     }
 
     var body: some View {
@@ -183,7 +69,7 @@ struct WorkoutDetailView: View {
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
 
                             // Exercises by section
-                            ForEach(Array(exerciseSections.enumerated()), id: \.offset) { sectionIndex, section in
+                            ForEach(Array(exerciseSections.enumerated()), id: \.offset) { _, section in
                                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
                                     // Section header divider
                                     if let sectionName = section.name {
@@ -438,9 +324,24 @@ struct WorkoutDetailView: View {
         .background(LiftMarkTheme.background)
     }
 
-    // MARK: - Helpers
+}
 
-    private func startWorkout() {
+// MARK: - Helpers
+
+private extension WorkoutDetailView {
+    /// Global exercise index (1-based) for numbering, excluding structural headers
+    func globalExerciseIndex(for exercise: PlannedExercise) -> Int {
+        guard let plan else { return 1 }
+        var index = 0
+        for ex in plan.exercises {
+            if ex.isStructuralHeader { continue }
+            index += 1
+            if ex.id == exercise.id { return index }
+        }
+        return 1
+    }
+
+    func startWorkout() {
         guard let plan else { return }
         let session = sessionStore.startSession(from: plan)
         if session != nil {
@@ -448,7 +349,7 @@ struct WorkoutDetailView: View {
         }
     }
 
-    private func sharePlan() {
+    func sharePlan() {
         guard let plan else { return }
         do {
             let url = try WorkoutExportService().exportPlanAsMarkdown(plan)
@@ -459,7 +360,7 @@ struct WorkoutDetailView: View {
         }
     }
 
-    private func reprocessPlan() {
+    func reprocessPlan() {
         guard let plan, let markdown = plan.sourceMarkdown else { return }
         planStore.reprocessPlan(id: plan.id, fromMarkdown: markdown)
     }

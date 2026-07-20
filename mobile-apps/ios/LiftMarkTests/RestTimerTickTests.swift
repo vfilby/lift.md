@@ -9,27 +9,27 @@ final class RestTimerTickTests: XCTestCase {
     // MARK: - Countdown phase
 
     func testAtStartCountingDownFromTotal() {
-        let t = RestTimerTick.compute(totalSeconds: 60, elapsedSeconds: 0)
-        XCTAssertEqual(t.phase, .counting)
-        XCTAssertFalse(t.isOverrun)
-        XCTAssertEqual(t.remainingSeconds, 60)
-        XCTAssertEqual(t.overrunSeconds, 0)
-        XCTAssertEqual(t.displayString, "1:00")
+        let tick = RestTimerTick.compute(totalSeconds: 60, elapsedSeconds: 0)
+        XCTAssertEqual(tick.phase, .counting)
+        XCTAssertFalse(tick.isOverrun)
+        XCTAssertEqual(tick.remainingSeconds, 60)
+        XCTAssertEqual(tick.overrunSeconds, 0)
+        XCTAssertEqual(tick.displayString, "1:00")
     }
 
     func testMidCountdownRemainingShrinks() {
-        let t = RestTimerTick.compute(totalSeconds: 60, elapsedSeconds: 25)
-        XCTAssertEqual(t.phase, .counting)
-        XCTAssertEqual(t.remainingSeconds, 35)
-        XCTAssertEqual(t.overrunSeconds, 0)
-        XCTAssertEqual(t.displayString, "0:35")
+        let tick = RestTimerTick.compute(totalSeconds: 60, elapsedSeconds: 25)
+        XCTAssertEqual(tick.phase, .counting)
+        XCTAssertEqual(tick.remainingSeconds, 35)
+        XCTAssertEqual(tick.overrunSeconds, 0)
+        XCTAssertEqual(tick.displayString, "0:35")
     }
 
     func testOneSecondBeforeZeroStillCountingDown() {
-        let t = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 9)
-        XCTAssertEqual(t.phase, .counting)
-        XCTAssertEqual(t.remainingSeconds, 1)
-        XCTAssertEqual(t.displayString, "0:01")
+        let tick = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 9)
+        XCTAssertEqual(tick.phase, .counting)
+        XCTAssertEqual(tick.remainingSeconds, 1)
+        XCTAssertEqual(tick.displayString, "0:01")
     }
 
     // MARK: - Zero-crossing into overrun
@@ -37,35 +37,35 @@ final class RestTimerTickTests: XCTestCase {
     func testAtExactZeroEntersOverrun() {
         // elapsed == total ⇒ remaining 0 ⇒ overrun phase begins.
         // This is the boundary tick where the zero-alert should fire.
-        let t = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 10)
-        XCTAssertEqual(t.phase, .overrun)
-        XCTAssertTrue(t.isOverrun)
-        XCTAssertEqual(t.remainingSeconds, 0)
-        XCTAssertEqual(t.overrunSeconds, 0)
-        XCTAssertEqual(t.displayString, "+0:00")
+        let tick = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 10)
+        XCTAssertEqual(tick.phase, .overrun)
+        XCTAssertTrue(tick.isOverrun)
+        XCTAssertEqual(tick.remainingSeconds, 0)
+        XCTAssertEqual(tick.overrunSeconds, 0)
+        XCTAssertEqual(tick.displayString, "+0:00")
     }
 
     func testOverrunCountsUpFromZero() {
-        let t = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 33)
-        XCTAssertEqual(t.phase, .overrun)
-        XCTAssertEqual(t.remainingSeconds, 0)
-        XCTAssertEqual(t.overrunSeconds, 23)
-        XCTAssertEqual(t.displayString, "+0:23")
+        let tick = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 33)
+        XCTAssertEqual(tick.phase, .overrun)
+        XCTAssertEqual(tick.remainingSeconds, 0)
+        XCTAssertEqual(tick.overrunSeconds, 23)
+        XCTAssertEqual(tick.displayString, "+0:23")
     }
 
     func testOverrunCrossesMinuteBoundary() {
         // 10s countdown, elapsed 85s ⇒ overrun 75s ⇒ "+1:15"
-        let t = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 85)
-        XCTAssertEqual(t.phase, .overrun)
-        XCTAssertEqual(t.overrunSeconds, 75)
-        XCTAssertEqual(t.displayString, "+1:15")
+        let tick = RestTimerTick.compute(totalSeconds: 10, elapsedSeconds: 85)
+        XCTAssertEqual(tick.phase, .overrun)
+        XCTAssertEqual(tick.overrunSeconds, 75)
+        XCTAssertEqual(tick.displayString, "+1:15")
     }
 
     func testLongOverrunFormatsAsPlusMSS() {
-        let t = RestTimerTick.compute(totalSeconds: 30, elapsedSeconds: 30 + 605) // 10:05 over
-        XCTAssertEqual(t.phase, .overrun)
-        XCTAssertEqual(t.overrunSeconds, 605)
-        XCTAssertEqual(t.displayString, "+10:05")
+        let tick = RestTimerTick.compute(totalSeconds: 30, elapsedSeconds: 30 + 605) // 10:05 over
+        XCTAssertEqual(tick.phase, .overrun)
+        XCTAssertEqual(tick.overrunSeconds, 605)
+        XCTAssertEqual(tick.displayString, "+10:05")
     }
 
     // MARK: - Transition detection (for alert-once behaviour)
@@ -96,19 +96,19 @@ final class RestTimerTickTests: XCTestCase {
     func testComputeFromDatesMatchesElapsedSeconds() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         let now = start.addingTimeInterval(45)
-        let t = RestTimerTick.compute(totalSeconds: 60, startDate: start, now: now)
-        XCTAssertEqual(t.phase, .counting)
-        XCTAssertEqual(t.remainingSeconds, 15)
-        XCTAssertEqual(t.displayString, "0:15")
+        let tick = RestTimerTick.compute(totalSeconds: 60, startDate: start, now: now)
+        XCTAssertEqual(tick.phase, .counting)
+        XCTAssertEqual(tick.remainingSeconds, 15)
+        XCTAssertEqual(tick.displayString, "0:15")
     }
 
     func testComputeFromDatesIntoOverrun() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         let now = start.addingTimeInterval(90) // 30s overrun
-        let t = RestTimerTick.compute(totalSeconds: 60, startDate: start, now: now)
-        XCTAssertEqual(t.phase, .overrun)
-        XCTAssertEqual(t.overrunSeconds, 30)
-        XCTAssertEqual(t.displayString, "+0:30")
+        let tick = RestTimerTick.compute(totalSeconds: 60, startDate: start, now: now)
+        XCTAssertEqual(tick.phase, .overrun)
+        XCTAssertEqual(tick.overrunSeconds, 30)
+        XCTAssertEqual(tick.displayString, "+0:30")
     }
 
     // MARK: - Edge cases
@@ -116,18 +116,18 @@ final class RestTimerTickTests: XCTestCase {
     func testNegativeElapsedClampsToZero() {
         // Clock skew guard: negative elapsed should never produce
         // nonsensical remaining > totalSeconds.
-        let t = RestTimerTick.compute(totalSeconds: 30, elapsedSeconds: -5)
-        XCTAssertEqual(t.phase, .counting)
-        XCTAssertEqual(t.remainingSeconds, 30)
-        XCTAssertEqual(t.displayString, "0:30")
+        let tick = RestTimerTick.compute(totalSeconds: 30, elapsedSeconds: -5)
+        XCTAssertEqual(tick.phase, .counting)
+        XCTAssertEqual(tick.remainingSeconds, 30)
+        XCTAssertEqual(tick.displayString, "0:30")
     }
 
     func testZeroTotalImmediatelyOverrun() {
         // Degenerate input: a 0s timer is already overrun at elapsed=0.
-        let t = RestTimerTick.compute(totalSeconds: 0, elapsedSeconds: 0)
-        XCTAssertEqual(t.phase, .overrun)
-        XCTAssertEqual(t.overrunSeconds, 0)
-        XCTAssertEqual(t.displayString, "+0:00")
+        let tick = RestTimerTick.compute(totalSeconds: 0, elapsedSeconds: 0)
+        XCTAssertEqual(tick.phase, .overrun)
+        XCTAssertEqual(tick.overrunSeconds, 0)
+        XCTAssertEqual(tick.displayString, "+0:00")
     }
 
     func testFormatMMSSPadsSeconds() {

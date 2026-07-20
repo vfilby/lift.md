@@ -104,23 +104,30 @@ extension DatabaseSeeds {
     INSERT INTO workout_templates
       (id, name, description, tags, default_weight_unit, source_markdown, created_at, updated_at, is_favorite)
     VALUES
-      ('\#(templatePushId)', 'Push Day', 'Chest/shoulders/triceps', '["push","upper"]', 'lbs', '# Push Day', '\#(ts1)', '\#(ts1)', 1),
+      ('\#(templatePushId)', 'Push Day', 'Chest/shoulders/triceps', '["push","upper"]', 'lbs',
+       '# Push Day', '\#(ts1)', '\#(ts1)', 1),
       ('\#(templatePullId)', 'Pull Day', NULL, NULL, NULL, NULL, '\#(ts2)', '\#(ts2)', 0);
 
     INSERT INTO template_exercises
-      (id, workout_template_id, exercise_name, order_index, notes, equipment_type, group_type, group_name, parent_exercise_id)
+      (id, workout_template_id, exercise_name, order_index, notes, equipment_type,
+       group_type, group_name, parent_exercise_id)
     VALUES
-      ('\#(tplExBench)',      '\#(templatePushId)', 'Bench Press',    0, 'warmup first', 'barbell',  'superset', 'Push A', NULL),
-      ('\#(tplExBenchChild)', '\#(templatePushId)', 'Overhead Press', 1, NULL,           'barbell',  'superset', 'Push A', '\#(tplExBench)'),
-      ('\#(tplExRow)',        '\#(templatePullId)', 'Barbell Row',    0, NULL,           'barbell',  NULL,       NULL,     NULL),
-      ('\#(tplExCurl)',       '\#(templatePullId)', 'Curl',           1, NULL,           'dumbbell', NULL,       NULL,     NULL);
+      ('\#(tplExBench)',      '\#(templatePushId)', 'Bench Press',    0, 'warmup first',
+       'barbell',  'superset', 'Push A', NULL),
+      ('\#(tplExBenchChild)', '\#(templatePushId)', 'Overhead Press', 1, NULL,
+       'barbell',  'superset', 'Push A', '\#(tplExBench)'),
+      ('\#(tplExRow)',        '\#(templatePullId)', 'Barbell Row',    0, NULL,
+       'barbell',  NULL,       NULL,     NULL),
+      ('\#(tplExCurl)',       '\#(templatePullId)', 'Curl',           1, NULL,
+       'dumbbell', NULL,       NULL,     NULL);
 
     INSERT INTO template_sets
       (id, template_exercise_id, order_index, target_weight, target_weight_unit, target_reps, target_time,
        target_rpe, rest_seconds, tempo, is_dropset, is_per_side, is_amrap, notes)
     VALUES
       ('\#(tplSet1)', '\#(tplExBench)',      0, 135.0, 'lbs', 5,    NULL, NULL, 180,  NULL,      0, 0, 0, NULL),
-      ('\#(tplSet2)', '\#(tplExBench)',      1, NULL,  NULL,  NULL, 60,   NULL, 60,   NULL,      0, 0, 0, 'plank-style hold'),
+      ('\#(tplSet2)', '\#(tplExBench)',      1, NULL,  NULL,  NULL, 60,   NULL, 60,   NULL,
+       0, 0, 0, 'plank-style hold'),
       ('\#(tplSet3)', '\#(tplExBench)',      2, 95.0,  'lbs', 8,    NULL, 8,    90,   NULL,      1, 0, 0, NULL),
       ('\#(tplSet4)', '\#(tplExBenchChild)', 0, 45.0,  'lbs', 10,   NULL, NULL, 60,   NULL,      0, 1, 0, NULL),
       ('\#(tplSet5)', '\#(tplExBenchChild)', 1, 135.0, 'lbs', NULL, NULL, NULL, 120,  NULL,      0, 0, 1, NULL),
@@ -151,15 +158,21 @@ extension DatabaseSeeds {
     INSERT INTO workout_sessions
       (id, workout_template_id, name, date, start_time, end_time, duration, notes, status)
     VALUES
-      ('\#(sessionDoneId)',       '\#(templatePushId)', 'Push Day - Done', '\#(tsDate)', '2024-01-15T08:00:00Z', '2024-01-15T09:05:00Z', 3900, NULL, 'completed'),
-      ('\#(sessionInProgressId)', NULL,                 'Freestyle',       '\#(tsDate)', '2024-01-15T17:00:00Z', NULL,                   NULL, NULL, 'in_progress');
+      ('\#(sessionDoneId)',       '\#(templatePushId)', 'Push Day - Done', '\#(tsDate)',
+       '2024-01-15T08:00:00Z', '2024-01-15T09:05:00Z', 3900, NULL, 'completed'),
+      ('\#(sessionInProgressId)', NULL,                 'Freestyle',       '\#(tsDate)',
+       '2024-01-15T17:00:00Z', NULL,                   NULL, NULL, 'in_progress');
 
     INSERT INTO session_exercises
-      (id, workout_session_id, exercise_name, order_index, notes, equipment_type, group_type, group_name, parent_exercise_id, status)
+      (id, workout_session_id, exercise_name, order_index, notes, equipment_type,
+       group_type, group_name, parent_exercise_id, status)
     VALUES
-      ('\#(sesExBench)',      '\#(sessionDoneId)',       'Bench Press',    0, NULL, 'barbell', 'superset', 'A',  NULL,              'completed'),
-      ('\#(sesExBenchChild)', '\#(sessionDoneId)',       'Overhead Press', 1, NULL, 'barbell', 'superset', 'A',  '\#(sesExBench)',  'pending'),
-      ('\#(sesExRow)',        '\#(sessionInProgressId)', 'Barbell Row',    0, NULL, 'barbell', NULL,       NULL, NULL,              'pending');
+      ('\#(sesExBench)',      '\#(sessionDoneId)',       'Bench Press',    0, NULL,
+       'barbell', 'superset', 'A',  NULL,              'completed'),
+      ('\#(sesExBenchChild)', '\#(sessionDoneId)',       'Overhead Press', 1, NULL,
+       'barbell', 'superset', 'A',  '\#(sesExBench)',  'pending'),
+      ('\#(sesExRow)',        '\#(sessionInProgressId)', 'Barbell Row',    0, NULL,
+       'barbell', NULL,       NULL, NULL,              'pending');
 
     -- Session sets covering: unstarted target-only, complete, dropset parent + child with drop_sequence + tempo,
     -- time-only, distance-no-column-in-v1 (populated as target_time=60 so v12 maps to unit='s').

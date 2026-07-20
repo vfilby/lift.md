@@ -209,9 +209,9 @@ struct InboxPreviewSheet: View {
             return formatDuration(time)
         }
         var parts: [String] = []
-        if let w = set.targetWeight {
+        if let weight = set.targetWeight {
             let unit = set.targetWeightUnit ?? defaultUnit
-            let weightStr = w == w.rounded() ? String(Int(w)) : String(w)
+            let weightStr = weight == weight.rounded() ? String(Int(weight)) : String(weight)
             let unitStr = unit.map { " \($0.rawValue)" } ?? ""
             parts.append(weightStr + unitStr)
         }

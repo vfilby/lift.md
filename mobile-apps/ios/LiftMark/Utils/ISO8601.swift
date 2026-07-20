@@ -15,16 +15,16 @@ import Foundation
 enum ISO8601 {
     // ISO8601DateFormatter is thread-safe for parsing; nonisolated(unsafe) silences the
     // Swift 6 global-state check (matches the convention used elsewhere in the app).
-    private nonisolated(unsafe) static let fractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+    nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
 
-    private nonisolated(unsafe) static let plain: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
+    nonisolated(unsafe) private static let plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
     }()
 
     /// Parse an ISO8601 timestamp, accepting both fractional- and whole-second forms.

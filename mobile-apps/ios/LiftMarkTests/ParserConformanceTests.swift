@@ -20,11 +20,13 @@ final class ParserConformanceTests: XCTestCase {
         // Sanity check: the directories exist
         var isDir: ObjCBool = false
         XCTAssertTrue(
-            FileManager.default.fileExists(atPath: examplesURL.appendingPathComponent("valid").path, isDirectory: &isDir) && isDir.boolValue,
+            FileManager.default.fileExists(atPath: examplesURL.appendingPathComponent("valid").path,
+                                           isDirectory: &isDir) && isDir.boolValue,
             "examples/valid/ directory not found at \(examplesURL.path)"
         )
         XCTAssertTrue(
-            FileManager.default.fileExists(atPath: examplesURL.appendingPathComponent("errors").path, isDirectory: &isDir) && isDir.boolValue,
+            FileManager.default.fileExists(atPath: examplesURL.appendingPathComponent("errors").path,
+                                           isDirectory: &isDir) && isDir.boolValue,
             "examples/errors/ directory not found at \(examplesURL.path)"
         )
     }
@@ -67,7 +69,8 @@ final class ParserConformanceTests: XCTestCase {
         }
 
         if !failures.isEmpty {
-            XCTFail("\(failures.count)/\(files.count) error examples unexpectedly passed:\n" + failures.joined(separator: "\n"))
+            XCTFail("\(failures.count)/\(files.count) error examples unexpectedly passed:\n"
+                + failures.joined(separator: "\n"))
         }
     }
 

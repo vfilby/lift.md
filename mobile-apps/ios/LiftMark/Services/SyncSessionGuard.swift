@@ -66,7 +66,8 @@ enum SyncSessionGuard {
             // Log OUTSIDE the db read block to avoid reentrancy (Logger writes to the same DB)
             if let snapshot {
                 Logger.shared.debug(.sync,
-                    "[sync-guard] Snapshot: session=\(snapshot.sessionRow.id), exercises=\(snapshot.exerciseCount), sets=\(snapshot.setCount)")
+                    "[sync-guard] Snapshot: session=\(snapshot.sessionRow.id), " +
+                        "exercises=\(snapshot.exerciseCount), sets=\(snapshot.setCount)")
             } else {
                 Logger.shared.debug(.sync, "[sync-guard] No active session, skipping snapshot")
             }
@@ -90,72 +91,20 @@ enum SyncSessionGuard {
             // Use a single write transaction for both validation and restore
             // to prevent user writes from interleaving between check and restore.
             let result: (missing: Bool, exerciseCount: Int, setCount: Int) = try dbQueue.write { db in
-                // Check session still exists
-                let currentSession = try WorkoutSessionRow.fetchOne(db, key: snapshot.sessionRow.id)
-                guard let currentSession else {
-                    // Session gone — restore everything including measurements
-                    try snapshot.sessionRow.insert(db)
-                    for exercise in snapshot.exerciseRows {
-                        try exercise.insert(db)
-                    }
-                    for set in snapshot.setRows {
-                        try set.insert(db)
-                    }
-                    for measurement in snapshot.measurementRows {
-                        try measurement.insert(db)
-                    }
-                    return (missing: true, exerciseCount: snapshot.exerciseRows.count, setCount: snapshot.setRows.count)
-                }
-
-                // If the session was canceled since the snapshot was taken,
-                // don't restore anything — the user intentionally discarded it.
-                if currentSession.status == SessionStatus.canceled.rawValue {
-                    return (missing: false, exerciseCount: 0, setCount: 0)
-                }
-
-                // Find current exercise IDs
-                let exerciseRows = try Row.fetchAll(db, sql: "SELECT id FROM session_exercises WHERE workout_session_id = ?", arguments: [snapshot.sessionRow.id])
-                let currentExIds = Set(exerciseRows.compactMap { $0["id"] as String? })
-                let missingExercises = snapshot.exerciseRows.filter { !currentExIds.contains($0.id) }
-
-                // Find current set IDs
-                let snapshotExerciseIds = snapshot.exerciseRows.map(\.id)
-                var missingSets: [SessionSetRow] = []
-                if !snapshotExerciseIds.isEmpty {
-                    let placeholders = snapshotExerciseIds.map { _ in "?" }.joined(separator: ",")
-                    let setRows = try Row.fetchAll(db, sql: "SELECT id FROM session_sets WHERE session_exercise_id IN (\(placeholders))", arguments: StatementArguments(snapshotExerciseIds))
-                    let currentSetIds = Set(setRows.compactMap { $0["id"] as String? })
-                    missingSets = snapshot.setRows.filter { !currentSetIds.contains($0.id) }
-                }
-
-                if missingExercises.isEmpty && missingSets.isEmpty {
-                    return (missing: false, exerciseCount: 0, setCount: 0)
-                }
-
-                // Restore missing rows within this same transaction.
-                // Use snapshot values (pre-sync) which preserves the user's local changes.
-                for exercise in missingExercises {
-                    try exercise.insert(db)
-                }
-                let missingSetIds = Set(missingSets.map(\.id))
-                for set in missingSets {
-                    try set.insert(db)
-                }
-                // Restore measurements for any restored sets
-                let missingMeasurements = snapshot.measurementRows.filter { missingSetIds.contains($0.setId) }
-                for measurement in missingMeasurements {
-                    try measurement.insert(db)
-                }
-
-                return (missing: true, exerciseCount: missingExercises.count, setCount: missingSets.count)
+                try checkAndRestore(db: db, snapshot: snapshot)
             }
 
             // Log OUTSIDE db block to avoid reentrancy (Logger writes to the same DB)
             if result.missing {
                 if result.exerciseCount > 0 || result.setCount > 0 {
                     Logger.shared.error(.sync,
-                        "[sync-guard] DATA LOSS detected and RESTORED \(result.exerciseCount) exercises, \(result.setCount) sets")
-                    let dataLossError = NSError(domain: "LiftMark.SyncSessionGuard", code: 1, userInfo: [NSLocalizedDescriptionKey: "Data loss detected and restored"])
+                        "[sync-guard] DATA LOSS detected and RESTORED \(result.exerciseCount) exercises, " +
+                            "\(result.setCount) sets")
+                    let dataLossError = NSError(
+                        domain: "LiftMark.SyncSessionGuard",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Data loss detected and restored"]
+                    )
                     CrashReporter.shared.captureError(dataLossError, category: .sync, metadata: ["tag": "data_loss"])
                 }
                 return false
@@ -169,6 +118,99 @@ enum SyncSessionGuard {
             Logger.shared.error(.sync, "[sync-guard] RESTORE FAILED: \(error.localizedDescription)")
             CrashReporter.shared.captureError(error, category: .sync, metadata: ["tag": "data_loss_restore_failed"])
             return false
+        }
+    }
+
+    // MARK: - Private (all run inside the single validate/restore write transaction)
+
+    /// Validates the snapshot against the current database state and restores any missing
+    /// rows. The comparison/decision order is behavior — preserved exactly: session gone →
+    /// full restore; session canceled → no restore; otherwise restore missing exercises,
+    /// then sets, then their measurements.
+    private static func checkAndRestore(
+        db: Database,
+        snapshot: SessionSnapshot
+    ) throws -> (missing: Bool, exerciseCount: Int, setCount: Int) {
+        // Check session still exists
+        let currentSession = try WorkoutSessionRow.fetchOne(db, key: snapshot.sessionRow.id)
+        guard let currentSession else {
+            try restoreEntireSession(db: db, snapshot: snapshot)
+            return (missing: true, exerciseCount: snapshot.exerciseRows.count, setCount: snapshot.setRows.count)
+        }
+
+        // If the session was canceled since the snapshot was taken,
+        // don't restore anything — the user intentionally discarded it.
+        if currentSession.status == SessionStatus.canceled.rawValue {
+            return (missing: false, exerciseCount: 0, setCount: 0)
+        }
+
+        // Find current exercise IDs
+        let exerciseRows = try Row.fetchAll(
+            db,
+            sql: "SELECT id FROM session_exercises WHERE workout_session_id = ?",
+            arguments: [snapshot.sessionRow.id]
+        )
+        let currentExIds = Set(exerciseRows.compactMap { $0["id"] as String? })
+        let missingExercises = snapshot.exerciseRows.filter { !currentExIds.contains($0.id) }
+
+        let missingSets = try findMissingSets(db: db, snapshot: snapshot)
+
+        if missingExercises.isEmpty && missingSets.isEmpty {
+            return (missing: false, exerciseCount: 0, setCount: 0)
+        }
+
+        try restoreMissingRows(db: db, snapshot: snapshot, exercises: missingExercises, sets: missingSets)
+        return (missing: true, exerciseCount: missingExercises.count, setCount: missingSets.count)
+    }
+
+    /// Session row itself is gone — restore everything including measurements.
+    private static func restoreEntireSession(db: Database, snapshot: SessionSnapshot) throws {
+        try snapshot.sessionRow.insert(db)
+        for exercise in snapshot.exerciseRows {
+            try exercise.insert(db)
+        }
+        for set in snapshot.setRows {
+            try set.insert(db)
+        }
+        for measurement in snapshot.measurementRows {
+            try measurement.insert(db)
+        }
+    }
+
+    /// Find current set IDs under the snapshot's exercises; returns the snapshot sets
+    /// whose IDs are no longer present.
+    private static func findMissingSets(db: Database, snapshot: SessionSnapshot) throws -> [SessionSetRow] {
+        let snapshotExerciseIds = snapshot.exerciseRows.map(\.id)
+        guard !snapshotExerciseIds.isEmpty else { return [] }
+        let placeholders = snapshotExerciseIds.map { _ in "?" }.joined(separator: ",")
+        let setRows = try Row.fetchAll(
+            db,
+            sql: "SELECT id FROM session_sets WHERE session_exercise_id IN (\(placeholders))",
+            arguments: StatementArguments(snapshotExerciseIds)
+        )
+        let currentSetIds = Set(setRows.compactMap { $0["id"] as String? })
+        return snapshot.setRows.filter { !currentSetIds.contains($0.id) }
+    }
+
+    /// Restore missing rows within this same transaction.
+    /// Use snapshot values (pre-sync) which preserves the user's local changes.
+    private static func restoreMissingRows(
+        db: Database,
+        snapshot: SessionSnapshot,
+        exercises missingExercises: [SessionExerciseRow],
+        sets missingSets: [SessionSetRow]
+    ) throws {
+        for exercise in missingExercises {
+            try exercise.insert(db)
+        }
+        let missingSetIds = Set(missingSets.map(\.id))
+        for set in missingSets {
+            try set.insert(db)
+        }
+        // Restore measurements for any restored sets
+        let missingMeasurements = snapshot.measurementRows.filter { missingSetIds.contains($0.setId) }
+        for measurement in missingMeasurements {
+            try measurement.insert(db)
         }
     }
 }

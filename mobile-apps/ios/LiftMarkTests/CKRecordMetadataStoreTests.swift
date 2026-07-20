@@ -18,9 +18,9 @@ final class CKRecordMetadataStoreTests: XCTestCase {
     private let callerZone = CKRecordZone.ID(zoneName: "CallerZone", ownerName: CKCurrentUserDefaultName)
 
     private let isoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
 
     override func setUp() {
@@ -98,7 +98,8 @@ final class CKRecordMetadataStoreTests: XCTestCase {
         // …rehydration must use the STORED identity AND carry the data fields over.
         let result = mapper.applyStoredSystemFields(to: fresh)
         XCTAssertEqual(result.recordID.zoneID, storedZone, "Existing record must rehydrate from stored system fields")
-        XCTAssertEqual(result["status"] as? String, "completed", "Data fields must be preserved onto the rehydrated base")
+        XCTAssertEqual(result["status"] as? String, "completed",
+                       "Data fields must be preserved onto the rehydrated base")
     }
 
     func testApplyStoredSystemFieldsReturnsFreshWhenNoMetadata() {

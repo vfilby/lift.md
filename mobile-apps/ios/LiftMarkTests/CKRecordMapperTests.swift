@@ -11,9 +11,9 @@ final class CKRecordMapperTests: XCTestCase {
     private let zoneID = CKRecordZone.ID(zoneName: "TestZone", ownerName: CKCurrentUserDefaultName)
 
     private let isoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }()
 
     override func setUp() {
@@ -54,7 +54,8 @@ final class CKRecordMapperTests: XCTestCase {
     func testGymRoundtrip() throws {
         let db = try dbQueue()
         let ts = now()
-        let original = GymRow(id: "gym-1", name: "Iron Paradise", isDefault: 1, deletedAt: nil, createdAt: ts, updatedAt: ts)
+        let original = GymRow(id: "gym-1", name: "Iron Paradise", isDefault: 1, deletedAt: nil, createdAt: ts,
+                              updatedAt: ts)
         try db.write { try original.insert($0) }
 
         let record = mapper.toCKRecord(original, zoneID: zoneID)
@@ -81,7 +82,8 @@ final class CKRecordMapperTests: XCTestCase {
         // Need a gym for FK
         try db.write { try GymRow(id: "gym-eq", name: "Gym", isDefault: 0, createdAt: ts, updatedAt: ts).insert($0) }
 
-        let original = GymEquipmentRow(id: "eq-1", name: "Barbell", isAvailable: 1, lastCheckedAt: ts, deletedAt: nil, createdAt: ts, updatedAt: ts, gymId: "gym-eq")
+        let original = GymEquipmentRow(id: "eq-1", name: "Barbell", isAvailable: 1, lastCheckedAt: ts, deletedAt: nil,
+                                       createdAt: ts, updatedAt: ts, gymId: "gym-eq")
         try db.write { try original.insert($0) }
 
         let record = mapper.toCKRecord(original, zoneID: zoneID)
@@ -133,7 +135,9 @@ final class CKRecordMapperTests: XCTestCase {
     func testPlannedExerciseRoundtrip() throws {
         let db = try dbQueue()
         let ts = now()
-        try db.write { try WorkoutPlanRow(id: "plan-pe", name: "Plan", createdAt: ts, updatedAt: ts, isFavorite: 0).insert($0) }
+        try db.write {
+            try WorkoutPlanRow(id: "plan-pe", name: "Plan", createdAt: ts, updatedAt: ts, isFavorite: 0).insert($0)
+        }
 
         let original = PlannedExerciseRow(
             id: "pe-1", workoutTemplateId: "plan-pe", exerciseName: "Bench Press",
@@ -165,7 +169,8 @@ final class CKRecordMapperTests: XCTestCase {
         let ts = now()
         try db.write {
             try WorkoutPlanRow(id: "plan-ps", name: "Plan", createdAt: ts, updatedAt: ts, isFavorite: 0).insert($0)
-            try PlannedExerciseRow(id: "pe-ps", workoutTemplateId: "plan-ps", exerciseName: "Squat", orderIndex: 0).insert($0)
+            try PlannedExerciseRow(id: "pe-ps", workoutTemplateId: "plan-ps", exerciseName: "Squat", orderIndex: 0)
+                .insert($0)
         }
 
         let original = PlannedSetRow(
@@ -175,13 +180,16 @@ final class CKRecordMapperTests: XCTestCase {
         )
         // Insert measurements alongside the set row
         let measurements = [
-            SetMeasurementRow(id: "m-ps-w", setId: "ps-1", parentType: "planned", role: "target", kind: "weight", value: 225.0, unit: "lbs", groupIndex: 0, updatedAt: ts),
-            SetMeasurementRow(id: "m-ps-r", setId: "ps-1", parentType: "planned", role: "target", kind: "reps", value: 5, unit: nil, groupIndex: 0, updatedAt: ts),
-            SetMeasurementRow(id: "m-ps-rpe", setId: "ps-1", parentType: "planned", role: "target", kind: "rpe", value: 8, unit: nil, groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ps-w", setId: "ps-1", parentType: "planned", role: "target", kind: "weight",
+                              value: 225.0, unit: "lbs", groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ps-r", setId: "ps-1", parentType: "planned", role: "target", kind: "reps",
+                              value: 5, unit: nil, groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ps-rpe", setId: "ps-1", parentType: "planned", role: "target", kind: "rpe",
+                              value: 8, unit: nil, groupIndex: 0, updatedAt: ts),
         ]
         try db.write { db in
             try original.insert(db)
-            for m in measurements { try m.insert(db) }
+            for measurement in measurements { try measurement.insert(db) }
         }
 
         let record = mapper.toCKRecord(original, measurements: measurements, zoneID: zoneID)
@@ -219,7 +227,9 @@ final class CKRecordMapperTests: XCTestCase {
         let db = try dbQueue()
         let ts = now()
         // Create parent plan for FK constraint
-        try db.write { try WorkoutPlanRow(id: "plan-1", name: "Push Day", createdAt: ts, updatedAt: ts, isFavorite: 0).insert($0) }
+        try db.write {
+            try WorkoutPlanRow(id: "plan-1", name: "Push Day", createdAt: ts, updatedAt: ts, isFavorite: 0).insert($0)
+        }
         let original = WorkoutSessionRow(
             id: "session-1", workoutTemplateId: "plan-1", name: "Push Day",
             date: "2026-03-28", startTime: ts, endTime: nil,
@@ -250,7 +260,8 @@ final class CKRecordMapperTests: XCTestCase {
         let db = try dbQueue()
         let ts = now()
         try db.write {
-            try WorkoutSessionRow(id: "session-se", name: "Workout", date: "2026-03-28", status: "in_progress").insert($0)
+            try WorkoutSessionRow(id: "session-se", name: "Workout", date: "2026-03-28", status: "in_progress")
+                .insert($0)
         }
 
         let original = SessionExerciseRow(
@@ -278,12 +289,31 @@ final class CKRecordMapperTests: XCTestCase {
 
     // MARK: - Roundtrip: SessionSet
 
+    private func makeSessionSetMeasurements(ts: String) -> [SetMeasurementRow] {
+        [
+            SetMeasurementRow(id: "m-ss-tw", setId: "ss-1", parentType: "session", role: "target", kind: "weight",
+                              value: 135.0, unit: "lbs", groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ss-tr", setId: "ss-1", parentType: "session", role: "target", kind: "reps",
+                              value: 10, unit: nil, groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ss-trpe", setId: "ss-1", parentType: "session", role: "target", kind: "rpe",
+                              value: 7, unit: nil, groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ss-aw", setId: "ss-1", parentType: "session", role: "actual", kind: "weight",
+                              value: 140.0, unit: "lbs", groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ss-ar", setId: "ss-1", parentType: "session", role: "actual", kind: "reps",
+                              value: 9, unit: nil, groupIndex: 0, updatedAt: ts),
+            SetMeasurementRow(id: "m-ss-arpe", setId: "ss-1", parentType: "session", role: "actual", kind: "rpe",
+                              value: 8, unit: nil, groupIndex: 0, updatedAt: ts),
+        ]
+    }
+
     func testSessionSetRoundtrip() throws {
         let db = try dbQueue()
         let ts = now()
         try db.write {
-            try WorkoutSessionRow(id: "session-ss", name: "Workout", date: "2026-03-28", status: "in_progress").insert($0)
-            try SessionExerciseRow(id: "se-ss", workoutSessionId: "session-ss", exerciseName: "Bench", orderIndex: 0, status: "pending").insert($0)
+            try WorkoutSessionRow(id: "session-ss", name: "Workout", date: "2026-03-28", status: "in_progress")
+                .insert($0)
+            try SessionExerciseRow(id: "se-ss", workoutSessionId: "session-ss", exerciseName: "Bench", orderIndex: 0,
+                                   status: "pending").insert($0)
         }
 
         let original = SessionSetRow(
@@ -292,17 +322,10 @@ final class CKRecordMapperTests: XCTestCase {
             notes: "Easy", isDropset: 0, isPerSide: 1, isAmrap: 0,
             side: "left", updatedAt: ts
         )
-        let measurements = [
-            SetMeasurementRow(id: "m-ss-tw", setId: "ss-1", parentType: "session", role: "target", kind: "weight", value: 135.0, unit: "lbs", groupIndex: 0, updatedAt: ts),
-            SetMeasurementRow(id: "m-ss-tr", setId: "ss-1", parentType: "session", role: "target", kind: "reps", value: 10, unit: nil, groupIndex: 0, updatedAt: ts),
-            SetMeasurementRow(id: "m-ss-trpe", setId: "ss-1", parentType: "session", role: "target", kind: "rpe", value: 7, unit: nil, groupIndex: 0, updatedAt: ts),
-            SetMeasurementRow(id: "m-ss-aw", setId: "ss-1", parentType: "session", role: "actual", kind: "weight", value: 140.0, unit: "lbs", groupIndex: 0, updatedAt: ts),
-            SetMeasurementRow(id: "m-ss-ar", setId: "ss-1", parentType: "session", role: "actual", kind: "reps", value: 9, unit: nil, groupIndex: 0, updatedAt: ts),
-            SetMeasurementRow(id: "m-ss-arpe", setId: "ss-1", parentType: "session", role: "actual", kind: "rpe", value: 8, unit: nil, groupIndex: 0, updatedAt: ts),
-        ]
+        let measurements = makeSessionSetMeasurements(ts: ts)
         try db.write { db in
             try original.insert(db)
-            for m in measurements { try m.insert(db) }
+            for measurement in measurements { try measurement.insert(db) }
         }
 
         let record = mapper.toCKRecord(original, measurements: measurements, zoneID: zoneID)
@@ -438,7 +461,8 @@ final class CKRecordMapperTests: XCTestCase {
         try db.write { try session.insert($0) }
 
         // Remote says "completed" and is newer
-        let record = CKRecord(recordType: "WorkoutSession", recordID: CKRecord.ID(recordName: "session-cancel", zoneID: zoneID))
+        let record = CKRecord(recordType: "WorkoutSession",
+                              recordID: CKRecord.ID(recordName: "session-cancel", zoneID: zoneID))
         record["name"] = "Canceled Workout" as CKRecordValue
         record["date"] = "2026-03-28" as CKRecordValue
         record["status"] = "completed" as CKRecordValue
@@ -448,7 +472,8 @@ final class CKRecordMapperTests: XCTestCase {
         XCTAssertTrue(merged)
 
         let fetched = try db.read { try WorkoutSessionRow.fetchOne($0, key: "session-cancel") }
-        XCTAssertEqual(fetched?.status, SessionStatus.canceled.rawValue, "Canceled status must be preserved regardless of remote")
+        XCTAssertEqual(fetched?.status, SessionStatus.canceled.rawValue,
+                       "Canceled status must be preserved regardless of remote")
     }
 
     // MARK: - Merge: Soft-Delete Protection
@@ -474,8 +499,11 @@ final class CKRecordMapperTests: XCTestCase {
     func testMergeGymEquipmentDoesNotReInsertSoftDeleted() throws {
         let db = try dbQueue()
         let ts = now()
-        try db.write { try GymRow(id: "gym-for-eq-sd", name: "Gym", isDefault: 0, createdAt: ts, updatedAt: ts).insert($0) }
-        let eq = GymEquipmentRow(id: "eq-sd", name: "Deleted Eq", isAvailable: 1, deletedAt: ts, createdAt: ts, updatedAt: ts, gymId: "gym-for-eq-sd")
+        try db.write {
+            try GymRow(id: "gym-for-eq-sd", name: "Gym", isDefault: 0, createdAt: ts, updatedAt: ts).insert($0)
+        }
+        let eq = GymEquipmentRow(id: "eq-sd", name: "Deleted Eq", isAvailable: 1, deletedAt: ts,
+                                 createdAt: ts, updatedAt: ts, gymId: "gym-for-eq-sd")
         try db.write { try eq.insert($0) }
 
         let record = CKRecord(recordType: "GymEquipment", recordID: CKRecord.ID(recordName: "eq-sd", zoneID: zoneID))
@@ -518,7 +546,8 @@ final class CKRecordMapperTests: XCTestCase {
         }
 
         // Remote changes theme but should not touch local-only fields
-        let record = CKRecord(recordType: "UserSettings", recordID: CKRecord.ID(recordName: "settings-lo", zoneID: zoneID))
+        let record = CKRecord(recordType: "UserSettings",
+                              recordID: CKRecord.ID(recordName: "settings-lo", zoneID: zoneID))
         record["defaultWeightUnit"] = "kg" as CKRecordValue
         record["enableWorkoutTimer"] = Int64(0) as CKRecordValue
         record["autoStartRestTimer"] = Int64(0) as CKRecordValue
@@ -551,7 +580,8 @@ final class CKRecordMapperTests: XCTestCase {
 
     func testMergePlannedExerciseSkipsEmptyFK() throws {
         // Merging a PlannedExercise with no workoutPlanId and no existing record should be skipped
-        let record = CKRecord(recordType: "PlannedExercise", recordID: CKRecord.ID(recordName: "pe-nofk", zoneID: zoneID))
+        let record = CKRecord(recordType: "PlannedExercise",
+                              recordID: CKRecord.ID(recordName: "pe-nofk", zoneID: zoneID))
         record["exerciseName"] = "Orphan Exercise" as CKRecordValue
         record["orderIndex"] = Int64(0) as CKRecordValue
         // workoutPlanId intentionally omitted
@@ -572,7 +602,8 @@ final class CKRecordMapperTests: XCTestCase {
     }
 
     func testMergeSessionExerciseSkipsEmptyFK() throws {
-        let record = CKRecord(recordType: "SessionExercise", recordID: CKRecord.ID(recordName: "se-nofk", zoneID: zoneID))
+        let record = CKRecord(recordType: "SessionExercise",
+                              recordID: CKRecord.ID(recordName: "se-nofk", zoneID: zoneID))
         record["exerciseName"] = "Orphan" as CKRecordValue
         record["orderIndex"] = Int64(0) as CKRecordValue
         record["status"] = "pending" as CKRecordValue
@@ -628,7 +659,8 @@ final class CKRecordMapperTests: XCTestCase {
     }
 
     func testMergeInsertsNewWorkoutSession() throws {
-        let record = CKRecord(recordType: "WorkoutSession", recordID: CKRecord.ID(recordName: "session-new", zoneID: zoneID))
+        let record = CKRecord(recordType: "WorkoutSession",
+                              recordID: CKRecord.ID(recordName: "session-new", zoneID: zoneID))
         record["name"] = "New Session" as CKRecordValue
         record["date"] = "2026-03-28" as CKRecordValue
         record["status"] = "completed" as CKRecordValue
@@ -647,7 +679,8 @@ final class CKRecordMapperTests: XCTestCase {
         // Clear any existing settings, then verify insert fresh
         let db = try dbQueue()
         try db.write { try $0.execute(sql: "DELETE FROM user_settings") }
-        let record = CKRecord(recordType: "UserSettings", recordID: CKRecord.ID(recordName: "user-settings", zoneID: zoneID))
+        let record = CKRecord(recordType: "UserSettings",
+                              recordID: CKRecord.ID(recordName: "user-settings", zoneID: zoneID))
         record["defaultWeightUnit"] = "kg" as CKRecordValue
         record["theme"] = "dark" as CKRecordValue
         record["enableWorkoutTimer"] = Int64(1) as CKRecordValue
@@ -726,11 +759,15 @@ final class CKRecordMapperTests: XCTestCase {
         try db.write { db in
             try WorkoutPlanRow(id: planId, name: "Active Plan", createdAt: ts, updatedAt: ts, isFavorite: 0).insert(db)
             try PlannedExerciseRow(id: peId, workoutTemplateId: planId, exerciseName: "Squat", orderIndex: 0).insert(db)
-            try PlannedSetRow(id: psId, templateExerciseId: peId, orderIndex: 0, isDropset: 0, isPerSide: 0, isAmrap: 0).insert(db)
+            try PlannedSetRow(id: psId, templateExerciseId: peId, orderIndex: 0,
+                              isDropset: 0, isPerSide: 0, isAmrap: 0).insert(db)
 
-            try WorkoutSessionRow(id: sessionId, workoutTemplateId: planId, name: "Active Plan", date: "2026-03-28", status: "in_progress").insert(db)
-            try SessionExerciseRow(id: seId, workoutSessionId: sessionId, exerciseName: "Squat", orderIndex: 0, status: "pending").insert(db)
-            try SessionSetRow(id: ssId, sessionExerciseId: seId, orderIndex: 0, status: "pending", isDropset: 0, isPerSide: 0, isAmrap: 0).insert(db)
+            try WorkoutSessionRow(id: sessionId, workoutTemplateId: planId, name: "Active Plan", date: "2026-03-28",
+                                  status: "in_progress").insert(db)
+            try SessionExerciseRow(id: seId, workoutSessionId: sessionId, exerciseName: "Squat", orderIndex: 0,
+                                   status: "pending").insert(db)
+            try SessionSetRow(id: ssId, sessionExerciseId: seId, orderIndex: 0, status: "pending",
+                              isDropset: 0, isPerSide: 0, isAmrap: 0).insert(db)
         }
 
         let protected = mapper.getActiveSessionProtectedIds()
@@ -770,18 +807,22 @@ final class CKRecordMapperTests: XCTestCase {
         try db.write { db in
             try GymRow(id: "lookup-gym", name: "Gym", isDefault: 0, createdAt: ts, updatedAt: ts).insert(db)
             try WorkoutPlanRow(id: "lookup-plan", name: "Plan", createdAt: ts, updatedAt: ts, isFavorite: 0).insert(db)
-            try WorkoutSessionRow(id: "lookup-session", name: "Session", date: "2026-03-28", status: "completed").insert(db)
+            try WorkoutSessionRow(id: "lookup-session", name: "Session", date: "2026-03-28", status: "completed")
+                .insert(db)
         }
 
-        let gymRecord = mapper.createCKRecord(for: CKRecord.ID(recordName: "lookup-gym", zoneID: zoneID), zoneID: zoneID)
+        let gymRecord = mapper.createCKRecord(for: CKRecord.ID(recordName: "lookup-gym", zoneID: zoneID),
+                                              zoneID: zoneID)
         XCTAssertNotNil(gymRecord)
         XCTAssertEqual(gymRecord?.recordType, "Gym")
 
-        let planRecord = mapper.createCKRecord(for: CKRecord.ID(recordName: "lookup-plan", zoneID: zoneID), zoneID: zoneID)
+        let planRecord = mapper.createCKRecord(for: CKRecord.ID(recordName: "lookup-plan", zoneID: zoneID),
+                                               zoneID: zoneID)
         XCTAssertNotNil(planRecord)
         XCTAssertEqual(planRecord?.recordType, "WorkoutPlan")
 
-        let sessionRecord = mapper.createCKRecord(for: CKRecord.ID(recordName: "lookup-session", zoneID: zoneID), zoneID: zoneID)
+        let sessionRecord = mapper.createCKRecord(for: CKRecord.ID(recordName: "lookup-session", zoneID: zoneID),
+                                                  zoneID: zoneID)
         XCTAssertNotNil(sessionRecord)
         XCTAssertEqual(sessionRecord?.recordType, "WorkoutSession")
 
@@ -794,7 +835,9 @@ final class CKRecordMapperTests: XCTestCase {
     func testDeleteLocalRecordRemovesFromDB() throws {
         let db = try dbQueue()
         let ts = now()
-        try db.write { try GymRow(id: "del-gym", name: "To Delete", isDefault: 0, createdAt: ts, updatedAt: ts).insert($0) }
+        try db.write {
+            try GymRow(id: "del-gym", name: "To Delete", isDefault: 0, createdAt: ts, updatedAt: ts).insert($0)
+        }
 
         try mapper.deleteLocalRecord(id: "del-gym")
 

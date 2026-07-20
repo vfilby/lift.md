@@ -70,26 +70,7 @@ final class WorkoutExportIntegrationTests: XCTestCase {
     }
 
     func testExportSingleSessionIncludesOptionalFields() throws {
-        let plan = WorkoutPlan(
-            name: "Detailed",
-            exercises: [PlannedExercise(
-                workoutPlanId: "p",
-                exerciseName: "Bench",
-                orderIndex: 0,
-                notes: "Heavy day",
-                equipmentType: "barbell",
-                sets: [PlannedSet(
-                    plannedExerciseId: "e",
-                    orderIndex: 0,
-                    targetWeight: 225,
-                    targetWeightUnit: .lbs,
-                    targetReps: 5,
-                    targetRpe: 8,
-                    restSeconds: 180,
-                    tempo: "3-1-1-0"
-                )]
-            )]
-        )
+        let plan = makeDetailedBenchPlan()
         try planRepo.create(plan)
         let (session, _) = try sessionRepo.createFromPlan(plan)
 
@@ -156,26 +137,7 @@ final class WorkoutExportIntegrationTests: XCTestCase {
 
     func testUnifiedExportCreatesValidJson() throws {
         // Create a plan
-        let plan = WorkoutPlan(
-            name: "Integration Test Plan",
-            tags: ["test", "push"],
-            defaultWeightUnit: .lbs,
-            sourceMarkdown: "# Integration Test Plan\n## Bench Press\n- 135 x 10",
-            exercises: [PlannedExercise(
-                workoutPlanId: "p",
-                exerciseName: "Bench Press",
-                orderIndex: 0,
-                equipmentType: "barbell",
-                sets: [PlannedSet(
-                    plannedExerciseId: "e",
-                    orderIndex: 0,
-                    targetWeight: 135,
-                    targetWeightUnit: .lbs,
-                    targetReps: 10,
-                    restSeconds: 90
-                )]
-            )]
-        )
+        let plan = makeIntegrationTestPlan()
         try planRepo.create(plan)
 
         // Create a completed session
@@ -241,7 +203,8 @@ final class WorkoutExportIntegrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
 
         // Validate against JSON schema using Python tool
-        let schemaPath = findProjectRoot()?.appendingPathComponent("spec/data/schemas/liftmark-export-unified.schema.json")
+        let schemaPath = findProjectRoot()?
+            .appendingPathComponent("spec/data/schemas/liftmark-export-unified.schema.json")
         guard let schemaPath, FileManager.default.fileExists(atPath: schemaPath.path) else {
             // Skip if we can't find the schema (CI environment)
             return
@@ -256,47 +219,70 @@ final class WorkoutExportIntegrationTests: XCTestCase {
         XCTAssertNotNil(json["appVersion"] as? String)
 
         // Validate sessions array structure
+        assertSessionsMatchSchema(json)
+
+        // Validate plans array structure
+        assertPlansMatchSchema(json)
+    }
+
+    private func assertSessionsMatchSchema(
+        _ json: [String: Any], file: StaticString = #filePath, line: UInt = #line
+    ) {
         if let sessions = json["sessions"] as? [[String: Any]] {
             for session in sessions {
-                XCTAssertNotNil(session["name"] as? String)
-                XCTAssertNotNil(session["date"] as? String)
-                XCTAssertNotNil(session["status"] as? String)
+                XCTAssertNotNil(session["name"] as? String, file: file, line: line)
+                XCTAssertNotNil(session["date"] as? String, file: file, line: line)
+                XCTAssertNotNil(session["status"] as? String, file: file, line: line)
                 if let exercises = session["exercises"] as? [[String: Any]] {
                     for exercise in exercises {
-                        XCTAssertNotNil(exercise["exerciseName"] as? String)
-                        XCTAssertNotNil(exercise["orderIndex"])
-                        XCTAssertNotNil(exercise["status"] as? String)
-                        if let sets = exercise["sets"] as? [[String: Any]] {
-                            for set in sets {
-                                XCTAssertNotNil(set["orderIndex"])
-                                XCTAssertNotNil(set["status"] as? String)
-                                // Verify booleans are actual booleans, not ints
-                                if let isDropset = set["isDropset"] {
-                                    XCTAssertTrue(isDropset is Bool, "isDropset should be Bool, got \(type(of: isDropset))")
-                                }
-                                if let isPerSide = set["isPerSide"] {
-                                    XCTAssertTrue(isPerSide is Bool, "isPerSide should be Bool, got \(type(of: isPerSide))")
-                                }
-                            }
-                        }
+                        XCTAssertNotNil(exercise["exerciseName"] as? String, file: file, line: line)
+                        XCTAssertNotNil(exercise["orderIndex"], file: file, line: line)
+                        XCTAssertNotNil(exercise["status"] as? String, file: file, line: line)
+                        assertSessionSetsMatchSchema(exercise, file: file, line: line)
                     }
                 }
             }
         }
+    }
 
-        // Validate plans array structure
+    private func assertSessionSetsMatchSchema(
+        _ exercise: [String: Any], file: StaticString = #filePath, line: UInt = #line
+    ) {
+        if let sets = exercise["sets"] as? [[String: Any]] {
+            for set in sets {
+                XCTAssertNotNil(set["orderIndex"], file: file, line: line)
+                XCTAssertNotNil(set["status"] as? String, file: file, line: line)
+                // Verify booleans are actual booleans, not ints
+                if let isDropset = set["isDropset"] {
+                    XCTAssertTrue(isDropset is Bool,
+                                  "isDropset should be Bool, got \(type(of: isDropset))",
+                                  file: file, line: line)
+                }
+                if let isPerSide = set["isPerSide"] {
+                    XCTAssertTrue(isPerSide is Bool,
+                                  "isPerSide should be Bool, got \(type(of: isPerSide))",
+                                  file: file, line: line)
+                }
+            }
+        }
+    }
+
+    private func assertPlansMatchSchema(
+        _ json: [String: Any], file: StaticString = #filePath, line: UInt = #line
+    ) {
         if let plans = json["plans"] as? [[String: Any]] {
             for plan in plans {
-                XCTAssertNotNil(plan["name"] as? String)
+                XCTAssertNotNil(plan["name"] as? String, file: file, line: line)
                 if let exercises = plan["exercises"] as? [[String: Any]] {
                     for exercise in exercises {
-                        XCTAssertNotNil(exercise["exerciseName"] as? String)
-                        XCTAssertNotNil(exercise["orderIndex"])
+                        XCTAssertNotNil(exercise["exerciseName"] as? String, file: file, line: line)
+                        XCTAssertNotNil(exercise["orderIndex"], file: file, line: line)
                         if let sets = exercise["sets"] as? [[String: Any]] {
                             for set in sets {
-                                XCTAssertNotNil(set["orderIndex"])
+                                XCTAssertNotNil(set["orderIndex"], file: file, line: line)
                                 if let isDropset = set["isDropset"] {
-                                    XCTAssertTrue(isDropset is Bool, "Plan set isDropset should be Bool")
+                                    XCTAssertTrue(isDropset is Bool, "Plan set isDropset should be Bool",
+                                                  file: file, line: line)
                                 }
                             }
                         }
@@ -445,6 +431,54 @@ final class WorkoutExportIntegrationTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// Plan exercising the optional fields (notes, equipment, RPE, rest, tempo).
+    private func makeDetailedBenchPlan() -> WorkoutPlan {
+        WorkoutPlan(
+            name: "Detailed",
+            exercises: [PlannedExercise(
+                workoutPlanId: "p",
+                exerciseName: "Bench",
+                orderIndex: 0,
+                notes: "Heavy day",
+                equipmentType: "barbell",
+                sets: [PlannedSet(
+                    plannedExerciseId: "e",
+                    orderIndex: 0,
+                    targetWeight: 225,
+                    targetWeightUnit: .lbs,
+                    targetReps: 5,
+                    targetRpe: 8,
+                    restSeconds: 180,
+                    tempo: "3-1-1-0"
+                )]
+            )]
+        )
+    }
+
+    /// Plan with tags, source markdown, and one bench set for unified-export tests.
+    private func makeIntegrationTestPlan() -> WorkoutPlan {
+        WorkoutPlan(
+            name: "Integration Test Plan",
+            tags: ["test", "push"],
+            defaultWeightUnit: .lbs,
+            sourceMarkdown: "# Integration Test Plan\n## Bench Press\n- 135 x 10",
+            exercises: [PlannedExercise(
+                workoutPlanId: "p",
+                exerciseName: "Bench Press",
+                orderIndex: 0,
+                equipmentType: "barbell",
+                sets: [PlannedSet(
+                    plannedExerciseId: "e",
+                    orderIndex: 0,
+                    targetWeight: 135,
+                    targetWeightUnit: .lbs,
+                    targetReps: 10,
+                    restSeconds: 90
+                )]
+            )]
+        )
+    }
 
     private func findProjectRoot() -> URL? {
         // Try to find the project root by walking up from the source file location

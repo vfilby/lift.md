@@ -19,6 +19,123 @@ struct ExerciseDisplaySection {
     let items: [PlanDisplayItem]
 }
 
+// MARK: - Display Builder
+
+/// Pure grouping logic that turns a plan's flat exercise list into the
+/// sectioned display items rendered by `WorkoutDetailView`.
+enum PlanDisplayBuilder {
+    /// Group exercises by section (warmup, cooldown, default) then build display items
+    static func sections(for plan: WorkoutPlan) -> [ExerciseDisplaySection] {
+        var sections: [ExerciseDisplaySection] = []
+        var currentSectionName: String?
+        var currentExercises: [PlannedExercise] = []
+
+        for exercise in plan.exercises {
+            let sectionName: String?
+            if exercise.groupType == .section {
+                sectionName = exercise.groupName
+            } else if exercise.parentExerciseId != nil {
+                // Children of sections/supersets stay in the current section
+                sectionName = currentSectionName
+            } else {
+                sectionName = nil
+            }
+
+            if sectionName != currentSectionName {
+                if !currentExercises.isEmpty {
+                    sections.append(ExerciseDisplaySection(
+                        name: currentSectionName,
+                        items: displayItems(from: currentExercises)
+                    ))
+                }
+                currentSectionName = sectionName
+                currentExercises = []
+            }
+            currentExercises.append(exercise)
+        }
+        if !currentExercises.isEmpty {
+            sections.append(ExerciseDisplaySection(
+                name: currentSectionName,
+                items: displayItems(from: currentExercises)
+            ))
+        }
+        return sections
+    }
+
+    /// Build display items from a flat list of exercises, grouping supersets
+    static func displayItems(from exercises: [PlannedExercise]) -> [PlanDisplayItem] {
+        var items: [PlanDisplayItem] = []
+        var processedIds = Set<String>()
+
+        for exercise in exercises {
+            if processedIds.contains(exercise.id) { continue }
+
+            if exercise.groupType == .superset && exercise.sets.isEmpty {
+                items.append(contentsOf: supersetItems(
+                    parent: exercise, in: exercises, processedIds: &processedIds
+                ))
+            } else if exercise.parentExerciseId != nil {
+                // Skip orphan children already handled
+                continue
+            } else if exercise.groupType == .section && exercise.sets.isEmpty {
+                items.append(contentsOf: sectionItems(
+                    header: exercise, in: exercises, processedIds: &processedIds
+                ))
+            } else {
+                items.append(.single(exercise: exercise))
+                processedIds.insert(exercise.id)
+            }
+        }
+        return items
+    }
+
+    /// Superset parent — gather children into a `.superset` item. A
+    /// single-member superset is not a real superset — render the lone child
+    /// as a standalone exercise (no SUPERSET badge), matching the active
+    /// workout view.
+    private static func supersetItems(
+        parent: PlannedExercise,
+        in exercises: [PlannedExercise],
+        processedIds: inout Set<String>
+    ) -> [PlanDisplayItem] {
+        var children: [PlannedExercise] = []
+        for child in exercises where child.parentExerciseId == parent.id {
+            children.append(child)
+            processedIds.insert(child.id)
+        }
+        processedIds.insert(parent.id)
+        if SupersetGrouping.isRealSuperset(childCount: children.count) {
+            return [.superset(parent: parent, children: children)]
+        }
+        return children.map { .single(exercise: $0) }
+    }
+
+    /// Section header — gather children. A child that is itself a superset
+    /// parent must recurse so grandchildren render inside PlanSupersetCard;
+    /// otherwise the superset parent (no sets) shows as an empty single card
+    /// and grandchildren are dropped.
+    private static func sectionItems(
+        header: PlannedExercise,
+        in exercises: [PlannedExercise],
+        processedIds: inout Set<String>
+    ) -> [PlanDisplayItem] {
+        var items: [PlanDisplayItem] = []
+        processedIds.insert(header.id)
+        for child in exercises {
+            guard child.parentExerciseId == header.id else { continue }
+            if child.groupType == .superset && child.sets.isEmpty {
+                items.append(contentsOf: supersetItems(
+                    parent: child, in: exercises, processedIds: &processedIds
+                ))
+            } else {
+                items.append(.single(exercise: child))
+                processedIds.insert(child.id)
+            }
+        }
+        return items
+    }
+}
+
 // MARK: - Section Color Helper
 
 func workoutSectionColor(for name: String) -> Color {
@@ -64,8 +181,8 @@ func planSetDetailString(_ set: PlannedSet) -> String {
     return detail
 }
 
-func planFormatWeight(_ w: Double) -> String {
-    w.formattedWeight
+func planFormatWeight(_ weight: Double) -> String {
+    weight.formattedWeight
 }
 
 func planFormatTime(_ seconds: Int) -> String {
@@ -279,7 +396,7 @@ struct PlanSupersetCard: View {
     /// Edit a single member exercise.
     var onEditChild: (PlannedExercise) -> Void = { _ in }
     /// Edit the superset grouping itself (the parent).
-    var onEdit: (() -> Void)? = nil
+    var onEdit: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {

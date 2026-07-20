@@ -143,7 +143,14 @@ struct InboxSectionView: View {
             // of fighting it for space.
             List {
                 ForEach(items) { item in
-                    inboxRow(item)
+                    InboxRowView(
+                        item: item,
+                        isBusy: inFlightInboxId == item.id,
+                        onPreview: { presentPreview(for: item) },
+                        onDiscard: { Task { await discard(item) } },
+                        onAdd: { Task { await promote(item, openDetail: false) } },
+                        onStart: { Task { await promote(item, openDetail: true) } }
+                    )
                 }
                 .listRowInsets(EdgeInsets(
                     top: 4,
@@ -181,79 +188,6 @@ struct InboxSectionView: View {
         .padding(.horizontal, LiftMarkTheme.spacingMD)
         .padding(.bottom, LiftMarkTheme.spacingMD)
         .accessibilityIdentifier("inbox-empty")
-    }
-
-    private func inboxRow(_ item: InboxItem) -> some View {
-        let isBusy = inFlightInboxId == item.id
-        return HStack(spacing: LiftMarkTheme.spacingSM) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.summary.name)
-                    .font(.lmHeadline)
-                    .lineLimit(1)
-                Text("\(item.summary.exerciseCount) exercises • \(item.summary.setCount) sets • \(relativeStamp(item.createdAtServer))")
-                    .font(.lmCaption)
-                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    .lineLimit(1)
-            }
-            Spacer()
-            if isBusy {
-                ProgressView()
-            }
-        }
-        .padding(LiftMarkTheme.spacingSM)
-        .background(LiftMarkTheme.background)
-        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
-        .contentShape(Rectangle())
-        // Tap the row to preview. Parsing happens inline so unparseable
-        // markdown fails as a logged warning instead of presenting an
-        // empty sheet.
-        .onTapGesture {
-            guard !isBusy else { return }
-            presentPreview(for: item)
-        }
-        .accessibilityIdentifier("inbox-row-\(item.id)")
-        .contextMenu {
-            Button {
-                Task { await discard(item) }
-            } label: {
-                Label("Discard", systemImage: "trash")
-            }
-            .accessibilityIdentifier("inbox-row-discard-\(item.id)")
-            Button {
-                Task { await promote(item, openDetail: false) }
-            } label: {
-                Label("Add to Plans", systemImage: "tray.and.arrow.down")
-            }
-            .accessibilityIdentifier("inbox-row-add-\(item.id)")
-            Button {
-                Task { await promote(item, openDetail: true) }
-            } label: {
-                Label("Start", systemImage: "play.fill")
-            }
-            .accessibilityIdentifier("inbox-row-start-\(item.id)")
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                Task { await discard(item) }
-            } label: {
-                Label("Discard", systemImage: "trash")
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button {
-                Task { await promote(item, openDetail: true) }
-            } label: {
-                Label("Start", systemImage: "play.fill")
-            }
-            .tint(.green)
-            Button {
-                Task { await promote(item, openDetail: false) }
-            } label: {
-                Label("Add", systemImage: "tray.and.arrow.down")
-            }
-            .tint(.blue)
-        }
-        .disabled(isBusy)
     }
 
     // MARK: - Actions
@@ -402,6 +336,93 @@ struct InboxSectionView: View {
                 "inbox \(action) server-delete failed (ignored): \(error)"
             )
         }
+    }
+
+}
+
+// MARK: - Inbox Row
+
+/// A single inbox row: tap to preview, context menu and swipe actions for
+/// Discard / Add to Plans / Start.
+private struct InboxRowView: View {
+    let item: InboxItem
+    let isBusy: Bool
+    let onPreview: () -> Void
+    let onDiscard: () -> Void
+    let onAdd: () -> Void
+    let onStart: () -> Void
+
+    var body: some View {
+        HStack(spacing: LiftMarkTheme.spacingSM) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.summary.name)
+                    .font(.lmHeadline)
+                    .lineLimit(1)
+                Text("\(item.summary.exerciseCount) exercises • \(item.summary.setCount) sets • "
+                    + "\(relativeStamp(item.createdAtServer))")
+                    .font(.lmCaption)
+                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                    .lineLimit(1)
+            }
+            Spacer()
+            if isBusy {
+                ProgressView()
+            }
+        }
+        .padding(LiftMarkTheme.spacingSM)
+        .background(LiftMarkTheme.background)
+        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusSM))
+        .contentShape(Rectangle())
+        // Tap the row to preview. Parsing happens inline so unparseable
+        // markdown fails as a logged warning instead of presenting an
+        // empty sheet.
+        .onTapGesture {
+            guard !isBusy else { return }
+            onPreview()
+        }
+        .accessibilityIdentifier("inbox-row-\(item.id)")
+        .contextMenu {
+            Button {
+                onDiscard()
+            } label: {
+                Label("Discard", systemImage: "trash")
+            }
+            .accessibilityIdentifier("inbox-row-discard-\(item.id)")
+            Button {
+                onAdd()
+            } label: {
+                Label("Add to Plans", systemImage: "tray.and.arrow.down")
+            }
+            .accessibilityIdentifier("inbox-row-add-\(item.id)")
+            Button {
+                onStart()
+            } label: {
+                Label("Start", systemImage: "play.fill")
+            }
+            .accessibilityIdentifier("inbox-row-start-\(item.id)")
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                onDiscard()
+            } label: {
+                Label("Discard", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button {
+                onStart()
+            } label: {
+                Label("Start", systemImage: "play.fill")
+            }
+            .tint(.green)
+            Button {
+                onAdd()
+            } label: {
+                Label("Add", systemImage: "tray.and.arrow.down")
+            }
+            .tint(.blue)
+        }
+        .disabled(isBusy)
     }
 
     private func relativeStamp(_ date: Date) -> String {

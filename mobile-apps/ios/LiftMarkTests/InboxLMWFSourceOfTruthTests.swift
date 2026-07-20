@@ -395,12 +395,12 @@ final class InboxLMWFSourceOfTruthTests: XCTestCase {
             INSERT INTO schema_version (version) VALUES (17);
             """)
         defer { DatabaseSeedLoader.cleanup(loaded) }
-        let q = try DatabaseSeedLoader.openQueue(at: loaded.path)
+        let queue = try DatabaseSeedLoader.openQueue(at: loaded.path)
 
         // schema_version=17 stamps v1..v17 as applied; the migrator then runs only v18.
-        try DatabaseSeedLoader.migrate(q, upTo: "v18_workout_inbox_drop_preparse")
+        try DatabaseSeedLoader.migrate(queue, upTo: "v18_workout_inbox_drop_preparse")
 
-        let columns: [String] = try q.read { db in
+        let columns: [String] = try queue.read { db in
             try Row.fetchAll(db, sql: "PRAGMA table_info(workout_inbox)").map { $0["name"] }
         }
         XCTAssertEqual(

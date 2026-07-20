@@ -71,19 +71,24 @@ final class AnthropicService: @unchecked Sendable {
     func generateWorkout(apiKey: String, prompt: String, model: String? = nil) async -> GenerateWorkoutResult {
         let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else {
-            return GenerateWorkoutResult(
-                success: false, workout: nil,
-                error: AnthropicError(
-                    message: "API key is required. Please add your Anthropic API key in Settings.",
-                    type: "missing_api_key", status: nil
-                )
+            return failure(
+                "API key is required. Please add your Anthropic API key in Settings.",
+                type: "missing_api_key"
             )
         }
 
-        let selectedModel = model ?? Self.defaultModel
+        switch buildRequest(key: key, prompt: prompt, model: model ?? Self.defaultModel) {
+        case .failure(let error):
+            return GenerateWorkoutResult(success: false, workout: nil, error: error)
+        case .success(let request):
+            return await performRequest(request)
+        }
+    }
 
+    /// Build the Messages API URLRequest for a workout-generation prompt.
+    private func buildRequest(key: String, prompt: String, model: String) -> Result<URLRequest, AnthropicError> {
         let requestBody: [String: Any] = [
-            "model": selectedModel,
+            "model": model,
             "max_tokens": Self.maxTokens,
             "messages": [
                 ["role": "user", "content": prompt]
@@ -91,10 +96,7 @@ final class AnthropicService: @unchecked Sendable {
         ]
 
         guard let url = URL(string: Self.apiURL) else {
-            return GenerateWorkoutResult(
-                success: false, workout: nil,
-                error: AnthropicError(message: "Invalid API URL", type: "internal_error", status: nil)
-            )
+            return .failure(AnthropicError(message: "Invalid API URL", type: "internal_error", status: nil))
         }
 
         var request = URLRequest(url: url)
@@ -106,51 +108,23 @@ final class AnthropicService: @unchecked Sendable {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         } catch {
-            return GenerateWorkoutResult(
-                success: false, workout: nil,
-                error: AnthropicError(message: "Failed to encode request", type: "internal_error", status: nil)
-            )
+            return .failure(AnthropicError(message: "Failed to encode request", type: "internal_error", status: nil))
         }
 
+        return .success(request)
+    }
+
+    /// Execute the request and map the response (or transport error) to a result.
+    private func performRequest(_ request: URLRequest) async -> GenerateWorkoutResult {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return GenerateWorkoutResult(
-                    success: false, workout: nil,
-                    error: AnthropicError(message: "Invalid response", type: "network_error", status: nil)
-                )
+                return failure("Invalid response", type: "network_error")
             }
 
             guard httpResponse.statusCode == 200 else {
-                let errorMessage: String
-                let errorType: String
-
-                switch httpResponse.statusCode {
-                case 401:
-                    errorMessage = "Invalid API key. Please check your Anthropic API key in Settings."
-                    errorType = "invalid_api_key"
-                case 429:
-                    errorMessage = "Rate limit exceeded. Please try again in a moment."
-                    errorType = "rate_limit"
-                case 400:
-                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let errorObj = json["error"] as? [String: Any],
-                       let msg = errorObj["message"] as? String {
-                        errorMessage = msg
-                    } else {
-                        errorMessage = "Invalid request. Please try again."
-                    }
-                    errorType = "bad_request"
-                default:
-                    errorMessage = "Anthropic API is currently unavailable. Please try again later."
-                    errorType = "server_error"
-                }
-
-                return GenerateWorkoutResult(
-                    success: false, workout: nil,
-                    error: AnthropicError(message: errorMessage, type: errorType, status: httpResponse.statusCode)
-                )
+                return errorResult(status: httpResponse.statusCode, data: data)
             }
 
             // Parse response
@@ -158,10 +132,7 @@ final class AnthropicService: @unchecked Sendable {
                   let content = json["content"] as? [[String: Any]],
                   let firstBlock = content.first,
                   let text = firstBlock["text"] as? String else {
-                return GenerateWorkoutResult(
-                    success: false, workout: nil,
-                    error: AnthropicError(message: "No workout generated. Please try again.", type: "empty_response", status: nil)
-                )
+                return failure("No workout generated. Please try again.", type: "empty_response")
             }
 
             return GenerateWorkoutResult(success: true, workout: text, error: nil)
@@ -169,14 +140,44 @@ final class AnthropicService: @unchecked Sendable {
         } catch {
             Logger.shared.error(.network, "Failed to generate workout", error: error)
 
-            return GenerateWorkoutResult(
-                success: false, workout: nil,
-                error: AnthropicError(
-                    message: "Network error. Please check your connection and try again.",
-                    type: "network_error", status: nil
-                )
-            )
+            return failure("Network error. Please check your connection and try again.", type: "network_error")
         }
+    }
+
+    /// Map a non-200 HTTP status (and error payload, when present) to a failure result.
+    private func errorResult(status: Int, data: Data) -> GenerateWorkoutResult {
+        let errorMessage: String
+        let errorType: String
+
+        switch status {
+        case 401:
+            errorMessage = "Invalid API key. Please check your Anthropic API key in Settings."
+            errorType = "invalid_api_key"
+        case 429:
+            errorMessage = "Rate limit exceeded. Please try again in a moment."
+            errorType = "rate_limit"
+        case 400:
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errorObj = json["error"] as? [String: Any],
+               let msg = errorObj["message"] as? String {
+                errorMessage = msg
+            } else {
+                errorMessage = "Invalid request. Please try again."
+            }
+            errorType = "bad_request"
+        default:
+            errorMessage = "Anthropic API is currently unavailable. Please try again later."
+            errorType = "server_error"
+        }
+
+        return failure(errorMessage, type: errorType, status: status)
+    }
+
+    private func failure(_ message: String, type: String, status: Int? = nil) -> GenerateWorkoutResult {
+        GenerateWorkoutResult(
+            success: false, workout: nil,
+            error: AnthropicError(message: message, type: type, status: status)
+        )
     }
 
     // MARK: - Verify API Key

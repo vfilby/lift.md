@@ -98,14 +98,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let plain = ISO8601DateFormatter()
         plain.formatOptions = [.withInternetDateTime]
-        decoder.dateDecodingStrategy = .custom { d in
-            let s = try d.singleValueContainer().decode(String.self)
-            if let date = fractional.date(from: s) ?? plain.date(from: s) {
+        decoder.dateDecodingStrategy = .custom { dateDecoder in
+            let string = try dateDecoder.singleValueContainer().decode(String.self)
+            if let date = fractional.date(from: string) ?? plain.date(from: string) {
                 return date
             }
             throw DecodingError.dataCorruptedError(
-                in: try d.singleValueContainer(),
-                debugDescription: "Not an ISO8601 date: \(s)"
+                in: try dateDecoder.singleValueContainer(),
+                debugDescription: "Not an ISO8601 date: \(string)"
             )
         }
         self.decoder = decoder
@@ -210,32 +210,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             }
         }
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch {
-            throw APIError.transport(error)
-        }
-
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.transport(URLError(.badServerResponse))
-        }
-
-        switch http.statusCode {
-        case 200..<300:
-            return (data, http)
-        case 401:
-            throw APIError.unauthorized
-        case 403:
-            throw Self.forbiddenError(from: data)
-        case 404:
-            throw APIError.notFound
-        case 409:
-            throw APIError.conflict(message: Self.errorMessage(from: data))
-        default:
-            throw APIError.server(status: http.statusCode, message: Self.errorMessage(from: data))
-        }
+        return try await execute(request)
     }
 
     private func performRaw(
@@ -254,6 +229,13 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         }
         request.httpBody = bodyData
 
+        return try await execute(request)
+    }
+
+    /// Runs the request and maps the HTTP status code to a success pair or an
+    /// `APIError`. Shared tail of `perform` / `performRaw` — the status-code
+    /// mapping must stay identical for both paths.
+    private func execute(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let data: Data
         let response: URLResponse
         do {

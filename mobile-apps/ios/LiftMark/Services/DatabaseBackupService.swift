@@ -98,8 +98,8 @@ enum DatabaseBackupService {
 
         guard headerData.count == 16 else { return false }
 
-        for (i, byte) in headerData.enumerated() {
-            if byte != expectedHeader[i] { return false }
+        for (i, byte) in headerData.enumerated() where byte != expectedHeader[i] {
+            return false
         }
 
         // Check required tables
@@ -109,8 +109,8 @@ enum DatabaseBackupService {
                 try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type='table'")
             }
 
-            for required in requiredTables {
-                if !tables.contains(required) { return false }
+            for required in requiredTables where !tables.contains(required) {
+                return false
             }
         } catch {
             return false

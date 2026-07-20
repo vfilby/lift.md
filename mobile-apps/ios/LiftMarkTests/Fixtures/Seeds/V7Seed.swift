@@ -115,7 +115,8 @@ extension DatabaseSeeds {
       ('\#(templatePushId)', 'Push Day', NULL, NULL, 'lbs', NULL, '\#(ts1)', '\#(ts1)', 1);
 
     INSERT INTO template_exercises
-      (id, workout_template_id, exercise_name, order_index, notes, equipment_type, group_type, group_name, parent_exercise_id)
+      (id, workout_template_id, exercise_name, order_index, notes, equipment_type,
+       group_type, group_name, parent_exercise_id)
     VALUES
       ('\#(tplExBench)', '\#(templatePushId)', 'Bench Press', 0, NULL, 'barbell', NULL, NULL, NULL);
 

@@ -29,8 +29,12 @@ jobs:
 
       - name: SwiftLint
         run: |
+          # The runner image ships with aws/tap pre-tapped; Homebrew warns on
+          # every command about untrusted taps. We don't use it — drop it.
+          brew untap aws/tap || true
           brew install swiftlint
-          swiftlint lint --reporter github-actions-logging
+          # The baseline was burned down to zero (GH #351); lint runs clean.
+          swiftlint lint --strict --reporter github-actions-logging
 
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
@@ -124,6 +128,7 @@ jobs:
 
       - name: Install XcodeGen
         run: |
+          brew untap aws/tap || true
           brew install xcodegen
           INSTALLED=$(xcodegen --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           MINIMUM="2.45.3"

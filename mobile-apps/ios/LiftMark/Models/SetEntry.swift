@@ -64,24 +64,24 @@ extension EntryValues {
     /// Build EntryValues from a flat array of measurement rows (all same role + groupIndex).
     static func from(_ measurements: [SetMeasurementRow]) -> EntryValues {
         var values = EntryValues()
-        for m in measurements {
-            switch m.kind {
+        for measurement in measurements {
+            switch measurement.kind {
             case "weight":
                 values.weight = MeasuredWeight(
-                    value: m.value,
-                    unit: m.unit.flatMap { WeightUnit(rawValue: $0) } ?? .lbs
+                    value: measurement.value,
+                    unit: measurement.unit.flatMap { WeightUnit(rawValue: $0) } ?? .lbs
                 )
             case "reps":
-                values.reps = Int(m.value)
+                values.reps = Int(measurement.value)
             case "time":
-                values.time = Int(m.value)
+                values.time = Int(measurement.value)
             case "distance":
                 values.distance = MeasuredDistance(
-                    value: m.value,
-                    unit: m.unit.flatMap { DistanceUnit(rawValue: $0) } ?? .meters
+                    value: measurement.value,
+                    unit: measurement.unit.flatMap { DistanceUnit(rawValue: $0) } ?? .meters
                 )
             case "rpe":
-                values.rpe = Int(m.value)
+                values.rpe = Int(measurement.value)
             default:
                 break
             }
@@ -98,38 +98,38 @@ extension EntryValues {
         now: String
     ) -> [SetMeasurementRow] {
         var rows: [SetMeasurementRow] = []
-        if let w = weight {
+        if let weight {
             rows.append(SetMeasurementRow(
                 id: IDGenerator.generate(), setId: setId, parentType: parentType,
-                role: role, kind: "weight", value: w.value, unit: w.unit.rawValue,
+                role: role, kind: "weight", value: weight.value, unit: weight.unit.rawValue,
                 groupIndex: groupIndex, updatedAt: now
             ))
         }
-        if let r = reps {
+        if let reps {
             rows.append(SetMeasurementRow(
                 id: IDGenerator.generate(), setId: setId, parentType: parentType,
-                role: role, kind: "reps", value: Double(r), unit: nil,
+                role: role, kind: "reps", value: Double(reps), unit: nil,
                 groupIndex: groupIndex, updatedAt: now
             ))
         }
-        if let t = time {
+        if let time {
             rows.append(SetMeasurementRow(
                 id: IDGenerator.generate(), setId: setId, parentType: parentType,
-                role: role, kind: "time", value: Double(t), unit: "s",
+                role: role, kind: "time", value: Double(time), unit: "s",
                 groupIndex: groupIndex, updatedAt: now
             ))
         }
-        if let d = distance {
+        if let distance {
             rows.append(SetMeasurementRow(
                 id: IDGenerator.generate(), setId: setId, parentType: parentType,
-                role: role, kind: "distance", value: d.value, unit: d.unit.rawValue,
+                role: role, kind: "distance", value: distance.value, unit: distance.unit.rawValue,
                 groupIndex: groupIndex, updatedAt: now
             ))
         }
-        if let r = rpe {
+        if let rpe {
             rows.append(SetMeasurementRow(
                 id: IDGenerator.generate(), setId: setId, parentType: parentType,
-                role: role, kind: "rpe", value: Double(r), unit: nil,
+                role: role, kind: "rpe", value: Double(rpe), unit: nil,
                 groupIndex: groupIndex, updatedAt: now
             ))
         }

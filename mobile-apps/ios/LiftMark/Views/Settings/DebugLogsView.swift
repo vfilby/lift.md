@@ -6,7 +6,7 @@ import UIKit
 struct DebugLogsView: View {
     @State private var isLoading = true
     @State private var logs: [LogEntry] = []
-    @State private var selectedLevel: LogLevel? = nil
+    @State private var selectedLevel: LogLevel?
     @State private var showClearConfirmation = false
     @State private var shareFile: ExportFile?
 

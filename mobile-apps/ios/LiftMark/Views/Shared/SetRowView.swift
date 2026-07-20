@@ -22,23 +22,27 @@ struct SetRowView: View {
     let exerciseName: String
     let equipmentType: String?
     let onComplete: (Double?, Int?, Int?) -> Void
-    var onCompleteDropSet: ((_ entries: [(weight: Double?, weightUnit: WeightUnit?, reps: Int?)]) -> Void)? = nil
+    var onCompleteDropSet: ((_ entries: [(weight: Double?, weightUnit: WeightUnit?, reps: Int?)]) -> Void)?
     let onSkip: () -> Void
     let onSave: (Double?, Int?, Int?) -> Void
-    var onUnlog: (() -> Void)? = nil
-    var onWeightChanged: ((String) -> Void)? = nil
+    var onUnlog: (() -> Void)?
+    var onWeightChanged: ((String) -> Void)?
 
-    @State private var weightText: String = ""
-    @State private var repsText: String = ""
-    @State private var timeText: String = ""
-    @State private var isEditing = false
+    // The input-field state below is non-private so the row-content helpers in
+    // SetRowView+CurrentSet.swift, SetRowView+CompletedRow.swift, and
+    // SetRowView+DropSet.swift (split out for SwiftLint's file/type-length
+    // limits) can read and mutate it.
+    @State var weightText: String = ""
+    @State var repsText: String = ""
+    @State var timeText: String = ""
+    @State var isEditing = false
     /// User tapped "add weight" on a set that started without a weight
     /// (reps-only / bodyweight). Reveals the weight field inline so a weight
     /// can be logged without editing the exercise definition (GH #194).
     /// Non-private so the weight helpers in SetRowView+Weight.swift can set it.
     @State var isAddingWeight = false
     /// Additional drop entries (groupIndex > 0). Each pair is (weight, reps) text.
-    @State private var dropEntries: [(weight: String, reps: String)] = []
+    @State var dropEntries: [(weight: String, reps: String)] = []
 
     var body: some View {
         Group {
@@ -72,30 +76,30 @@ struct SetRowView: View {
         .onAppear {
             let target = set.entries.first?.target
             let actual = set.entries.first?.actual
-            if let w = target?.weight?.value ?? actual?.weight?.value {
-                weightText = formatWeight(w)
+            if let weight = target?.weight?.value ?? actual?.weight?.value {
+                weightText = formatWeight(weight)
                 onWeightChanged?(weightText)
             }
-            if let r = target?.reps ?? actual?.reps {
-                repsText = "\(r)"
+            if let reps = target?.reps ?? actual?.reps {
+                repsText = "\(reps)"
             }
-            if let t = target?.time ?? actual?.time {
-                timeText = DurationFormat.mmss(t)
+            if let time = target?.time ?? actual?.time {
+                timeText = DurationFormat.mmss(time)
             }
         }
     }
 
     /// Step size for +/- buttons. Coarser steps for long holds so users
     /// aren't tapping 12 times to add a minute.
-    private var timeStepSeconds: Int {
-        let t = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
-        return t >= 90 ? 30 : 5
+    var timeStepSeconds: Int {
+        let time = set.entries.first?.target?.time ?? set.entries.first?.actual?.time ?? 0
+        return time >= 90 ? 30 : 5
     }
 
     // MARK: - Set Number Indicator
 
     @ViewBuilder
-    private var setIndicator: some View {
+    var setIndicator: some View {
         ZStack {
             switch set.status {
             case .completed:
@@ -123,713 +127,13 @@ struct SetRowView: View {
             }
         }
         .frame(width: 28)
-        .accessibilityLabel("Set \(setNumber), \(set.status == .completed ? "completed" : set.status == .skipped ? "skipped" : set.status == .failed ? "failed" : isCurrent ? "current" : "pending")")
-    }
-
-    // MARK: - Current Set (Editable)
-
-    @ViewBuilder
-    private var currentSetContent: some View {
-        VStack(spacing: LiftMarkTheme.spacingSM) {
-            // Plate math info — barbell exercises only (above weight × reps)
-            if let plateMathText = plateMathText {
-                HStack(spacing: 6) {
-                    Image(systemName: "scalemass")
-                        .font(.lmCaption)
-                        .accessibilityHidden(true)
-                    Text(plateMathText)
-                        .font(.lmCallout)
-                }
-                .foregroundStyle(Color.blue)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.blue.opacity(0.08))
-                .overlay(
-                    Rectangle()
-                        .frame(width: 3)
-                        .foregroundStyle(Color.blue.opacity(0.4)),
-                    alignment: .leading
-                )
-                .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusXS))
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Plate loading: \(plateMathText)")
-            }
-
-            // Top row: indicator + inputs + skip
-            HStack(alignment: .textFieldCenter, spacing: LiftMarkTheme.spacingSM) {
-                setIndicator
-                    .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-
-                // Side label for per-side sets (Left/Right)
-                if let side = set.side {
-                    Text(side.capitalized)
-                        .font(.lmCaption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(LiftMarkTheme.primary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(LiftMarkTheme.primary.opacity(0.1))
-                        .clipShape(Capsule())
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                }
-
-                // Weight input — shown for weighted exercises, or when the user
-                // taps "add weight" on a reps-only/bodyweight set (GH #194).
-                if showsWeightField {
-                    VStack(alignment: .center, spacing: 2) {
-                        Text("Weight\(weightUnitLabel)")
-                            .font(.lmCaption2)
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                        HStack(spacing: 2) {
-                            Button { adjustWeight(by: -weightStepIncrement) } label: {
-                                Image(systemName: "minus.circle")
-                                    .font(.lmBody)
-                                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Decrease weight by \(formatWeight(weightStepIncrement))")
-
-                            TextField("--", text: $weightText)
-                                #if os(iOS)
-                                .keyboardType(.decimalPad)
-                                #endif
-                                .font(.lmTitle3.monospacedDigit())
-                                .multilineTextAlignment(.center)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 72)
-                                .onChange(of: weightText) { _, newValue in
-                                    onWeightChanged?(newValue)
-                                }
-
-                            Button { adjustWeight(by: weightStepIncrement) } label: {
-                                Image(systemName: "plus.circle")
-                                    .font(.lmBody)
-                                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Increase weight by \(formatWeight(weightStepIncrement))")
-                        }
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                    }
-
-                    // Show × separator only when reps follow (not for weighted-timed sets)
-                    if set.entries.first?.target?.time == nil {
-                        Text("×")
-                            .font(.lmCallout)
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                    }
-                } else {
-                    // Reps-only / bodyweight set: offer to add a weight inline.
-                    addWeightButton
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                }
-
-                // Time input — for all timed exercises (including weighted-timed)
-                if set.entries.first?.target?.time != nil {
-                    VStack(alignment: .center, spacing: 2) {
-                        Text("Time (m:ss)")
-                            .font(.lmCaption2)
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                        HStack(spacing: 2) {
-                            Button { adjustTime(by: -timeStepSeconds) } label: {
-                                Image(systemName: "minus.circle")
-                                    .font(.lmCallout)
-                                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Decrease time by \(timeStepSeconds) seconds")
-
-                            TextField("--", text: $timeText)
-                                #if os(iOS)
-                                .keyboardType(.numbersAndPunctuation)
-                                #endif
-                                .font(.lmTitle3.monospacedDigit())
-                                .multilineTextAlignment(.center)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 88)
-
-                            Button { adjustTime(by: timeStepSeconds) } label: {
-                                Image(systemName: "plus.circle")
-                                    .font(.lmCallout)
-                                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Increase time by \(timeStepSeconds) seconds")
-                        }
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                    }
-                }
-
-                // Reps input — only for non-timed exercises
-                if set.entries.first?.target?.time == nil {
-                    VStack(alignment: .center, spacing: 2) {
-                        Text("Reps")
-                            .font(.lmCaption2)
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                        HStack(spacing: 2) {
-                            Button { adjustReps(by: -1) } label: {
-                                Image(systemName: "minus.circle")
-                                    .font(.lmCallout)
-                                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Decrease reps by 1")
-
-                            TextField("--", text: $repsText)
-                                #if os(iOS)
-                                .keyboardType(.numberPad)
-                                #endif
-                                .font(.lmTitle3.monospacedDigit())
-                                .multilineTextAlignment(.center)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 50)
-
-                            Button { adjustReps(by: 1) } label: {
-                                Image(systemName: "plus.circle")
-                                    .font(.lmCallout)
-                                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Increase reps by 1")
-                        }
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                    }
-                }
-
-                Spacer()
-
-                // Skip button
-                Button {
-                    onSkip()
-                } label: {
-                    Image(systemName: "forward.fill")
-                        .font(.lmBody)
-                        .foregroundStyle(LiftMarkTheme.warning)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("set-skip-button")
-                .accessibilityLabel("Skip set \(setNumber)")
-                .accessibilityHint("Marks this set as skipped")
-                .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-            }
-
-            // Drop set entries (additional drops, groupIndex > 0)
-            if set.isDropset && !dropEntries.isEmpty {
-                ForEach(Array(dropEntries.enumerated()), id: \.offset) { index, _ in
-                    dropEntryRow(index: index)
-                }
-            }
-
-            // "+ Drop" button for drop sets
-            if set.isDropset {
-                Button {
-                    // Auto-decrement weight by 5 lbs from previous entry
-                    let prevWeightStr = dropEntries.last?.weight ?? weightText
-                    let prevWeight = Double(prevWeightStr) ?? 0
-                    let droppedWeight = max(0, prevWeight - 5)
-                    let newWeight = droppedWeight.truncatingRemainder(dividingBy: 1) == 0
-                        ? "\(Int(droppedWeight))" : String(format: "%.1f", droppedWeight)
-
-                    // Pre-fill reps with remaining count (target - sum of entered reps)
-                    let targetReps = set.entries.first?.target?.reps ?? 0
-                    let primaryReps = Int(repsText) ?? 0
-                    let dropRepsSum = dropEntries.compactMap { Int($0.reps) }.reduce(0, +)
-                    let remaining = max(0, targetReps - primaryReps - dropRepsSum)
-                    let newReps = remaining > 0 ? "\(remaining)" : ""
-
-                    dropEntries.append((weight: newWeight, reps: newReps))
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.lmSubheadline.bold())
-                        Text("Add Drop")
-                            .font(.lmSubheadline.bold())
-                    }
-                    .foregroundStyle(LiftMarkTheme.destructive)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(LiftMarkTheme.destructive.opacity(0.1))
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(LiftMarkTheme.destructive.opacity(0.3), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("add-drop-button")
-                .accessibilityLabel("Add drop")
-                .accessibilityHint("Adds another weight reduction entry to this drop set")
-            }
-
-            // Middle row: target hint — always reserve space, show when values differ from target
-            if let target = targetHint {
-                Text(target)
-                    .font(.lmCaption)
-                    .foregroundStyle(LiftMarkTheme.tertiaryLabel)
-                    .opacity(valuesChangedFromTarget ? 1 : 0)
-            }
-
-            // Bottom row: complete button — hide for timed sets (completed via ExerciseTimerView Done)
-            if set.entries.first?.target?.time == nil {
-                Button {
-                    if set.isDropset && !dropEntries.isEmpty, let callback = onCompleteDropSet {
-                        // Build all entries: primary + drops
-                        let weightUnit = set.entries.first?.target?.weight?.unit
-                        var allEntries: [(weight: Double?, weightUnit: WeightUnit?, reps: Int?)] = [
-                            (weight: Double(weightText), weightUnit: weightUnit, reps: Int(repsText))
-                        ]
-                        for drop in dropEntries {
-                            allEntries.append((weight: Double(drop.weight), weightUnit: weightUnit, reps: Int(drop.reps)))
-                        }
-                        callback(allEntries)
-                    } else {
-                        onComplete(Double(weightText), Int(repsText), DurationFormat.parse(timeText))
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark")
-                            .font(.lmFootnote.bold())
-                        Text("Complete Set")
-                            .font(.lmFootnote.bold())
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.small)
-                .tint(LiftMarkTheme.success)
-                .accessibilityIdentifier("set-complete-button")
-                .accessibilityLabel("Complete set \(setNumber)")
-                .accessibilityHint("Records this set with the entered weight and reps")
-            }
-        }
-    }
-
-    // MARK: - Completed / Pending Set
-
-    @ViewBuilder
-    private var completedOrPendingContent: some View {
-        if isEditing && (set.status == .completed || set.status == .skipped) {
-            // Inline edit form
-            inlineEditContent
-        } else {
-            Button {
-                if set.status == .completed || set.status == .skipped {
-                    // Don't allow inline edit for multi-entry drop sets (too complex)
-                    let actualEntries = set.entries.filter { $0.actual != nil }
-                    guard !(set.isDropset && actualEntries.count > 1) else { return }
-
-                    isEditing.toggle()
-                    // Initialize edit fields with current values
-                    let target = set.entries.first?.target
-                    let actual = set.entries.first?.actual
-                    if let w = actual?.weight?.value ?? target?.weight?.value {
-                        weightText = formatWeight(w)
-                    }
-                    if let r = actual?.reps ?? target?.reps {
-                        repsText = "\(r)"
-                    }
-                    if let t = actual?.time ?? target?.time {
-                        timeText = DurationFormat.mmss(t)
-                    }
-                }
-            } label: {
-                if set.status == .completed && set.isDropset {
-                    completedDropSetContent
-                } else {
-                    HStack(spacing: LiftMarkTheme.spacingSM) {
-                        if set.status == .completed {
-                            normalCompletedContent
-                        } else if set.status == .skipped {
-                            // Show target values + "-- Skipped"
-                            let target = set.entries.first?.target
-                            if let w = target?.weight?.value, let u = target?.weight?.unit {
-                                Text("\(formatWeight(w)) \(u.rawValue)")
-                                    .font(.lmSubheadline.monospacedDigit())
-                                    .foregroundStyle(LiftMarkTheme.warning)
-                            }
-                            if let r = target?.reps {
-                                Text("\u{00D7} \(r)")
-                                    .font(.lmSubheadline.monospacedDigit())
-                                    .foregroundStyle(LiftMarkTheme.warning)
-                            }
-                            Text("-- Skipped")
-                                .font(.lmSubheadline)
-                                .foregroundStyle(LiftMarkTheme.warning)
-
-                            Spacer()
-
-                            modifierBadges
-                        } else {
-                            // Pending - show targets
-                            let target = set.entries.first?.target
-                            if let w = target?.weight?.value, let u = target?.weight?.unit {
-                                Text("\(formatWeight(w)) \(u.rawValue)")
-                                    .font(.lmSubheadline.monospacedDigit())
-                                    .foregroundStyle(LiftMarkTheme.tertiaryLabel)
-                            }
-                            if let r = target?.reps {
-                                Text("\u{00D7} \(r)")
-                                    .font(.lmSubheadline.monospacedDigit())
-                                    .foregroundStyle(LiftMarkTheme.tertiaryLabel)
-                            }
-                            if let t = target?.time {
-                                Text(DurationFormat.mmss(t))
-                                    .font(.lmSubheadline.monospacedDigit())
-                                    .foregroundStyle(LiftMarkTheme.tertiaryLabel)
-                            }
-
-                            Spacer()
-
-                            modifierBadges
-                        }
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    // MARK: - Inline Edit (completed/skipped sets)
-
-    @ViewBuilder
-    private var inlineEditContent: some View {
-        HStack(alignment: .textFieldCenter, spacing: LiftMarkTheme.spacingSM) {
-            if showsWeightField {
-                VStack(alignment: .center, spacing: 2) {
-                    Text("Weight\(weightUnitLabel)")
-                        .font(.lmCaption2)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    TextField("--", text: $weightText)
-                        #if os(iOS)
-                        .keyboardType(.decimalPad)
-                        #endif
-                        .font(.lmBody.monospacedDigit())
-                        .multilineTextAlignment(.center)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 80)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                }
-
-                // Show × separator only for non-timed sets (weighted reps)
-                if set.entries.first?.target?.time == nil {
-                    Text("×")
-                        .font(.lmCaption)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                }
-            } else {
-                // Reps-only / bodyweight set logged without a weight: let the
-                // user add one while editing (GH #194).
-                addWeightButton
-                    .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-            }
-
-            // Reps field — only for non-timed sets
-            if set.entries.first?.target?.time == nil {
-                VStack(alignment: .center, spacing: 2) {
-                    Text("Reps")
-                        .font(.lmCaption2)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    TextField("--", text: $repsText)
-                        #if os(iOS)
-                        .keyboardType(.numberPad)
-                        #endif
-                        .font(.lmBody.monospacedDigit())
-                        .multilineTextAlignment(.center)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                }
-            }
-
-            // Time input — editable for timed sets in inline edit
-            if set.entries.first?.actual?.time != nil || set.entries.first?.target?.time != nil {
-                VStack(alignment: .center, spacing: 2) {
-                    Text("Time (m:ss)")
-                        .font(.lmCaption2)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    TextField("--", text: $timeText)
-                        #if os(iOS)
-                        .keyboardType(.numbersAndPunctuation)
-                        #endif
-                        .font(.lmBody.monospacedDigit())
-                        .multilineTextAlignment(.center)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 88)
-                        .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-                }
-            }
-
-            Spacer()
-
-            // Overflow menu — destructive set actions (skip / clear log) live
-            // here rather than as bare buttons to keep the edit row uncluttered.
-            Menu {
-                Button {
-                    onSkip()
-                    isEditing = false
-                } label: {
-                    Label("Mark as Skipped", systemImage: "forward.end")
-                }
-                if let onUnlog {
-                    Button(role: .destructive) {
-                        onUnlog()
-                        isEditing = false
-                    } label: {
-                        Label("Clear Log", systemImage: "arrow.uturn.backward")
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.lmBody)
-                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Circle()
-                            .stroke(LiftMarkTheme.tertiaryLabel, lineWidth: 1)
-                    )
-            }
-            .accessibilityLabel("More set actions")
-            .accessibilityHint("Mark as skipped or clear the log for this set")
-            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-
-            // Update button
-            Button {
-                onSave(Double(weightText), Int(repsText), DurationFormat.parse(timeText))
-                isEditing = false
-            } label: {
-                Image(systemName: "checkmark")
-                    .font(.lmBody.bold())
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(LiftMarkTheme.primary)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Save changes")
-            .accessibilityHint("Updates this set with the edited values")
-            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-
-            // Cancel button
-            Button {
-                isEditing = false
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.lmCaption)
-                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Circle()
-                            .stroke(LiftMarkTheme.tertiaryLabel, lineWidth: 1)
-                    )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Cancel editing")
-            .alignmentGuide(.textFieldCenter) { d in d[VerticalAlignment.center] }
-        }
-    }
-
-    // MARK: - Drop Entry Row
-
-    @ViewBuilder
-    private func dropEntryRow(index: Int) -> some View {
-        HStack(spacing: LiftMarkTheme.spacingSM) {
-            // Drop arrow indicator
-            Image(systemName: "arrow.turn.down.right")
-                .font(.lmCaption)
-                .foregroundStyle(LiftMarkTheme.destructive)
-                .frame(width: 28)
-
-            Text("Drop \(index + 1)")
-                .font(.lmCaption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(LiftMarkTheme.destructive)
-
-            if set.entries.first?.target?.weight != nil {
-                HStack(spacing: 2) {
-                    Button { adjustDropWeight(index: index, by: -weightStepIncrement) } label: {
-                        Image(systemName: "minus.circle")
-                            .font(.lmBody)
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Decrease drop \(index + 1) weight by \(formatWeight(weightStepIncrement))")
-
-                    TextField("--", text: Binding(
-                        get: { dropEntries[index].weight },
-                        set: { dropEntries[index].weight = $0 }
-                    ))
-                    #if os(iOS)
-                    .keyboardType(.decimalPad)
-                    #endif
-                    .font(.lmBody.monospacedDigit())
-                    .multilineTextAlignment(.center)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 72)
-
-                    Button { adjustDropWeight(index: index, by: weightStepIncrement) } label: {
-                        Image(systemName: "plus.circle")
-                            .font(.lmBody)
-                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Increase drop \(index + 1) weight by \(formatWeight(weightStepIncrement))")
-                }
-
-                Text("\u{00D7}")
-                    .font(.lmCaption)
-                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
-            }
-
-            HStack(spacing: 2) {
-                Button { adjustDropReps(index: index, by: -1) } label: {
-                    Image(systemName: "minus.circle")
-                        .font(.lmCallout)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Decrease drop \(index + 1) reps by 1")
-
-                TextField("--", text: Binding(
-                    get: { dropEntries[index].reps },
-                    set: { dropEntries[index].reps = $0 }
-                ))
-                #if os(iOS)
-                .keyboardType(.numberPad)
-                #endif
-                .font(.lmBody.monospacedDigit())
-                .multilineTextAlignment(.center)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 50)
-
-                Button { adjustDropReps(index: index, by: 1) } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.lmCallout)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Increase drop \(index + 1) reps by 1")
-            }
-
-            Spacer()
-
-            // Delete drop button
-            Button {
-                dropEntries.remove(at: index)
-            } label: {
-                Image(systemName: "minus.circle.fill")
-                    .font(.lmBody)
-                    .foregroundStyle(LiftMarkTheme.destructive.opacity(0.7))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove drop \(index + 1)")
-        }
-        .padding(.leading, LiftMarkTheme.spacingSM)
-    }
-
-    // MARK: - Completed Drop Set Display
-
-    /// Compact display for completed drop sets: "225x10 -> 185x6 -> 135x4"
-    @ViewBuilder
-    private var completedDropSetContent: some View {
-        let actualEntries = set.entries.filter { $0.actual != nil }
-        if actualEntries.count > 1 {
-            HStack(spacing: 4) {
-                ForEach(Array(actualEntries.enumerated()), id: \.offset) { index, entry in
-                    if index > 0 {
-                        Image(systemName: "arrow.right")
-                            .font(.lmCaption2)
-                            .foregroundStyle(LiftMarkTheme.success.opacity(0.6))
-                    }
-                    HStack(spacing: 2) {
-                        if let w = entry.actual?.weight?.value {
-                            Text(formatWeight(w))
-                                .font(.lmSubheadline.monospacedDigit())
-                                .foregroundStyle(LiftMarkTheme.success)
-                        }
-                        if let r = entry.actual?.reps {
-                            Text("\u{00D7}\(r)")
-                                .font(.lmSubheadline.monospacedDigit())
-                                .foregroundStyle(LiftMarkTheme.success)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                modifierBadges
-            }
-        } else {
-            // Single entry or no entries — fall back to normal display
-            normalCompletedContent
-        }
-    }
-
-    /// Standard single-entry completed content (extracted from completedOrPendingContent)
-    @ViewBuilder
-    private var normalCompletedContent: some View {
-        HStack(spacing: LiftMarkTheme.spacingSM) {
-            let actual = set.entries.first?.actual
-            if let w = actual?.weight?.value, let u = actual?.weight?.unit {
-                Text("\(formatWeight(w)) \(u.rawValue)")
-                    .font(.lmSubheadline.monospacedDigit())
-                    .foregroundStyle(LiftMarkTheme.success)
-            }
-            if let r = actual?.reps {
-                Text("\u{00D7} \(r)")
-                    .font(.lmSubheadline.monospacedDigit())
-                    .foregroundStyle(LiftMarkTheme.success)
-            }
-            if let t = actual?.time {
-                Text(DurationFormat.mmss(t))
-                    .font(.lmSubheadline.monospacedDigit())
-                    .foregroundStyle(LiftMarkTheme.success)
-            }
-
-            Spacer()
-
-            modifierBadges
-        }
-    }
-
-    // MARK: - Modifier Badges
-
-    @ViewBuilder
-    private var modifierBadges: some View {
-        HStack(spacing: 4) {
-            if set.isDropset {
-                modifierBadge("Drop", color: LiftMarkTheme.destructive)
-            }
-            if set.isAmrap {
-                modifierBadge("AMRAP", color: LiftMarkTheme.primary)
-            }
-            // /side badge for non-expanded per-side sets — expanded Left/Right shown inline before data
-            if set.isPerSide && set.side == nil {
-                modifierBadge("/side", color: LiftMarkTheme.primary)
-            }
-        }
-    }
-
-    private func modifierBadge(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.lmCaption2)
-            .fontWeight(.semibold)
-            .foregroundStyle(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(color.opacity(0.1))
-            .clipShape(Capsule())
+        .accessibilityLabel("Set \(setNumber), \(setStatusDescription)")
     }
 
     // MARK: - Helpers
 
     /// Plate math text for barbell exercises, computed from current weight input.
-    private var plateMathText: String? {
+    var plateMathText: String? {
         let target = set.entries.first?.target
         guard target?.weight != nil,
               PlateCalculator.isBarbellExercise(exerciseName: exerciseName, equipmentType: equipmentType)
@@ -846,7 +150,7 @@ struct SetRowView: View {
         return PlateCalculator.formatCompletePlateSetup(breakdown)
     }
 
-    private var valuesChangedFromTarget: Bool {
+    var valuesChangedFromTarget: Bool {
         let target = set.entries.first?.target
         if let tw = target?.weight?.value {
             if Double(weightText) != tw { return true }
@@ -857,15 +161,15 @@ struct SetRowView: View {
         return false
     }
 
-    private var targetHint: String? {
+    var targetHint: String? {
         let target = set.entries.first?.target
         var parts: [String] = []
-        if let w = target?.weight?.value {
+        if let weight = target?.weight?.value {
             let unit = target?.weight?.unit.rawValue ?? ""
-            parts.append("\(formatWeight(w)) \(unit)")
+            parts.append("\(formatWeight(weight)) \(unit)")
         }
-        if let r = target?.reps {
-            parts.append("× \(r)")
+        if let reps = target?.reps {
+            parts.append("× \(reps)")
         }
         guard !parts.isEmpty else { return nil }
         return "Target: \(parts.joined(separator: " "))"
@@ -874,7 +178,7 @@ struct SetRowView: View {
     /// Step increment for weight stepper buttons. The user's configured step tier
     /// (stored as its lbs value: 2.5 = fine, 5 = coarse) maps to a unit-appropriate
     /// value: lbs uses the tier directly; kg uses 1.25 (fine) or 2.5 (coarse).
-    private var weightStepIncrement: Double {
+    var weightStepIncrement: Double {
         let unit = effectiveWeightUnit
         let tier = settingsStore.settings?.defaultWeightStepLbs ?? 2.5
         if unit == .kg {
@@ -884,7 +188,7 @@ struct SetRowView: View {
     }
 
     /// Adjusts the main weight field by the given delta, clamped to 0.
-    private func adjustWeight(by delta: Double) {
+    func adjustWeight(by delta: Double) {
         let current = Double(weightText) ?? 0
         let newWeight = max(0, current + delta)
         weightText = formatWeight(newWeight)
@@ -892,33 +196,29 @@ struct SetRowView: View {
     }
 
     /// Adjusts the main reps field by the given delta, clamped to 0.
-    private func adjustReps(by delta: Int) {
+    func adjustReps(by delta: Int) {
         let current = Int(repsText) ?? 0
         repsText = "\(max(0, current + delta))"
     }
 
     /// Adjusts the main time field by the given delta, clamped to 0.
-    private func adjustTime(by delta: Int) {
+    func adjustTime(by delta: Int) {
         let current = DurationFormat.parse(timeText) ?? 0
         timeText = DurationFormat.mmss(max(0, current + delta))
     }
 
-    /// Adjusts a drop entry's reps field by the given delta, clamped to 0.
-    private func adjustDropReps(index: Int, by delta: Int) {
-        guard index >= 0 && index < dropEntries.count else { return }
-        let current = Int(dropEntries[index].reps) ?? 0
-        dropEntries[index].reps = "\(max(0, current + delta))"
+    func formatWeight(_ weight: Double) -> String {
+        weight.formattedWeight
     }
+}
 
-    /// Adjusts a drop entry's weight field by the given delta, clamped to 0.
-    private func adjustDropWeight(index: Int, by delta: Double) {
-        guard index >= 0 && index < dropEntries.count else { return }
-        let current = Double(dropEntries[index].weight) ?? 0
-        let newWeight = max(0, current + delta)
-        dropEntries[index].weight = formatWeight(newWeight)
-    }
-
-    private func formatWeight(_ w: Double) -> String {
-        w.formattedWeight
+private extension SetRowView {
+    var setStatusDescription: String {
+        switch set.status {
+        case .completed: return "completed"
+        case .skipped: return "skipped"
+        case .failed: return "failed"
+        case .pending: return isCurrent ? "current" : "pending"
+        }
     }
 }

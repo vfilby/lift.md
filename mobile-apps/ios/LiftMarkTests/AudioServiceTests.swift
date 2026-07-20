@@ -11,9 +11,9 @@ final class AudioServiceTests: XCTestCase {
     }
 
     func testSharedInstanceIsSameReference() {
-        let a = AudioService.shared
-        let b = AudioService.shared
-        XCTAssertTrue(a === b)
+        let first = AudioService.shared
+        let second = AudioService.shared
+        XCTAssertTrue(first === second)
     }
 
     // MARK: - Sound File Existence

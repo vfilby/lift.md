@@ -36,8 +36,12 @@ final class CKSyncMetadataStore: @unchecked Sendable {
         do {
             let dbQueue = try DatabaseManager.shared.database()
             return try dbQueue.read { db in
-                let row = try Row.fetchOne(db, sql: "SELECT last_sync_date, last_uploaded, last_downloaded, last_conflicts FROM sync_metadata LIMIT 1")
-                guard let row, let _: String = row["last_sync_date"] else { return nil }
+                let row = try Row.fetchOne(
+                    db,
+                    sql: "SELECT last_sync_date, last_uploaded, last_downloaded, last_conflicts " +
+                        "FROM sync_metadata LIMIT 1"
+                )
+                guard let row, (row["last_sync_date"] as String?) != nil else { return nil }
                 return LastSyncStats(
                     uploaded: row["last_uploaded"] ?? 0,
                     downloaded: row["last_downloaded"] ?? 0,
@@ -74,10 +78,14 @@ final class CKSyncMetadataStore: @unchecked Sendable {
             try dbQueue.write { db in
                 let existing = try Row.fetchOne(db, sql: "SELECT id FROM sync_metadata LIMIT 1")
                 if existing != nil {
-                    try db.execute(sql: "UPDATE sync_metadata SET sync_enabled = ?, updated_at = ?", arguments: [enabled ? 1 : 0, now])
+                    try db.execute(
+                        sql: "UPDATE sync_metadata SET sync_enabled = ?, updated_at = ?",
+                        arguments: [enabled ? 1 : 0, now]
+                    )
                 } else {
                     try db.execute(
-                        sql: "INSERT INTO sync_metadata (id, device_id, sync_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                        sql: "INSERT INTO sync_metadata (id, device_id, sync_enabled, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, ?)",
                         arguments: [IDGenerator.generate(), UUID().uuidString, enabled ? 1 : 0, now, now]
                     )
                 }
@@ -95,7 +103,8 @@ final class CKSyncMetadataStore: @unchecked Sendable {
                 let existing = try Row.fetchOne(db, sql: "SELECT id FROM sync_metadata LIMIT 1")
                 if existing != nil {
                     try db.execute(
-                        sql: "UPDATE sync_metadata SET last_sync_date = ?, last_uploaded = ?, last_downloaded = ?, last_conflicts = ?, updated_at = ?",
+                        sql: "UPDATE sync_metadata SET last_sync_date = ?, last_uploaded = ?, " +
+                            "last_downloaded = ?, last_conflicts = ?, updated_at = ?",
                         arguments: [now, stats.uploaded, stats.downloaded, stats.conflicts, now]
                     )
                 } else {

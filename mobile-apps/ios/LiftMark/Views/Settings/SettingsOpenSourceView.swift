@@ -28,7 +28,8 @@ struct SettingsOpenSourceView: View {
     var body: some View {
         List {
             Section {
-                Text("lift.md is built with the following open source packages. Thanks to their authors and maintainers.")
+                Text("lift.md is built with the following open source packages. "
+                    + "Thanks to their authors and maintainers.")
                     .font(.lmFootnote)
                     .foregroundStyle(.secondary)
             }

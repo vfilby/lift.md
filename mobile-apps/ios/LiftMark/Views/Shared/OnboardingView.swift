@@ -31,7 +31,8 @@ struct OnboardingView: View {
                     .padding(.top, 48)
 
                     // Brief explanation
-                    Text("Track your workouts in markdown — portable, yours, and ready for any text editor or AI assistant.")
+                    Text("Track your workouts in markdown — portable, yours, "
+                        + "and ready for any text editor or AI assistant.")
                         .font(.lmBody)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)

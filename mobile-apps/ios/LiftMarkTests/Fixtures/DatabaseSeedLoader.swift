@@ -81,10 +81,10 @@ enum DatabaseSeedLoader {
                 sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'"
             ) ?? 0) > 0
             guard hasSchemaVersion else { return }
-            let n = try Int.fetchOne(db, sql: "SELECT version FROM schema_version LIMIT 1") ?? 0
-            guard n > 0 else { return }
+            let legacyVersion = try Int.fetchOne(db, sql: "SELECT version FROM schema_version LIMIT 1") ?? 0
+            guard legacyVersion > 0 else { return }
             try db.execute(sql: "CREATE TABLE IF NOT EXISTS grdb_migrations (identifier TEXT PRIMARY KEY NOT NULL)")
-            for identifier in DatabaseMigrations.identifiers.prefix(n) {
+            for identifier in DatabaseMigrations.identifiers.prefix(legacyVersion) {
                 try db.execute(
                     sql: "INSERT OR IGNORE INTO grdb_migrations (identifier) VALUES (?)",
                     arguments: [identifier]

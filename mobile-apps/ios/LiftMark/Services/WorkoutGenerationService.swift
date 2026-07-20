@@ -76,7 +76,9 @@ enum WorkoutGenerationService {
     ) -> String {
         var sections: [String] = []
 
-        sections.append("You are a professional strength coach creating a personalized workout plan in lift.md format (LMWF).")
+        sections.append(
+            "You are a professional strength coach creating a personalized workout plan in lift.md format (LMWF)."
+        )
 
         let userContext = buildUserContextSection(context: context, params: params)
         if !userContext.isEmpty {
@@ -94,7 +96,8 @@ enum WorkoutGenerationService {
         sections.append("""
         # OUTPUT INSTRUCTIONS
 
-        Output ONLY the workout in lift.md format. No preamble, no explanation, no surrounding prose — the response will be parsed directly.
+        Output ONLY the workout in lift.md format. No preamble, no explanation, no surrounding prose \
+        — the response will be parsed directly.
         """)
 
         return sections.joined(separator: "\n\n")
@@ -165,7 +168,8 @@ enum WorkoutGenerationService {
         ```
 
         Use nested headers (`###` under a `## Superset:` parent) for supersets/circuits.
-        Functional modifiers: `@rest: 120s`, `@dropset`, `@perside` (primarily for timed per-side sets, e.g. `30s @perside`).
+        Functional modifiers: `@rest: 120s`, `@dropset`, `@perside` \
+        (primarily for timed per-side sets, e.g. `30s @perside`).
         For AMRAP, use the rep value (`- 135 x AMRAP` or `- bw x AMRAP`) — there is no `@amrap` modifier.
         """
     }
@@ -197,13 +201,17 @@ enum WorkoutGenerationService {
 
         var requirements: [String] = ["1. Match the stated intent."]
         if context.toggles.includeProgression || context.toggles.includeRecentWorkouts {
-            requirements.append("2. Base weights and exercise selection on the recent training history / progression above.")
+            requirements.append(
+                "2. Base weights and exercise selection on the recent training history / progression above."
+            )
         }
         if context.toggles.includeEquipment {
             requirements.append("\(requirements.count + 1). Only use equipment from the available list above.")
         }
         if context.toggles.includeRecentWorkouts {
-            requirements.append("\(requirements.count + 1). Consider recency and volume of similar movements for recovery.")
+            requirements.append(
+                "\(requirements.count + 1). Consider recency and volume of similar movements for recovery."
+            )
         }
 
         return """
@@ -259,33 +267,7 @@ enum WorkoutGenerationService {
 
         // Exercise validation
         for (idx, exercise) in workout.exercises.enumerated() {
-            if exercise.exerciseName.trimmingCharacters(in: .whitespaces).isEmpty {
-                issues.append("Exercise \(idx + 1) is missing a name")
-            }
-
-            if exercise.sets.isEmpty {
-                warnings.append("Exercise \"\(exercise.exerciseName)\" has no sets")
-            }
-
-            // Set validation
-            for (setIdx, set) in exercise.sets.enumerated() {
-                let target = set.entries.first?.target
-                let hasWeight = target?.weight?.value != nil
-                let hasReps = target?.reps != nil
-                let hasTime = target?.time != nil
-
-                if !hasWeight && !hasReps && !hasTime {
-                    issues.append("Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): must specify weight, reps, or time")
-                }
-
-                if hasWeight && target?.weight?.unit == nil {
-                    warnings.append("Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): weight specified without unit")
-                }
-
-                if let rpe = target?.rpe, (rpe < 1 || rpe > 10) {
-                    issues.append("Exercise \"\(exercise.exerciseName)\", set \(setIdx + 1): RPE must be between 1 and 10")
-                }
-            }
+            validateExercise(exercise, index: idx, issues: &issues, warnings: &warnings)
         }
 
         // Quality warnings
@@ -302,6 +284,53 @@ enum WorkoutGenerationService {
             issues: issues,
             warnings: warnings
         )
+    }
+
+    /// Validate a single exercise (name, set presence, and each set's targets).
+    private static func validateExercise(
+        _ exercise: PlannedExercise, index: Int, issues: inout [String], warnings: inout [String]
+    ) {
+        if exercise.exerciseName.trimmingCharacters(in: .whitespaces).isEmpty {
+            issues.append("Exercise \(index + 1) is missing a name")
+        }
+
+        if exercise.sets.isEmpty {
+            warnings.append("Exercise \"\(exercise.exerciseName)\" has no sets")
+        }
+
+        // Set validation
+        for (setIdx, set) in exercise.sets.enumerated() {
+            validateSet(set, setIdx: setIdx, exerciseName: exercise.exerciseName,
+                        issues: &issues, warnings: &warnings)
+        }
+    }
+
+    /// Validate a single set's target values (measurement presence, unit, RPE range).
+    private static func validateSet(
+        _ set: PlannedSet, setIdx: Int, exerciseName: String, issues: inout [String], warnings: inout [String]
+    ) {
+        let target = set.entries.first?.target
+        let hasWeight = target?.weight?.value != nil
+        let hasReps = target?.reps != nil
+        let hasTime = target?.time != nil
+
+        if !hasWeight && !hasReps && !hasTime {
+            issues.append(
+                "Exercise \"\(exerciseName)\", set \(setIdx + 1): must specify weight, reps, or time"
+            )
+        }
+
+        if hasWeight && target?.weight?.unit == nil {
+            warnings.append(
+                "Exercise \"\(exerciseName)\", set \(setIdx + 1): weight specified without unit"
+            )
+        }
+
+        if let rpe = target?.rpe, rpe < 1 || rpe > 10 {
+            issues.append(
+                "Exercise \"\(exerciseName)\", set \(setIdx + 1): RPE must be between 1 and 10"
+            )
+        }
     }
 }
 

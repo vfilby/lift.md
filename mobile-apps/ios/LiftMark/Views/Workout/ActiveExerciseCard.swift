@@ -39,11 +39,11 @@ struct ActiveExerciseCard: View {
             let hasReps = (actual?.reps ?? target?.reps) != nil
 
             if !hasReps {
-                if let t = actual?.time ?? target?.time {
-                    return formatTimeSummary(t)
+                if let time = actual?.time ?? target?.time {
+                    return formatTimeSummary(time)
                 }
-                if let d = actual?.distance ?? target?.distance {
-                    return "\(formatDistance(d.value)) \(d.unit.rawValue)"
+                if let distance = actual?.distance ?? target?.distance {
+                    return "\(formatDistance(distance.value)) \(distance.unit.rawValue)"
                 }
             }
         }
@@ -119,7 +119,9 @@ struct ActiveExerciseCard: View {
 
                         Text(exercise.exerciseName)
                             .font(.lmHeadline)
-                            .foregroundStyle(exercise.sets.allSatisfy({ $0.status == .completed || $0.status == .skipped }) ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
+                            .foregroundStyle(
+                                exercise.sets.allSatisfy({ $0.status == .completed || $0.status == .skipped })
+                                    ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
 
                         Spacer()
 
@@ -136,7 +138,9 @@ struct ActiveExerciseCard: View {
                     .padding(.vertical, 4)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(isCollapsed ? "Expand \(exercise.exerciseName), \(collapsedSummary)" : "Collapse \(exercise.exerciseName)")
+                .accessibilityLabel(isCollapsed
+                    ? "Expand \(exercise.exerciseName), \(collapsedSummary)"
+                    : "Collapse \(exercise.exerciseName)")
                 .accessibilityHint(isCollapsed ? "Shows all sets for this exercise" : "Hides sets for this exercise")
 
                 // Edit button — separate from collapse toggle for reliable tap handling

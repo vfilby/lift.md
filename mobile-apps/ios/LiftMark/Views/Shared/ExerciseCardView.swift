@@ -162,8 +162,8 @@ private struct SetDisplayRow: View {
         }
     }
 
-    private func formatWeight(_ w: Double) -> String {
-        w.formattedWeight
+    private func formatWeight(_ weight: Double) -> String {
+        weight.formattedWeight
     }
 
     private func formatTime(_ seconds: Int) -> String {

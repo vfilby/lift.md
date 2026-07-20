@@ -23,10 +23,10 @@ enum DurationFormat {
         if trimmed.contains(":") {
             let parts = trimmed.split(separator: ":")
             guard parts.count == 2,
-                  let m = Int(parts[0]),
-                  let s = Int(parts[1]),
-                  m >= 0, s >= 0, s < 60 else { return nil }
-            return m * 60 + s
+                  let minutes = Int(parts[0]),
+                  let secs = Int(parts[1]),
+                  minutes >= 0, secs >= 0, secs < 60 else { return nil }
+            return minutes * 60 + secs
         }
         guard let seconds = Int(trimmed), seconds >= 0 else { return nil }
         return seconds

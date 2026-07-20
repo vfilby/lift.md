@@ -52,8 +52,8 @@ enum ExerciseDictionary {
     }
 
     /// Check if two exercise names refer to the same movement.
-    static func isSameExercise(_ a: String, _ b: String) -> Bool {
-        getCanonicalName(a) == getCanonicalName(b)
+    static func isSameExercise(_ lhs: String, _ rhs: String) -> Bool {
+        getCanonicalName(lhs) == getCanonicalName(rhs)
     }
 
     /// Get all lowercase aliases (including the canonical name lowercased)

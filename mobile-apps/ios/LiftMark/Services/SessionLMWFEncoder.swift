@@ -54,10 +54,10 @@ enum SessionLMWFEncoder {
             if processed.contains(exercise.id) { continue }
 
             // Group parent? Collect children from the same list.
-            if let gt = exercise.groupType, exercise.sets.isEmpty, (gt == .section || gt == .superset) {
+            if let gt = exercise.groupType, exercise.sets.isEmpty, gt == .section || gt == .superset {
                 let children = exercises.filter { $0.parentExerciseId == exercise.id }
                 processed.insert(exercise.id)
-                for c in children { processed.insert(c.id) }
+                for child in children { processed.insert(child.id) }
                 if gt == .section {
                     result.append(.section(parent: exercise, children: children))
                 } else {
@@ -123,6 +123,17 @@ enum SessionLMWFEncoder {
         let source = entry?.actual ?? entry?.target
         guard let source else { return nil }
 
+        guard let tokens = measurementTokens(for: set, source: source) else {
+            // No numeric info — nothing to emit.
+            return nil
+        }
+
+        return "- " + tokens.joined(separator: " ") + modifierSuffix(for: set)
+    }
+
+    /// Build the primary measurement tokens (weight, time/AMRAP/reps/distance) for a set line.
+    /// Returns nil when the set carries no numeric info to emit.
+    private static func measurementTokens(for set: SessionSet, source: EntryValues) -> [String]? {
         var tokens: [String] = []
 
         if let weight = source.weight {
@@ -152,23 +163,25 @@ enum SessionLMWFEncoder {
         } else if let distance = source.distance {
             tokens.append("\(formatNumber(distance.value)) \(distance.unit.rawValue)")
         } else {
-            // No numeric info — nothing to emit.
             return nil
         }
 
-        var line = "- " + tokens.joined(separator: " ")
+        return tokens
+    }
 
-        // Functional modifiers — order matches the spec's documented examples.
+    /// Functional modifiers — order matches the spec's documented examples.
+    private static func modifierSuffix(for set: SessionSet) -> String {
+        var suffix = ""
         if let rest = set.restSeconds, rest > 0 {
-            line += " @rest: \(rest)s"
+            suffix += " @rest: \(rest)s"
         }
         if set.isDropset {
-            line += " @dropset"
+            suffix += " @dropset"
         }
         if set.isPerSide {
-            line += " @perside"
+            suffix += " @perside"
         }
-        return line
+        return suffix
     }
 
     private static func formatNumber(_ value: Double) -> String {

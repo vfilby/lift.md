@@ -21,6 +21,10 @@ opt_in_rules:
   - first_where
   - modifier_order
   - toggle_bool
+
+# Only run by `swiftlint analyze`; listed here so `swiftlint lint` doesn't
+# warn about an analyzer rule in opt_in_rules.
+analyzer_rules:
   - unused_declaration
 
 line_length:

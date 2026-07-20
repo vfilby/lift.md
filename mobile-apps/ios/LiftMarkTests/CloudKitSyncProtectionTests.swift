@@ -151,32 +151,18 @@ final class CloudKitSyncProtectionTests: XCTestCase {
 
         try dbQueue.write { db in
             // Active session
-            try WorkoutSessionRow(
-                id: activeSessionId, workoutTemplateId: nil, name: "Active",
-                date: "2026-03-03", status: "in_progress"
-            ).insert(db)
-            try SessionExerciseRow(
-                id: activeExerciseId, workoutSessionId: activeSessionId,
-                exerciseName: "Bench", orderIndex: 0, status: "pending"
-            ).insert(db)
-            try SessionSetRow(
-                id: activeSetId, sessionExerciseId: activeExerciseId, orderIndex: 0,
-                status: "pending", isDropset: 0, isPerSide: 0, isAmrap: 0
-            ).insert(db)
+            try insertSessionTree(db, SessionTree(
+                sessionId: activeSessionId, exerciseId: activeExerciseId, setId: activeSetId,
+                name: "Active", date: "2026-03-03", sessionStatus: "in_progress",
+                exerciseName: "Bench", childStatus: "pending"
+            ))
 
             // Completed session (should be eligible for deletion)
-            try WorkoutSessionRow(
-                id: completedSessionId, workoutTemplateId: nil, name: "Completed",
-                date: "2026-03-02", status: "completed"
-            ).insert(db)
-            try SessionExerciseRow(
-                id: completedExerciseId, workoutSessionId: completedSessionId,
-                exerciseName: "Squat", orderIndex: 0, status: "completed"
-            ).insert(db)
-            try SessionSetRow(
-                id: completedSetId, sessionExerciseId: completedExerciseId, orderIndex: 0,
-                status: "completed", isDropset: 0, isPerSide: 0, isAmrap: 0
-            ).insert(db)
+            try insertSessionTree(db, SessionTree(
+                sessionId: completedSessionId, exerciseId: completedExerciseId, setId: completedSetId,
+                name: "Completed", date: "2026-03-02", sessionStatus: "completed",
+                exerciseName: "Squat", childStatus: "completed"
+            ))
         }
 
         // Simulate sync where the server has NO records (all would be deleted without protection)
@@ -642,5 +628,34 @@ final class CloudKitSyncProtectionTests: XCTestCase {
             try PlannedExerciseRow.fetchOne(db, key: exerciseId)
         }
         XCTAssertEqual(exercise?.exerciseName, "Incline Bench Press")
+    }
+
+    // MARK: - Helpers
+
+    /// A session with one exercise and one set (a full session record tree).
+    private struct SessionTree {
+        let sessionId: String
+        let exerciseId: String
+        let setId: String
+        let name: String
+        let date: String
+        let sessionStatus: String
+        let exerciseName: String
+        let childStatus: String
+    }
+
+    private func insertSessionTree(_ db: Database, _ tree: SessionTree) throws {
+        try WorkoutSessionRow(
+            id: tree.sessionId, workoutTemplateId: nil, name: tree.name,
+            date: tree.date, status: tree.sessionStatus
+        ).insert(db)
+        try SessionExerciseRow(
+            id: tree.exerciseId, workoutSessionId: tree.sessionId,
+            exerciseName: tree.exerciseName, orderIndex: 0, status: tree.childStatus
+        ).insert(db)
+        try SessionSetRow(
+            id: tree.setId, sessionExerciseId: tree.exerciseId, orderIndex: 0,
+            status: tree.childStatus, isDropset: 0, isPerSide: 0, isAmrap: 0
+        ).insert(db)
     }
 }

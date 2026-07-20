@@ -115,7 +115,8 @@ struct WorkoutHighlightsService {
                 exerciseName: currentEx.exerciseName,
                 excludeSessionId: session.id
             ) {
-                if let lastEx = lastSession.exercises.first(where: { ExerciseDictionary.isSameExercise($0.exerciseName, currentEx.exerciseName) }),
+                if let lastEx = lastSession.exercises.first(
+                    where: { ExerciseDictionary.isSameExercise($0.exerciseName, currentEx.exerciseName) }),
                    let lastMax = getExerciseMaxWeight(lastEx),
                    currentMax.weight > lastMax.weight {
                     increases.append(ExercisePR(
@@ -177,8 +178,8 @@ struct WorkoutHighlightsService {
             return streak
         }
 
-        for s in sortedSessions {
-            guard let currentDate = dateFormatter.date(from: String(s.date.prefix(10))) else { continue }
+        for priorSession in sortedSessions {
+            guard let currentDate = dateFormatter.date(from: String(priorSession.date.prefix(10))) else { continue }
 
             let daysDiff = Calendar.current.dateComponents([.day], from: currentDate, to: lastDate).day ?? 0
 
@@ -255,7 +256,9 @@ struct WorkoutHighlightsService {
     ) -> WorkoutSession? {
         sessions.first { session in
             session.id != excludeSessionId &&
-            session.exercises.contains { ExerciseDictionary.isSameExercise($0.exerciseName, exerciseName) && !$0.sets.isEmpty }
+            session.exercises.contains {
+                ExerciseDictionary.isSameExercise($0.exerciseName, exerciseName) && !$0.sets.isEmpty
+            }
         }
     }
 
@@ -284,7 +287,8 @@ struct WorkoutHighlightsService {
             type: .weightIncrease,
             emoji: "💪",
             title: "Weight Increase!",
-            message: "\(increase.exerciseName): \(Int(increase.newWeight))\(increase.unit) (up from \(Int(increase.oldWeight ?? 0))\(increase.unit))"
+            message: "\(increase.exerciseName): \(Int(increase.newWeight))\(increase.unit) "
+                + "(up from \(Int(increase.oldWeight ?? 0))\(increase.unit))"
         )
     }
 

@@ -42,20 +42,26 @@ struct SupersetCard: View {
         children.reduce(0) { $0 + $1.exercise.sets.count }
     }
 
+    /// One set in the round-robin interleaving, tagged with where it came from.
+    private struct InterleavedSet {
+        let exercise: SessionExercise
+        let exerciseIndex: Int
+        let set: SessionSet
+        let setIndex: Int
+    }
+
     /// Build interleaved sets: round-robin across children
-    private var interleavedSets: [(exercise: SessionExercise, exerciseIndex: Int, set: SessionSet, setIndex: Int)] {
+    private var interleavedSets: [InterleavedSet] {
         let maxSets = children.map { $0.exercise.sets.count }.max() ?? 0
-        var result: [(exercise: SessionExercise, exerciseIndex: Int, set: SessionSet, setIndex: Int)] = []
+        var result: [InterleavedSet] = []
         for round in 0..<maxSets {
-            for child in children {
-                if round < child.exercise.sets.count {
-                    result.append((
-                        exercise: child.exercise,
-                        exerciseIndex: child.exerciseIndex,
-                        set: child.exercise.sets[round],
-                        setIndex: round
-                    ))
-                }
+            for child in children where round < child.exercise.sets.count {
+                result.append(InterleavedSet(
+                    exercise: child.exercise,
+                    exerciseIndex: child.exerciseIndex,
+                    set: child.exercise.sets[round],
+                    setIndex: round
+                ))
             }
         }
         return result
@@ -115,7 +121,8 @@ struct SupersetCard: View {
                         Text(supersetTitle)
                             .font(.lmHeadline)
                             .foregroundStyle(allSetsCompleted ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
-                        Text(children.map { "\($0.displayNumber). \($0.exercise.exerciseName)" }.joined(separator: " + "))
+                        Text(children.map { "\($0.displayNumber). \($0.exercise.exerciseName)" }
+                            .joined(separator: " + "))
                             .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     }
@@ -133,7 +140,9 @@ struct SupersetCard: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isCollapsed ? "Expand superset, \(completedSetCount) of \(totalSetCount) sets done" : "Collapse superset")
+            .accessibilityLabel(isCollapsed
+                ? "Expand superset, \(completedSetCount) of \(totalSetCount) sets done"
+                : "Collapse superset")
             .accessibilityHint(isCollapsed ? "Shows all interleaved sets" : "Hides sets for this superset")
 
             if !isCollapsed {
@@ -158,7 +167,7 @@ struct SupersetCard: View {
                 // Interleaved sets
                 let interleaved = interleavedSets
                 let firstPendingSetId = interleaved.first(where: { $0.set.status == .pending })?.set.id
-                ForEach(Array(interleaved.enumerated()), id: \.element.set.id) { idx, item in
+                ForEach(Array(interleaved.enumerated()), id: \.element.set.id) { _, item in
                     let isCurrent = item.set.id == firstPendingSetId
 
                     // Exercise name label for each set

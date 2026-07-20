@@ -143,7 +143,8 @@ struct WorkoutExportService {
 
         // Read gyms directly from database
         let gyms: [[String: Any]] = (try? DatabaseManager.shared.database().read { db -> [[String: Any]] in
-            let tableExists = try Bool.fetchOne(db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='gyms'") ?? false
+            let tableExists = try Bool.fetchOne(
+                db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='gyms'") ?? false
             guard tableExists else { return [] }
 
             let rows = try Row.fetchAll(db, sql: "SELECT * FROM gyms")
@@ -160,19 +161,20 @@ struct WorkoutExportService {
         // Read settings (strip sensitive data)
         let settings: [String: Any] = (try? DatabaseManager.shared.database().read { db in
             // Check if settings table exists
-            let tableExists = try Bool.fetchOne(db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='settings'") ?? false
+            let tableExists = try Bool.fetchOne(
+                db, sql: "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='settings'") ?? false
             guard tableExists else { return [:] as [String: Any] }
 
             guard let row = try Row.fetchOne(db, sql: "SELECT * FROM settings LIMIT 1") else {
                 return [:] as [String: Any]
             }
             var dict: [String: Any] = [:]
-            if let v = row["default_weight_unit"] as? String { dict["defaultWeightUnit"] = v }
-            if let v = row["enable_workout_timer"] as? Int { dict["enableWorkoutTimer"] = v == 1 }
-            if let v = row["auto_start_rest_timer"] as? Int { dict["autoStartRestTimer"] = v == 1 }
-            if let v = row["theme"] as? String { dict["theme"] = v }
-            if let v = row["keep_screen_awake"] as? Int { dict["keepScreenAwake"] = v == 1 }
-            if let v = row["custom_prompt_addition"] as? String { dict["customPromptAddition"] = v }
+            if let unit = row["default_weight_unit"] as? String { dict["defaultWeightUnit"] = unit }
+            if let flag = row["enable_workout_timer"] as? Int { dict["enableWorkoutTimer"] = flag == 1 }
+            if let flag = row["auto_start_rest_timer"] as? Int { dict["autoStartRestTimer"] = flag == 1 }
+            if let theme = row["theme"] as? String { dict["theme"] = theme }
+            if let flag = row["keep_screen_awake"] as? Int { dict["keepScreenAwake"] = flag == 1 }
+            if let prompt = row["custom_prompt_addition"] as? String { dict["customPromptAddition"] = prompt }
             return dict
         }) ?? [:]
 
@@ -214,7 +216,8 @@ struct WorkoutExportService {
     private func stripPlan(_ plan: WorkoutPlan) -> [String: Any] {
         var dict: [String: Any] = [
             "name": plan.name,
-            "exercises": plan.exercises.filter { !$0.sets.isEmpty || $0.groupType != nil }.map { stripPlannedExercise($0) }
+            "exercises": plan.exercises.filter { !$0.sets.isEmpty || $0.groupType != nil }
+                .map { stripPlannedExercise($0) }
         ]
         if let desc = plan.description { dict["description"] = desc }
         if !plan.tags.isEmpty { dict["tags"] = plan.tags }
@@ -238,21 +241,15 @@ struct WorkoutExportService {
     }
 
     private func stripPlannedSet(_ set: PlannedSet) -> [String: Any] {
-        let target = set.entries.first?.target
-
         var dict: [String: Any] = [
             "orderIndex": set.orderIndex,
             "isDropset": set.isDropset,
             "isPerSide": set.isPerSide,
             "isAmrap": set.isAmrap
         ]
-        if let v = target?.weight?.value { dict["targetWeight"] = v }
-        if let v = target?.weight?.unit { dict["targetWeightUnit"] = v.rawValue }
-        if let v = target?.reps { dict["targetReps"] = v }
-        if let v = target?.time { dict["targetTime"] = v }
-        if let v = target?.rpe { dict["targetRpe"] = v }
-        if let v = set.restSeconds { dict["restSeconds"] = v }
-        if let v = set.notes { dict["notes"] = v }
+        addMeasurements(set.entries.first?.target, keys: .targetKeys, into: &dict)
+        if let rest = set.restSeconds { dict["restSeconds"] = rest }
+        if let notes = set.notes { dict["notes"] = notes }
         return dict
     }
 
@@ -285,8 +282,7 @@ struct WorkoutExportService {
     }
 
     private func stripSet(_ set: SessionSet) -> [String: Any] {
-        let target = set.entries.first?.target
-        let actual = set.entries.first?.actual
+        let entry = set.entries.first
 
         var dict: [String: Any] = [
             "orderIndex": set.orderIndex,
@@ -294,19 +290,22 @@ struct WorkoutExportService {
             "isDropset": set.isDropset,
             "isPerSide": set.isPerSide
         ]
-        if let v = target?.weight?.value { dict["targetWeight"] = v }
-        if let v = target?.weight?.unit { dict["targetWeightUnit"] = v.rawValue }
-        if let v = target?.reps { dict["targetReps"] = v }
-        if let v = target?.time { dict["targetTime"] = v }
-        if let v = target?.rpe { dict["targetRpe"] = v }
-        if let v = set.restSeconds { dict["restSeconds"] = v }
-        if let v = actual?.weight?.value { dict["actualWeight"] = v }
-        if let v = actual?.weight?.unit { dict["actualWeightUnit"] = v.rawValue }
-        if let v = actual?.reps { dict["actualReps"] = v }
-        if let v = actual?.time { dict["actualTime"] = v }
-        if let v = actual?.rpe { dict["actualRpe"] = v }
-        if let v = set.completedAt { dict["completedAt"] = v }
-        if let v = set.notes { dict["notes"] = v }
+        addMeasurements(entry?.target, keys: .targetKeys, into: &dict)
+        if let rest = set.restSeconds { dict["restSeconds"] = rest }
+        addMeasurements(entry?.actual, keys: .actualKeys, into: &dict)
+        if let completedAt = set.completedAt { dict["completedAt"] = completedAt }
+        if let notes = set.notes { dict["notes"] = notes }
         return dict
+    }
+
+    /// Merge one role's measurement values (weight/reps/time/rpe) into an export
+    /// dictionary under the JSON keys named by `keys` (target* or actual*).
+    private func addMeasurements(_ values: EntryValues?, keys: MeasurementKeyMap, into dict: inout [String: Any]) {
+        guard let values else { return }
+        if let weight = values.weight?.value { dict[keys.weightKey] = weight }
+        if let unit = values.weight?.unit { dict[keys.weightUnitKey] = unit.rawValue }
+        if let reps = values.reps { dict[keys.repsKey] = reps }
+        if let time = values.time { dict[keys.timeKey] = time }
+        if let rpe = values.rpe { dict[keys.rpeKey] = rpe }
     }
 }

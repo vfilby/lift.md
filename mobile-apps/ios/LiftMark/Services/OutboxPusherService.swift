@@ -178,10 +178,14 @@ final class OutboxPusherService {
 
     /// Loud, recoverable handling of an auth failure that leaves completed
     /// workouts stranded in the queue. The rows are NEVER deleted here — the
-    /// caller guarantees the queue is untouched. Emits one device-log error and
-    /// one Sentry capture per flush cycle, and reflects the unsynced state in
-    /// the observable `lastError` / `pendingCount` so the app-level auth-sync
-    /// banner can render. See `spec/services/workout-outbox.md`.
+    /// caller guarantees the queue is untouched. Emits one device-log error
+    /// per flush cycle, and reflects the unsynced state in the observable
+    /// `lastError` / `pendingCount` so the app-level auth-sync banner can
+    /// render. The Sentry capture is throttled to once per build per device
+    /// (repeats drop to breadcrumbs) — a persistently signed-out device
+    /// re-hits this on every foreground flush, and per-cycle captures put
+    /// 700+ identical events on one issue (Sentry LIFTMARK-IOS-P).
+    /// See `spec/services/workout-outbox.md`.
     private func reportAuthFailure(reason: String) {
         let stranded = (try? queue.count()) ?? pendingCount
         pendingCount = stranded
@@ -205,8 +209,10 @@ final class OutboxPusherService {
             code: 401,
             userInfo: [NSLocalizedDescriptionKey: "Outbox auth failure: \(stranded) completed workout(s) cannot sync"]
         )
-        CrashReporter.shared.captureError(
-            err,
+        CrashReporter.shared.captureErrorOncePerBuild(
+            key: "outbox-auth-failure",
+            error: err,
+            breadcrumb: "outbox.authFailure.repeat",
             category: .sync,
             metadata: [
                 "tag": "outbox_auth_failure",
@@ -226,16 +232,22 @@ final class OutboxPusherService {
         }
     }
 
-    // MARK: - Private
+}
 
-    private enum PushOutcome {
+// MARK: - Push pipeline
+//
+// Same-file private extension: the pipeline steps stay private to this file
+// while the class body itself stays within the type-length lint limit.
+
+private extension OutboxPusherService {
+    enum PushOutcome {
         case pushed
         case retryQueued
         case gaveUpClientError
         case authMissing
     }
 
-    private func pushOne(_ item: OutboxPendingItem) async -> PushOutcome {
+    func pushOne(_ item: OutboxPendingItem) async -> PushOutcome {
         let clientSessionId = item.clientSessionId
 
         // Pull the durable session from the database. If it's missing the
@@ -274,6 +286,14 @@ final class OutboxPusherService {
             return .gaveUpClientError
         }
 
+        return await sendPush(bodyData: bodyData, item: item)
+    }
+
+    /// Perform the authorized POST for one queued item and map the result to a
+    /// `PushOutcome`. Split out of `pushOne` so each method stays focused (and
+    /// within the function-length lint limit).
+    func sendPush(bodyData: Data, item: OutboxPendingItem) async -> PushOutcome {
+        let clientSessionId = item.clientSessionId
         do {
             let response: OutboxPushResponse = try await authStore.withAuthorizedRequest { token in
                 try await self.apiClient.sendData(
@@ -301,7 +321,7 @@ final class OutboxPusherService {
 
     /// Map a thrown push error to a `PushOutcome`. Split out of `pushOne` so each
     /// method stays focused (and within the function-length lint limit).
-    private func classifyPushFailure(_ error: Error, item: OutboxPendingItem) -> PushOutcome {
+    func classifyPushFailure(_ error: Error, item: OutboxPendingItem) -> PushOutcome {
         let clientSessionId = item.clientSessionId
         guard let apiError = error as? APIError else {
             // Decoding errors etc. — transient; a response-shape mismatch is more
@@ -326,20 +346,7 @@ final class OutboxPusherService {
             )
             return .retryQueued
         case let .forbidden(msg):
-            // A real API 403 IS terminal: surface via lastError + drop. Capture
-            // so the drop is observable (Problem D).
-            Logger.shared.error(
-                .network,
-                "outbox push 403 — dropping queue row",
-                metadata: ["clientSessionId": clientSessionId, "message": msg ?? ""]
-            )
-            lastError = msg ?? "Forbidden"
-            captureOutboxFailure(
-                tag: "outbox_push_403", status: 403, clientSessionId: clientSessionId,
-                message: "Outbox push 403 — dropping queue row: \(msg ?? "")"
-            )
-            try? queue.remove(clientSessionId: clientSessionId)
-            return .gaveUpClientError
+            return dropForForbidden(msg: msg, clientSessionId: clientSessionId)
         case let .server(status, _) where status == 429:
             scheduleRetry(item: item, error: "Rate limited (\(status))")
             return .retryQueued
@@ -347,18 +354,7 @@ final class OutboxPusherService {
             scheduleRetry(item: item, error: "Server error (\(status)): \(msg ?? "")")
             return .retryQueued
         case let .server(status, msg):
-            // Other 4xx — bad payload. Drop the row + capture (Problem D).
-            Logger.shared.error(
-                .network,
-                "outbox push gave up on 4xx",
-                metadata: ["clientSessionId": clientSessionId, "status": String(status), "message": msg ?? ""]
-            )
-            captureOutboxFailure(
-                tag: "outbox_push_4xx", status: status, clientSessionId: clientSessionId,
-                message: "Outbox push gave up on 4xx (\(status)): \(msg ?? "")"
-            )
-            try? queue.remove(clientSessionId: clientSessionId)
-            return .gaveUpClientError
+            return dropForClientError(status: status, msg: msg, clientSessionId: clientSessionId)
         case let .transport(err):
             scheduleRetry(item: item, error: "Transport: \(err.localizedDescription)")
             return .retryQueued
@@ -370,9 +366,41 @@ final class OutboxPusherService {
         }
     }
 
+    /// A real API 403 IS terminal: surface via lastError + drop. Capture
+    /// so the drop is observable (Problem D).
+    func dropForForbidden(msg: String?, clientSessionId: String) -> PushOutcome {
+        Logger.shared.error(
+            .network,
+            "outbox push 403 — dropping queue row",
+            metadata: ["clientSessionId": clientSessionId, "message": msg ?? ""]
+        )
+        lastError = msg ?? "Forbidden"
+        captureOutboxFailure(
+            tag: "outbox_push_403", status: 403, clientSessionId: clientSessionId,
+            message: "Outbox push 403 — dropping queue row: \(msg ?? "")"
+        )
+        try? queue.remove(clientSessionId: clientSessionId)
+        return .gaveUpClientError
+    }
+
+    /// Other 4xx — bad payload. Drop the row + capture (Problem D).
+    func dropForClientError(status: Int, msg: String?, clientSessionId: String) -> PushOutcome {
+        Logger.shared.error(
+            .network,
+            "outbox push gave up on 4xx",
+            metadata: ["clientSessionId": clientSessionId, "status": String(status), "message": msg ?? ""]
+        )
+        captureOutboxFailure(
+            tag: "outbox_push_4xx", status: status, clientSessionId: clientSessionId,
+            message: "Outbox push gave up on 4xx (\(status)): \(msg ?? "")"
+        )
+        try? queue.remove(clientSessionId: clientSessionId)
+        return .gaveUpClientError
+    }
+
     /// Emit one Sentry capture for an outbox push failure. The tag/status/
     /// clientSessionId keys are on the CrashReporter sync metadata allowlist.
-    private func captureOutboxFailure(tag: String, status: Int, clientSessionId: String, message: String) {
+    func captureOutboxFailure(tag: String, status: Int, clientSessionId: String, message: String) {
         let err = NSError(
             domain: "LiftMark.Outbox",
             code: status,
@@ -385,7 +413,7 @@ final class OutboxPusherService {
         )
     }
 
-    private func scheduleRetry(item: OutboxPendingItem, error: String) {
+    func scheduleRetry(item: OutboxPendingItem, error: String) {
         let backoff = Self.backoffSeconds(attempt: item.attemptCount)
         let nextAttempt = Date().addingTimeInterval(backoff)
         do {
@@ -409,7 +437,7 @@ final class OutboxPusherService {
         }
     }
 
-    private static func backoffSeconds(attempt: Int) -> TimeInterval {
+    static func backoffSeconds(attempt: Int) -> TimeInterval {
         // attempt is the *prior* attempt count; the row hasn't been bumped
         // yet. Cap matches the spec: 30s, 2m, 10m, 30m, 2h.
         switch attempt {
@@ -421,7 +449,7 @@ final class OutboxPusherService {
         }
     }
 
-    private static func deviceId() -> String? {
+    static func deviceId() -> String? {
         return UIDevice.current.identifierForVendor?.uuidString
     }
 }

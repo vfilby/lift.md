@@ -23,10 +23,11 @@ final class ShareSheetTests: XCTestCase {
 
     func testExportFileIdsAreUniquePerConstruction() {
         let url = URL(fileURLWithPath: "/tmp/liftmark_test.db")
-        let a = ExportFile(url: url)
-        let b = ExportFile(url: url)
-        XCTAssertNotEqual(a.id, b.id,
-            "Each ExportFile must have a unique id so reassigning the @State binding with the same URL still triggers onChange(of: item?.id) in the ShareSheetPresenter.")
+        let first = ExportFile(url: url)
+        let second = ExportFile(url: url)
+        XCTAssertNotEqual(first.id, second.id,
+            "Each ExportFile must have a unique id so reassigning the @State binding with the same URL still"
+            + " triggers onChange(of: item?.id) in the ShareSheetPresenter.")
     }
 
     // MARK: - File readiness at return time
@@ -57,7 +58,8 @@ final class ShareSheetTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: exportURL) }
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: exportURL.path),
-            "exportUnifiedJson() must produce a file that exists on disk before returning so the share sheet presenter can read it without race.")
+            "exportUnifiedJson() must produce a file that exists on disk before returning so the share sheet"
+            + " presenter can read it without race.")
 
         let attrs = try FileManager.default.attributesOfItem(atPath: exportURL.path)
         let size = attrs[.size] as? Int ?? 0
