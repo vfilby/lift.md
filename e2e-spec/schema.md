@@ -114,6 +114,13 @@ Replace all text in a text input.
 | `target` | yes      | Accessibility ID of the input   |
 | `value`  | yes      | Text to set                     |
 
+Runners must verify the field holds the intended text after typing and retry
+once on mismatch (guards against dropped-keystroke flakes). Secure text fields
+(password inputs) cannot be read back as plaintext — their value renders as one
+bullet per character — so runners verify by character count instead of
+equality. On a final mismatch the typed best-effort text must be left in
+place, never a cleared field.
+
 ### typeText
 
 Type text into an input (simulates keyboard).
