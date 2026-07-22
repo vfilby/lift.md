@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1080.0",
+    "@aws-sdk/client-dynamodb": "^3.1091.0",
     "@aws-sdk/lib-dynamodb": "^3.1076.0",
     "@hono/node-server": "^2.0.11",
     "@types/aws-lambda": "^8.10.162",
