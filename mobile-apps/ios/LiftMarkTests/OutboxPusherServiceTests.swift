@@ -3,10 +3,13 @@ import GRDB
 @testable import LiftMark
 
 /// Tests for the GH #143 loud-failure + recovery behavior of the outbox
-/// pusher: an auth failure must log to the device log, capture to Sentry once
-/// per build (breadcrumbs on repeat flush cycles — Sentry LIFTMARK-IOS-P),
-/// surface an observable `lastError`, and — critically — leave the queued
-/// completions in place so they can drain after re-auth.
+/// pusher: a *lapsed-session* auth failure must log to the device log,
+/// capture to Sentry once per build (breadcrumbs on repeat flush cycles —
+/// Sentry LIFTMARK-IOS-P), surface an observable `lastError`, and —
+/// critically — leave the queued completions in place so they can drain
+/// after re-auth. A device that was NEVER signed in takes the quiet path:
+/// same queue preservation and observable state, no Sentry traffic — offline
+/// use without an account is normal operation, not an error.
 @MainActor
 final class OutboxPusherServiceTests: XCTestCase {
 
@@ -71,8 +74,19 @@ final class OutboxPusherServiceTests: XCTestCase {
     // MARK: - Helpers
 
     private func makeUnauthenticatedStore() -> AuthenticationStore {
-        // No tokens → currentUser nil → !isAuthenticated.
+        // No tokens → currentUser nil → !isAuthenticated. `sessionExpired`
+        // stays false: this is the never-signed-in device.
         AuthenticationStore(api: mockAPI, tokenStore: tokenStore)
+    }
+
+    /// A store in the GH #143 lapsed-session state: signed out because the
+    /// refresh chain died (as opposed to never having signed in).
+    private func makeLapsedSessionStore() -> AuthenticationStore {
+        let store = AuthenticationStore(api: mockAPI, tokenStore: tokenStore)
+        store.seedSessionExpiredForTesting()
+        XCTAssertFalse(store.isAuthenticated)
+        XCTAssertTrue(store.sessionExpired)
+        return store
     }
 
     /// A store with a live, unexpired access token so `pushOne` actually
@@ -206,9 +220,9 @@ final class OutboxPusherServiceTests: XCTestCase {
         XCTAssertEqual(captures.first?.1["tag"], "outbox_push_403")
     }
 
-    // MARK: - Auth failure: unauthenticated flush
+    // MARK: - Auth failure: lapsed-session flush (loud path)
 
-    func testFlushWhileSignedOutKeepsQueueAndReportsLoudly() async throws {
+    func testFlushWithLapsedSessionKeepsQueueAndReportsLoudly() async throws {
         try queue.enqueue(clientSessionId: "sess-1")
         try queue.enqueue(clientSessionId: "sess-2")
 
@@ -217,8 +231,7 @@ final class OutboxPusherServiceTests: XCTestCase {
             captures.append((category, metadata))
         }
 
-        let auth = makeUnauthenticatedStore()
-        XCTAssertFalse(auth.isAuthenticated)
+        let auth = makeLapsedSessionStore()
         let pusher = OutboxPusherService(
             authStore: auth,
             apiClient: mockAPI,
@@ -232,17 +245,93 @@ final class OutboxPusherServiceTests: XCTestCase {
         XCTAssertEqual(pusher.pendingCount, 2)
         XCTAssertNotNil(pusher.lastError, "lastError must reflect the unsynced state")
 
-        // Exactly one Sentry capture per flush cycle, tagged + carrying count.
+        // Exactly one Sentry capture per flush cycle, tagged + carrying count
+        // and the trigger-path discriminator.
         XCTAssertEqual(captures.count, 1, "Auth failure should capture once per cycle, not per item")
         XCTAssertEqual(captures.first?.0, .sync)
         XCTAssertEqual(captures.first?.1["tag"], "outbox_auth_failure")
         XCTAssertEqual(captures.first?.1["partialFailureCount"], "2")
+        XCTAssertEqual(captures.first?.1["reason"], "not_authenticated")
 
         // Device log error must be written. The SQLite write is dispatched to a
         // background serial queue, so poll briefly for it to land rather than
         // asserting synchronously (which would race the write).
         let logged = await waitForSyncErrorLog(containing: "authentication required")
         XCTAssertTrue(logged, "Auth failure must write a device-log error entry")
+    }
+
+    // MARK: - Never signed in: quiet path
+
+    /// A device that has NEVER signed in is normal offline operation — the
+    /// queue and observable state behave identically, but nothing is sent to
+    /// Sentry (no capture, no breadcrumb). Sentry LIFTMARK-IOS-P was exactly
+    /// this: one never-signed-in device emitting hundreds of error events.
+    func testNeverSignedInFlushStaysQuiet() async throws {
+        try queue.enqueue(clientSessionId: "sess-1")
+        try queue.enqueue(clientSessionId: "sess-2")
+
+        var captureCount = 0
+        var breadcrumbCount = 0
+        CrashReporter.captureErrorRecorder = { _, _, _ in captureCount += 1 }
+        CrashReporter.breadcrumbRecorder = { _, _, _ in breadcrumbCount += 1 }
+
+        let auth = makeUnauthenticatedStore()
+        XCTAssertFalse(auth.isAuthenticated)
+        XCTAssertFalse(auth.sessionExpired, "Never-signed-in device must not read as lapsed")
+        let pusher = OutboxPusherService(
+            authStore: auth,
+            apiClient: mockAPI,
+            queue: queue
+        )
+
+        await pusher.flushIfAuthenticated()
+
+        // Same recoverable behavior as the loud path…
+        XCTAssertEqual(try queue.count(), 2, "Queued completions must survive")
+        XCTAssertEqual(pusher.pendingCount, 2)
+        XCTAssertNotNil(pusher.lastError, "Settings pill still needs the unsynced state")
+        XCTAssertTrue(mockAPI.sentPaths.isEmpty, "Nothing should touch the network while signed out")
+
+        // …but zero Sentry traffic.
+        XCTAssertEqual(captureCount, 0, "Never-signed-in flush must not capture to Sentry")
+        XCTAssertEqual(breadcrumbCount, 0, "Never-signed-in flush must not emit breadcrumbs")
+    }
+
+    /// A live push rejected with 401 server-side is real auth breakage and
+    /// must capture even though the flush started authenticated. The mock
+    /// 401s the push, then 401s the refresh attempt (dead chain), which also
+    /// flips `sessionExpired` — the GH #143 lapse, observed mid-flush.
+    func testPush401WhileSignedInCapturesLoudly() async throws {
+        let sessionId = try makeCompletedSession()
+        try queue.enqueue(clientSessionId: sessionId)
+
+        var captures: [(LogCategory, [String: String])] = []
+        CrashReporter.captureErrorRecorder = { _, category, metadata in
+            captures.append((category, metadata))
+        }
+
+        mockAPI.responses = [
+            .failure(APIError.unauthorized),  // POST /v1/workouts/outbox
+            .failure(APIError.unauthorized),  // POST /v1/auth/refresh → dead chain
+        ]
+
+        let auth = makeAuthenticatedStore()
+        let pusher = OutboxPusherService(authStore: auth, apiClient: mockAPI, queue: queue)
+
+        await pusher.flushIfAuthenticated()
+
+        XCTAssertEqual(
+            mockAPI.sentPaths,
+            ["/v1/workouts/outbox", "/v1/auth/refresh"],
+            "Push should 401, then the refresh retry should 401"
+        )
+        XCTAssertTrue(auth.sessionExpired, "Dead refresh chain must mark the session expired")
+        XCTAssertEqual(try queue.count(), 1, "Server 401 must not delete the queued completion")
+
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures.first?.1["tag"], "outbox_auth_failure")
+        XCTAssertEqual(captures.first?.1["reason"], "push_401")
+        XCTAssertEqual(captures.first?.1["partialFailureCount"], "1")
     }
 
     /// GH #265: the core unanswered question — after a 401 strands a completed
@@ -261,9 +350,8 @@ final class OutboxPusherServiceTests: XCTestCase {
             captures.append((category, metadata))
         }
 
-        // --- Strand: flush while signed out. ---
-        let auth = makeUnauthenticatedStore()
-        XCTAssertFalse(auth.isAuthenticated)
+        // --- Strand: flush after the session lapsed (GH #143 state). ---
+        let auth = makeLapsedSessionStore()
         let pusher = OutboxPusherService(authStore: auth, apiClient: mockAPI, queue: queue)
 
         await pusher.flushIfAuthenticated()
@@ -378,11 +466,13 @@ final class OutboxPusherServiceTests: XCTestCase {
         XCTAssertEqual(pusher.pendingCount, 0)
     }
 
-    /// Sentry LIFTMARK-IOS-P: a persistently signed-out device re-hits the
+    /// Sentry LIFTMARK-IOS-P: a persistently stranded device re-hits the
     /// auth failure on every foreground flush and emitted 700+ identical
-    /// events. The Sentry capture must fire once per build — the second
-    /// signed-out flush emits a breadcrumb, not a second capture, while the
-    /// device log and observable state still update every cycle.
+    /// events. For a *lapsed* session the Sentry capture must fire once per
+    /// build — the second flush emits a breadcrumb, not a second capture,
+    /// while the device log and observable state still update every cycle.
+    /// (A never-signed-in device emits nothing at all — see
+    /// `testNeverSignedInFlushStaysQuiet`.)
     func testRepeatedAuthFailureCapturesOncePerBuild() async throws {
         try queue.enqueue(clientSessionId: "sess-1")
 
@@ -393,7 +483,7 @@ final class OutboxPusherServiceTests: XCTestCase {
             breadcrumbs.append((message, metadata))
         }
 
-        let auth = makeUnauthenticatedStore()
+        let auth = makeLapsedSessionStore()
         let pusher = OutboxPusherService(authStore: auth, apiClient: mockAPI, queue: queue)
 
         await pusher.flushIfAuthenticated()

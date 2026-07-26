@@ -93,6 +93,7 @@ When toggled off mid-session, `CrashReporter.setEnabled(false)` calls `SentrySDK
 - `fkTable` — FK target table for merge errors (e.g. `session_sets`)
 - `partialFailureCount` — integer (also used by `OutboxPusherService` to carry the count of completed workouts stranded by an auth failure)
 - `tag` — short stable event-category marker (e.g. `"data_loss"`, `"outbox_auth_failure"`); enables single-rule Sentry alerts
+- `reason` — short stable trigger-path discriminator within a tag (e.g. `"not_authenticated"` vs `"push_401"` on `outbox_auth_failure`), so paths that share an event are distinguishable in Sentry
 - `sdkVersion`, `osVersion`, `buildType` — already on every event via Sentry defaults
 
 Record IDs (UUIDs) are allowed in breadcrumbs but **not** in captured error metadata, because Sentry's search makes high-cardinality UUIDs noisy without being useful.
@@ -114,7 +115,7 @@ Tags attached to captured events:
 | Tag | Values | Purpose |
 |-----|--------|---------|
 | `tag: "data_loss"` | set on `SyncSessionGuard` data-loss-detected / restore-failed paths | Target for a single alert rule |
-| `tag: "outbox_auth_failure"` | set on `OutboxPusherService` flush cycles that cannot push completed workouts because the session is missing/expired (GH #143) | Target an alert: a user has completed workouts that silently aren't syncing |
+| `tag: "outbox_auth_failure"` | set on `OutboxPusherService` flush cycles that cannot push completed workouts because a previously signed-in session lapsed (`sessionExpired`) or a live push was 401-rejected; carries `reason: "not_authenticated"` \| `"push_401"`. Never fired by never-signed-in devices — offline use without an account is normal operation (see [workout-outbox.md](workout-outbox.md)) | Target an alert: a user who believed they were synced has completed workouts that silently aren't syncing (GH #143) |
 
 ### `beforeSend` hook
 

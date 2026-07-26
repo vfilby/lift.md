@@ -26,6 +26,7 @@ final class CrashReporter: @unchecked Sendable {
         "fkTable",
         "partialFailureCount",
         "tag",
+        "reason",
         "status",
         "clientSessionId"
     ]
