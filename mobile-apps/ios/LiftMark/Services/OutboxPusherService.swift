@@ -106,9 +106,12 @@ final class OutboxPusherService {
     /// Drain the queue. Idempotent — silently returns if a flush is in flight.
     ///
     /// If the device isn't authenticated but there ARE queued completions, the
-    /// queue is preserved and the failure is surfaced loudly (device log +
-    /// Sentry + observable `lastError`) so a silently-unsynced completed
-    /// workout can't go unnoticed (GH #143).
+    /// queue is preserved and the state is surfaced observably (`lastError` /
+    /// `pendingCount`). When the session actually *lapsed* (as opposed to a
+    /// device that was never signed in — normal offline use) the failure is
+    /// additionally loud: device-log error + Sentry capture, so a
+    /// silently-unsynced completed workout can't go unnoticed (GH #143).
+    /// See `reportAuthFailure(reason:)`.
     ///
     /// - Parameter force: when `true` (a manual "Sync now"), process ALL queued
     ///   items regardless of their `next_attempt_after` backoff timer. The
@@ -176,16 +179,21 @@ final class OutboxPusherService {
         }
     }
 
-    /// Loud, recoverable handling of an auth failure that leaves completed
-    /// workouts stranded in the queue. The rows are NEVER deleted here — the
-    /// caller guarantees the queue is untouched. Emits one device-log error
-    /// per flush cycle, and reflects the unsynced state in the observable
-    /// `lastError` / `pendingCount` so the app-level auth-sync banner can
-    /// render. The Sentry capture is throttled to once per build per device
-    /// (repeats drop to breadcrumbs) — a persistently signed-out device
-    /// re-hits this on every foreground flush, and per-cycle captures put
-    /// 700+ identical events on one issue (Sentry LIFTMARK-IOS-P).
-    /// See `spec/services/workout-outbox.md`.
+    /// Recoverable handling of an auth failure that leaves completed workouts
+    /// stranded in the queue. The rows are NEVER deleted here — the caller
+    /// guarantees the queue is untouched — and the unsynced state is always
+    /// reflected in the observable `lastError` / `pendingCount` so the
+    /// auth-sync banner and Settings pill can render.
+    ///
+    /// Loudness is gated on a *lapsed* session: a device that was never
+    /// signed in (or deliberately signed out and kept training) is fully
+    /// supported offline operation, not data-at-risk — completions queue
+    /// locally and drain if the user ever signs in. Only a session that
+    /// lapsed out from under a signed-in user (`sessionExpired`, or a live
+    /// push 401-rejected server-side) logs at error level and captures to
+    /// Sentry — throttled to once per build per device (repeats drop to
+    /// breadcrumbs; Sentry LIFTMARK-IOS-P). Mirrors the auth-sync banner
+    /// gate. See `spec/services/workout-outbox.md`.
     private func reportAuthFailure(reason: String) {
         let stranded = (try? queue.count()) ?? pendingCount
         pendingCount = stranded
@@ -194,6 +202,22 @@ final class OutboxPusherService {
         guard stranded > 0 else { return }
 
         lastError = "Sign in to sync \(stranded) completed workout\(stranded == 1 ? "" : "s")"
+
+        // The dead-refresh-chain path inside withAuthorizedRequest sets
+        // sessionExpired before the flush reports, so these two conditions
+        // together cover every real auth breakage.
+        let sessionLapsed = reason == "push_401" || authStore.sessionExpired
+        guard sessionLapsed else {
+            Logger.shared.info(
+                .sync,
+                "outbox flush skipped: not signed in",
+                metadata: [
+                    "pendingCount": String(stranded),
+                    "reason": reason,
+                ]
+            )
+            return
+        }
 
         Logger.shared.error(
             .sync,
@@ -217,6 +241,7 @@ final class OutboxPusherService {
             metadata: [
                 "tag": "outbox_auth_failure",
                 "partialFailureCount": String(stranded),
+                "reason": reason,
             ]
         )
     }
