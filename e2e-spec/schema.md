@@ -114,8 +114,12 @@ Replace all text in a text input.
 | `target` | yes      | Accessibility ID of the input   |
 | `value`  | yes      | Text to set                     |
 
-Runners must verify the field holds the intended text after typing and retry
-once on mismatch (guards against dropped-keystroke flakes). Secure text fields
+Runners must confirm the input actually gained keyboard focus before
+synthesizing keystrokes, retrying the focusing tap on a miss — on a loaded CI
+host the tap is occasionally dropped, and typing into an unfocused field
+aborts the test (XCUITest: "Neither element nor any descendant has keyboard
+focus"). Runners must also verify the field holds the intended text after
+typing and retry once on mismatch (guards against dropped-keystroke flakes). Secure text fields
 (password inputs) cannot be read back as plaintext — their value renders as one
 bullet per character — so runners verify by character count instead of
 equality. On a final mismatch the typed best-effort text must be left in
