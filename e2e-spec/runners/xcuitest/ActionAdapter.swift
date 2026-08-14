@@ -497,10 +497,27 @@ class ActionAdapter {
     /// settle, then verify the field holds the intended text and retry once on
     /// mismatch. On a final mismatch the best-effort text is left in place —
     /// never a cleared field.
+    ///
+    /// A second hazard sits before the first keystroke: the focusing tap
+    /// itself is occasionally dropped on a loaded CI runner (same family as
+    /// the scenario-level dropped-tap retries), so the field never gains
+    /// keyboard focus and the first synthesized keystroke aborts the test with
+    /// "Neither element nor any descendant has keyboard focus" (nightly
+    /// testActiveWorkout, 2026-08-14). The keyboard wait doubles as the focus
+    /// probe — re-tap on a miss, with `hasKeyboardFocus` covering
+    /// hardware-keyboard setups where the software keyboard never appears.
     func robustReplaceText(_ el: XCUIElement, with text: String) {
-        el.tap()
-        // Let the keyboard come up so the first keystroke keeps its modifier.
-        _ = app.keyboards.firstMatch.waitForExistence(timeout: UITestTiming.scaled(5))
+        for attempt in 1...3 {
+            el.tap()
+            // Let the keyboard come up so the first keystroke keeps its
+            // modifier — and so a dropped tap is caught here instead of as a
+            // failed-to-synthesize-event abort on the first keystroke.
+            if app.keyboards.firstMatch.waitForExistence(timeout: UITestTiming.scaled(5))
+                || hasKeyboardFocus(el) {
+                break
+            }
+            NSLog("[robustReplaceText] no keyboard focus after tap (attempt \(attempt)); re-tapping")
+        }
 
         for attempt in 1...2 {
             el.typeKey("a", modifierFlags: .command)
@@ -516,6 +533,14 @@ class ActionAdapter {
             el.typeKey("a", modifierFlags: .command)
             el.typeText(XCUIKeyboardKey.delete.rawValue)
         }
+    }
+
+    /// Whether the element currently owns keyboard focus. XCUIElement exposes
+    /// this only via the private-but-stable `hasKeyboardFocus` attribute (no
+    /// public API). Used as a fallback focus signal for hardware-keyboard
+    /// setups where the software keyboard never appears on screen.
+    private func hasKeyboardFocus(_ el: XCUIElement) -> Bool {
+        (el.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
     }
 
     /// Secure fields (password inputs) read back one bullet per character, so
