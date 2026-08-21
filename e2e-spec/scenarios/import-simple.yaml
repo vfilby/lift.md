@@ -41,12 +41,25 @@ tests:
   # Issue 7: After importing, the workout detail must show weight values
   - name: "imported workout detail shows weight values"
     steps:
-      # Navigate to the workout detail
+      # Navigate to the workout detail.
+      # The import alert's "OK" button sits at the same screen position as the
+      # new plan's Recent Plans card; dismissing it can leave the card's
+      # NavigationLink stuck in its pressed-highlight state, and the next tap
+      # then only clears the highlight instead of navigating (nightly flake,
+      # issue #398). If the detail view doesn't appear, tap once more.
       - action: tapText
         text: "Test Workout"
-      - action: waitFor
-        target: "workout-detail-view"
-        timeout: 10000
+      - action: tryCatch
+        try:
+          - action: waitFor
+            target: "workout-detail-view"
+            timeout: 10000
+        catch:
+          - action: tapText
+            text: "Test Workout"
+          - action: waitFor
+            target: "workout-detail-view"
+            timeout: 10000
       # The fixture has "Bench Press: 135 x 5, 155 x 5" and "Squat: 185 x 5, 205 x 5"
       # All weights MUST be visible — not just the reps
       - action: waitForText
