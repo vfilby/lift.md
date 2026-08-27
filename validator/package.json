@@ -24,7 +24,7 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
-    "@node-rs/argon2": "^2.0.2",
+    "@node-rs/argon2": "^2.1.0",
     "hono": "^4.13.3",
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^9.0.5",
