@@ -11,12 +11,12 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1116.0",
-    "@aws-sdk/lib-dynamodb": "^3.1116.0",
+    "@aws-sdk/client-dynamodb": "^3.1127.0",
+    "@aws-sdk/lib-dynamodb": "^3.1121.0",
     "@hono/node-server": "^2.1.1",
     "@types/aws-lambda": "^8.10.162",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/nodemailer": "^8.0.1",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.12",
@@ -25,9 +25,9 @@
   },
   "dependencies": {
     "@node-rs/argon2": "^2.1.0",
-    "hono": "^4.13.3",
+    "hono": "^4.13.5",
     "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^9.0.5",
+    "nodemailer": "^9.0.6",
     "ulid": "^3.0.2"
   }
 }
