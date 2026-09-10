@@ -183,7 +183,9 @@ struct WorkoutDetailView: View {
                     // Superset: replace parent + all old children with the new
                     // parent + new children, then renumber orderIndex so the
                     // section's exercises stay sequential.
-                    let oldChildIds = Set(currentPlan.exercises.filter { $0.parentExerciseId == exercise.id }.map { $0.id })
+                    let oldChildIds = Set(
+                        currentPlan.exercises.filter { $0.parentExerciseId == exercise.id }.map { $0.id }
+                    )
                     currentPlan.exercises.removeAll { oldChildIds.contains($0.id) }
                     if let parentIdx = currentPlan.exercises.firstIndex(where: { $0.id == exercise.id }) {
                         currentPlan.exercises[parentIdx] = updatedExercises[0]

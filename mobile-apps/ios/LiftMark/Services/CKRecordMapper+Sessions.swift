@@ -8,7 +8,8 @@ extension CKRecordMapper {
     // MARK: - To CKRecord
 
     func toCKRecord(_ session: WorkoutSessionRow, zoneID: CKRecordZone.ID) -> CKRecord {
-        let record = CKRecord(recordType: "WorkoutSession", recordID: CKRecord.ID(recordName: session.id, zoneID: zoneID))
+        let recordID = CKRecord.ID(recordName: session.id, zoneID: zoneID)
+        let record = CKRecord(recordType: "WorkoutSession", recordID: recordID)
         record["name"] = session.name as CKRecordValue
         record["date"] = session.date as CKRecordValue
         record["status"] = session.status as CKRecordValue

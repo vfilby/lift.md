@@ -144,7 +144,9 @@ struct ActiveWorkoutView: View {
             EditExerciseSheet(
                 exercise: exercise,
                 onSave: { name, notes, equipmentType, setChanges in
-                    sessionStore.updateExercise(exerciseId: exercise.id, name: name, notes: notes, equipmentType: equipmentType)
+                    sessionStore.updateExercise(
+                        exerciseId: exercise.id, name: name, notes: notes, equipmentType: equipmentType
+                    )
                     for change in setChanges {
                         switch change {
                         case .update(let setId, let weight, let reps, let time, let rest):

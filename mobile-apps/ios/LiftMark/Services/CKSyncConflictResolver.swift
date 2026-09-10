@@ -194,6 +194,7 @@ final class CKSyncConflictResolver: @unchecked Sendable {
     }
 
     private func handleServerRecordChanged(recordName: String, recordType: String, error: CKError) {
+        let recordKey = "\(recordType)/\(recordName)"
         if let serverRecord = error.serverRecord {
             // Always merge the server record first. `mergeIncoming` persists the server's
             // system fields (the fresh change tag) unconditionally before merging, so even a
@@ -203,11 +204,7 @@ final class CKSyncConflictResolver: @unchecked Sendable {
             do {
                 _ = try mapper.mergeIncoming(serverRecord)
             } catch {
-                Logger.shared.error(
-                    .sync,
-                    "[sync-engine] Failed to merge conflict for \(recordType)/\(recordName)",
-                    error: error
-                )
+                Logger.shared.error(.sync, "[sync-engine] Failed to merge conflict for \(recordKey)", error: error)
                 CrashReporter.shared.captureError(
                     error,
                     category: .sync,
@@ -217,7 +214,7 @@ final class CKSyncConflictResolver: @unchecked Sendable {
 
             if mapper.serverRecordIsNewer(serverRecord) {
                 // Server wins — we already merged it above, mark resolved
-                Logger.shared.info(.sync, "[sync-engine] Conflict: server wins for \(recordType)/\(recordName)")
+                Logger.shared.info(.sync, "[sync-engine] Conflict: server wins for \(recordKey)")
                 lock.lock()
                 resolvedConflicts.insert(recordName)
                 lock.unlock()
@@ -235,13 +232,13 @@ final class CKSyncConflictResolver: @unchecked Sendable {
                 lock.lock()
                 serverRecordCache[recordName] = serverRecord
                 lock.unlock()
-                Logger.shared.info(.sync, "[sync-engine] Conflict: local wins for \(recordType)/\(recordName), re-uploading")
+                Logger.shared.info(.sync, "[sync-engine] Conflict: local wins for \(recordKey), re-uploading")
             }
         } else {
             Logger.shared.error(
                 .sync,
-                "[sync-engine] serverRecordChanged for \(recordType)/\(recordName) " +
-                    "but no serverRecord provided (CKError \(error.code.rawValue))"
+                "[sync-engine] serverRecordChanged for \(recordKey) but no serverRecord provided " +
+                    "(CKError \(error.code.rawValue))"
             )
             CrashReporter.shared.captureError(
                 error,
