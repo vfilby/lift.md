@@ -237,7 +237,10 @@ extension CKSyncEngineManager {
             lock.lock()
             hasScheduledInitialUpload = true
             lock.unlock()
-            Logger.shared.info(.sync, "[sync-engine] Account changed (\(event.changeType)), creating zone and scheduling full upload")
+            Logger.shared.info(
+                .sync,
+                "[sync-engine] Account changed (\(event.changeType)), creating zone and scheduling full upload"
+            )
             Task {
                 await createZoneAndScheduleFullUpload()
             }
@@ -245,12 +248,17 @@ extension CKSyncEngineManager {
             lock.lock()
             guard !hasScheduledInitialUpload else {
                 lock.unlock()
-                Logger.shared.info(.sync, "[sync-engine] Account changed but initial upload already scheduled, skipping")
+                Logger.shared.info(
+                    .sync, "[sync-engine] Account changed but initial upload already scheduled, skipping"
+                )
                 return
             }
             hasScheduledInitialUpload = true
             lock.unlock()
-            Logger.shared.info(.sync, "[sync-engine] Account changed (\(event.changeType)), creating zone and scheduling full upload")
+            Logger.shared.info(
+                .sync,
+                "[sync-engine] Account changed (\(event.changeType)), creating zone and scheduling full upload"
+            )
             Task {
                 await createZoneAndScheduleFullUpload()
             }
