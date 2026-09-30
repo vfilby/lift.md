@@ -46,6 +46,7 @@ extension MarkdownParser {
                 }
                 context.currentIndex += 1
             } else {
+                warnIfIgnoredLine(context, line: line)
                 context.currentIndex += 1
             }
         }

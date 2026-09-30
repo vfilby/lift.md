@@ -60,6 +60,9 @@ enum MarkdownParser {
             )
         }
 
+        // Flag set modifiers written on their own line anywhere in the workout block
+        warnStandaloneModifiers(context, workoutHeaderIndex: context.currentIndex)
+
         // Parse workout metadata and notes
         let section = parseWorkoutSection(context, headerLine: workoutHeaderLine)
 

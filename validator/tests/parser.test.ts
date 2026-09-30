@@ -2072,3 +2072,107 @@ describe('Exercise Name Suggestions', () => {
     expect(aliasWarnings[0]).toMatch(/^Line 3:/);
   });
 });
+
+// MARK: - Standalone modifiers / ignored lines (GH #425)
+
+describe('STANDALONE_MODIFIER warning', () => {
+  const standalone = (warnings: string[]) =>
+    warnings.filter((w) => w.includes('on its own line and has no effect'));
+
+  it('warns on a bare @rest line before the set list and does not apply it to sets', () => {
+    const md = `# Upper\n\n## Bench Press\n@rest: 180s\n- 185 lbs x 8\n- 185 lbs x 8`;
+    const result = parseWorkout(md);
+    expect(result.success).toBe(true);
+    const w = standalone(result.warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^Line 4:/);
+    expect(w[0]).toContain('"@rest: 180s"');
+    expect(w[0]).toContain('"- 135 lbs x 5 @rest: 180s"');
+    for (const set of result.data!.exercises[0].sets) {
+      expect(set.restSeconds).toBeNull();
+    }
+  });
+
+  it('warns on a bare modifier under the workout header', () => {
+    const md = `# Upper\n@rest: 90s\n\n## Bench Press\n- 185 lbs x 8`;
+    const w = standalone(parseWorkout(md).warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^Line 2:/);
+  });
+
+  it('warns on a bare modifier under a superset header', () => {
+    const md = `# W\n## Superset: Arms\n@rest: 60s\n### Curl\n- 30 x 12\n### Pushdown\n- 40 x 12`;
+    const w = standalone(parseWorkout(md).warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^Line 3:/);
+  });
+
+  it('warns on a bare modifier between and after sets (not IGNORED_LINE)', () => {
+    const md = `# W\n## Leg Extension\n- 100 x 12\n@dropset\n- 70 x 10\n@rest: 60s`;
+    const result = parseWorkout(md);
+    const w = standalone(result.warnings);
+    expect(w).toHaveLength(2);
+    expect(w[0]).toMatch(/^Line 4:/);
+    expect(w[1]).toMatch(/^Line 6:/);
+    expect(result.warnings.some((x) => x.includes('Line ignored'))).toBe(false);
+    expect(result.data!.exercises[0].sets[1].isDropset).toBe(false);
+  });
+
+  it('recognizes every modifier keyword case-insensitively, with or without a value', () => {
+    const md = `# W\n## Plank\n@REST: 2m\n@dropset\n@perside\n@rpe: 8\n@tempo: 3-0-1-0\n@amrap\n- 60s`;
+    expect(standalone(parseWorkout(md).warnings)).toHaveLength(6);
+  });
+
+  it('does not warn for modifiers attached to set lines', () => {
+    const md = `# W\n## Bench\n- 185 x 8 @rest: 180s\n- 135 x 10 @dropset`;
+    expect(standalone(parseWorkout(md).warnings)).toHaveLength(0);
+  });
+
+  it('does not warn for unknown metadata (forward compatible) or @type', () => {
+    const md = `# W\n@program: 5/3/1\n@restday: no\n## Bench Press\n@type: barbell\n@video: https://x\n- 185 x 8`;
+    expect(parseWorkout(md).warnings).toEqual([]);
+  });
+
+  it('ignores lines outside the workout block', () => {
+    const md = `# Log\n@rest: 60s\n# Push Day\n## Bench Press\n- 185 x 8`;
+    // "# Log" has no exercises below it, so "# Push Day" is the workout.
+    const result = parseWorkout(md);
+    expect(result.data?.name).toBe('Push Day');
+    expect(standalone(result.warnings)).toHaveLength(0);
+  });
+});
+
+describe('IGNORED_LINE warning', () => {
+  const ignored = (warnings: string[]) => warnings.filter((w) => w.includes('Line ignored'));
+
+  it('warns on prose between and after sets', () => {
+    const md = `# W\n## Row\n- 135 x 10\nKeep your back flat.\n- 155 x 8\n\nFinisher next.`;
+    const result = parseWorkout(md);
+    expect(result.success).toBe(true);
+    const w = ignored(result.warnings);
+    expect(w).toHaveLength(2);
+    expect(w[0]).toMatch(/^Line 4:/);
+    expect(w[0]).toContain('"Keep your back flat."');
+    expect(w[1]).toMatch(/^Line 7:/);
+    expect(result.data!.exercises[0].sets).toHaveLength(2);
+  });
+
+  it('does not warn on prose under a section/superset header (out of scope for IGNORED_LINE)', () => {
+    const md = `# W\n## Warmup\nEasy pace.\n### Jog\n- 5m`;
+    expect(ignored(parseWorkout(md).warnings)).toHaveLength(0);
+  });
+
+  it('does not warn for exercise notes before the first set or blank lines', () => {
+    const md = `# W\nWorkout notes.\n\n## Row\nNotes here.\n\n- 135 x 10\n\n- 155 x 8\n`;
+    expect(ignored(parseWorkout(md).warnings)).toHaveLength(0);
+  });
+
+  it('truncates long ignored lines in the message', () => {
+    const long = 'x'.repeat(200);
+    const md = `# W\n## Row\n- 135 x 10\n${long}`;
+    const w = ignored(parseWorkout(md).warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).not.toContain(long);
+    expect(w[0]).toContain('...');
+  });
+});

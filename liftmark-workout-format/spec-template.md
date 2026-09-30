@@ -96,6 +96,7 @@ Note: The workout is "Week 1 - Day 1: Push" (the first header with exercises). H
 ### Optional Metadata
 - `@type: [equipment]` - Freeform equipment type (e.g., `barbell`, `dumbbell`, `cable`, `resistance band`, `kettlebell`) - completely optional
 - **Freeform notes**: Any text after the exercise header (before first set) is treated as exercise notes
+- **Text after the first set is not captured**: once the set list begins, any non-empty line that is not a set (`-` list item) is ignored and produces a non-blocking `IGNORED_LINE` warning. Put exercise notes before the first set, or put per-set notes at the end of the set line (e.g., `- 185 lbs x 8 slow eccentric`). Lines that are standalone modifiers produce `STANDALONE_MODIFIER` instead.
 
 ### Exercise Name Resolution
 
@@ -270,6 +271,27 @@ Pull heel to glutes, keep knees together
 
 If `@amrap` appears on a set line it is treated as a deprecated modifier and the parser emits a `DEPRECATED_AMRAP` warning pointing to the rep-value form. The set still parses; the flag has no effect.
 
+### Modifiers only apply on a set line
+
+Modifiers are **per-set**: they take effect only when appended to a set line (a `-` list item). There is no exercise-level or workout-level default — a modifier written on its own line has no effect.
+
+```markdown
+## Bench Press
+@rest: 180s          ← no effect: not attached to a set (STANDALONE_MODIFIER warning)
+- 185 lbs x 8
+- 185 lbs x 8
+```
+
+Write the modifier on every set it should apply to instead:
+
+```markdown
+## Bench Press
+- 185 lbs x 8 @rest: 180s
+- 185 lbs x 8 @rest: 180s
+```
+
+Any line inside the workout that is not a set line and begins with a modifier keyword (`@rest`, `@dropset`, `@perside`, `@rpe`, `@tempo`, `@amrap`) — whether under the workout header, under an exercise header, under a section/superset header, or between/after sets — produces a non-blocking `STANDALONE_MODIFIER` warning pointing at that line. The file still parses. (Unknown `@key: value` metadata such as `@program: 5/3/1` is unaffected and remains silently ignored for forward compatibility; only the set-modifier keywords above are flagged.)
+
 ### Descriptive Information (Use Freeform Notes)
 
 For tempo, RPE, and other descriptive data, use freeform notes:
@@ -338,6 +360,8 @@ For tempo, RPE, and other descriptive data, use freeform notes:
 - ⚠️ Very long rest (>10m, might be typo)
 - ⚠️ `EXERCISE_ALIAS_SUGGESTION` — alias used in place of canonical name (e.g., `Bench` → `Bench Press`)
 - ⚠️ `EXERCISE_NAME_SUGGESTION` — fuzzy "did you mean?" hint for likely typos near a canonical name
+- ⚠️ `STANDALONE_MODIFIER` — a set modifier (`@rest`, `@dropset`, `@perside`, `@rpe`, `@tempo`, `@amrap`) written on its own line instead of appended to a set line. It has no effect (there is no exercise- or workout-level default); the warning points at the line and suggests appending the modifier to each set.
+- ⚠️ `IGNORED_LINE` — a non-empty, non-set line after an exercise's first set (between or after its sets). The text is not captured anywhere; the warning points at the line.
 
 ### Error Examples
 
@@ -751,6 +775,22 @@ All test cases below are validated against the LMWF parser at spec generation ti
 **TC-V30: Every valid set format**
 <!-- EXAMPLE: valid/tc-all-set-formats.md -->
 
+### Warning Test Cases
+
+Files in `examples/warnings/` must parse successfully **and** emit the listed warnings.
+
+**TC-W01: Standalone `@rest` before the set list (GH #425)**
+<!-- EXAMPLE: warnings/tc-standalone-rest-modifier.md -->
+Parses successfully; sets have no rest timer; one `STANDALONE_MODIFIER` warning on line 4.
+
+**TC-W02: Standalone modifiers at every level**
+<!-- EXAMPLE: warnings/tc-standalone-modifiers-everywhere.md -->
+Parses successfully; `STANDALONE_MODIFIER` warnings on lines 2, 5, 9 and 18; no set gets rest or dropset from them.
+
+**TC-W03: Text after the first set is ignored**
+<!-- EXAMPLE: warnings/tc-text-after-sets-ignored.md -->
+Parses successfully with 3 sets; one `IGNORED_LINE` warning on line 6.
+
 ### Invalid Test Cases — Structure Errors
 
 **TC-E01: Empty file**
@@ -852,6 +892,11 @@ All test cases below are validated against the LMWF parser at spec generation ti
 ---
 
 ## Changelog
+
+### Version 1.5 (2026-09-30)
+- **Clarified modifiers are per-set only** (GH #425) — a modifier on its own line (e.g., `@rest: 180s` above the set list) has no effect. The parser now emits a `STANDALONE_MODIFIER` warning for such lines instead of silently dropping them.
+- **Ignored lines are reported** — non-set text after an exercise's first set now produces an `IGNORED_LINE` warning instead of being silently dropped.
+- Added warning test cases TC-W01 through TC-W03 (`examples/warnings/`).
 
 ### Version 1.4 (2026-05-22)
 - **Exercise name resolution via alias table** — `spec/data/exercise-dictionary.json` is now consulted by the validator. Two new non-blocking warnings: `EXERCISE_ALIAS_SUGGESTION` (alias used; suggests canonical) and `EXERCISE_NAME_SUGGESTION` (fuzzy "did you mean?"). Names that match neither path pass through silently.

@@ -43,6 +43,9 @@ export function parseWorkout(markdown: string): ParseResult {
     };
   }
 
+  // Flag set modifiers written on their own line anywhere in the workout block
+  warnStandaloneModifiers(context, context.currentIndex);
+
   // Parse workout metadata and notes
   const section = parseWorkoutSection(context, workoutHeaderLine);
 
@@ -201,6 +204,57 @@ function preprocessLines(markdown: string): ParsedLine[] {
       metadataKey: null,
       metadataValue: null,
     };
+  });
+}
+
+// MARK: - Stray Line Warnings
+
+/// Set-modifier keywords. These only take effect when appended to a set line.
+const SET_MODIFIER_KEYWORDS = new Set(['rest', 'dropset', 'perside', 'rpe', 'tempo', 'amrap']);
+
+function isStandaloneModifier(line: ParsedLine): boolean {
+  if (line.isList || line.headerLevel != null) return false;
+  const match = line.trimmed.match(/^@(\w+)/);
+  return match != null && SET_MODIFIER_KEYWORDS.has(match[1].toLowerCase());
+}
+
+function preview(text: string): string {
+  return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+}
+
+/// Warn on every non-set line inside the workout block that begins with a set
+/// modifier (e.g. a bare `@rest: 180s` above the set list). Modifiers are per-set
+/// only, so such a line has no effect (GH #425).
+function warnStandaloneModifiers(context: ParseContext, workoutHeaderIndex: number): void {
+  for (let i = workoutHeaderIndex + 1; i < context.lines.length; i++) {
+    const line = context.lines[i];
+    if (line.headerLevel != null && context.workoutHeaderLevel != null && line.headerLevel <= context.workoutHeaderLevel) {
+      break;
+    }
+    if (isStandaloneModifier(line)) {
+      const text = preview(line.trimmed);
+      context.warnings.push({
+        line: line.lineNumber,
+        message:
+          `Modifier "${text}" is on its own line and has no effect — modifiers only apply when ` +
+          `appended to a set line (e.g., "- 135 lbs x 5 ${text}"). Add it to each set it should apply to.`,
+        code: 'STANDALONE_MODIFIER',
+      });
+    }
+  }
+}
+
+/// Warn on a non-empty, non-set line inside an exercise's set list (after its first
+/// set). Such text is skipped without being captured anywhere. Standalone modifiers are
+/// excluded — they already get STANDALONE_MODIFIER.
+function warnIfIgnoredLine(context: ParseContext, line: ParsedLine): void {
+  if (line.trimmed.length === 0 || isStandaloneModifier(line)) return;
+  context.warnings.push({
+    line: line.lineNumber,
+    message:
+      `Line ignored: "${preview(line.trimmed)}" is not a set and is not captured. Put exercise notes ` +
+      `between the exercise header and its first set, or append per-set notes to the end of a set line.`,
+    code: 'IGNORED_LINE',
   });
 }
 
@@ -771,6 +825,7 @@ function parseSets(context: ParseContext, exerciseHeaderLevel: number, exerciseI
       }
       context.currentIndex += 1;
     } else {
+      warnIfIgnoredLine(context, line);
       context.currentIndex += 1;
     }
   }

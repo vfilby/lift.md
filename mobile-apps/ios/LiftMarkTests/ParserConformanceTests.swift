@@ -74,6 +74,50 @@ final class ParserConformanceTests: XCTestCase {
         }
     }
 
+    // MARK: - Warning Examples
+
+    /// Files in examples/warnings/ must parse successfully AND emit at least one warning.
+    func testAllWarningExamplesParseWithWarnings() throws {
+        let files = try markdownFiles(in: examplesURL.appendingPathComponent("warnings"))
+        XCTAssertGreaterThan(files.count, 0, "No warning example files found")
+
+        var failures: [String] = []
+        for file in files {
+            let result = MarkdownParser.parseWorkout(try String(contentsOf: file, encoding: .utf8))
+            if !result.success {
+                failures.append("\(file.lastPathComponent): \(result.errors.joined(separator: "; "))")
+            } else if result.warnings.isEmpty {
+                failures.append("\(file.lastPathComponent): expected warnings but got none")
+            }
+        }
+
+        if !failures.isEmpty {
+            XCTFail("\(failures.count)/\(files.count) warning examples failed:\n" + failures.joined(separator: "\n"))
+        }
+    }
+
+    /// Spec TC-W01..W03: the documented warnings fire on the documented lines.
+    func testWarningExamplesEmitDocumentedWarnings() throws {
+        let standalone = "on its own line and has no effect"
+        let ignored = "Line ignored"
+        let cases: [(file: String, marker: String, lines: [Int])] = [
+            ("tc-standalone-rest-modifier.md", standalone, [4]),
+            ("tc-standalone-modifiers-everywhere.md", standalone, [2, 5, 9, 18]),
+            ("tc-standalone-modifiers-everywhere.md", ignored, []),
+            ("tc-text-after-sets-ignored.md", ignored, [6]),
+        ]
+        for testCase in cases {
+            let url = examplesURL.appendingPathComponent("warnings").appendingPathComponent(testCase.file)
+            let result = MarkdownParser.parseWorkout(try String(contentsOf: url, encoding: .utf8))
+            let lines = result.warnings
+                .filter { $0.contains(testCase.marker) }
+                .compactMap { $0.firstMatch(of: /^Line (\d+):/).flatMap { Int($0.1) } }
+            XCTAssertEqual(lines, testCase.lines, "\(testCase.file) [\(testCase.marker)]")
+            let sets = result.data?.exercises.flatMap(\.sets) ?? []
+            XCTAssertTrue(sets.allSatisfy { $0.restSeconds == nil && !$0.isDropset }, testCase.file)
+        }
+    }
+
     // MARK: - Helpers
 
     private func markdownFiles(in directory: URL) throws -> [URL] {
