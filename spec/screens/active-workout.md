@@ -85,6 +85,10 @@ Primary workout execution screen. Displays all exercises and sets for the active
 ### Exercise Timer (timed sets)
 - ExerciseTimer component appears **inline directly below the current set row** (not at the bottom of the exercise card). This keeps the timer visually associated with the active set when multiple timed sets exist.
 - ExerciseTimer component appears for sets with `targetTime`
+- **Auto-scroll to the timer (GH #433)**: When completing a set makes a timed set the current set — the next set in the same card, or the first pending set of the card that focus advances to — the list scrolls so that set's ExerciseTimerView is centered on screen. The user must never have to scroll to find the timer for the set they are about to start. The timer carries its own scroll identity (`exercise-timer-{setId}`), distinct from the set row's id. For supersets the current set is the first pending set in round-robin order, matching the card's own timer placement.
+  - The scroll decision is a pure function `ActiveWorkoutViewModel.autoScrollTarget(exercises:lastInteractedExerciseId:)` returning `.exerciseTimer(setId:)`, `.card(id:)`, or nil, and all post-completion scrolling goes through it. The *focus card* is the card containing the last-interacted exercise while it still has pending sets (for a superset, any child counts), otherwise the next card with pending sets after it, wrapping around. If the focus card's current set is timed → `.exerciseTimer`; else if focus moved to a different card → `.card` (scroll that card's top into view; superset cards are identified by the parent exercise id); else nil (stay put).
+  - Unit tests (`ActiveWorkoutAutoScrollTests`) cover: timed next set in the same card, rep next set in the same card (no scroll), timed and rep next exercise, skipped/completed sets passed over, zero `targetTime` treated as untimed, no prior interaction, wrap-around, all done, round-robin superset timer, finished child with a pending sibling (no scroll), and superset card targeting via the parent id.
+  - E2E (`e2e-spec/scenarios/timer-auto-scroll.yaml`): finishing the last set of an exercise that is followed by a timed exercise whose timer would sit below the fold leaves that timer's Start button visible without any manual scroll.
 - This applies equally to timed sets inside a superset: when the current pending set in the interleaved superset list has a `targetTime`, the same `ExerciseTimerView` renders directly below that set row. Re-pending a previously skipped timed set (via "Clear Log" in the edit menu) restores the timer.
 - **Tap Start** → begins counting up toward target
 - **Tap Pause** → pauses timer; elapsed time is frozen
@@ -220,7 +224,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 ### Exercise Collapse Behavior
 - Completed exercises (all sets completed or skipped) automatically collapse to a compact summary showing: exercise name, completion status badge, and a brief summary (e.g., "3/3 sets completed")
 - Collapsed exercises can be tapped to expand and view full set detail
-- When an exercise's last set is completed, it collapses and scroll focus moves to the next exercise
+- When an exercise's last set is completed, it collapses and scroll focus moves to the next exercise (or to its exercise timer when the next set is timed — see Exercise Timer → Auto-scroll to the timer)
 - The currently active exercise (containing the current pending set) is always expanded
 - User can manually expand/collapse any exercise
 - **Tap target**: The entire exercise header row (number badge, exercise name, spacer area, set count) must be tappable to toggle collapse. The button label HStack must use `.contentShape(Rectangle())` so that transparent spacer areas forward taps. Additional `.padding(.vertical, 4)` ensures a comfortable vertical tap target.

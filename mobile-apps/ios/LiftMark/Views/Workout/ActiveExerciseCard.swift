@@ -205,7 +205,7 @@ struct ActiveExerciseCard: View {
                             let weight = Double(currentWeightText)
                             onCompleteSet(setIndex, weight, nil, elapsedSeconds)
                         }
-                        .id(setId)
+                        .id(ActiveWorkoutViewModel.exerciseTimerScrollId(setId: setId))
                     }
 
                     // Inline rest timer — placed directly under the set that

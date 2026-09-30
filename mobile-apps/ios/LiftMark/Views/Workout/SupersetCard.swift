@@ -208,7 +208,7 @@ struct SupersetCard: View {
                             let weight = Double(currentWeightText)
                             onCompleteSet(item.exerciseIndex, item.setIndex, weight, nil, elapsedSeconds)
                         }
-                        .id(item.set.id)
+                        .id(ActiveWorkoutViewModel.exerciseTimerScrollId(setId: item.set.id))
                     }
 
                     // Rest timer rendered directly below the set that
