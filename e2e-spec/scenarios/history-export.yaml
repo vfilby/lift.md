@@ -119,3 +119,34 @@ tests:
           - action: tapText
             text: "Close"
         catch: []
+
+  # GH #432: press and hold an exercise card to read it at an enlarged size.
+  - name: "long-press enlarges an exercise card"
+    steps:
+      - action: tap
+        target: "tab-history"
+      - action: waitFor
+        target: "history-session-card"
+        timeout: 5000
+      - action: tapIndex
+        target: "history-session-card"
+        index: 0
+      - action: waitFor
+        target: "history-detail-screen"
+        timeout: 5000
+      - action: longPress
+        target: "exercise-card-enlarge-Bench Press"
+      - action: waitFor
+        target: "enlarged-view"
+        timeout: 5000
+      - action: expect
+        target: "enlarged-view-close"
+        assertion: "toBeVisible"
+      - action: tap
+        target: "enlarged-view-close"
+      - action: expect
+        target: "enlarged-view"
+        assertion: "notToExist"
+      - action: expect
+        target: "history-detail-screen"
+        assertion: "toBeVisible"

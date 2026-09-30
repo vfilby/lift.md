@@ -163,6 +163,9 @@ Implementations on any platform must attach these identifiers to the correspondi
 |----|-------------|---------|
 | `history-detail-screen` | View | Root container |
 | `history-detail-view` | ScrollView | Detail view (from HistoryDetailView component) |
+| `exercise-card-enlarge-{exerciseName}` | View | Long-press target on an exercise card; opens the enlarged view (GH #432) |
+| `enlarged-view` | View | Full-screen enlarged exercise view |
+| `enlarged-view-close` | Button | Closes the enlarged view |
 
 ---
 

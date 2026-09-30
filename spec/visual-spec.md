@@ -77,6 +77,12 @@ The app uses the iOS system font (SF Pro) throughout.
 | Caption | 12pt | Regular (400) | Input labels, hints, progress text |
 | Caption 2 | 11pt | Regular (400) | Smallest labels ("UP NEXT") |
 
+### Dynamic Type
+
+All text uses the brand font tokens, which scale with Dynamic Type (`relativeTo:`). Fixed-size chrome placed inline with text (badges, icons) must use `@ScaledMetric` so it does not clip enlarged text.
+
+**Enlarged reading view** (GH #432): read-only report content can be enlarged on long press via `.enlargeOnLongPress(accessibilityIdentifier:)`. It re-renders the content at `EnlargedTypeSize.size(for:)` — three Dynamic Type steps above the user's setting, clamped to `.accessibility2`…`.accessibility5`. See `spec/screens/history-detail.md` → "Enlarged Exercise View".
+
 ### Numeric Display
 
 - Use `.monospacedDigit()` for all numeric values (weights, reps, timers, counters)

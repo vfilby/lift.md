@@ -24,6 +24,9 @@ Detailed view of a completed workout session showing date/time, stats, exercises
 | Detail view container | `history-detail-view` | ScrollView |
 | Trend toggle | `trend-toggle-{exerciseName}` | Button |
 | Exercise card | `exercise-card-{exerciseName}` | View |
+| Exercise card long-press target (name, sets, notes) | `exercise-card-enlarge-{exerciseName}` | View |
+| Enlarged view (full-screen cover) | `enlarged-view` | View |
+| Enlarged view close button | `enlarged-view-close` | Button |
 | Delete button | `delete-session-button` | Button |
 | Share button | `share-session-button` | Button |
 | Notes card | `history-detail-notes-card` | View |
@@ -33,6 +36,7 @@ Detailed view of a completed workout session showing date/time, stats, exercises
 - **Tap share button (header)** → exports single session as JSON → share sheet
 - **Tap "Show trends" toggle** on exercise → expands/collapses inline ExerciseHistoryChart
 - **Tap "Details" button** under chart → opens ExerciseHistoryBottomSheet
+- **Long-press an exercise card** (name / sets / notes area) → opens the Enlarged Exercise View (see below). GH #432.
 - **Tap "Add" / "Edit" on Notes card** → opens `SessionNotesSheet`. Saving updates the session via `SessionStore.updateSessionNotes`. This is the "edit later" entry point described in GH #91; users can revisit notes as many times as they want. Empty / whitespace-only input is normalized to nil.
 - **Tap "Delete Workout"** → confirmation alert → deletes session → navigates back
 
@@ -71,6 +75,25 @@ Detailed view of a completed workout session showing date/time, stats, exercises
 - Numbered exercises with name + optional equipment type
 - Supersets: purple SUPERSET capsule badge + group name + individual exercise names, interleaved sets
 - Each set: status badge (green ✓ for completed, yellow − for skipped) + weight x reps or "Skipped"
+
+### Enlarged Exercise View (long press) — GH #432
+
+The session report is read mid-workout, at arm's length, often without reading glasses. Any exercise card can be enlarged on demand.
+
+- **Trigger**: press and hold (system default long-press duration, 0.5s) on the exercise card's readable content — number, name, equipment, set rows and exercise notes. The inline trend section is **not** part of the long-press target, so its own buttons keep working. A medium impact haptic fires when the enlarged view opens.
+- **Presentation**: full-screen cover on the standard `background` color. It re-renders the *same* card content (not a bitmap zoom), so text stays crisp and reflows to the screen width. Content scrolls vertically when it is taller than the screen.
+- **Size — respects Dynamic Type**: the content is rendered at an enlarged Dynamic Type size derived from the user's current setting by `EnlargedTypeSize.size(for:)`:
+  - three steps above the current size,
+  - never smaller than `.accessibility2` (≈2× default body text),
+  - never larger than `.accessibility5` (the platform maximum).
+  - So the default `.large` → `.accessibility2`; `.accessibility1` → `.accessibility4`; `.accessibility3` and above → `.accessibility5`. The enlarged view is therefore always at least as large as the regular screen, and grows with the user's own setting.
+  - Because every brand font token is built with `Font.custom(_:size:relativeTo:)`, all text in the card scales. Non-text chrome that sits next to text (the set status badge) is sized with `@ScaledMetric` so it grows with the text instead of clipping it.
+- **Dismissal**: tap anywhere in the enlarged view, tap the close (✕) button in the top-trailing corner (`enlarged-view-close`), or the VoiceOver escape gesture. A "Tap anywhere to close" hint is shown at the bottom at the user's regular text size.
+- **Reusable**: implemented as the `.enlargeOnLongPress(accessibilityIdentifier:)` view modifier (`Views/Shared/EnlargeOnLongPress.swift`), which presents the modified view itself, enlarged. Other read-only report surfaces can adopt it without new logic.
+
+#### Tests
+- Unit (`EnlargedTypeSizeTests`): the mapping above — default `.large` → `.accessibility2`; every input maps to a size ≥ `.accessibility2`, ≤ `.accessibility5`, and ≥ the input; `.accessibility1` → `.accessibility4`; `.accessibility3`/`.accessibility5` → `.accessibility5`; output is monotonic non-decreasing across all sizes.
+- E2E (`e2e-spec/scenarios/history-export.yaml`, "long-press enlarges an exercise card"): open the history detail, long-press `exercise-card-enlarge-Bench Press`, expect `enlarged-view` visible, tap `enlarged-view-close`, expect `enlarged-view` gone and `history-detail-screen` visible.
 
 ### Exercise Trend (inline, per exercise)
 

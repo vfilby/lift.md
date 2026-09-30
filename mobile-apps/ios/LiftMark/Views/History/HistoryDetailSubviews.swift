@@ -6,25 +6,7 @@ extension HistoryDetailView {
     @ViewBuilder
     func setRow(_ set: SessionSet, index: Int) -> some View {
         HStack(spacing: LiftMarkTheme.spacingMD) {
-            // Status badge (✓ for completed, − for skipped)
-            Group {
-                switch set.status {
-                case .completed:
-                    Text("✓")
-                case .skipped:
-                    Text("−")
-                case .failed:
-                    Text("✗")
-                case .pending:
-                    Text("○")
-                }
-            }
-            .font(.lmCaption)
-            .fontWeight(.bold)
-            .frame(width: 28, height: 28)
-            .background(statusColor(set.status).opacity(0.12))
-            .foregroundStyle(statusColor(set.status))
-            .clipShape(Circle())
+            SetStatusBadge(status: set.status, color: statusColor(set.status))
 
             // Weight & reps or "Skipped"
             if set.status == .skipped {
@@ -64,6 +46,36 @@ extension HistoryDetailView {
         case .skipped: return LiftMarkTheme.warning
         case .failed: return LiftMarkTheme.destructive
         case .pending: return LiftMarkTheme.secondaryLabel
+        }
+    }
+}
+
+// MARK: - Set Status Badge
+
+/// ✓ completed, − skipped, ✗ failed, ○ pending. The circle is a `@ScaledMetric`
+/// so it grows with Dynamic Type (and the enlarged view, GH #432) instead of
+/// clipping the glyph.
+private struct SetStatusBadge: View {
+    let status: SetStatus
+    let color: Color
+    @ScaledMetric(relativeTo: .caption) private var diameter: CGFloat = 28
+
+    var body: some View {
+        Text(glyph)
+            .font(.lmCaption)
+            .fontWeight(.bold)
+            .frame(width: diameter, height: diameter)
+            .background(color.opacity(0.12))
+            .foregroundStyle(color)
+            .clipShape(Circle())
+    }
+
+    private var glyph: String {
+        switch status {
+        case .completed: return "✓"
+        case .skipped: return "−"
+        case .failed: return "✗"
+        case .pending: return "○"
         }
     }
 }
