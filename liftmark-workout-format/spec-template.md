@@ -95,8 +95,29 @@ Note: The workout is "Week 1 - Day 1: Push" (the first header with exercises). H
 
 ### Optional Metadata
 - `@type: [equipment]` - Freeform equipment type (e.g., `barbell`, `dumbbell`, `cable`, `resistance band`, `kettlebell`) - completely optional
+- `@rest: [duration]` - Default rest after each set of this exercise (see [Default rest](#default-rest-rest) below) - completely optional
 - **Freeform notes**: Any text after the exercise header (before first set) is treated as exercise notes
 - **Text after the first set is not captured**: once the set list begins, any non-empty line that is not a set (`-` list item) is ignored and produces a non-blocking `IGNORED_LINE` warning. Put exercise notes before the first set, or put per-set notes at the end of the set line (e.g., `- 185 lbs x 8 slow eccentric`). Lines that are standalone modifiers produce `STANDALONE_MODIFIER` instead.
+
+### Default rest (`@rest`)
+
+An `@rest: <duration>` line between the exercise header and the exercise's first set sets a default rest for that exercise:
+
+- **Value**: exactly a duration, using the same syntax as the `@rest` set modifier (`180s`, `90 sec`, `3m`, `2 min`). Anything else (e.g., `@rest: 90s between sets`) is an `INVALID_REST` error. `SHORT_REST` / `LONG_REST` warnings are emitted once, on the `@rest` line.
+- **Applies to**: every set of this exercise that has no `@rest` modifier of its own. A set-level `@rest` always overrides the default.
+- **Drop sets are excluded**: the default is not applied to `@dropset` sets, because a drop is performed immediately after the previous set. A drop set that carries its own `@rest` keeps it.
+- **Scope**: this exercise only. It is not inherited by other exercises, and it is not available under a workout or section/superset header (there it has no effect and produces a `STANDALONE_MODIFIER` warning). Inside a superset or section, put it under the individual exercise's header.
+- **Position**: it may appear in any order with `@type` and the exercise notes, but must come before the first set. After the first set it is a standalone modifier with no effect.
+- **Repeated**: if more than one `@rest:` line is given, the last one wins (as with `@type`).
+- **Parse result**: the default is expanded into each set's rest value at parse time; there is no separate exercise-level field. Encoders (e.g., the app's export) write per-set `@rest` modifiers, which parse back to the same values.
+
+```markdown
+## Bicep Curl
+@rest: 60s
+- 40 lbs x 10              ← 60s
+- 30 lbs x 12 @dropset     ← no rest (drop set)
+- 20 lbs x 15 @dropset     ← no rest (drop set)
+```
 
 ### Exercise Name Resolution
 
@@ -211,7 +232,7 @@ Modifiers provide functional metadata that affects how the app behaves. They use
 
 | Modifier | Values | Description | Example |
 |----------|--------|-------------|---------|
-| `@rest` | Number + `s`/`m` | Rest timer after set (triggers countdown in app) | `@rest: 180s` or `@rest: 3m` |
+| `@rest` | Number + `s`/`m` | Rest timer after set (triggers countdown in app). Can also be set once per exercise as a [default](#default-rest-rest). | `@rest: 180s` or `@rest: 3m` |
 | `@dropset` | flag | Drop set indicator (changes UI tracking) | `@dropset` |
 | `@perside` | flag | Per-side indicator — primarily for **timed** per-side sets where the rep value alone (e.g., `30s`) carries no side cue. For rep-based sets, prefer trailing prose like `per side` or `each leg`, which is auto-detected. | `30s @perside` |
 
@@ -271,26 +292,37 @@ Pull heel to glutes, keep knees together
 
 If `@amrap` appears on a set line it is treated as a deprecated modifier and the parser emits a `DEPRECATED_AMRAP` warning pointing to the rep-value form. The set still parses; the flag has no effect.
 
-### Modifiers only apply on a set line
+### Where modifiers apply
 
-Modifiers are **per-set**: they take effect only when appended to a set line (a `-` list item). There is no exercise-level or workout-level default — a modifier written on its own line has no effect.
+Modifiers are **per-set**: they take effect when appended to a set line (a `-` list item).
 
-```markdown
-## Bench Press
-@rest: 180s          ← no effect: not attached to a set (STANDALONE_MODIFIER warning)
-- 185 lbs x 8
-- 185 lbs x 8
-```
-
-Write the modifier on every set it should apply to instead:
+The one exception is an **exercise-level default rest**: an `@rest: <duration>` line directly under an exercise header, before that exercise's first set, applies to that exercise's sets (see [Exercise Blocks → Default rest](#default-rest-rest)):
 
 ```markdown
 ## Bench Press
-- 185 lbs x 8 @rest: 180s
-- 185 lbs x 8 @rest: 180s
+@rest: 180s
+- 135 lbs x 5 @rest: 90s   ← 90s (the set's own @rest wins)
+- 185 lbs x 5              ← 180s (exercise default)
+- 225 lbs x 5              ← 180s
 ```
 
-Any line inside the workout that is not a set line and begins with a modifier keyword (`@rest`, `@dropset`, `@perside`, `@rpe`, `@tempo`, `@amrap`) — whether under the workout header, under an exercise header, under a section/superset header, or between/after sets — produces a non-blocking `STANDALONE_MODIFIER` warning pointing at that line. The file still parses. (Unknown `@key: value` metadata such as `@program: 5/3/1` is unaffected and remains silently ignored for forward compatibility; only the set-modifier keywords above are flagged.)
+Anywhere else, a modifier written on its own line has no effect. There is no workout-level or section/superset-level default, and only `@rest` has an exercise-level form:
+
+```markdown
+# Pull Day
+@rest: 120s                ← no effect (workout level)
+
+## Superset: Back
+@rest: 90s                 ← no effect (superset level)
+
+### Lat Pulldown
+@dropset                   ← no effect (@dropset has no exercise-level form)
+- 120 lbs x 10
+@rest: 60s                 ← no effect (after the first set)
+- 120 lbs x 10
+```
+
+Any line inside the workout that is not a set line and begins with a modifier keyword (`@rest`, `@dropset`, `@perside`, `@rpe`, `@tempo`, `@amrap`) produces a non-blocking `STANDALONE_MODIFIER` warning pointing at that line, **except** an exercise-level `@rest:` default in the position described above. The file still parses. (Unknown `@key: value` metadata such as `@program: 5/3/1` is unaffected and remains silently ignored for forward compatibility; only the set-modifier keywords above are flagged.)
 
 ### Descriptive Information (Use Freeform Notes)
 
@@ -360,7 +392,7 @@ For tempo, RPE, and other descriptive data, use freeform notes:
 - ⚠️ Very long rest (>10m, might be typo)
 - ⚠️ `EXERCISE_ALIAS_SUGGESTION` — alias used in place of canonical name (e.g., `Bench` → `Bench Press`)
 - ⚠️ `EXERCISE_NAME_SUGGESTION` — fuzzy "did you mean?" hint for likely typos near a canonical name
-- ⚠️ `STANDALONE_MODIFIER` — a set modifier (`@rest`, `@dropset`, `@perside`, `@rpe`, `@tempo`, `@amrap`) written on its own line instead of appended to a set line. It has no effect (there is no exercise- or workout-level default); the warning points at the line and suggests appending the modifier to each set.
+- ⚠️ `STANDALONE_MODIFIER` — a set modifier (`@rest`, `@dropset`, `@perside`, `@rpe`, `@tempo`, `@amrap`) written on its own line where it has no effect: under the workout or a section/superset header, or after an exercise's first set. An exercise-level `@rest:` default (before the first set) does not warn. The warning points at the line and suggests appending the modifier to each set (for `@rest`, it also points to the exercise-level default).
 - ⚠️ `IGNORED_LINE` — a non-empty, non-set line after an exercise's first set (between or after its sets). The text is not captured anywhere; the warning points at the line.
 
 ### Error Examples
@@ -482,9 +514,10 @@ For tempo, RPE, and other descriptive data, use freeform notes:
 4. **Identify exercises** (headers one level below workout):
    - Must have at least one set (list item with `-`)
 5. **For each exercise**:
-   - Extract `@` metadata lines
+   - Extract `@` metadata lines (`@type`, default `@rest`)
    - Collect freeform notes (text before first set)
    - Parse sets (lines starting with `-`)
+   - Apply the default `@rest` to sets without their own `@rest` (excluding `@dropset` sets)
 6. **Validate structure** against rules
 7. **Return parse result** with data + errors/warnings
 
@@ -775,13 +808,17 @@ All test cases below are validated against the LMWF parser at spec generation ti
 **TC-V30: Every valid set format**
 <!-- EXAMPLE: valid/tc-all-set-formats.md -->
 
+**TC-V35: Exercise-level default rest (GH #425)**
+<!-- EXAMPLE: valid/tc-exercise-default-rest.md -->
+Rests: Bench Press 90s / 180s / 180s; Bicep Curl 60s / none / none (drop sets); Hammer Curl 30s / 30s; Tricep Kickback 90s / 90s. No `STANDALONE_MODIFIER` warnings.
+
 ### Warning Test Cases
 
 Files in `examples/warnings/` must parse successfully **and** emit the listed warnings.
 
-**TC-W01: Standalone `@rest` before the set list (GH #425)**
-<!-- EXAMPLE: warnings/tc-standalone-rest-modifier.md -->
-Parses successfully; sets have no rest timer; one `STANDALONE_MODIFIER` warning on line 4.
+**TC-W01: Misplaced `@rest` defaults (workout, superset, after first set)**
+<!-- EXAMPLE: warnings/tc-misplaced-default-rest.md -->
+Parses successfully; `STANDALONE_MODIFIER` warnings on lines 2, 5 and 18 only (the exercise-level default on line 8 does not warn); Lat Pulldown sets rest 60s, all other sets have no rest.
 
 **TC-W02: Standalone modifiers at every level**
 <!-- EXAMPLE: warnings/tc-standalone-modifiers-everywhere.md -->
@@ -894,9 +931,10 @@ Parses successfully with 3 sets; one `IGNORED_LINE` warning on line 6.
 ## Changelog
 
 ### Version 1.5 (2026-09-30)
-- **Clarified modifiers are per-set only** (GH #425) — a modifier on its own line (e.g., `@rest: 180s` above the set list) has no effect. The parser now emits a `STANDALONE_MODIFIER` warning for such lines instead of silently dropping them.
+- **Exercise-level default rest** (GH #425) — an `@rest: <duration>` line between an exercise header and its first set applies to every set of that exercise without its own `@rest` (drop sets excluded). Expanded at parse time; no data-model change.
+- **Standalone modifiers are reported** — a modifier on its own line anywhere else (workout or section/superset header, or after the first set) has no effect, and the parser now emits a `STANDALONE_MODIFIER` warning instead of silently dropping it.
 - **Ignored lines are reported** — non-set text after an exercise's first set now produces an `IGNORED_LINE` warning instead of being silently dropped.
-- Added warning test cases TC-W01 through TC-W03 (`examples/warnings/`).
+- Added valid test case TC-V35 and warning test cases TC-W01 through TC-W03 (`examples/warnings/`).
 
 ### Version 1.4 (2026-05-22)
 - **Exercise name resolution via alias table** — `spec/data/exercise-dictionary.json` is now consulted by the validator. Two new non-blocking warnings: `EXERCISE_ALIAS_SUGGESTION` (alias used; suggests canonical) and `EXERCISE_NAME_SUGGESTION` (fuzzy "did you mean?"). Names that match neither path pass through silently.

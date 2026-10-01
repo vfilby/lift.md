@@ -2079,25 +2079,23 @@ describe('STANDALONE_MODIFIER warning', () => {
   const standalone = (warnings: string[]) =>
     warnings.filter((w) => w.includes('on its own line and has no effect'));
 
-  it('warns on a bare @rest line before the set list and does not apply it to sets', () => {
-    const md = `# Upper\n\n## Bench Press\n@rest: 180s\n- 185 lbs x 8\n- 185 lbs x 8`;
+  it('warns on a bare @rest under the workout header and does not apply it to sets', () => {
+    const md = `# Upper\n@rest: 90s\n\n## Bench Press\n- 185 lbs x 8`;
     const result = parseWorkout(md);
     expect(result.success).toBe(true);
     const w = standalone(result.warnings);
     expect(w).toHaveLength(1);
-    expect(w[0]).toMatch(/^Line 4:/);
-    expect(w[0]).toContain('"@rest: 180s"');
-    expect(w[0]).toContain('"- 135 lbs x 5 @rest: 180s"');
-    for (const set of result.data!.exercises[0].sets) {
-      expect(set.restSeconds).toBeNull();
-    }
+    expect(w[0]).toMatch(/^Line 2:/);
+    expect(w[0]).toContain('"@rest: 90s"');
+    expect(w[0]).toContain('"- 135 lbs x 5 @rest: 90s"');
+    expect(w[0]).toContain("directly under that exercise's header");
+    expect(result.data!.exercises[0].sets[0].restSeconds).toBeNull();
   });
 
-  it('warns on a bare modifier under the workout header', () => {
-    const md = `# Upper\n@rest: 90s\n\n## Bench Press\n- 185 lbs x 8`;
-    const w = standalone(parseWorkout(md).warnings);
+  it('does not add the exercise-default hint for non-rest modifiers', () => {
+    const w = standalone(parseWorkout(`# W\n@dropset\n## Bench Press\n- 185 x 8`).warnings);
     expect(w).toHaveLength(1);
-    expect(w[0]).toMatch(/^Line 2:/);
+    expect(w[0]).not.toContain("exercise's header");
   });
 
   it('warns on a bare modifier under a superset header', () => {
@@ -2119,7 +2117,7 @@ describe('STANDALONE_MODIFIER warning', () => {
   });
 
   it('recognizes every modifier keyword case-insensitively, with or without a value', () => {
-    const md = `# W\n## Plank\n@REST: 2m\n@dropset\n@perside\n@rpe: 8\n@tempo: 3-0-1-0\n@amrap\n- 60s`;
+    const md = `# W\n## Plank\n- 60s\n@REST: 2m\n@dropset\n@perside\n@rpe: 8\n@tempo: 3-0-1-0\n@amrap`;
     expect(standalone(parseWorkout(md).warnings)).toHaveLength(6);
   });
 
@@ -2174,5 +2172,73 @@ describe('IGNORED_LINE warning', () => {
     expect(w).toHaveLength(1);
     expect(w[0]).not.toContain(long);
     expect(w[0]).toContain('...');
+  });
+});
+
+describe('Exercise-level default @rest', () => {
+  const rests = (md: string, i = 0) => parseWorkout(md).data!.exercises[i].sets.map((s) => s.restSeconds);
+  const standalone = (warnings: string[]) =>
+    warnings.filter((w) => w.includes('on its own line and has no effect'));
+
+  it('applies to every set without its own @rest; set-level @rest overrides', () => {
+    const md = `# W\n## Bench Press\n@rest: 180s\n- 135 x 5 @rest: 90s\n- 185 x 5\n- 225 x 5`;
+    expect(rests(md)).toEqual([90, 180, 180]);
+    expect(standalone(parseWorkout(md).warnings)).toEqual([]);
+  });
+
+  it('accepts minutes, is case-insensitive, and coexists with @type and notes in any order', () => {
+    const md = `# W\n## Bench Press\nControl the bar.\n@REST: 3m\n@type: barbell\n- 185 x 5`;
+    const ex = parseWorkout(md).data!.exercises[0];
+    expect(ex.sets[0].restSeconds).toBe(180);
+    expect(ex.equipmentType).toBe('barbell');
+    expect(ex.notes).toBe('Control the bar.');
+  });
+
+  it('is not applied to @dropset sets unless they carry their own @rest', () => {
+    const md = `# W\n## Curl\n@rest: 60s\n- 40 x 10\n- 30 x 12 @dropset\n- 20 x 15 @dropset @rest: 120s`;
+    expect(rests(md)).toEqual([60, null, 120]);
+  });
+
+  it('only applies to its own exercise', () => {
+    const md = `# W\n## Bench Press\n@rest: 90s\n- 185 x 5\n## Squat\n- 225 x 5`;
+    expect(rests(md, 1)).toEqual([null]);
+  });
+
+  it('works on an exercise inside a superset, while a superset-level @rest still warns', () => {
+    const md = `# W\n## Superset: Arms\n@rest: 90s\n### Curl\n@rest: 30s\n- 30 x 12\n### Pushdown\n- 40 x 12`;
+    const result = parseWorkout(md);
+    const sets = result.data!.exercises.filter((e) => e.sets.length > 0).map((e) => e.sets[0].restSeconds);
+    expect(sets).toEqual([30, null]);
+    const w = standalone(result.warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^Line 3:/);
+  });
+
+  it('after the first set it is a standalone modifier, not a default', () => {
+    const md = `# W\n## Row\n- 135 x 8\n@rest: 120s\n- 135 x 8`;
+    expect(rests(md)).toEqual([null, null]);
+    expect(standalone(parseWorkout(md).warnings)).toHaveLength(1);
+  });
+
+  it('last @rest line wins when repeated (same as @type)', () => {
+    expect(rests(`# W\n## Bench Press\n@rest: 60s\n@rest: 90s\n- 185 x 5`)).toEqual([90]);
+  });
+
+  it('rejects an invalid value with INVALID_REST', () => {
+    for (const value of ['abc', '-30s', '90s between sets']) {
+      const result = parseWorkout(`# W\n## Bench Press\n@rest: ${value}\n- 185 x 5`);
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toMatch(/^Line 3: Invalid rest time format/);
+      expect(standalone(result.warnings)).toEqual([]);
+    }
+  });
+
+  it('emits SHORT_REST / LONG_REST once on the @rest line, not per set', () => {
+    const short = parseWorkout(`# W\n## Bench Press\n@rest: 5s\n- 185 x 5\n- 185 x 5`).warnings;
+    expect(short.filter((w) => w.includes('Very short rest'))).toEqual([
+      'Line 3: Very short rest period (5s). Double-check for typos.',
+    ]);
+    const long = parseWorkout(`# W\n## Bench Press\n@rest: 11m\n- 185 x 5\n- 185 x 5`).warnings;
+    expect(long.filter((w) => w.includes('Very long rest'))).toHaveLength(1);
   });
 });

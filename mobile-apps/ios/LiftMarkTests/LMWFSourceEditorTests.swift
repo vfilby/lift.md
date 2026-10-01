@@ -246,6 +246,36 @@ final class LMWFSourceEditorTests: XCTestCase {
                        LMWFSourceSpan(startLine: 11, endLine: 12, headerLevel: 2, childHeaderLevel: nil))
     }
 
+    // MARK: - Exercise-level default rest (GH #425)
+
+    /// Re-rendering an exercise that used an `@rest:` default writes per-set
+    /// `@rest` instead; the rest values (including drop sets having none) survive
+    /// the round-trip, and an untouched block keeps its default line verbatim.
+    func testDefaultRestRoundTripsAsPerSetRest() throws {
+        let source = """
+        # Day
+
+        ## Bicep Curl
+        @rest: 60s
+        - 40 lbs x 10
+        - 30 lbs x 12 @dropset
+
+        ## Squat
+        @rest: 3m
+        - 225 lbs x 5
+        """
+        let curl = exercise(parse(source), named: "Bicep Curl")
+        let spliced = try XCTUnwrap(LMWFSourceEditor.replacingExercise(orderIndex: 0, in: source, with: [curl]))
+
+        XCTAssertTrue(hasLine(spliced, "- 40 lbs x 10 @rest: 60s"))
+        XCTAssertTrue(hasLine(spliced, "- 30 lbs x 12 @dropset"))
+        XCTAssertTrue(hasLine(spliced, "@rest: 3m"))
+
+        let reparsed = parse(spliced)
+        XCTAssertEqual(exercise(reparsed, named: "Bicep Curl").sets.map(\.restSeconds), [60, nil])
+        XCTAssertEqual(exercise(reparsed, named: "Squat").sets.map(\.restSeconds), [180])
+    }
+
     // MARK: - Legacy fallback
 
     func testUnlocatableOrderIndexReturnsNil() {

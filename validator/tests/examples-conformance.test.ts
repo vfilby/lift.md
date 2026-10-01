@@ -34,16 +34,33 @@ describe('LMWF example conformance', () => {
   });
 });
 
+describe('exercise-level default rest example (spec TC-V35)', () => {
+  it('expands the default into sets, set-level overrides, drop sets excluded', () => {
+    const result = parse('valid', 'tc-exercise-default-rest.md');
+    expect(result.warnings.filter((w) => w.includes('on its own line'))).toEqual([]);
+    const rests = Object.fromEntries(
+      result.data!.exercises.filter((e) => e.sets.length > 0).map((e) => [e.exerciseName, e.sets.map((s) => s.restSeconds)])
+    );
+    expect(rests).toEqual({
+      'Bench Press': [90, 180, 180],
+      'Bicep Curl': [60, null, null],
+      'Hammer Curl': [30, 30],
+      'Tricep Kickback': [90, 90],
+    });
+  });
+});
+
 describe('warning examples emit the documented warnings (spec TC-W01..W03)', () => {
   const lines = (warnings: string[], marker: string) =>
     warnings.filter((w) => w.includes(marker)).map((w) => Number(/^Line (\d+):/.exec(w)![1]));
   const STANDALONE = 'on its own line and has no effect';
   const IGNORED = 'Line ignored';
 
-  it('TC-W01 standalone @rest before the set list', () => {
-    const result = parse('warnings', 'tc-standalone-rest-modifier.md');
-    expect(lines(result.warnings, STANDALONE)).toEqual([4]);
-    expect(result.data!.exercises[0].sets.every((s) => s.restSeconds === null)).toBe(true);
+  it('TC-W01 workout-, superset- and post-first-set @rest warn; exercise-level default does not', () => {
+    const result = parse('warnings', 'tc-misplaced-default-rest.md');
+    expect(lines(result.warnings, STANDALONE)).toEqual([2, 5, 18]);
+    const rests = result.data!.exercises.filter((e) => e.sets.length > 0).map((e) => e.sets.map((s) => s.restSeconds));
+    expect(rests).toEqual([[60, 60], [null, null], [null, null]]);
   });
 
   it('TC-W02 standalone modifiers at every level', () => {

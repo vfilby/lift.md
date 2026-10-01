@@ -40,21 +40,46 @@ extension MarkdownParser {
     }
 
     /// Warn on every non-set line inside the workout block that begins with a set
-    /// modifier (e.g. a bare `@rest: 180s` above the set list). Modifiers are per-set
-    /// only, so such a line has no effect (GH #425).
+    /// modifier and has no effect — e.g. `@rest: 180s` under the workout or a
+    /// section/superset header, or after an exercise's first set (GH #425). An
+    /// exercise-level `@rest:` default (consumed by parseExerciseMetadata) is exempt.
     static func warnStandaloneModifiers(_ context: ParseContext, workoutHeaderIndex: Int) {
         for line in context.lines.dropFirst(workoutHeaderIndex + 1) {
             if let level = line.headerLevel, let workoutLevel = context.workoutHeaderLevel, level <= workoutLevel {
                 break
             }
-            guard isStandaloneModifier(line) else { continue }
+            guard isStandaloneModifier(line), !context.exerciseRestDefaultLines.contains(line.lineNumber) else {
+                continue
+            }
             let text = warningPreview(line.trimmed)
+            let restHint = line.metadataKey == "rest"
+                ? " To set a default rest for every set of one exercise, put \"@rest:\" directly under "
+                    + "that exercise's header, before its first set."
+                : ""
             context.warnings.append(ParseWarning(
                 line: line.lineNumber,
                 message: "Modifier \"\(text)\" is on its own line and has no effect — modifiers only apply when "
                     + "appended to a set line (e.g., \"- 135 lbs x 5 \(text)\"). "
-                    + "Add it to each set it should apply to.",
+                    + "Add it to each set it should apply to." + restHint,
                 code: "STANDALONE_MODIFIER"
+            ))
+        }
+    }
+
+    /// Warn on rest periods that look like typos (shared by set-level and exercise-level @rest).
+    static func warnRestRange(_ rest: Int, context: ParseContext, lineNumber: Int) {
+        if rest < 10 {
+            context.warnings.append(ParseWarning(
+                line: lineNumber,
+                message: "Very short rest period (\(rest)s). Double-check for typos.",
+                code: "SHORT_REST"
+            ))
+        }
+        if rest > 600 {
+            context.warnings.append(ParseWarning(
+                line: lineNumber,
+                message: "Very long rest period (\(rest)s). Double-check for typos.",
+                code: "LONG_REST"
             ))
         }
     }

@@ -101,21 +101,48 @@ final class ParserConformanceTests: XCTestCase {
         let standalone = "on its own line and has no effect"
         let ignored = "Line ignored"
         let cases: [(file: String, marker: String, lines: [Int])] = [
-            ("tc-standalone-rest-modifier.md", standalone, [4]),
+            ("tc-misplaced-default-rest.md", standalone, [2, 5, 18]),
             ("tc-standalone-modifiers-everywhere.md", standalone, [2, 5, 9, 18]),
             ("tc-standalone-modifiers-everywhere.md", ignored, []),
             ("tc-text-after-sets-ignored.md", ignored, [6]),
         ]
         for testCase in cases {
-            let url = examplesURL.appendingPathComponent("warnings").appendingPathComponent(testCase.file)
-            let result = MarkdownParser.parseWorkout(try String(contentsOf: url, encoding: .utf8))
+            let result = try parseExample("warnings", testCase.file)
             let lines = result.warnings
                 .filter { $0.contains(testCase.marker) }
                 .compactMap { $0.firstMatch(of: /^Line (\d+):/).flatMap { Int($0.1) } }
             XCTAssertEqual(lines, testCase.lines, "\(testCase.file) [\(testCase.marker)]")
-            let sets = result.data?.exercises.flatMap(\.sets) ?? []
-            XCTAssertTrue(sets.allSatisfy { $0.restSeconds == nil && !$0.isDropset }, testCase.file)
         }
+        // Misplaced @rest lines never reach a set; only the exercise-level default does.
+        XCTAssertEqual(try setRests("warnings", "tc-misplaced-default-rest.md"), [
+            "Lat Pulldown": [60, 60], "Seated Row": [nil, nil], "Barbell Row": [nil, nil],
+        ])
+        let everywhere = try parseExample("warnings", "tc-standalone-modifiers-everywhere.md")
+        let sets = everywhere.data?.exercises.flatMap(\.sets) ?? []
+        XCTAssertTrue(sets.allSatisfy { $0.restSeconds == nil && !$0.isDropset })
+    }
+
+    /// Spec TC-V35: exercise-level default rest expands into sets; set-level overrides; drop sets excluded.
+    func testExerciseDefaultRestExample() throws {
+        let result = try parseExample("valid", "tc-exercise-default-rest.md")
+        XCTAssertTrue(result.warnings.filter { $0.contains("on its own line") }.isEmpty)
+        XCTAssertEqual(try setRests("valid", "tc-exercise-default-rest.md"), [
+            "Bench Press": [90, 180, 180],
+            "Bicep Curl": [60, nil, nil],
+            "Hammer Curl": [30, 30],
+            "Tricep Kickback": [90, 90],
+        ])
+    }
+
+    private func parseExample(_ dir: String, _ file: String) throws -> LMWFParseResult {
+        let url = examplesURL.appendingPathComponent(dir).appendingPathComponent(file)
+        return MarkdownParser.parseWorkout(try String(contentsOf: url, encoding: .utf8))
+    }
+
+    private func setRests(_ dir: String, _ file: String) throws -> [String: [Int?]] {
+        let exercises = try parseExample(dir, file).data?.exercises ?? []
+        let withSets = exercises.filter { !$0.sets.isEmpty }
+        return Dictionary(uniqueKeysWithValues: withSets.map { ($0.exerciseName, $0.sets.map(\.restSeconds)) })
     }
 
     // MARK: - Helpers

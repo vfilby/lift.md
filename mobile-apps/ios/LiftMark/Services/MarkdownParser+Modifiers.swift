@@ -63,20 +63,7 @@ extension MarkdownParser {
             let remaining = nonEmpty(restMatch.3)?.trimmingCharacters(in: .whitespaces)
             let restValue = "\(numStr)\(unitStr ?? "")"
             if let rest = parseRestTime(restValue) {
-                if rest < 10 {
-                    context.warnings.append(ParseWarning(
-                        line: lineNumber,
-                        message: "Very short rest period (\(rest)s). Double-check for typos.",
-                        code: "SHORT_REST"
-                    ))
-                }
-                if rest > 600 {
-                    context.warnings.append(ParseWarning(
-                        line: lineNumber,
-                        message: "Very long rest period (\(rest)s). Double-check for typos.",
-                        code: "LONG_REST"
-                    ))
-                }
+                warnRestRange(rest, context: context, lineNumber: lineNumber)
                 modifiers.rest = rest
                 if let remaining = remaining, !remaining.isEmpty { trailingTextParts.append(remaining) }
             } else {
