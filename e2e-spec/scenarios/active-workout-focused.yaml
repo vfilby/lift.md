@@ -162,6 +162,30 @@ tests:
         target: "active-workout-finish-button"
         timeout: 5000
 
+  # GH #432: exercise notes stay small in the card; press and hold to read
+  # them enlarged. Bench Press is the current (expanded) exercise.
+  - name: "long-press on exercise notes shows enlarged view"
+    steps:
+      - action: waitFor
+        target: "exercise-notes-0"
+        timeout: 5000
+      - action: longPress
+        target: "exercise-notes-0"
+      - action: waitFor
+        target: "enlarged-view"
+        timeout: 5000
+      - action: expect
+        target: "enlarged-view-close"
+        assertion: "toBeVisible"
+      - action: tap
+        target: "enlarged-view-close"
+      - action: expect
+        target: "enlarged-view"
+        assertion: "notToExist"
+      - action: expect
+        target: "active-workout-screen"
+        assertion: "toBeVisible"
+
   - name: "finish workout shows summary screen"
     steps:
       # The finish → confirm-dialog → summary hop is the historically flakiest

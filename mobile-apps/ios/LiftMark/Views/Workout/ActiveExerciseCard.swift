@@ -169,6 +169,10 @@ struct ActiveExerciseCard: View {
                         .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
                         .italic()
+                        // Long press → readable enlarged copy (GH #432).
+                        .enlargeNotesOnLongPress(
+                            title: exercise.exerciseName, notes: notes,
+                            accessibilityIdentifier: "exercise-notes-\(exerciseIndex)")
                         .padding(.leading, 32) // badge width + spacing
                 }
 

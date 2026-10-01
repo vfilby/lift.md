@@ -28,6 +28,9 @@ Primary workout execution screen. Displays all exercises and sets for the active
 | Progress section | `active-workout-progress` | View |
 | Scroll content | `active-workout-scroll` | ScrollView |
 | Exercise card | `exercise-card-{index}` | View |
+| Exercise notes (long-press to enlarge) | `exercise-notes-{index}` | Text |
+| Enlarged notes view (full-screen cover) | `enlarged-view` | View |
+| Enlarged notes view close button | `enlarged-view-close` | Button |
 | Exercise timer start | `exercise-timer-start-button` | Button |
 | Exercise timer done | `exercise-timer-done-button` | Button |
 | YouTube link | `youtube-link-{exerciseName}` | Link |
@@ -42,6 +45,20 @@ Primary workout execution screen. Displays all exercises and sets for the active
 - Saving persists immediately via `SessionStore.updateActiveSessionNotes`, so notes survive app backgrounding or termination mid-session.
 - The notes button icon changes to indicate whether notes already exist (`note.text` when present, `square.and.pencil` when empty).
 - Empty / whitespace-only input is normalized to `nil` at the repository layer.
+
+### Enlarged Exercise Notes (GH #432)
+Exercise notes (form cues, e.g. "Step into a deep lunge… 5 reps per side.") render in small grey caption text under the exercise name so the card stays compact. They must be readable at the gym without glasses, **without** making the regular layout bigger.
+
+- **Trigger**: press and hold (system default long-press duration, 0.5s) on the notes text of an expanded exercise card. On a superset card, each member's notes block (member name + notes) is its own target. Only the notes text is the target — the collapse toggle, edit button, set rows and scrolling are unaffected, and a short tap on the notes does nothing.
+- **Presentation**: medium impact haptic, then a full-screen cover on the standard `background` color showing the exercise name as a heading (`lmTitle`) and the notes as body text (`lmBody`), both in the primary label color. Content scrolls if it is taller than the screen. The card's own layout and text sizes do not change.
+- **Size — respects Dynamic Type**: the cover renders at `EnlargedTypeSize.size(for:)` of the user's current Dynamic Type size: three steps larger, never below `.accessibility2` (≈2× default body), never above `.accessibility5`. Default `.large` → `.accessibility2`; `.accessibility1` → `.accessibility4`; `.accessibility3`+ → `.accessibility5`. It is never smaller than the user's own setting.
+- **Dismissal**: tap anywhere, the ✕ button (`enlarged-view-close`, top trailing), or the VoiceOver escape gesture. A "Tap anywhere to close" hint sits at the bottom at the regular text size.
+- **VoiceOver**: the notes element carries the button trait and a "Double-tap to show larger" hint; its default action opens the cover.
+- **Implementation**: reusable `.enlargeOnLongPress(accessibilityIdentifier:enlarged:)` / `.enlargeNotesOnLongPress(title:notes:accessibilityIdentifier:)` modifiers in `Views/Shared/EnlargeOnLongPress.swift`.
+
+#### Tests
+- Unit (`EnlargedTypeSizeTests`): the size mapping above — `.large` → `.accessibility2`; every input maps within `.accessibility2`…`.accessibility5` and ≥ the input; `.accessibility1` → `.accessibility4`; `.accessibility3`/`.accessibility5` → `.accessibility5`; monotonic across all sizes.
+- E2E (`e2e-spec/scenarios/active-workout-focused.yaml`, "long-press on exercise notes shows enlarged view"): the fixture's Bench Press (the current, expanded exercise) has notes; long-press `exercise-notes-0`, expect `enlarged-view` and `enlarged-view-close` visible, tap `enlarged-view-close`, expect `enlarged-view` gone and `active-workout-screen` visible.
 
 ### Set Completion
 - **Tap current set** → no-op (already expanded)

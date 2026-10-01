@@ -161,6 +161,10 @@ struct SupersetCard: View {
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                 .italic()
                         }
+                        // Long press → readable enlarged copy (GH #432).
+                        .enlargeNotesOnLongPress(
+                            title: child.exercise.exerciseName, notes: notes,
+                            accessibilityIdentifier: "exercise-notes-\(child.exerciseIndex)")
                         .padding(.leading, 32)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
