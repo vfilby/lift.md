@@ -3,8 +3,8 @@ import XCTest
 @testable import LiftMark
 
 /// Unit tests for `EnlargedTypeSize` — the Dynamic Type size used by the
-/// long-press enlarged reading view. See spec/screens/history-detail.md →
-/// "Enlarged Exercise View (long press) — GH #432".
+/// long-press enlarged reading view. See spec/screens/active-workout.md →
+/// "Enlarged Exercise Notes (GH #432)".
 final class EnlargedTypeSizeTests: XCTestCase {
 
     func testDefaultSizeEnlargesToAccessibility2() {

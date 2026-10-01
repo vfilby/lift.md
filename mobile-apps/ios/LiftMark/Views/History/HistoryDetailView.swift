@@ -345,29 +345,6 @@ extension HistoryDetailView {
     @ViewBuilder
     private func exerciseCard(_ exercise: SessionExercise, number: Int) -> some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
-            // Press and hold to read the card at an enlarged size (GH #432).
-            // The trend section stays outside the target so its buttons keep working.
-            exerciseReport(exercise, number: number)
-                .enlargeOnLongPress(accessibilityIdentifier: "exercise-card-enlarge-\(exercise.exerciseName)")
-
-            // Inline trend with chart
-            ExerciseTrendView(exerciseName: exercise.exerciseName, onShowDetails: {
-                selectedExerciseName = exercise.exerciseName
-                showExerciseHistory = true
-            })
-        }
-        .padding()
-        .background(LiftMarkTheme.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
-        // Container, so the card id doesn't overwrite the nested long-press target's id.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("exercise-card-\(exercise.exerciseName)")
-    }
-
-    /// Read-only card content: number, name, equipment, set rows and notes.
-    @ViewBuilder
-    private func exerciseReport(_ exercise: SessionExercise, number: Int) -> some View {
-        VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
             HStack(alignment: .top, spacing: LiftMarkTheme.spacingMD) {
                 // Numbered blue badge
                 Text("\(number)")
@@ -413,7 +390,17 @@ extension HistoryDetailView {
                     .foregroundStyle(.secondary)
                     .padding(.top, LiftMarkTheme.spacingXS)
             }
+
+            // Inline trend with chart
+            ExerciseTrendView(exerciseName: exercise.exerciseName, onShowDetails: {
+                selectedExerciseName = exercise.exerciseName
+                showExerciseHistory = true
+            })
         }
+        .padding()
+        .background(LiftMarkTheme.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+        .accessibilityIdentifier("exercise-card-\(exercise.exerciseName)")
     }
 
     // MARK: - Helpers

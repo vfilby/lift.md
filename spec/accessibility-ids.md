@@ -139,6 +139,9 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `active-workout-finish-button` | TouchableOpacity | Finish the workout |
 | `active-workout-progress` | View | Progress bar and text container |
 | `active-workout-scroll` | ScrollView | Scrollable exercise content |
+| `exercise-notes-{index}` | Text | Exercise notes on an active card; long-press opens the enlarged view (GH #432) |
+| `enlarged-view` | View | Full-screen enlarged notes view |
+| `enlarged-view-close` | Button | Closes the enlarged notes view |
 
 ---
 
@@ -163,9 +166,6 @@ Implementations on any platform must attach these identifiers to the correspondi
 |----|-------------|---------|
 | `history-detail-screen` | View | Root container |
 | `history-detail-view` | ScrollView | Detail view (from HistoryDetailView component) |
-| `exercise-card-enlarge-{exerciseName}` | View | Long-press target on an exercise card; opens the enlarged view (GH #432) |
-| `enlarged-view` | View | Full-screen enlarged exercise view |
-| `enlarged-view-close` | Button | Closes the enlarged view |
 
 ---
 

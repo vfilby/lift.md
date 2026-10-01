@@ -7,7 +7,7 @@ import SwiftUI
 /// Three steps above the user's current size, clamped to
 /// `.accessibility2`...`.accessibility5`, so the enlarged view is always
 /// legible at arm's length and still grows with the user's own setting.
-/// See spec/screens/history-detail.md → "Enlarged Exercise View".
+/// See spec/screens/active-workout.md → "Enlarged Exercise Notes".
 enum EnlargedTypeSize {
     static let stepsAboveCurrent = 3
     static let minimum: DynamicTypeSize = .accessibility2
@@ -21,22 +21,38 @@ enum EnlargedTypeSize {
     }
 }
 
-// MARK: - Modifier
+// MARK: - Modifiers
 
 extension View {
-    /// Press and hold to present this view re-rendered at an enlarged Dynamic
-    /// Type size in a full-screen cover; tap anywhere to dismiss.
-    ///
-    /// Apply it to read-only content only — the enlarged copy is the same view,
-    /// so any controls inside it would be live in the cover too.
-    func enlargeOnLongPress(accessibilityIdentifier: String) -> some View {
-        modifier(EnlargeOnLongPressModifier(enlarged: self, accessibilityIdentifier: accessibilityIdentifier))
+    /// Press and hold to present `enlarged` at an enlarged Dynamic Type size
+    /// in a full-screen cover; tap anywhere to dismiss. The modified view's
+    /// own layout is unchanged.
+    func enlargeOnLongPress<Enlarged: View>(
+        accessibilityIdentifier: String,
+        @ViewBuilder enlarged: @escaping () -> Enlarged
+    ) -> some View {
+        modifier(EnlargeOnLongPressModifier(accessibilityIdentifier: accessibilityIdentifier, enlarged: enlarged))
+    }
+
+    /// Exercise notes flavour: the enlarged view shows `title` as a heading
+    /// above `notes` in large body text.
+    func enlargeNotesOnLongPress(title: String, notes: String, accessibilityIdentifier: String) -> some View {
+        enlargeOnLongPress(accessibilityIdentifier: accessibilityIdentifier) {
+            VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {
+                Text(title)
+                    .font(.lmTitle)
+                    .foregroundStyle(LiftMarkTheme.label)
+                Text(notes)
+                    .font(.lmBody)
+                    .foregroundStyle(LiftMarkTheme.label)
+            }
+        }
     }
 }
 
 private struct EnlargeOnLongPressModifier<Enlarged: View>: ViewModifier {
-    let enlarged: Enlarged
     let accessibilityIdentifier: String
+    let enlarged: () -> Enlarged
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isPresented = false
 
@@ -47,12 +63,13 @@ private struct EnlargeOnLongPressModifier<Enlarged: View>: ViewModifier {
             .sensoryFeedback(.impact(weight: .medium), trigger: isPresented) { _, isNowPresented in
                 isNowPresented
             }
-            .accessibilityElement(children: .contain)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Double-tap to show larger")
+            .accessibilityAction { isPresented = true }
             .accessibilityIdentifier(accessibilityIdentifier)
             .fullScreenCover(isPresented: $isPresented) {
-                EnlargedContentView(typeSize: EnlargedTypeSize.size(for: dynamicTypeSize)) {
-                    enlarged
-                }
+                EnlargedContentView(typeSize: EnlargedTypeSize.size(for: dynamicTypeSize), content: enlarged)
             }
     }
 }
@@ -61,12 +78,12 @@ private struct EnlargeOnLongPressModifier<Enlarged: View>: ViewModifier {
 
 private struct EnlargedContentView<Content: View>: View {
     let typeSize: DynamicTypeSize
-    @ViewBuilder let content: Content
+    @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
-            content
+            content()
                 .dynamicTypeSize(typeSize)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(LiftMarkTheme.spacingMD)
