@@ -208,8 +208,15 @@ Assert a condition on an element.
 | `text`      | yes*     | Visible text to match (*or use `target`)     |
 | `assertion` | yes      | One of the assertion types below             |
 | `value`     | no       | Expected value for `toHaveText`              |
+| `timeout`   | no       | Max wait in ms for `toBeOnScreen` (default 5000) |
 
-**Assertion types**: `toBeVisible`, `toHaveText`, `toExist`, `notToBeVisible`, `notToExist`
+**Assertion types**: `toBeVisible`, `toBeOnScreen`, `toHaveText`, `toExist`, `notToBeVisible`, `notToExist`
+
+`toBeVisible` may scroll the element into view before asserting (runners make
+the target hittable first). `toBeOnScreen` never scrolls: it waits (up to
+`timeout`) for the element to be visible in the current viewport and fails if
+it is only reachable by scrolling. Use it to verify that the app itself brought
+something into view (e.g. auto-scroll to the exercise timer, GH #433).
 
 ### scroll
 

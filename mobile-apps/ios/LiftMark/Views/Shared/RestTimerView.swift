@@ -17,11 +17,9 @@ struct RestTimerView: View {
     @State private var timer: Timer?
     @State private var isRunning = false
     @State private var tick: RestTimerTick
-    @State private var lastPlayedSecond: Int = -1
-    /// Whether the zero-crossing alert (completion sound + haptic) has fired
-    /// for the current timer instance. Ensures it plays exactly once per
-    /// timer, not repeatedly on every overrun tick.
-    @State private var zeroAlertFired: Bool = false
+    /// Countdown audio cues (5..1 ticks + one zero-crossing tone) for this
+    /// timer instance, keyed to this timer's own `totalSeconds`.
+    @State private var cues: CountdownCueTracker
     @Environment(\.scenePhase) private var scenePhase
     @Environment(SettingsStore.self) private var settingsStore
 
@@ -29,6 +27,7 @@ struct RestTimerView: View {
         self.totalSeconds = totalSeconds
         self.onSkip = onSkip
         self._tick = State(initialValue: RestTimerTick.compute(totalSeconds: totalSeconds, elapsedSeconds: 0))
+        self._cues = State(initialValue: CountdownCueTracker(targetSeconds: totalSeconds))
     }
 
     /// Color for the timer display. Amber once in overrun; primary while counting down.
@@ -100,29 +99,14 @@ struct RestTimerView: View {
     }
 
     private func recalculate() {
-        let previousTick = tick
-        let newTick = RestTimerTick.compute(totalSeconds: totalSeconds, startDate: startDate, now: Date())
-        tick = newTick
+        let now = Date()
+        tick = RestTimerTick.compute(totalSeconds: totalSeconds, startDate: startDate, now: now)
 
-        guard settingsStore.settings?.countdownSoundsEnabled == true else { return }
-
-        // Countdown ticks at 5..1 — only while still counting down.
-        if newTick.phase == .counting,
-           previousTick.remainingSeconds != newTick.remainingSeconds,
-           newTick.remainingSeconds >= 1,
-           newTick.remainingSeconds <= 5,
-           lastPlayedSecond != newTick.remainingSeconds {
-            lastPlayedSecond = newTick.remainingSeconds
-            AudioService.shared.playTick()
-        }
-
-        // Zero-crossing completion alert: fire exactly once when we first
-        // observe the overrun phase for this timer instance. Do NOT re-trigger
-        // on subsequent overrun ticks — the alert represents "you hit zero",
-        // not "you are still past zero".
-        if newTick.isOverrun && !zeroAlertFired {
-            zeroAlertFired = true
-            AudioService.shared.playComplete()
+        // Ticks at 5..1 while counting down, then one zero-crossing tone —
+        // never re-fired during overrun (see CountdownCueTracker).
+        let cue = cues.advance(toElapsed: Int(now.timeIntervalSince(startDate)))
+        if let cue, settingsStore.settings?.countdownSoundsEnabled == true {
+            AudioService.shared.play(cue)
         }
     }
 
@@ -130,8 +114,7 @@ struct RestTimerView: View {
         guard !isRunning else { return }
         startDate = Date()
         isRunning = true
-        zeroAlertFired = false
-        lastPlayedSecond = -1
+        cues = CountdownCueTracker(targetSeconds: totalSeconds)
         tick = RestTimerTick.compute(totalSeconds: totalSeconds, elapsedSeconds: 0)
         restartDisplayTick()
     }
@@ -164,6 +147,9 @@ struct RestTimerView: View {
 /// Uses wall-clock Date() timestamps so the timer survives app backgrounding.
 struct ExerciseTimerView: View {
     let targetSeconds: Int?
+    /// Called on Start and Resume. The workout uses it to dismiss any running
+    /// rest timer so only one timer drives countdown audio (GH #435).
+    let onStart: () -> Void
     let onComplete: (Int) -> Void
 
     /// The Date when the timer was last started/resumed. nil when paused or stopped.
@@ -174,8 +160,8 @@ struct ExerciseTimerView: View {
     @State private var isRunning = false
     /// Display value updated by the 1-second timer tick.
     @State private var displayElapsed: Int = 0
-    @State private var lastPlayedSecond: Int = -1
-    @State private var completionPlayed: Bool = false
+    /// Countdown audio cues keyed to this set's own `targetSeconds` and elapsed time.
+    @State private var cues: CountdownCueTracker?
     @State private var showCountdown: Bool = false
     /// Tracks whether `showCountdown` has been seeded from the user setting.
     /// Prevents re-seeding on subsequent `onAppear` calls (e.g. after backgrounding)
@@ -184,9 +170,11 @@ struct ExerciseTimerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(SettingsStore.self) private var settingsStore
 
-    init(targetSeconds: Int?, onComplete: @escaping (Int) -> Void) {
+    init(targetSeconds: Int?, onStart: @escaping () -> Void = {}, onComplete: @escaping (Int) -> Void) {
         self.targetSeconds = targetSeconds
+        self.onStart = onStart
         self.onComplete = onComplete
+        self._cues = State(initialValue: targetSeconds.map { CountdownCueTracker(targetSeconds: $0) })
     }
 
     /// Total elapsed seconds (running + paused accumulated).
@@ -356,20 +344,11 @@ struct ExerciseTimerView: View {
         let previousElapsed = displayElapsed
         displayElapsed = currentElapsed
 
-        // Play countdown sounds if enabled and there is a target
-        if let target = targetSeconds,
-           settingsStore.settings?.countdownSoundsEnabled == true,
-           displayElapsed != previousElapsed {
-            let remaining = target - displayElapsed
-            if remaining >= 1 && remaining <= 5 && lastPlayedSecond != remaining {
-                lastPlayedSecond = remaining
-                AudioService.shared.playTick()
-            }
-            if displayElapsed >= target && !completionPlayed {
-                completionPlayed = true
-                AudioService.shared.playComplete()
-            }
-        }
+        // Countdown sounds relative to this set's own target (GH #436).
+        guard displayElapsed != previousElapsed,
+              let cue = cues?.advance(toElapsed: displayElapsed),
+              settingsStore.settings?.countdownSoundsEnabled == true else { return }
+        AudioService.shared.play(cue)
     }
 
     /// Restart the 1-second display tick, aligned to the next whole-second boundary.
@@ -392,6 +371,7 @@ struct ExerciseTimerView: View {
         AudioService.shared.preloadSounds()
         startDate = Date()
         isRunning = true
+        onStart()
         restartDisplayTick()
     }
 

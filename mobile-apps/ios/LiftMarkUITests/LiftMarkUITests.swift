@@ -86,6 +86,12 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "active-workout-focused")
     }
 
+    /// GH #433: completing a set that makes a timed set current must scroll
+    /// that set's exercise timer on screen.
+    func testTimerAutoScroll() throws {
+        runner.runScenario(named: "timer-auto-scroll")
+    }
+
     func testHistoryFlow() throws {
         runner.runScenario(named: "history-flow-robust")
     }

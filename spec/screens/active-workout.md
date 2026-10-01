@@ -28,6 +28,9 @@ Primary workout execution screen. Displays all exercises and sets for the active
 | Progress section | `active-workout-progress` | View |
 | Scroll content | `active-workout-scroll` | ScrollView |
 | Exercise card | `exercise-card-{index}` | View |
+| Exercise notes (long-press to enlarge) | `exercise-notes-{index}` | Text |
+| Enlarged notes view (full-screen cover) | `enlarged-view` | View |
+| Enlarged notes view close button | `enlarged-view-close` | Button |
 | Exercise timer start | `exercise-timer-start-button` | Button |
 | Exercise timer done | `exercise-timer-done-button` | Button |
 | YouTube link | `youtube-link-{exerciseName}` | Link |
@@ -42,6 +45,20 @@ Primary workout execution screen. Displays all exercises and sets for the active
 - Saving persists immediately via `SessionStore.updateActiveSessionNotes`, so notes survive app backgrounding or termination mid-session.
 - The notes button icon changes to indicate whether notes already exist (`note.text` when present, `square.and.pencil` when empty).
 - Empty / whitespace-only input is normalized to `nil` at the repository layer.
+
+### Enlarged Exercise Notes (GH #432)
+Exercise notes (form cues, e.g. "Step into a deep lunge… 5 reps per side.") render in small grey caption text under the exercise name so the card stays compact. They must be readable at the gym without glasses, **without** making the regular layout bigger.
+
+- **Trigger**: press and hold (system default long-press duration, 0.5s) on the notes text of an expanded exercise card. On a superset card, each member's notes block (member name + notes) is its own target. Only the notes text is the target — the collapse toggle, edit button, set rows and scrolling are unaffected, and a short tap on the notes does nothing.
+- **Presentation**: medium impact haptic, then a full-screen cover on the standard `background` color showing the exercise name as a heading (`lmTitle`) and the notes as body text (`lmBody`), both in the primary label color. Content scrolls if it is taller than the screen. The card's own layout and text sizes do not change.
+- **Size — respects Dynamic Type**: the cover renders at `EnlargedTypeSize.size(for:)` of the user's current Dynamic Type size: three steps larger, never below `.accessibility2` (≈2× default body), never above `.accessibility5`. Default `.large` → `.accessibility2`; `.accessibility1` → `.accessibility4`; `.accessibility3`+ → `.accessibility5`. It is never smaller than the user's own setting.
+- **Dismissal**: tap anywhere, the ✕ button (`enlarged-view-close`, top trailing), or the VoiceOver escape gesture. A "Tap anywhere to close" hint sits at the bottom at the regular text size.
+- **VoiceOver**: the notes element carries the button trait and a "Double-tap to show larger" hint; its default action opens the cover.
+- **Implementation**: reusable `.enlargeOnLongPress(accessibilityIdentifier:enlarged:)` / `.enlargeNotesOnLongPress(title:notes:accessibilityIdentifier:)` modifiers in `Views/Shared/EnlargeOnLongPress.swift`.
+
+#### Tests
+- Unit (`EnlargedTypeSizeTests`): the size mapping above — `.large` → `.accessibility2`; every input maps within `.accessibility2`…`.accessibility5` and ≥ the input; `.accessibility1` → `.accessibility4`; `.accessibility3`/`.accessibility5` → `.accessibility5`; monotonic across all sizes.
+- E2E (`e2e-spec/scenarios/active-workout-focused.yaml`, "long-press on exercise notes shows enlarged view"): the fixture's Bench Press (the current, expanded exercise) has notes; long-press `exercise-notes-0`, expect `enlarged-view` and `enlarged-view-close` visible, tap `enlarged-view-close`, expect `enlarged-view` gone and `active-workout-screen` visible.
 
 ### Set Completion
 - **Tap current set** → no-op (already expanded)
@@ -79,14 +96,22 @@ Primary workout execution screen. Displays all exercises and sets for the active
 - Timer completion plays completion sound, clears "Up Next" preview
 - **Continue past zero (overrun)**: When the countdown reaches zero the timer does NOT auto-dismiss. It fires the zero-crossing alert (completion sound + haptic, gated by the Countdown Sounds setting), switches the timer color to amber (`LiftMarkTheme.warning`) and begins **counting up from zero** as an overrun indicator. The overrun display is formatted as `+M:SS` (e.g. `+0:23`, `+1:05`). The zero-crossing alert fires exactly once per timer instance — it does NOT re-fire on subsequent overrun ticks. Countdown audio ticks (5/4/3/2/1) only fire while in the counting-down phase; no ticks fire during overrun. The timer keeps ticking in overrun until the user taps **Stop** or the next set implicitly dismisses it (see Auto-dismiss below).
 - **Auto-dismiss on next set**: If a rest timer is currently running (countdown OR overrun) and the user completes or skips the next set, the running rest timer is dismissed. If the newly completed set also has `restSeconds` defined, a new rest timer starts for that set's rest duration. The user's action of completing the next set implicitly signals they are done resting. A freshly-started timer always begins in the counting-down phase with a new `startDate` — overrun state does not carry across timer instances.
+- **Auto-dismiss on timed-set start (GH #435)**: If a rest timer is running (countdown OR overrun) and the user taps **Start** (or **Resume**) on a timed set's ExerciseTimerView — on any card — the rest timer is dismissed exactly as if **Stop** had been tapped: it is removed from the view hierarchy, its display tick stops, and the Live Activity rest countdown is cleared. Starting the hold signals the rest is over. The policy is the pure function `ActiveWorkoutViewModel.restTimer(_:afterStartingTimedSet:)`, which always returns `nil`.
+- **Single audio driver (GH #435/#436)**: At most one timer drives countdown audio at any moment. Because a running hold always dismisses the rest timer (above), and at most one rest timer exists (Single visible instance), the rest timer and a timed-set timer never both emit ticks/completion tones. Otherwise the rest timer's 5/4/3/2/1 ticks and completion tone play mid-hold and sound like the hold ended early (the reported "Child's Pose 1:00 hold beeps out at 0:45").
+- **Countdown cue computation**: Both the rest timer and the exercise timer derive their audio cues from the shared pure `CountdownCueTracker`, keyed only to **that timer's own** `targetSeconds` and elapsed seconds (computed from that timer's own `startDate`). `advance(toElapsed:)` returns `.tick(remaining:)` exactly once for each remaining second in 5...1 while counting down, and `.complete` exactly once when elapsed first reaches `targetSeconds` (never earlier). A jump that skips past zero (e.g. foreground return) yields only `.complete`; no cues fire after completion.
+  - Tests (`CountdownCueTrackerTests`): a 60s target emits no cue before elapsed 55, ticks 5..1 at elapsed 55..59, and `.complete` exactly at 60 and never again; each tick fires once even when the same elapsed is observed repeatedly; a rest timer started at t=0 and dismissed when a 60s hold starts at t=15 produces no cues during the hold, so the only cues heard are the hold's own (at hold-elapsed 55..60); `restTimer(_:afterStartingTimedSet:)` returns nil for a rest timer owned by the same exercise or a different card.
 - **State machine**: The timer's runtime display state is derived by a pure, testable state machine (`RestTimerTick`) from three inputs — `totalSeconds`, `startDate`, and the current `Date()`. It exposes `phase` (`.counting` | `.overrun`), `remainingSeconds`, `overrunSeconds`, `isOverrun`, and a formatted `displayString`. The SwiftUI view renders from this tick and fires side effects (sound/haptic) based on observed phase transitions.
 - **Background resilience**: Rest timer uses wall-clock `Date()` timestamps internally (not counter-based). A `startDate` is recorded on timer start, and the current tick is computed as `RestTimerTick.compute(totalSeconds:, startDate:, now:)`. The 1-second Timer is kept only for UI updates and must keep ticking during overrun. The timer responds to `scenePhase` changes to recalculate on foreground return. On return to foreground, the timer must restart its display update tick if it was running before backgrounding (the system may invalidate the Timer during extended background periods) — this applies equally in the counting-down and overrun phases.
 
 ### Exercise Timer (timed sets)
 - ExerciseTimer component appears **inline directly below the current set row** (not at the bottom of the exercise card). This keeps the timer visually associated with the active set when multiple timed sets exist.
 - ExerciseTimer component appears for sets with `targetTime`
+- **Auto-scroll to the timer (GH #433)**: When completing a set makes a timed set the current set — the next set in the same card, or the first pending set of the card that focus advances to — the list scrolls so that set's ExerciseTimerView is centered on screen. The user must never have to scroll to find the timer for the set they are about to start. The timer carries its own scroll identity (`exercise-timer-{setId}`), distinct from the set row's id. For supersets the current set is the first pending set in round-robin order, matching the card's own timer placement.
+  - The scroll decision is a pure function `ActiveWorkoutViewModel.autoScrollTarget(exercises:lastInteractedExerciseId:)` returning `.exerciseTimer(setId:)`, `.card(id:)`, or nil, and all post-completion scrolling goes through it. The *focus card* is the card containing the last-interacted exercise while it still has pending sets (for a superset, any child counts), otherwise the next card with pending sets after it, wrapping around. If the focus card's current set is timed → `.exerciseTimer`; else if focus moved to a different card → `.card` (scroll that card's top into view; superset cards are identified by the parent exercise id); else nil (stay put).
+  - Unit tests (`ActiveWorkoutAutoScrollTests`) cover: timed next set in the same card, rep next set in the same card (no scroll), timed and rep next exercise, skipped/completed sets passed over, zero `targetTime` treated as untimed, no prior interaction, wrap-around, all done, round-robin superset timer, finished child with a pending sibling (no scroll), and superset card targeting via the parent id.
+  - E2E (`e2e-spec/scenarios/timer-auto-scroll.yaml`): finishing the last set of an exercise that is followed by a timed exercise whose timer would sit below the fold leaves that timer's Start button visible without any manual scroll.
 - This applies equally to timed sets inside a superset: when the current pending set in the interleaved superset list has a `targetTime`, the same `ExerciseTimerView` renders directly below that set row. Re-pending a previously skipped timed set (via "Clear Log" in the edit menu) restores the timer.
-- **Tap Start** → begins counting up toward target
+- **Tap Start / Resume** → begins counting up toward target, and dismisses any running rest timer (see Rest Timer → Auto-dismiss on timed-set start). Countdown ticks (5/4/3/2/1 before target) and the completion tone are computed from this set's own `targetSeconds` via `CountdownCueTracker` (gated by the Countdown Sounds setting).
 - **Tap Pause** → pauses timer; elapsed time is frozen
 - **Tap timer display** → toggles between count-up and count-down display modes:
   - **Count-up**: Shows elapsed time counting from 0 toward target (e.g., "0:00 → target")
@@ -220,7 +245,7 @@ Primary workout execution screen. Displays all exercises and sets for the active
 ### Exercise Collapse Behavior
 - Completed exercises (all sets completed or skipped) automatically collapse to a compact summary showing: exercise name, completion status badge, and a brief summary (e.g., "3/3 sets completed")
 - Collapsed exercises can be tapped to expand and view full set detail
-- When an exercise's last set is completed, it collapses and scroll focus moves to the next exercise
+- When an exercise's last set is completed, it collapses and scroll focus moves to the next exercise (or to its exercise timer when the next set is timed — see Exercise Timer → Auto-scroll to the timer)
 - The currently active exercise (containing the current pending set) is always expanded
 - User can manually expand/collapse any exercise
 - **Tap target**: The entire exercise header row (number badge, exercise name, spacer area, set count) must be tappable to toggle collapse. The button label HStack must use `.contentShape(Rectangle())` so that transparent spacer areas forward taps. Additional `.padding(.vertical, 4)` ensures a comfortable vertical tap target.
