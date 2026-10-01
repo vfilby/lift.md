@@ -39,7 +39,7 @@ extension ActiveWorkoutView {
                 .padding()
             }
             .onChange(of: completedSets) { _, _ in
-                scrollToNextPendingExercise(proxy: proxy)
+                autoScroll(proxy: proxy)
             }
         }
     }
@@ -91,12 +91,8 @@ extension ActiveWorkoutView {
             onUnlogSet: { setIndex in
                 unlogSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             },
-            onDismissRest: {
-                activeRestTimer = nil
-                ActiveWorkoutViewModel.updateLiveActivity(
-                    session: sessionStore.activeSession,
-                    settings: settingsStore.settings)
-            },
+            onDismissRest: dismissRestTimer,
+            onStartTimedSet: timedSetTimerStarted(setId:),
             restTimerGeneration: restTimerGeneration
         )
         .id(exercise.id)
@@ -143,12 +139,8 @@ extension ActiveWorkoutView {
             onUnlogSet: { exerciseIndex, setIndex in
                 unlogSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             },
-            onDismissRest: {
-                activeRestTimer = nil
-                ActiveWorkoutViewModel.updateLiveActivity(
-                    session: sessionStore.activeSession,
-                    settings: settingsStore.settings)
-            },
+            onDismissRest: dismissRestTimer,
+            onStartTimedSet: timedSetTimerStarted(setId:),
             restTimerGeneration: restTimerGeneration
         )
         .id(parentExercise.id)
@@ -197,32 +189,24 @@ extension ActiveWorkoutView {
         }
     }
 
-    private func scrollToNextPendingExercise(proxy: ScrollViewProxy) {
-        guard let exercises = session?.exercises, !exercises.isEmpty else { return }
-
-        // Only advance once the just-interacted exercise is fully done; otherwise
-        // stay put so the user can keep working on it.
-        let anchorIdx: Int
-        if let lastId = lastInteractedExerciseId,
-           let idx = exercises.firstIndex(where: { $0.id == lastId }) {
-            let allDone = exercises[idx].sets.allSatisfy { $0.status == .completed || $0.status == .skipped }
-            guard allDone else { return }
-            anchorIdx = idx
-        } else {
-            anchorIdx = -1 // no anchor — search from the start
-        }
-
-        // Search for the next pending exercise starting *after* the anchor,
-        // wrapping around so earlier-skipped exercises still get picked up
-        // once everything later is done.
-        let count = exercises.count
-        for offset in 1...count {
-            let i = (anchorIdx + offset) % count
-            if exercises[i].sets.contains(where: { $0.status == .pending }) {
-                withAnimation {
-                    proxy.scrollTo(exercises[i].id, anchor: .top)
+    /// After a set is completed, scroll to the next card or — when the new
+    /// current set is timed — center its exercise timer (#433). The decision
+    /// lives in `ActiveWorkoutViewModel.autoScrollTarget` so it is unit-tested.
+    /// Deferred one run-loop turn so a timer inserted by this same update is
+    /// laid out before we scroll to it.
+    private func autoScroll(proxy: ScrollViewProxy) {
+        guard let exercises = session?.exercises,
+              let target = ActiveWorkoutViewModel.autoScrollTarget(
+                exercises: exercises, lastInteractedExerciseId: lastInteractedExerciseId)
+        else { return }
+        DispatchQueue.main.async {
+            withAnimation {
+                switch target {
+                case .card(let id):
+                    proxy.scrollTo(id, anchor: .top)
+                case .exerciseTimer(let setId):
+                    proxy.scrollTo(ActiveWorkoutViewModel.exerciseTimerScrollId(setId: setId), anchor: .center)
                 }
-                return
             }
         }
     }

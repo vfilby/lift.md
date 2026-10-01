@@ -647,6 +647,25 @@ class ActionAdapter {
                 XCTAssertTrue(el.isHittable, "Expected '\(desc)' to be visible (hittable)")
             }
 
+        case "toBeOnScreen":
+            // Unlike toBeVisible, never scroll: the element must already be in
+            // the viewport (e.g. brought there by the app's own auto-scroll).
+            let timeout = TimeInterval(action.timeout ?? 5000) / 1000.0
+            let found: XCUIElement?
+            if let target = action.target {
+                found = waitForAnyElement(byId: target, timeout: timeout)
+            } else {
+                let el = try resolveElement(action)
+                found = el.waitForExistence(timeout: UITestTiming.scaled(timeout)) ? el : nil
+            }
+            guard let el = found else {
+                XCTFail("Expected '\(desc)' to be on screen but it was not found")
+                return
+            }
+            XCTAssertTrue(
+                waitForHittable(el, timeout: timeout),
+                "Expected '\(desc)' to be on screen without scrolling")
+
         case "toExist":
             if let target = action.target {
                 if let el = waitForAnyElement(byId: target, timeout: 5) {

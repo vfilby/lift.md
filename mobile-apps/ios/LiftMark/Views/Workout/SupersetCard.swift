@@ -13,6 +13,8 @@ struct SupersetCard: View {
     let onSaveSet: (Int, Int, Double?, Int?, Int?) -> Void  // exerciseIndex, setIndex, weight, reps, time
     let onUnlogSet: (Int, Int) -> Void  // exerciseIndex, setIndex
     let onDismissRest: () -> Void
+    /// Hold timer of the given timed set was started/resumed (GH #435).
+    let onStartTimedSet: (String) -> Void
     var restTimerGeneration: Int = 0
 
     /// Weight text from the currently editing set, captured so the inline
@@ -208,11 +210,14 @@ struct SupersetCard: View {
                     // can't be re-timed after being skipped + unlogged.
                     if isCurrent,
                        let targetTime = item.set.entries.first?.target?.time, targetTime > 0 {
-                        ExerciseTimerView(targetSeconds: targetTime) { elapsedSeconds in
+                        ExerciseTimerView(
+                            targetSeconds: targetTime,
+                            onStart: { onStartTimedSet(item.set.id) }
+                        ) { elapsedSeconds in
                             let weight = Double(currentWeightText)
                             onCompleteSet(item.exerciseIndex, item.setIndex, weight, nil, elapsedSeconds)
                         }
-                        .id(item.set.id)
+                        .id(ActiveWorkoutViewModel.exerciseTimerScrollId(setId: item.set.id))
                     }
 
                     // Rest timer rendered directly below the set that

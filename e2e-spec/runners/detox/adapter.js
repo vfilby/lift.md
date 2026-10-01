@@ -142,6 +142,10 @@ const actionHandlers = {
       case 'toBeVisible':
         await expect(el).toBeVisible();
         break;
+      case 'toBeOnScreen':
+        // Detox visibility never scrolls, so this is on-screen by definition.
+        await waitFor(el).toBeVisible().withTimeout(action.timeout || 5000);
+        break;
       case 'toHaveText':
         await expect(el).toHaveText(action.value);
         break;
