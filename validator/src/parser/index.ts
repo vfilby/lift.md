@@ -29,6 +29,7 @@ export function parseWorkout(markdown: string): ParseResult {
     exerciseHeaderLevel: null,
     errors: [],
     warnings: [],
+    exerciseRestDefaultLines: new Set(),
   };
   const workoutId = generateId();
 
@@ -43,11 +44,17 @@ export function parseWorkout(markdown: string): ParseResult {
     };
   }
 
+  const workoutHeaderIndex = context.currentIndex;
+
   // Parse workout metadata and notes
   const section = parseWorkoutSection(context, workoutHeaderLine);
 
   // Parse exercises
   let exercises = parseExercises(context, workoutId);
+
+  // Flag set modifiers written on their own line anywhere in the workout block
+  // (runs after exercise parsing so exercise-level `@rest:` defaults are known)
+  warnStandaloneModifiers(context, workoutHeaderIndex);
 
   // Apply default weight unit to sets that have a weight but no explicit unit
   if (section.defaultWeightUnit) {
@@ -201,6 +208,81 @@ function preprocessLines(markdown: string): ParsedLine[] {
       metadataKey: null,
       metadataValue: null,
     };
+  });
+}
+
+// MARK: - Stray Line Warnings
+
+/// Set-modifier keywords. These only take effect when appended to a set line.
+const SET_MODIFIER_KEYWORDS = new Set(['rest', 'dropset', 'perside', 'rpe', 'tempo', 'amrap']);
+
+function isStandaloneModifier(line: ParsedLine): boolean {
+  if (line.isList || line.headerLevel != null) return false;
+  const match = line.trimmed.match(/^@(\w+)/);
+  return match != null && SET_MODIFIER_KEYWORDS.has(match[1].toLowerCase());
+}
+
+function preview(text: string): string {
+  return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+}
+
+/// Warn on every non-set line inside the workout block that begins with a set
+/// modifier and has no effect — e.g. `@rest: 180s` under the workout or a
+/// section/superset header, or after an exercise's first set (GH #425). An
+/// exercise-level `@rest:` default (consumed by parseExerciseMetadata) is exempt.
+function warnStandaloneModifiers(context: ParseContext, workoutHeaderIndex: number): void {
+  for (let i = workoutHeaderIndex + 1; i < context.lines.length; i++) {
+    const line = context.lines[i];
+    if (line.headerLevel != null && context.workoutHeaderLevel != null && line.headerLevel <= context.workoutHeaderLevel) {
+      break;
+    }
+    if (isStandaloneModifier(line) && !context.exerciseRestDefaultLines.has(line.lineNumber)) {
+      const text = preview(line.trimmed);
+      const restHint =
+        line.metadataKey === 'rest'
+          ? ` To set a default rest for every set of one exercise, put "@rest:" directly under that exercise's header, before its first set.`
+          : '';
+      context.warnings.push({
+        line: line.lineNumber,
+        message:
+          `Modifier "${text}" is on its own line and has no effect — modifiers only apply when ` +
+          `appended to a set line (e.g., "- 135 lbs x 5 ${text}"). Add it to each set it should apply to.` +
+          restHint,
+        code: 'STANDALONE_MODIFIER',
+      });
+    }
+  }
+}
+
+/// Warn on rest periods that look like typos (shared by set-level and exercise-level @rest).
+function warnRestRange(rest: number, context: ParseContext, lineNumber: number): void {
+  if (rest < 10) {
+    context.warnings.push({
+      line: lineNumber,
+      message: `Very short rest period (${rest}s). Double-check for typos.`,
+      code: 'SHORT_REST',
+    });
+  }
+  if (rest > 600) {
+    context.warnings.push({
+      line: lineNumber,
+      message: `Very long rest period (${rest}s). Double-check for typos.`,
+      code: 'LONG_REST',
+    });
+  }
+}
+
+/// Warn on a non-empty, non-set line inside an exercise's set list (after its first
+/// set). Such text is skipped without being captured anywhere. Standalone modifiers are
+/// excluded — they already get STANDALONE_MODIFIER.
+function warnIfIgnoredLine(context: ParseContext, line: ParsedLine): void {
+  if (line.trimmed.length === 0 || isStandaloneModifier(line)) return;
+  context.warnings.push({
+    line: line.lineNumber,
+    message:
+      `Line ignored: "${preview(line.trimmed)}" is not a set and is not captured. Put exercise notes ` +
+      `between the exercise header and its first set, or append per-set notes to the end of a set line.`,
+    code: 'IGNORED_LINE',
   });
 }
 
@@ -478,10 +560,19 @@ function parseExerciseBlock(
   context.currentIndex += 1;
 
   // Parse metadata and notes
-  const { equipmentType, notes } = parseExerciseMetadata(context, headerLevel);
+  const { equipmentType, notes, defaultRest } = parseExerciseMetadata(context, headerLevel);
 
   // Parse sets
   let sets = parseSets(context, headerLevel, exerciseId);
+
+  // Apply the exercise-level default rest to sets without their own @rest.
+  // Drop sets are excluded: a drop is performed immediately, so a rest timer
+  // between drops would be wrong (an explicit set-level @rest still applies).
+  if (defaultRest != null) {
+    sets = sets.map((set) =>
+      set.restSeconds == null && !set.isDropset ? { ...set, restSeconds: defaultRest } : set
+    );
+  }
 
   // Auto-detect per-side keywords in exercise notes
   const perSideKeywords = ['per side', 'per leg', 'per arm', 'each side', 'each leg', 'each arm', 'each'];
@@ -693,8 +784,9 @@ function parseGroupedExercises(
 function parseExerciseMetadata(
   context: ParseContext,
   exerciseHeaderLevel: number
-): { equipmentType: string | null; notes: string | null } {
+): { equipmentType: string | null; notes: string | null; defaultRest: number | null } {
   let equipmentType: string | null = null;
+  let defaultRest: number | null = null;
   const noteLines: string[] = [];
 
   while (context.currentIndex < context.lines.length) {
@@ -714,6 +806,21 @@ function parseExerciseMetadata(
     if (line.isMetadata) {
       if (line.metadataKey === 'type') {
         equipmentType = line.metadataValue;
+      } else if (line.metadataKey === 'rest') {
+        // Exercise-level default rest; the value must be exactly a duration
+        context.exerciseRestDefaultLines.add(line.lineNumber);
+        const value = line.metadataValue ?? '';
+        const rest = parseRestTime(value);
+        if (rest != null) {
+          warnRestRange(rest, context, line.lineNumber);
+          defaultRest = rest;
+        } else {
+          context.errors.push({
+            line: line.lineNumber,
+            message: `Invalid rest time format: ${value}. Expected format: "180s" or "3m"`,
+            code: 'INVALID_REST',
+          });
+        }
       }
       // Ignore unknown metadata (forward compatible)
       context.currentIndex += 1;
@@ -728,6 +835,7 @@ function parseExerciseMetadata(
   return {
     equipmentType,
     notes: noteLines.length === 0 ? null : noteLines.join('\n'),
+    defaultRest,
   };
 }
 
@@ -771,6 +879,7 @@ function parseSets(context: ParseContext, exerciseHeaderLevel: number, exerciseI
       }
       context.currentIndex += 1;
     } else {
+      warnIfIgnoredLine(context, line);
       context.currentIndex += 1;
     }
   }
@@ -1199,20 +1308,7 @@ function parseModifiersAndTrailingText(
           const restValue = `${numStr}${unitStr ?? ''}`;
           const rest = parseRestTime(restValue);
           if (rest != null) {
-            if (rest < 10) {
-              context.warnings.push({
-                line: lineNumber,
-                message: `Very short rest period (${rest}s). Double-check for typos.`,
-                code: 'SHORT_REST',
-              });
-            }
-            if (rest > 600) {
-              context.warnings.push({
-                line: lineNumber,
-                message: `Very long rest period (${rest}s). Double-check for typos.`,
-                code: 'LONG_REST',
-              });
-            }
+            warnRestRange(rest, context, lineNumber);
             modifiers.rest = rest;
             if (remaining && remaining.length > 0) trailingTextParts.push(remaining);
           } else {

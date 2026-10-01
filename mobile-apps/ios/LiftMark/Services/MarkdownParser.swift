@@ -60,11 +60,17 @@ enum MarkdownParser {
             )
         }
 
+        let workoutHeaderIndex = context.currentIndex
+
         // Parse workout metadata and notes
         let section = parseWorkoutSection(context, headerLine: workoutHeaderLine)
 
         // Parse exercises
         var exercises = parseExercises(context, workoutPlanId: workoutId)
+
+        // Flag set modifiers written on their own line anywhere in the workout block
+        // (runs after exercise parsing so exercise-level `@rest:` defaults are known)
+        warnStandaloneModifiers(context, workoutHeaderIndex: workoutHeaderIndex)
 
         // Apply default weight unit to sets that have a weight but no explicit unit
         applyDefaultWeightUnit(section.defaultWeightUnit, to: &exercises)

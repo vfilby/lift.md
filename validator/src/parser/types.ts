@@ -94,6 +94,8 @@ export interface ParseContext {
   exerciseHeaderLevel: number | null;
   errors: ParseError[];
   warnings: ParseWarning[];
+  /** Line numbers of `@rest:` lines consumed as an exercise-level default rest. */
+  exerciseRestDefaultLines: Set<number>;
 }
 
 export interface ParsedSet {

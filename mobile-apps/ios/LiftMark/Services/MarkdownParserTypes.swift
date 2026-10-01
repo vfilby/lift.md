@@ -67,6 +67,8 @@ class ParseContext {
     var exerciseHeaderLevel: Int?
     var errors: [ParseError] = []
     var warnings: [ParseWarning] = []
+    /// Line numbers of `@rest:` lines consumed as an exercise-level default rest.
+    var exerciseRestDefaultLines: Set<Int> = []
     /// Source spans collected during parsing, keyed by exercise `orderIndex`.
     var spans: [Int: LMWFSourceSpan] = [:]
 
