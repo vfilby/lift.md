@@ -103,6 +103,26 @@ extension ActiveWorkoutView {
         sessionStore.addExercise(exerciseName: parsed.name, sets: parsed.sets)
     }
 
+    /// Dismiss the running rest timer (Stop button) and clear its Live
+    /// Activity countdown. No-op when no rest timer is running.
+    func dismissRestTimer() {
+        guard activeRestTimer != nil else { return }
+        activeRestTimer = nil
+        ActiveWorkoutViewModel.updateLiveActivity(
+            session: sessionStore.activeSession,
+            settings: settingsStore.settings)
+    }
+
+    /// The user started/resumed the hold timer of a timed set. Dismiss any
+    /// running rest timer so only one timer drives countdown audio (GH #435).
+    func timedSetTimerStarted(setId: String) {
+        guard activeRestTimer != nil else { return }
+        activeRestTimer = ActiveWorkoutViewModel.restTimer(activeRestTimer, afterStartingTimedSet: setId)
+        ActiveWorkoutViewModel.updateLiveActivity(
+            session: sessionStore.activeSession,
+            settings: settingsStore.settings)
+    }
+
     // MARK: - Shared Set-Interaction Plumbing
 
     /// Common preamble for set interactions: bounds-check the indices, record

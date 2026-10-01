@@ -91,12 +91,8 @@ extension ActiveWorkoutView {
             onUnlogSet: { setIndex in
                 unlogSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             },
-            onDismissRest: {
-                activeRestTimer = nil
-                ActiveWorkoutViewModel.updateLiveActivity(
-                    session: sessionStore.activeSession,
-                    settings: settingsStore.settings)
-            },
+            onDismissRest: dismissRestTimer,
+            onStartTimedSet: timedSetTimerStarted(setId:),
             restTimerGeneration: restTimerGeneration
         )
         .id(exercise.id)
@@ -143,12 +139,8 @@ extension ActiveWorkoutView {
             onUnlogSet: { exerciseIndex, setIndex in
                 unlogSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             },
-            onDismissRest: {
-                activeRestTimer = nil
-                ActiveWorkoutViewModel.updateLiveActivity(
-                    session: sessionStore.activeSession,
-                    settings: settingsStore.settings)
-            },
+            onDismissRest: dismissRestTimer,
+            onStartTimedSet: timedSetTimerStarted(setId:),
             restTimerGeneration: restTimerGeneration
         )
         .id(parentExercise.id)

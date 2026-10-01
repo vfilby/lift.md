@@ -15,6 +15,8 @@ struct ActiveExerciseCard: View {
     let onSaveSet: (Int, Double?, Int?, Int?) -> Void
     let onUnlogSet: (Int) -> Void
     let onDismissRest: () -> Void
+    /// Hold timer of the given timed set was started/resumed (GH #435).
+    let onStartTimedSet: (String) -> Void
     var restTimerGeneration: Int = 0
 
     @State private var currentWeightText: String = ""
@@ -201,7 +203,10 @@ struct ActiveExerciseCard: View {
                     if setIndex == currentSetIndex,
                        let targetTime = currentTimedSetTarget,
                        let setId = currentTimedSetId {
-                        ExerciseTimerView(targetSeconds: targetTime) { elapsedSeconds in
+                        ExerciseTimerView(
+                            targetSeconds: targetTime,
+                            onStart: { onStartTimedSet(setId) }
+                        ) { elapsedSeconds in
                             let weight = Double(currentWeightText)
                             onCompleteSet(setIndex, weight, nil, elapsedSeconds)
                         }
