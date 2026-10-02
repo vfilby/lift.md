@@ -12,6 +12,12 @@ struct HomeView: View {
     @State private var showImport = false
     @State private var showExercisePicker = false
     @State private var editingTileIndex: Int?
+    @State private var historyTarget: HistoryTarget?
+
+    private struct HistoryTarget: Identifiable {
+        let name: String
+        var id: String { name }
+    }
 
     private var inboxCount: Int { inboxPoller.pendingCount }
 
@@ -135,6 +141,7 @@ struct HomeView: View {
                                 unit: settingsStore.settings?.defaultWeightUnit ?? .lbs,
                                 isRegularWidth: isRegularWidth,
                                 sparklineData: isRegularWidth ? (cachedSparklines[exerciseName] ?? []) : [],
+                                onTap: { historyTarget = HistoryTarget(name: exerciseName) },
                                 onLongPress: {
                                     editingTileIndex = index
                                     showExercisePicker = true
@@ -224,6 +231,11 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showImport) {
             ImportView()
+        }
+        .sheet(item: $historyTarget) { target in
+            NavigationStack {
+                ExerciseHistorySheetView(exerciseName: target.name)
+            }
         }
         .sheet(isPresented: $showExercisePicker) {
             ExercisePickerView { selectedExercise in
