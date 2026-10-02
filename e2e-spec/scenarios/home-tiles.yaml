@@ -42,6 +42,16 @@ tests:
         text: "Overhead Press"
         assertion: "toBeVisible"
 
+  - name: "tapping a tile opens exercise history"
+    steps:
+      - action: tap
+        target: "max-lift-tile-0"
+      - action: tap
+        text: "Done"
+      - action: expect
+        target: "max-lift-tile-0"
+        assertion: "toBeVisible"
+
   # Issue 5: Create Plan button must be visible and tappable above the tab bar
   - name: "Create Plan button is visible and not hidden behind tab bar"
     steps:
