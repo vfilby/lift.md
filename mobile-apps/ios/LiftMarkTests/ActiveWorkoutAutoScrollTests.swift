@@ -4,6 +4,7 @@ import XCTest
 /// Tests for `ActiveWorkoutViewModel.autoScrollTarget` — where the active
 /// workout list scrolls after a set is completed. Guards #433: when the new
 /// current set is timed, its exercise timer must be scrolled into view.
+/// Guards #444: a running rest timer must not be scrolled off-screen.
 final class ActiveWorkoutAutoScrollTests: XCTestCase {
 
     private typealias Target = ActiveWorkoutViewModel.AutoScrollTarget
@@ -101,6 +102,53 @@ final class ActiveWorkoutAutoScrollTests: XCTestCase {
         XCTAssertEqual(target(exercises, last: "warmup"), .card(id: "ss"))
     }
 
+    // MARK: - Running rest timer (#444)
+
+    func testRestTimerPinnedToTopWhenFocusMovesToRepCard() {
+        // Finishing squat collapses its card with the rest timer under the
+        // header; scrolling deadlift's top into view would push it off-screen.
+        let squat = exercise("squat", sets: [repSet("s1", status: .completed)])
+        let deadlift = exercise("deadlift", sets: [repSet("d1")])
+        XCTAssertEqual(
+            target([squat, deadlift], last: "squat", rest: rest(after: "s1")), .restTimer(pinToTop: true))
+    }
+
+    func testRestTimerPinnedToTopWhenFocusMovesToTimedCard() {
+        let lunges = exercise("lunges", sets: [repSet("l1", status: .completed)])
+        let stretch = exercise("stretch", sets: [timedSet("w-left")])
+        XCTAssertEqual(
+            target([lunges, stretch], last: "lunges", rest: rest(after: "l1")), .restTimer(pinToTop: true))
+    }
+
+    func testRestTimerRevealedInSameCardWithRepNextSet() {
+        let bench = exercise("bench", sets: [repSet("b1", status: .completed), repSet("b2")])
+        XCTAssertEqual(target([bench], last: "bench", rest: rest(after: "b1")), .restTimer(pinToTop: false))
+    }
+
+    func testTimedNextSetInSameCardStillCentersItsTimer() {
+        // The rest timer renders directly above the timed set's row and timer.
+        let plank = exercise("plank", sets: [timedSet("p1", status: .completed), timedSet("p2")])
+        XCTAssertEqual(target([plank], last: "plank", rest: rest(after: "p1")), .exerciseTimer(setId: "p2"))
+    }
+
+    func testRestTimerRevealedWhenEverythingIsDone() {
+        let done = exercise("a", sets: [repSet("a1", status: .completed)])
+        XCTAssertEqual(target([done], last: "a", rest: rest(after: "a1")), .restTimer(pinToTop: false))
+    }
+
+    func testRestTimerRevealedWhenSupersetSiblingStillPending() {
+        let exercises = superset(
+            childA: [repSet("a1", status: .completed)],
+            childB: [repSet("b1")])
+        XCTAssertEqual(target(exercises, last: "child-a", rest: rest(after: "a1")), .restTimer(pinToTop: false))
+    }
+
+    func testRestTimerForUnknownSetIsIgnored() {
+        let squat = exercise("squat", sets: [repSet("s1", status: .completed)])
+        let deadlift = exercise("deadlift", sets: [repSet("d1")])
+        XCTAssertEqual(target([squat, deadlift], last: "squat", rest: rest(after: "gone")), .card(id: "deadlift"))
+    }
+
     // MARK: - Scroll id
 
     func testExerciseTimerScrollIdDiffersFromSetId() {
@@ -108,10 +156,24 @@ final class ActiveWorkoutAutoScrollTests: XCTestCase {
         XCTAssertNotEqual(ActiveWorkoutViewModel.exerciseTimerScrollId(setId: "s1"), "s1")
     }
 
+    func testRestTimerScrollIdChangesPerGeneration() {
+        // Doubles as the view identity that resets each new rest timer.
+        XCTAssertNotEqual(
+            ActiveWorkoutViewModel.restTimerScrollId(generation: 1),
+            ActiveWorkoutViewModel.restTimerScrollId(generation: 2))
+    }
+
     // MARK: - Helpers
 
-    private func target(_ exercises: [SessionExercise], last: String?) -> Target? {
-        ActiveWorkoutViewModel.autoScrollTarget(exercises: exercises, lastInteractedExerciseId: last)
+    private func target(
+        _ exercises: [SessionExercise], last: String?, rest: RestTimerState? = nil
+    ) -> Target? {
+        ActiveWorkoutViewModel.autoScrollTarget(
+            exercises: exercises, lastInteractedExerciseId: last, restTimer: rest)
+    }
+
+    private func rest(after setId: String) -> RestTimerState {
+        RestTimerState(seconds: 90, triggeringSetId: setId)
     }
 
     private func exercise(

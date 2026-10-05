@@ -190,15 +190,18 @@ extension ActiveWorkoutView {
     }
 
     /// After a set is completed, scroll to the next card or — when the new
-    /// current set is timed — center its exercise timer (#433). The decision
+    /// current set is timed — center its exercise timer (#433), keeping a
+    /// running rest timer on screen (#444). The decision
     /// lives in `ActiveWorkoutViewModel.autoScrollTarget` so it is unit-tested.
     /// Deferred one run-loop turn so a timer inserted by this same update is
     /// laid out before we scroll to it.
     private func autoScroll(proxy: ScrollViewProxy) {
         guard let exercises = session?.exercises,
               let target = ActiveWorkoutViewModel.autoScrollTarget(
-                exercises: exercises, lastInteractedExerciseId: lastInteractedExerciseId)
+                exercises: exercises, lastInteractedExerciseId: lastInteractedExerciseId,
+                restTimer: activeRestTimer)
         else { return }
+        let restTimerId = ActiveWorkoutViewModel.restTimerScrollId(generation: restTimerGeneration)
         DispatchQueue.main.async {
             withAnimation {
                 switch target {
@@ -206,6 +209,9 @@ extension ActiveWorkoutView {
                     proxy.scrollTo(id, anchor: .top)
                 case .exerciseTimer(let setId):
                     proxy.scrollTo(ActiveWorkoutViewModel.exerciseTimerScrollId(setId: setId), anchor: .center)
+                case .restTimer(let pinToTop):
+                    // A nil anchor scrolls the minimal amount to reveal it.
+                    proxy.scrollTo(restTimerId, anchor: pinToTop ? .top : nil)
                 }
             }
         }
