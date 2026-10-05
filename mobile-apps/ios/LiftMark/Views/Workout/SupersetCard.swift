@@ -92,7 +92,7 @@ struct SupersetCard: View {
             RestTimerView(totalSeconds: restState.seconds) {
                 onDismissRest()
             }
-            .id(restTimerGeneration)
+            .id(ActiveWorkoutViewModel.restTimerScrollId(generation: restTimerGeneration))
         }
     }
 

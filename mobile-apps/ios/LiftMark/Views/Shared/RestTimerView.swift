@@ -69,6 +69,7 @@ struct RestTimerView: View {
                     )
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("rest-timer-stop-button")
             .accessibilityLabel("Stop rest timer")
             .accessibilityHint("Dismisses the rest timer and moves to the next set")
 

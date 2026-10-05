@@ -92,6 +92,12 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "timer-auto-scroll")
     }
 
+    /// GH #444: completing a set must not auto-scroll the rest timer it just
+    /// started off-screen.
+    func testRestTimerAutoScroll() throws {
+        runner.runScenario(named: "rest-timer-auto-scroll")
+    }
+
     func testHistoryFlow() throws {
         runner.runScenario(named: "history-flow-robust")
     }
