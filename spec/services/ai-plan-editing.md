@@ -160,7 +160,12 @@ enum PlanEditError: Error, Equatable {
 ### `ApplePrivateCloudEngine` (`applePrivateCloud`)
 
 - Requires `#available(iOS 27, *)`; on iOS 26 the engine is constructible but reports
-  `.unavailable("Apple Private Cloud Compute requires iOS 27.")`. `availability()` maps
+  `.unavailable("Apple Private Cloud Compute requires iOS 27.")`. The implementation is
+  also wrapped in `#if canImport(FoundationModels, _version: 2.0)` (the iOS 27 SDK's module
+  version): a build made with an older SDK compiles a stand-in that always reports
+  `.unavailable("Apple Private Cloud Compute needs a build made with the iOS 27 SDK.")`, so
+  CI on Xcode 26 and local Xcode 27 builds share one source tree. GitHub's macOS runners do
+  not yet ship Xcode 27; until they do, TestFlight builds from CI cannot use PCC. `availability()` maps
   `PrivateCloudComputeLanguageModel.availability`: `.available` → `.available`;
   `.unavailable(reason)` → `.unavailable` with a reason string per case. The iOS 27 SDK
   defines only `deviceNotEligible` and `systemNotReady` for PCC (the "Apple Intelligence not

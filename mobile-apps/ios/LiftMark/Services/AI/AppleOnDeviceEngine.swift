@@ -50,15 +50,18 @@ enum ApplePlanEditSupport {
     static func mapError(_ error: Error) -> PlanEditError {
         if error is CancellationError { return .cancelled }
         if let planEditError = error as? PlanEditError { return planEditError }
+        #if canImport(FoundationModels, _version: 2.0)
         if #available(iOS 27, *), let modelError = error as? LanguageModelError {
             return map(modelError)
         }
+        #endif
         if let generationError = error as? LanguageModelSession.GenerationError {
             return map(generationError)
         }
         return .model(describe(error))
     }
 
+    #if canImport(FoundationModels, _version: 2.0)
     @available(iOS 27, *)
     private static func map(_ error: LanguageModelError) -> PlanEditError {
         switch error {
@@ -70,6 +73,7 @@ enum ApplePlanEditSupport {
             return .model(describe(error))
         }
     }
+    #endif
 
     private static func map(_ error: LanguageModelSession.GenerationError) -> PlanEditError {
         switch error {

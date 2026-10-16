@@ -1,4 +1,11 @@
 import Foundation
+
+// The Private Cloud Compute model ships in the iOS 27 SDK (FoundationModels
+// module version 2.x). Builds made with an older SDK (CI runners still on
+// Xcode 26) get a stand-in engine that always reports itself unavailable, so
+// the rest of the feature compiles and the selector falls through to the
+// LiftMark cloud engine exactly as it does on devices that can't run PCC.
+#if canImport(FoundationModels, _version: 2.0)
 import FoundationModels
 
 /// `applePrivateCloud`: FoundationModels `PrivateCloudComputeLanguageModel`
@@ -135,3 +142,25 @@ struct ApplePrivateCloudEngine: PlanEditEngine {
         return ApplePlanEditSupport.mapError(error)
     }
 }
+
+#else
+
+/// Stand-in used when the app is compiled against an SDK older than iOS 27.
+/// Same public surface as the real engine; every entry point reports that the
+/// build lacks PCC support.
+struct ApplePrivateCloudEngine: PlanEditEngine {
+    static let requiresNewerSDKReason = "Apple Private Cloud Compute needs a build made with the iOS 27 SDK."
+
+    let kind: PlanEditEngineKind = .applePrivateCloud
+    let displayName = "Apple Private Cloud Compute"
+
+    func availability() async -> PlanEditEngineAvailability {
+        .unavailable(reason: Self.requiresNewerSDKReason)
+    }
+
+    func edit(_ request: PlanEditRequest) async throws -> PlanEditResult {
+        throw PlanEditError.engineUnavailable(Self.requiresNewerSDKReason)
+    }
+}
+
+#endif
