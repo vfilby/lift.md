@@ -125,6 +125,29 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `superset-{index}` | View | Superset group container |
 | `exercise-{exercise.id}` | View | Exercise container |
 | `set-{set.id}` | View | Individual set display |
+| `edit-plan-ai-button` | Button | "Edit with AI" — opens the AI edit sheet (Pro, `aiPlanEditing` flag) |
+| `edit-plan-ai-upsell` | Button | Same row rendered for signed-out / free users; explains AI editing is part of Pro |
+
+### AI Edit Sheet (presented from Workout Detail)
+
+| ID | Element Type | Purpose |
+|----|-------------|---------|
+| `ai-edit-sheet` | View | Sheet container |
+| `ai-edit-close` | Button | Dismiss the sheet (confirms if a proposal is unapplied) |
+| `ai-edit-engine-label` | Text | Active engine display name |
+| `ai-edit-quota-label` | Text | Quota state for the active engine, when known |
+| `ai-edit-quota-options` | Button | Apple limit-increase sheet (PCC engine only) |
+| `ai-edit-chip-{slug}` | Button | Quick-action chip (`make-it-shorter`, `swap-barbell-for-dumbbells`, `add-a-warm-up`, `progress-loads`, `thirty-minutes`) |
+| `ai-edit-input` | TextField | Instruction input |
+| `ai-edit-send` | Button | Send the instruction |
+| `ai-edit-cancel` | Button | Cancel the in-flight request |
+| `ai-edit-message-{index}` | View | Transcript message container (0-based) |
+| `ai-edit-diff` | View | Exercise-level diff for the latest proposal |
+| `ai-edit-diff-row-{slug}` | View | One diff row, slug = kind + exercise name (`added-face-pull`) |
+| `ai-edit-error` | Text | Error message in the transcript |
+| `ai-edit-apply` | Button | Persist the proposal |
+| `ai-edit-discard` | Button | Drop the proposal |
+| `ai-edit-undo` | Button | Restore the markdown persisted before the last Apply |
 
 ---
 

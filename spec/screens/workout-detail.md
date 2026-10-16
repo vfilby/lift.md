@@ -29,6 +29,8 @@ Display full details of a workout plan template — exercises, sets, tags, metad
 | Set row | `set-{set.id}` | View |
 | YouTube link | `youtube-link-{exerciseName}` | Link |
 | Edit markdown button | `edit-plan-markdown-button` | Button |
+| Edit with AI button | `edit-plan-ai-button` | Button |
+| Edit with AI upsell row | `edit-plan-ai-upsell` | Button |
 | Reprocess button | `reprocess-plan-button` | Button |
 | Exercise edit button | `edit-plan-exercise-{exerciseName}` | Button |
 
@@ -42,6 +44,7 @@ Display full details of a workout plan template — exercises, sets, tags, metad
   - **Critical**: After tapping "Start Workout", the app MUST navigate to the Active Workout screen (`/workout/active`) and display the workout exercises with their sets. The active workout screen must be fully functional — showing exercise names, set targets (weight, reps, time), and input controls. If the session is created but navigation fails or the active workout screen does not appear, this is a blocking bug.
 - **Tap "Edit"** → opens Edit Plan Markdown sheet pre-populated with `sourceMarkdown`. User can edit the markdown text with real-time parse validation (same as import flow). Save updates `sourceMarkdown` and reprocesses the plan. Cancel discards changes.
 - **Tap "Reprocess"** → confirmation alert → re-parses plan from original `sourceMarkdown` (no editing)
+- **Tap "Edit with AI"** → opens the AI Edit sheet (`ai-edit-sheet`) for this plan. See `spec/services/ai-plan-editing.md` for the engine contract and `spec/flows/ai-plan-editing.md` for the step-by-step flow. The button is shown only when `sourceMarkdown != nil`, the `aiPlanEditing` developer flag is on, and the signed-in user's tier is `pro` or `trial` (or the stub engine is active). When the flag is on but the user is signed out or on `free`, the same slot renders `edit-plan-ai-upsell`, which explains that AI editing is part of LiftMark Pro and, when signed out, offers Sign in. Applying an AI proposal goes through `updatePlanMarkdown` exactly like the markdown editor, so the detail view behind the sheet refreshes on Apply.
 - **Tap pencil icon on exercise card** → opens Edit Exercise sheet (same Form/Markdown dual-tab sheet as active workout) pre-populated with the exercise's data. Save updates the exercise within the plan.
   - **Critical (GH #264)**: Persisting an exercise edit MUST NOT regenerate the whole plan from the model. It splices **only the edited exercise's block** back into the plan's `sourceMarkdown` and re-parses that spliced text (`LMWFSourceEditor.replacingExercise` → `updatePlanMarkdown`). Everything the user did not edit — other exercises, section/superset **header levels**, blank lines, comments, and unknown `@metadata` — is preserved verbatim. Regenerating the entire document (the old behavior) flattened every header to `##`, so `## Warmup` / `### Band Side Step` collapsed to two `##` headers, breaking the section nesting and producing a parse error the user then had to hand-repair. An exercise edit must be equivalent to replacing that one section of the source markdown with the user's edited version, at its original header level.
   - Superset edits splice the entire superset block (parent header + all child headers) at their original levels; section-child edits splice just that child's block. The header level(s) come from the source itself, so non-standard nesting (e.g. a superset whose children skip a level) round-trips unchanged.
@@ -72,6 +75,18 @@ Display full details of a workout plan template — exercises, sets, tags, metad
   - **Edit** (`edit-plan-markdown-button`): Opens Edit Plan Markdown sheet
   - **Reprocess** (`reprocess-plan-button`): Shows confirmation alert, then reprocesses from stored markdown
 - Both buttons use secondary styling (same as the previous single Reprocess button)
+- When the `aiPlanEditing` flag is on, a third full-width row sits beneath them: **Edit with AI** (`edit-plan-ai-button`, sparkles icon, secondary styling) or the `edit-plan-ai-upsell` variant.
+
+### AI Edit Sheet (`ai-edit-sheet`)
+
+Presented with `.sheet` hosted on `WorkoutDetailView` (stable host, see the Settings sign-in sheet note in `settings.md`). Layout, top to bottom:
+
+1. **Header**: title "Edit with AI", close button (`ai-edit-close`), engine label (`ai-edit-engine-label`) and quota label (`ai-edit-quota-label`) as a caption line.
+2. **Transcript** (scrolling): user messages right-aligned, assistant messages left-aligned containing the summary, the diff (`ai-edit-diff`), and parser warnings; error messages (`ai-edit-error`) in the error tint. Empty transcript shows the quick-action chips (`ai-edit-chip-{slug}`) and a one-line privacy footer naming the active engine.
+3. **Proposal bar** (only while a proposal is unapplied): **Discard** (`ai-edit-discard`) and **Apply** (`ai-edit-apply`, primary). After an Apply, **Undo** (`ai-edit-undo`) appears in place of the bar until the next proposal.
+4. **Composer**: text field (`ai-edit-input`, multiline, placeholder "Describe a change…"), send (`ai-edit-send`, disabled when empty or thinking), cancel (`ai-edit-cancel`, shown only while thinking).
+
+Diff rows (`ai-edit-diff-row-{slug}`): added exercises with a green `+` and their set lines; removed with a red `−`; changed with an amber `~` and before/after set lines; unchanged exercises collapsed to "N exercises unchanged". Uses `Theme` semantic colours only.
 
 ### Exercise Cards
 - Numbered with section-colored index
