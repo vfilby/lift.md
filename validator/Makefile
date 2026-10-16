@@ -1,4 +1,4 @@
-.PHONY: test test-watch typecheck install install-cdk bundle sync-dict \
+.PHONY: test test-watch typecheck install install-cdk bundle sync-dict sync-prompt \
         website-build \
         dev-up dev-down dev-bootstrap \
         synth diff-beta diff-prod deploy-beta deploy-prod \
@@ -26,6 +26,11 @@ typecheck:
 sync-dict:
 	cp ../spec/data/exercise-dictionary.json src/data/exercise-dictionary.json
 
+# ── Sync the AI plan-edit system prompt from spec/ canonical source ──
+# tests/ai.test.ts fails if src/data/ drifts from spec/data/.
+sync-prompt:
+	cp ../spec/data/ai-plan-edit-system-prompt.md src/data/ai-plan-edit-system-prompt.md
+
 # ── Local dev stack (DynamoDB Local + Mailpit in Docker + table bootstrap) ──
 # Mailpit web UI: http://localhost:8025  (SMTP listener on localhost:1025)
 dev-up:
@@ -47,17 +52,21 @@ dev-down:
 # @node-rs/argon2 ships a platform-specific .node binary that esbuild can't
 # inline. We mark it external and install the linux-arm64 variant into
 # dist/node_modules at bundle time. Lambda runtime requires it from there.
-bundle: sync-dict
+# Two entry points share one dist/ asset: handler.js (validator function)
+# and handler-ai.js (ai-fn, /v1/ai/* only). The AI system prompt is read at
+# runtime from dist/data/ (see src/infra/bedrock.ts → systemPromptPath), so
+# it is copied alongside. `empty-import-meta` is silenced because the ESM
+# source uses import.meta.url only on the non-bundled (tsx/vitest) path.
+ESBUILD_FLAGS = --bundle --platform=node --target=node22 --format=cjs \
+	--loader:.json=json --external:@node-rs/argon2 \
+	--log-override:empty-import-meta=silent
+
+bundle: sync-dict sync-prompt
 	rm -rf dist
-	mkdir -p dist
-	npx esbuild src/handler.ts \
-		--bundle \
-		--platform=node \
-		--target=node22 \
-		--outfile=dist/handler.js \
-		--format=cjs \
-		--loader:.json=json \
-		--external:@node-rs/argon2
+	mkdir -p dist/data
+	npx esbuild src/handler.ts $(ESBUILD_FLAGS) --outfile=dist/handler.js
+	npx esbuild src/handler-ai.ts $(ESBUILD_FLAGS) --outfile=dist/handler-ai.js
+	cp src/data/ai-plan-edit-system-prompt.md dist/data/ai-plan-edit-system-prompt.md
 	@printf '{"dependencies":{"@node-rs/argon2":"^2.0.2"}}\n' > dist/package.json
 	# --cpu/--os/--libc tells npm to install the Lambda-platform variant of
 	# the argon2 .node binary even when bundling from a different host. We

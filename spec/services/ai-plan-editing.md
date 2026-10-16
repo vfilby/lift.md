@@ -301,7 +301,7 @@ collapsed into a single "N exercises unchanged" line.
 
 | Status | Body | When |
 |---|---|---|
-| 200 | `{ plan_markdown, summary, warnings: [string], quota: { limit, remaining, reset_at, in_grace }, model: string, usage: { input_tokens, output_tokens } }` | Success. `plan_markdown` has passed `parseWorkout()`. |
+| 200 | `{ plan_markdown, summary, warnings: [string], attempts: 1 \| 2, quota: { limit, remaining, reset_at, in_grace }, model: string, usage: { input_tokens, output_tokens } }` | Success. `plan_markdown` has passed `parseWorkout()`. `attempts` is 2 when the repair turn was needed; `usage` sums both turns. |
 | 400 | `{ error }` | Missing/invalid fields, bad JSON. |
 | 401 | `{ error }` | No/invalid auth (from `auth` middleware). |
 | 402 | `{ error: "Subscription required", upgrade_url }` | `tier === 'free'`. Same shape as `/v1/tokens`. |
@@ -353,7 +353,14 @@ collapsed into a single "N exercises unchanged" line.
   attempts, status }` (never content) → 200.
 - PAT scope `ai:edit` is added to `ALLOWED_SCOPES` in `routes/tokens.ts`.
 - An AWS Budgets alarm on Bedrock spend is created per environment by CDK; its threshold is
-  a CDK context value, not committed.
+  a CDK context value, not committed (`--context aiBudgetUsd=<usd>`, optional
+  `aiBudgetEmail=<address>` for the 80 % actual / 100 % forecast notifications; no budget
+  resource is created when `aiBudgetUsd` is absent).
+- The validator's prompt copy is refreshed with `make sync-prompt` (run automatically by
+  `make bundle`); the Lambda bundle ships it as `dist/data/ai-plan-edit-system-prompt.md`
+  and reads it at runtime.
+- For local dev and the Vitest suite the main validator app also mounts `/v1/ai` so the
+  route is reachable on `npm run dev`; in production only `ai-fn` serves it.
 
 ## iOS UI (summary; details in `screens/workout-detail.md`)
 

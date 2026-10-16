@@ -6,6 +6,7 @@ HTTP validation service for the LiftMark Workout Format (LMWF). Accepts markdown
 ## Endpoints
 - `POST /validate` — see [Request](#request) / [Response](#response)
 - `GET /version` — see [Version](#version)
+- `POST /v1/ai/plan/edit` — AI plan editing, served by the separate `ai-fn` Lambda; contract in `ai-plan-editing.md`, deployment in [`ai-fn` Lambda](#ai-fn-lambda-ai-plan-editing)
 
 ## Endpoint
 `POST /validate`
@@ -226,6 +227,23 @@ Redirect semantics:
 - Runtime: Node.js 22 on AWS Lambda (arm64)
 - Infrastructure: AWS CDK (`validator/cdk/`) — edge stack (us-east-1: hosted zone, ACM cert, CLOUDFRONT-scoped WAFv2 web ACL) + main stack (Lambda, HTTP API, DynamoDB, CloudFront, DNS, alarms). In prod the canonical `getlift.md` distribution serves the site + API + spec + schemas, while the `liftmark.app` / `liftmd.app` / `workoutformat.liftmark.app` distributions handle the redirect topology above (liftmark.app's distribution additionally serves the AASA exception). Beta serves everything from `beta.getlift.md`, with `beta.liftmark.app` redirecting to it.
 - The public `/validate` and `/version` endpoints require no authentication; the `/v1/*` auth/PAT/workout routes are bearer-authenticated (session JWT or PAT)
+
+### `ai-fn` Lambda (AI plan editing)
+
+The API is served by **two** Lambda functions behind the same HTTP API:
+
+| Function | Entry (bundle) | Routes | Memory / timeout | Why |
+|---|---|---|---|---|
+| `ValidatorFunction` | `dist/handler.js` (`src/handler.ts` → `src/app.ts`) | `/validate`, `/version`, `/v1/{proxy+}` | 256 MB / 10 s | Everything except AI. |
+| `AiFunction` (`ai-fn`) | `dist/handler-ai.js` (`src/handler-ai.ts` → `src/ai-app.ts`) | `/v1/ai/{proxy+}` (+ its own `/version`) | 512 MB / 29 s | One Amazon Bedrock round trip per request (p50 ≈ 6–10 s); isolating it keeps the validator's 10 s timeout and alarms meaningful. The HTTP API integration cap is 30 s. |
+
+- Both are built from the same source by `make bundle` (two esbuild entry points into one `dist/` asset, plus `dist/data/ai-plan-edit-system-prompt.md`). Both share `src/base-app.ts` (request-id middleware + `GET /version`) and the same environment (tables, JWT secret, SMTP, deploy metadata); `ai-fn` additionally gets `AI_MODEL_ID`, `AI_DAILY_LIMIT`, `AI_MAX_OUTPUT_TOKENS`, `AI_MODEL_TIMEOUT_MS` (CDK context `aiModelId` / `aiDailyLimit` / `aiMaxOutputTokens` / `aiModelTimeoutMs`, defaults `us.amazon.nova-2-lite-v1:0` / 20 / 4000 / 24000).
+- Route precedence: HTTP API matches the most specific route, so `/v1/ai/{proxy+}` → `ai-fn` wins over `/v1/{proxy+}` → validator. CloudFront needs no change (`/v1/*` already proxies to the API origin).
+- IAM: `ai-fn` may read `users` / `entitlements`, read-write `pat_tokens` (last-used stamp) and `ai_usage`, and call `bedrock:InvokeModel` + `bedrock:InvokeModelWithResponseStream` on the configured foundation model (`arn:aws:bedrock:*::foundation-model/<id>`) and, for `us.`/`eu.`/`apac.`/`global.` ids, the account's inference profile (`arn:aws:bedrock:<region>:<account>:inference-profile/<id>`). Extra ARNs via context `aiExtraModelArns=a,b`. Model access (Amazon Nova) must be enabled in the account's Bedrock console per env; the deploy does not do that.
+- Observability: own log group, `AiLambdaErrorAlarm` (> 5 errors / 5 min), `AiLambdaDurationAlarm` (p95 > 20 s), `AiLambdaThrottleAlarm`; audit line `ai_plan_edit` with token counts only. Optional monthly AWS Budgets cost budget on the Bedrock service (`aiBudgetUsd` / `aiBudgetEmail` context; see `ai-plan-editing.md`).
+- Locally the main app also mounts `/v1/ai` so `npm run dev` and the Vitest suite exercise the route without a second server; in production only `ai-fn` serves it.
+
+Contract and tests: `spec/services/ai-plan-editing.md` (Cloud API, Quota, Testing → Validator, Beta smoke) and `validator/tests/ai.test.ts`.
 
 ### Edge security controls
 - **CORS**: explicit origin allowlist (no wildcard), derived per-env via `corsAllowedOrigins()` in `validator/cdk/config.ts` — the canonical serving origin (prod: `getlift.md`; beta: `beta.getlift.md`) and (beta only) the local Astro dev origin. The legacy `liftmark.app` hosts are *not* in the allowlist: browser requests there get redirected (308/301) to the canonical origin before any XHR, so they never originate a cross-origin request from a legacy host. `allowCredentials: true` so the SameSite refresh-token cookie flow works.

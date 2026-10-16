@@ -143,6 +143,30 @@ the CDK stack (`cdk/stack.ts`) and the local bootstrap script
 (`scripts/ddb-local-bootstrap.ts`). Add a table by appending to that
 file, then run `make dev-up` locally and `make deploy` to roll it out.
 
+### AI plan editing (`/v1/ai/plan/edit`)
+
+In production this route runs on its own Lambda (`ai-fn`, entry
+`src/handler-ai.ts`, 29 s timeout) and calls Amazon Bedrock. Locally the
+main app mounts it too, so `npm run dev` serves it on port 3000. The
+Vitest suite never touches Bedrock — `tests/ai.test.ts` injects
+`FakeBedrockPlanEditor` from `src/infra/bedrock.ts`.
+
+Env vars (all optional; CDK sets them from context values of the same
+camelCase name):
+
+| Var | Default | Meaning |
+|---|---|---|
+| `AI_MODEL_ID` | `us.amazon.nova-2-lite-v1:0` | Bedrock model / inference-profile id |
+| `AI_DAILY_LIMIT` | `20` | Per-user requests per UTC day (ceiling = ×1.1) |
+| `AI_MAX_OUTPUT_TOKENS` | `4000` | `inferenceConfig.maxTokens` |
+| `AI_MODEL_TIMEOUT_MS` | `24000` | Total model budget per request (both turns) |
+
+To hit the real model from a local server you need AWS credentials with
+`bedrock:InvokeModel` on that model and Nova access enabled in the
+account; otherwise the route answers 502. Spec:
+`spec/services/ai-plan-editing.md`. Live smoke:
+`scripts/smoke-ai-live.sh <base_url>` (needs `LMWF_E2E_TEST_SECRET`).
+
 ## Credentials & deploy setup
 
 Deploys go through AWS CDK, which authenticates via [aws-vault](https://github.com/99designs/aws-vault). Credentials never sit plaintext on disk — aws-vault's encrypted file backend holds the access key, and the unlock passphrase comes from 1Password. MFA is mandatory on every deploy.

@@ -33,14 +33,20 @@ const MAX_NAME_LEN = 80;
 const DEFAULT_SCOPES = ['workouts:write', 'workouts:read'];
 // Server-side allowlist of scopes a self-service PAT may carry. This is
 // exactly the set the API enforces today via `requireScope` (see
-// src/routes/workouts.ts and workout_outbox.ts). Any future privileged
-// scope is deny-by-default here: a user cannot pre-mint a token carrying a
-// scope the server hasn't deliberately added to this set.
-const ALLOWED_SCOPES = new Set(['workouts:read', 'workouts:write']);
-// Generous cap — there are only two scopes today; this just bounds abuse.
+// src/routes/workouts.ts, workout_outbox.ts and ai.ts). Any future
+// privileged scope is deny-by-default here: a user cannot pre-mint a token
+// carrying a scope the server hasn't deliberately added to this set.
+export const ALLOWED_SCOPES = new Set([
+  'workouts:read',
+  'workouts:write',
+  // AI plan editing (POST /v1/ai/plan/edit) — opt-in, never a default scope.
+  // See spec/services/ai-plan-editing.md.
+  'ai:edit',
+]);
+// Generous cap — there are only three scopes today; this just bounds abuse.
 const MAX_SCOPES = 16;
 const TRIAL_MAX_ACTIVE_TOKENS = 2;
-const UPGRADE_URL = 'https://getlift.md/account';
+export const UPGRADE_URL = 'https://getlift.md/account';
 
 function patMode(): TokenMode {
   return process.env.STRIPE_MODE === 'live' ? 'live' : 'test';

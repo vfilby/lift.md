@@ -91,7 +91,7 @@ Both `ack` and `DELETE` are state-changing and require `workouts:write` (a read-
 
 Resource endpoints (`/v1/workouts/*`) accept session JWT **OR** PAT — see `validator/src/middleware/auth.ts`. Pushes from the web portal use the session; pushes from Claude Code use a PAT.
 
-**PAT scope allowlist.** `POST /v1/tokens` validates requested scopes against a server-side allowlist (`ALLOWED_SCOPES` in `validator/src/routes/tokens.ts`) — currently exactly the scopes the API enforces: `workouts:read`, `workouts:write`. Unknown scopes are rejected with `400`, and the array is length-capped. This keeps any future privileged scope deny-by-default for self-service token creation (a user cannot pre-mint a token carrying a scope the server hasn't yet wired up).
+**PAT scope allowlist.** `POST /v1/tokens` validates requested scopes against a server-side allowlist (`ALLOWED_SCOPES` in `validator/src/routes/tokens.ts`) — currently exactly the scopes the API enforces: `workouts:read`, `workouts:write`, and `ai:edit` (AI plan editing, see `ai-plan-editing.md`; never a default scope). Unknown scopes are rejected with `400`, and the array is length-capped. This keeps any future privileged scope deny-by-default for self-service token creation (a user cannot pre-mint a token carrying a scope the server hasn't yet wired up).
 
 ### Web portal inbox table
 

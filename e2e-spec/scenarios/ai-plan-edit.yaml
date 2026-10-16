@@ -1,0 +1,116 @@
+name: "AI plan editing — stub engine"
+
+# Drives the Edit with AI sheet end to end against the deterministic stub engine
+# (`--ai-engine-stub`), which appends a "Face Pull" exercise for any instruction
+# and fails for an instruction containing "fail". See
+# spec/services/ai-plan-editing.md and spec/flows/ai-plan-editing.md.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+    launchArgs:
+      - "--enable-flag=workoutInbox"
+      - "--enable-flag=aiPlanEditing"
+      - "--ai-engine-stub"
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+  - action: waitFor
+    target: "button-import-workout"
+    timeout: 5000
+  - action: tap
+    target: "button-import-workout"
+  - action: waitFor
+    target: "input-markdown"
+    timeout: 10000
+  - action: replaceText
+    target: "input-markdown"
+    fixture: "ai-edit-plan.md"
+  - action: tap
+    target: "button-import"
+  - action: waitForText
+    text: "OK"
+    timeout: 10000
+  - action: tapText
+    text: "OK"
+  - action: waitForText
+    text: "AI Edit Probe Plan"
+    timeout: 10000
+
+tests:
+  - name: "applies a stub edit and the detail view shows the new exercise"
+    steps:
+      - action: tapText
+        text: "AI Edit Probe Plan"
+      - action: waitFor
+        target: "workout-detail-view"
+        timeout: 5000
+      - action: waitFor
+        target: "edit-plan-ai-button"
+        timeout: 5000
+      - action: tap
+        target: "edit-plan-ai-button"
+      - action: waitFor
+        target: "ai-edit-sheet"
+        timeout: 5000
+      - action: expect
+        target: "ai-edit-engine-label"
+        assertion: "toBeVisible"
+      - action: tap
+        target: "ai-edit-input"
+      - action: typeText
+        target: "ai-edit-input"
+        text: "add face pulls"
+      - action: tap
+        target: "ai-edit-send"
+      - action: waitFor
+        target: "ai-edit-apply"
+        timeout: 10000
+      - action: expect
+        target: "ai-edit-diff-row-added-face-pull"
+        assertion: "toExist"
+      - action: tap
+        target: "ai-edit-apply"
+      - action: waitFor
+        target: "ai-edit-undo"
+        timeout: 5000
+      - action: tap
+        target: "ai-edit-close"
+      - action: waitFor
+        target: "workout-detail-view"
+        timeout: 5000
+      - action: waitForText
+        text: "Face Pull"
+        timeout: 5000
+
+  - name: "shows an error message when the engine fails"
+    steps:
+      - action: tap
+        target: "edit-plan-ai-button"
+      - action: waitFor
+        target: "ai-edit-sheet"
+        timeout: 5000
+      - action: tap
+        target: "ai-edit-input"
+      - action: typeText
+        target: "ai-edit-input"
+        text: "please fail"
+      - action: tap
+        target: "ai-edit-send"
+      - action: waitFor
+        target: "ai-edit-error"
+        timeout: 10000
+      - action: expect
+        target: "ai-edit-apply"
+        assertion: "notToExist"
+      - action: tap
+        target: "ai-edit-close"
+      - action: waitFor
+        target: "workout-detail-view"
+        timeout: 5000

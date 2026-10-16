@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
+import * as budgets from 'aws-cdk-lib/aws-budgets';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
@@ -51,6 +52,7 @@ function createTable(
     pointInTimeRecoverySpecification: schema.pointInTimeRecovery
       ? { pointInTimeRecoveryEnabled: true }
       : undefined,
+    timeToLiveAttribute: schema.ttlAttribute,
     // Keep data on accidental cdk destroy — never silently dropped.
     removalPolicy: cdk.RemovalPolicy.RETAIN,
   });
@@ -238,6 +240,50 @@ export class LmwfValidatorStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Environment shared by BOTH Lambda functions (validator + ai-fn) so the
+    // auth middleware, table resolution and deploy metadata behave the same
+    // whichever function API Gateway routes a request to.
+    const sharedLambdaEnv: Record<string, string> = {
+      NODE_ENV: 'production',
+      LMWF_ENV: env.name,
+      STRIPE_MODE: env.stripeMode,
+      // Deploy metadata surfaced via /version endpoint and the
+      // X-Validator-Version response header. See
+      // spec/services/lmwf-validator.md → Version.
+      BUILD_COMMIT: this.node.tryGetContext('buildCommit') ?? 'unknown',
+      BUILD_TIMESTAMP:
+        this.node.tryGetContext('buildTimestamp') ?? 'unknown',
+      ...tableEnv,
+      // JWT secret resolved at deploy time from Secrets Manager.
+      JWT_SECRET: cdk.SecretValue.secretsManager(jwtSigningSecret.secretArn).unsafeUnwrap(),
+      // SMTP — SES STARTTLS endpoint + creds resolved at deploy time
+      // from the manually-managed smtpSecret above.
+      SMTP_HOST: `email-smtp.${this.region}.amazonaws.com`,
+      SMTP_PORT: '587',
+      SMTP_FROM: `noreply@${env.domainName}`,
+      // Host for user-facing links in emails (verify, password reset). Tracks
+      // the env's serving origin so it follows the beta.getlift.md cutover
+      // automatically — beta.liftmark.app while undefined/zone-only,
+      // beta.getlift.md once 'live'. password.ts falls back to its LMWF_ENV
+      // hardcode if unset. See spec/services/beta-getlift-cutover.md.
+      APP_BASE_URL: `https://${servingWebOrigin(env)}`,
+      SMTP_USER: cdk.SecretValue.secretsManager(smtpSecret.secretArn, {
+        jsonField: 'user',
+      }).unsafeUnwrap(),
+      SMTP_PASS: cdk.SecretValue.secretsManager(smtpSecret.secretArn, {
+        jsonField: 'pass',
+      }).unsafeUnwrap(),
+      // Only set on beta. The /v1/__test__/* router 404s any request
+      // when this env var is empty/missing.
+      ...(e2eTestSecret
+        ? {
+            E2E_TEST_SECRET: cdk.SecretValue.secretsManager(
+              e2eTestSecret.secretArn,
+            ).unsafeUnwrap(),
+          }
+        : {}),
+    };
+
     const validatorFn = new lambda.Function(this, 'ValidatorFunction', {
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
@@ -246,46 +292,7 @@ export class LmwfValidatorStack extends cdk.Stack {
       memorySize: 256,
       timeout: cdk.Duration.seconds(10),
       description: `LMWF Validator (${env.name}) — validates LiftMark Workout Format markdown`,
-      environment: {
-        NODE_ENV: 'production',
-        LMWF_ENV: env.name,
-        STRIPE_MODE: env.stripeMode,
-        // Deploy metadata surfaced via /version endpoint and the
-        // X-Validator-Version response header. See
-        // spec/services/lmwf-validator.md → Version.
-        BUILD_COMMIT: this.node.tryGetContext('buildCommit') ?? 'unknown',
-        BUILD_TIMESTAMP:
-          this.node.tryGetContext('buildTimestamp') ?? 'unknown',
-        ...tableEnv,
-        // JWT secret resolved at deploy time from Secrets Manager.
-        JWT_SECRET: cdk.SecretValue.secretsManager(jwtSigningSecret.secretArn).unsafeUnwrap(),
-        // SMTP — SES STARTTLS endpoint + creds resolved at deploy time
-        // from the manually-managed smtpSecret above.
-        SMTP_HOST: `email-smtp.${this.region}.amazonaws.com`,
-        SMTP_PORT: '587',
-        SMTP_FROM: `noreply@${env.domainName}`,
-        // Host for user-facing links in emails (verify, password reset). Tracks
-        // the env's serving origin so it follows the beta.getlift.md cutover
-        // automatically — beta.liftmark.app while undefined/zone-only,
-        // beta.getlift.md once 'live'. password.ts falls back to its LMWF_ENV
-        // hardcode if unset. See spec/services/beta-getlift-cutover.md.
-        APP_BASE_URL: `https://${servingWebOrigin(env)}`,
-        SMTP_USER: cdk.SecretValue.secretsManager(smtpSecret.secretArn, {
-          jsonField: 'user',
-        }).unsafeUnwrap(),
-        SMTP_PASS: cdk.SecretValue.secretsManager(smtpSecret.secretArn, {
-          jsonField: 'pass',
-        }).unsafeUnwrap(),
-        // Only set on beta. The /v1/__test__/* router 404s any request
-        // when this env var is empty/missing.
-        ...(e2eTestSecret
-          ? {
-              E2E_TEST_SECRET: cdk.SecretValue.secretsManager(
-                e2eTestSecret.secretArn,
-              ).unsafeUnwrap(),
-            }
-          : {}),
-      },
+      environment: sharedLambdaEnv,
       logGroup: validatorLogGroup,
     });
 
@@ -296,6 +303,78 @@ export class LmwfValidatorStack extends cdk.Stack {
     for (const table of Object.values(tables)) {
       table.grantReadWriteData(validatorFn);
     }
+
+    // ── AI plan-edit Lambda (`ai-fn`) ──
+    // Serves ONLY /v1/ai/* (src/ai-app.ts → src/handler-ai.ts, same bundle
+    // dir). Separate function so the Bedrock round trip (p50 ≈ 6–10 s) runs
+    // under its own 29 s timeout — the API Gateway HTTP API integration cap
+    // is 30 s — while the validator function keeps its 10 s budget and
+    // alarms. See spec/services/ai-plan-editing.md → Server implementation
+    // and spec/services/lmwf-validator.md → ai-fn.
+    //
+    // Model + quota knobs are CDK context values with spec'd defaults so an
+    // operator can change the model id without a code change:
+    //   cdk deploy --context aiModelId=amazon.nova-lite-v1:0
+    const aiModelId: string =
+      this.node.tryGetContext('aiModelId') ?? 'us.amazon.nova-2-lite-v1:0';
+    const aiEnv: Record<string, string> = {
+      AI_MODEL_ID: aiModelId,
+      AI_DAILY_LIMIT: String(this.node.tryGetContext('aiDailyLimit') ?? '20'),
+      AI_MAX_OUTPUT_TOKENS: String(this.node.tryGetContext('aiMaxOutputTokens') ?? '4000'),
+      AI_MODEL_TIMEOUT_MS: String(this.node.tryGetContext('aiModelTimeoutMs') ?? '24000'),
+    };
+
+    const aiLogGroup = new logs.LogGroup(this, 'AiLogGroup', {
+      retention: logs.RetentionDays.TWO_WEEKS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const aiFn = new lambda.Function(this, 'AiFunction', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'handler-ai.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'dist')),
+      memorySize: 512,
+      timeout: cdk.Duration.seconds(29),
+      description: `LMWF AI plan editing (${env.name}) — /v1/ai/* via Amazon Bedrock`,
+      environment: { ...sharedLambdaEnv, ...aiEnv },
+      logGroup: aiLogGroup,
+    });
+
+    // Only the tables the route touches: auth (users read, pat_tokens
+    // read + last-used stamp), the per-user limit override, and the counter.
+    tables.users.grantReadData(aiFn);
+    tables.pat_tokens.grantReadWriteData(aiFn);
+    tables.entitlements.grantReadData(aiFn);
+    tables.ai_usage.grantReadWriteData(aiFn);
+
+    // Bedrock: the configured model + its cross-region inference profile.
+    // `us.amazon.nova-2-lite-v1:0` is an inference profile that fans out to
+    // the foundation model in several regions, so InvokeModel needs BOTH the
+    // profile ARN (this account/region) and the foundation-model ARN in
+    // every region the profile may route to (`*`). A plain model id (no
+    // `us.`/`eu.`/`apac.`/`global.` prefix) only needs the foundation model.
+    // Extra ARNs (e.g. a second model under A/B) via context:
+    //   --context aiExtraModelArns=arn1,arn2
+    const profileMatch = aiModelId.match(/^(us|eu|apac|global)\.(.+)$/);
+    const foundationModelId = profileMatch ? profileMatch[2] : aiModelId;
+    const bedrockResources = [
+      `arn:aws:bedrock:*::foundation-model/${foundationModelId}`,
+      ...(profileMatch
+        ? [`arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${aiModelId}`]
+        : []),
+      ...String(this.node.tryGetContext('aiExtraModelArns') ?? '')
+        .split(',')
+        .map((a) => a.trim())
+        .filter((a) => a.length > 0),
+    ];
+    aiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: 'BedrockInvokeConfiguredModel',
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: bedrockResources,
+      }),
+    );
 
     // ── HTTP API ──
     const httpApi = new apigw.HttpApi(this, 'ValidatorApi', {
@@ -374,6 +453,20 @@ export class LmwfValidatorStack extends cdk.Stack {
       path: '/version',
       methods: [apigw.HttpMethod.GET],
       integration: validatorIntegration,
+    });
+
+    // AI plan editing → the dedicated ai-fn Lambda. HTTP API picks the most
+    // specific matching route, so `/v1/ai/{proxy+}` wins over `/v1/{proxy+}`
+    // below regardless of declaration order; it is declared first anyway so
+    // the precedence is obvious when reading the template.
+    const aiIntegration = new integrations.HttpLambdaIntegration(
+      'AiIntegration',
+      aiFn,
+    );
+    httpApi.addRoutes({
+      path: '/v1/ai/{proxy+}',
+      methods: [apigw.HttpMethod.ANY],
+      integration: aiIntegration,
     });
 
     // All new auth/PAT/workout routes — Hono routes inside Lambda.
@@ -824,6 +917,79 @@ function handler(event) {
       alarmDescription: `[${env.name}] API Gateway 5xx count > 5 in 5 minutes`,
     });
 
+    // ai-fn alarms. Its own error alarm, and a p95 latency alarm at 20 s
+    // (timeout is 29 s; the plan doc moves to async jobs if p95 nears 22 s).
+    new cloudwatch.Alarm(this, 'AiLambdaErrorAlarm', {
+      metric: aiFn.metricErrors({ period: cdk.Duration.minutes(5) }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      alarmDescription: `[${env.name}] ai-fn error count > 5 in 5 minutes`,
+    });
+
+    new cloudwatch.Alarm(this, 'AiLambdaDurationAlarm', {
+      metric: aiFn.metricDuration({ period: cdk.Duration.minutes(5), statistic: 'p95' }),
+      threshold: 20_000,
+      evaluationPeriods: 1,
+      alarmDescription: `[${env.name}] ai-fn p95 latency > 20s (timeout is 29s)`,
+    });
+
+    new cloudwatch.Alarm(this, 'AiLambdaThrottleAlarm', {
+      metric: aiFn.metricThrottles({ period: cdk.Duration.minutes(5) }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      alarmDescription: `[${env.name}] ai-fn throttles detected`,
+    });
+
+    // ── Bedrock spend budget ──
+    // Monthly cost budget filtered to the Bedrock service. The amount is a
+    // CDK context value (NOT committed) so each env/account sets its own:
+    //   cdk deploy --context aiBudgetUsd=25 [--context aiBudgetEmail=ops@…]
+    // Skipped entirely when `aiBudgetUsd` is absent. Notifications (80 %
+    // actual, 100 % forecasted) are attached only when `aiBudgetEmail` is
+    // also given — AWS Budgets requires a subscriber per notification.
+    const aiBudgetUsdRaw = this.node.tryGetContext('aiBudgetUsd');
+    if (aiBudgetUsdRaw !== undefined && aiBudgetUsdRaw !== null && aiBudgetUsdRaw !== '') {
+      const aiBudgetUsd = Number(aiBudgetUsdRaw);
+      if (!Number.isFinite(aiBudgetUsd) || aiBudgetUsd <= 0) {
+        throw new Error(`aiBudgetUsd context must be a positive number, got "${aiBudgetUsdRaw}"`);
+      }
+      const aiBudgetEmail: string | undefined = this.node.tryGetContext('aiBudgetEmail');
+      const subscribers = aiBudgetEmail
+        ? [{ subscriptionType: 'EMAIL', address: aiBudgetEmail }]
+        : undefined;
+      new budgets.CfnBudget(this, 'AiBedrockBudget', {
+        budget: {
+          budgetName: `lmwf-${env.name}-bedrock-monthly`,
+          budgetType: 'COST',
+          timeUnit: 'MONTHLY',
+          budgetLimit: { amount: aiBudgetUsd, unit: 'USD' },
+          costFilters: { Service: ['Amazon Bedrock'] },
+        },
+        notificationsWithSubscribers: subscribers
+          ? [
+              {
+                notification: {
+                  notificationType: 'ACTUAL',
+                  comparisonOperator: 'GREATER_THAN',
+                  threshold: 80,
+                  thresholdType: 'PERCENTAGE',
+                },
+                subscribers,
+              },
+              {
+                notification: {
+                  notificationType: 'FORECASTED',
+                  comparisonOperator: 'GREATER_THAN',
+                  threshold: 100,
+                  thresholdType: 'PERCENTAGE',
+                },
+                subscribers,
+              },
+            ]
+          : undefined,
+      });
+    }
+
     // ── Outputs ──
     new cdk.CfnOutput(this, 'SiteUrl', {
       value: `https://${domainName}`,
@@ -847,6 +1013,16 @@ function handler(event) {
 
     new cdk.CfnOutput(this, 'FunctionName', {
       value: validatorFn.functionName,
+    });
+
+    new cdk.CfnOutput(this, 'AiFunctionName', {
+      value: aiFn.functionName,
+      description: 'ai-fn Lambda (serves /v1/ai/*)',
+    });
+
+    new cdk.CfnOutput(this, 'AiModelId', {
+      value: aiModelId,
+      description: 'Bedrock model id the ai-fn Lambda invokes (AI_MODEL_ID)',
     });
   }
 }
