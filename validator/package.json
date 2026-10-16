@@ -24,6 +24,7 @@
     "vitest": "^5.0.4"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1152.0",
     "@hono/aws-lambda": "^1.0.1",
     "@node-rs/argon2": "^2.2.1",
     "hono": "^4.13.13",

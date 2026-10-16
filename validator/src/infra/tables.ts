@@ -39,6 +39,12 @@ export interface TableSchema {
   globalSecondaryIndexes?: GlobalSecondaryIndex[];
   /** Enable point-in-time recovery in production. Ignored locally. */
   pointInTimeRecovery?: boolean;
+  /**
+   * Name of the Number attribute holding an epoch-seconds expiry. When set,
+   * CDK enables DynamoDB TTL on it (and the local bootstrap mirrors that so
+   * DDB Local also reaps rows). Rows without the attribute never expire.
+   */
+  ttlAttribute?: string;
 }
 
 export const TABLES = {
@@ -147,6 +153,17 @@ export const TABLES = {
       },
     ],
     pointInTimeRecovery: true,
+  },
+  ai_usage: {
+    logicalName: 'ai_usage',
+    // Per-user, per-UTC-day counter for the AI plan-edit quota. One row per
+    // (user, day) holding `count` (N) and `ttl` (N, epoch seconds, 7 days
+    // after the day) so rows reap themselves. The reserve/release logic is
+    // an atomic conditional ADD in repositories/ai_usage.ts — see
+    // spec/services/ai-plan-editing.md → Quota. Ephemeral counters: no PITR.
+    partitionKey: { name: 'user_id', type: 'S' },
+    sortKey: { name: 'day', type: 'S' },
+    ttlAttribute: 'ttl',
   },
 } as const satisfies Record<string, TableSchema>;
 

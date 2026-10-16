@@ -1,7 +1,6 @@
-import { Hono } from 'hono';
-import type { LambdaEvent } from '@hono/aws-lambda';
-import { randomUUID } from 'node:crypto';
+import { buildCommit, createBaseApp } from './base-app.js';
 import { parseWorkout } from './parser/index.js';
+import { aiRouter } from './routes/ai.js';
 import { authRouter } from './routes/auth/index.js';
 import { meRouter } from './routes/me.js';
 import { tokensRouter } from './routes/tokens.js';
@@ -43,30 +42,20 @@ function log(entry: Record<string, unknown>): void {
   console.log(JSON.stringify(entry));
 }
 
-type Bindings = {
-  event?: LambdaEvent;
-};
-
-type Variables = {
-  requestId: string;
-  startTime: number;
-};
-
-export const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-
-app.use('*', async (c, next) => {
-  const lambdaRequestId =
-    (c.env?.event as { requestContext?: { requestId?: string } } | undefined)
-      ?.requestContext?.requestId;
-  c.set('requestId', lambdaRequestId ?? randomUUID());
-  c.set('startTime', Date.now());
-  await next();
-});
+// Shared scaffolding (requestId/startTime middleware + GET /version) lives
+// in base-app.ts so the ai-fn entry point (ai-app.ts) gets the same setup.
+export const app = createBaseApp();
 
 app.route('/v1/auth', authRouter);
 app.route('/v1/me', meRouter);
 app.route('/v1/tokens', tokensRouter);
 app.route('/v1/workouts', workoutsRouter);
+
+// AI plan editing. In production API Gateway routes /v1/ai/* to the
+// dedicated ai-fn Lambda (src/ai-app.ts, 29 s timeout) and this mount is
+// never reached; it exists so local dev (`npm run dev`), the e2e-local
+// server and the Vitest suite exercise the route through the main app.
+app.route('/v1/ai', aiRouter);
 
 // Test-only endpoints (e.g. /v1/__test__/mint-token). The router's gate
 // middleware 404s every request unless E2E_TEST_SECRET is set,
@@ -74,22 +63,6 @@ app.route('/v1/workouts', workoutsRouter);
 // safe to always mount. See spec/services/validator-e2e.md and
 // routes/__test__/index.ts.
 app.route('/v1/__test__', testRouter);
-
-// Deploy metadata. Set at deploy time via CDK context → Lambda env. Read
-// per-request rather than at module load so tests can set/clear env vars
-// without import-order coupling. See spec/services/lmwf-validator.md → Version.
-const buildCommit = () => process.env.BUILD_COMMIT ?? 'unknown';
-const buildTimestamp = () => process.env.BUILD_TIMESTAMP ?? 'unknown';
-const buildEnv = () => process.env.LMWF_ENV ?? 'unknown';
-
-app.get('/version', (c) => {
-  c.header('Cache-Control', 'no-store');
-  return c.json({
-    commit: buildCommit(),
-    builtAt: buildTimestamp(),
-    env: buildEnv(),
-  });
-});
 
 app.post('/validate', async (c) => {
   c.header('X-Validator-Version', buildCommit());

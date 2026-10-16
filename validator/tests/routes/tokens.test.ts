@@ -253,7 +253,7 @@ live('PAT issuance routes (/v1/tokens)', () => {
       allowed_scopes: string[];
     };
     expect(body.error).toMatch(/unknown scope/i);
-    expect(body.allowed_scopes).toEqual(['workouts:read', 'workouts:write']);
+    expect(body.allowed_scopes).toEqual(['workouts:read', 'workouts:write', 'ai:edit']);
   });
 
   it('rejects a scopes array over the length cap with 400', async () => {

@@ -330,9 +330,10 @@ testRouter.post('/delete-user-by-email', async (c) => {
     }),
   );
 
-  // workout_inbox / workout_outbox: composite (user_id, <sk>).
-  for (const t of ['workout_inbox', 'workout_outbox'] as const) {
-    const skName = t === 'workout_inbox' ? 'inbox_id' : 'outbox_id';
+  // workout_inbox / workout_outbox / ai_usage: composite (user_id, <sk>).
+  for (const t of ['workout_inbox', 'workout_outbox', 'ai_usage'] as const) {
+    const skName =
+      t === 'workout_inbox' ? 'inbox_id' : t === 'workout_outbox' ? 'outbox_id' : 'day';
     const q = await ddb.send(
       new QueryCommand({
         TableName: tableName(t),

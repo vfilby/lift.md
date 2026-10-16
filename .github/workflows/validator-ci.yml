@@ -152,6 +152,7 @@ jobs:
           DDB_TABLE_REFRESH_TOKENS: lmwf-local-refresh_tokens
           DDB_TABLE_WORKOUT_INBOX: lmwf-local-workout_inbox
           DDB_TABLE_WORKOUT_OUTBOX: lmwf-local-workout_outbox
+          DDB_TABLE_AI_USAGE: lmwf-local-ai_usage
           SMTP_HOST: localhost
           SMTP_PORT: '1025'
           SMTP_FROM: noreply@local.test
@@ -296,6 +297,7 @@ jobs:
           export DDB_TABLE_REFRESH_TOKENS=lmwf-local-refresh_tokens
           export DDB_TABLE_WORKOUT_INBOX=lmwf-local-workout_inbox
           export DDB_TABLE_WORKOUT_OUTBOX=lmwf-local-workout_outbox
+          export DDB_TABLE_AI_USAGE=lmwf-local-ai_usage
           export AWS_REGION=us-west-2
           export AWS_ACCESS_KEY_ID=local
           export AWS_SECRET_ACCESS_KEY=local
@@ -403,17 +405,55 @@ jobs:
           validator/ci/aws-console-links.sh beta validator/cdk/outputs-beta.json
 
   # ── Stage 4: smoke-beta ────────────────────────────────────────────────
+  # `environment: beta` is needed only by the (gated) AI smoke steps, which
+  # assume the beta OIDC deploy role to read the e2e test secret.
   smoke-beta:
     name: smoke-beta
     needs: [changes, deploy-beta]
     if: ${{ github.event_name == 'push' && needs.changes.outputs.validator == 'true' && needs['deploy-beta'].result == 'success' }}
     runs-on: ubuntu-latest
+    environment:
+      name: beta
+    env:
+      AWS_DEFAULT_REGION: us-west-2
+      AWS_REGION: us-west-2
+      # AI plan-edit smoke (one real Bedrock call against beta). Off until
+      # Amazon Nova model access is granted in the beta account — flip to '1'
+      # (or set the repo/environment variable AI_SMOKE=1) to enable. See
+      # spec/services/ai-plan-editing.md → Beta smoke.
+      AI_SMOKE: ${{ vars.AI_SMOKE || '0' }}
     steps:
       - uses: actions/checkout@v7
       - name: Smoke test beta
         run: |
           chmod +x validator/scripts/smoke-test-live.sh
           validator/scripts/smoke-test-live.sh https://beta.getlift.md "${{ github.sha }}"
+      - name: Configure AWS credentials (OIDC) for AI smoke
+        if: ${{ env.AI_SMOKE == '1' }}
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Fetch E2E test secret for AI smoke
+        if: ${{ env.AI_SMOKE == '1' }}
+        id: ai-smoke-secret
+        run: |
+          set -euo pipefail
+          SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id lmwf-beta-e2e-test-secret \
+            --query SecretString --output text)
+          echo "::add-mask::$SECRET"
+          echo "secret=$SECRET" >> "$GITHUB_OUTPUT"
+      - name: AI plan-edit smoke (beta, live Bedrock call)
+        if: ${{ env.AI_SMOKE == '1' }}
+        env:
+          LMWF_E2E_TEST_SECRET: ${{ steps.ai-smoke-secret.outputs.secret }}
+        run: |
+          chmod +x validator/scripts/smoke-ai-live.sh
+          validator/scripts/smoke-ai-live.sh https://beta.getlift.md
+      - name: AI plan-edit smoke skipped
+        if: ${{ env.AI_SMOKE != '1' }}
+        run: echo "AI_SMOKE=${AI_SMOKE} — skipping the live /v1/ai/plan/edit smoke (set AI_SMOKE=1 once Nova access exists)"
 
   # ── Stage 4.5: e2e-beta ────────────────────────────────────────────────
   # Browser-driven E2E suite against the live beta hostname. Uses the

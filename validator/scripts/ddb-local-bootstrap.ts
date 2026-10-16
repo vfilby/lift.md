@@ -14,6 +14,7 @@ import {
   DescribeTableCommand,
   ResourceNotFoundException,
   ResourceInUseException,
+  UpdateTimeToLiveCommand,
   type AttributeDefinition,
   type GlobalSecondaryIndex,
   type KeySchemaElement,
@@ -115,6 +116,29 @@ async function ensureTable(schema: TableSchema): Promise<void> {
       }),
     );
     console.log(`[created] ${tableName}`);
+    if (schema.ttlAttribute) {
+      // Mirror the CDK `timeToLiveAttribute` so local rows reap too. DDB
+      // Local honours TTL (lazily); a failure here is non-fatal because the
+      // app never depends on reaping for correctness.
+      try {
+        await client.send(
+          new UpdateTimeToLiveCommand({
+            TableName: tableName,
+            TimeToLiveSpecification: {
+              AttributeName: schema.ttlAttribute,
+              Enabled: true,
+            },
+          }),
+        );
+        console.log(`[ttl] ${tableName}.${schema.ttlAttribute}`);
+      } catch (ttlErr) {
+        console.warn(
+          `[ttl] ${tableName}: could not enable TTL on ${schema.ttlAttribute}: ${
+            ttlErr instanceof Error ? ttlErr.message : String(ttlErr)
+          }`,
+        );
+      }
+    }
   } catch (err) {
     if (err instanceof ResourceInUseException) {
       console.log(`[exists] ${tableName} (race)`);

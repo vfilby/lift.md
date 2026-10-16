@@ -46,7 +46,7 @@ spec/
                             MUST follow this spec to be deployable.
   screens/               -- Per-screen specs (layout, elements, interactions).
   flows/                 -- Per-flow specs (user journeys, step-by-step).
-  services/              -- Per-service specs (AI generation, backup, CloudKit sync,
+  services/              -- Per-service specs (AI generation, AI plan editing, backup, CloudKit sync,
                             exercise history, export, file import, HealthKit,
                             Live Activities, LMWF parser, logger, plate calculator,
                             secure storage, workout highlights, workout history).
