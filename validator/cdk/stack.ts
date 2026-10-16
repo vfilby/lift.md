@@ -324,7 +324,13 @@ export class LmwfValidatorStack extends cdk.Stack {
       AI_MODEL_TIMEOUT_MS: String(this.node.tryGetContext('aiModelTimeoutMs') ?? '24000'),
     };
 
+    // Explicit name: the scoped CFN execution policy (cdk/deploy-policy.json,
+    // CloudWatchLogs statement) only allows log groups under
+    // `/aws/lambda/Lmwf*Stack-*`. A CFN-generated name
+    // (`LmwfBetaValidatorStack-AiLogGroup…`) lacks that prefix and the first
+    // beta deploy failed with logs:CreateLogGroup AccessDenied.
     const aiLogGroup = new logs.LogGroup(this, 'AiLogGroup', {
+      logGroupName: `/aws/lambda/${this.stackName}-AiFunction`,
       retention: logs.RetentionDays.TWO_WEEKS,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
