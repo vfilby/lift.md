@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { handler } from '../src/handler.js';
-import type { ApiGatewayRequestContextV2 } from 'hono/aws-lambda';
+import type { ApiGatewayRequestContextV2 } from '@hono/aws-lambda';
 
 // Mirror of Hono's internal APIGatewayProxyEventV2 (not exported by the
 // adapter). Synthesizes the event shape its Lambda handler expects.

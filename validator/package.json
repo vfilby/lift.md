@@ -13,7 +13,7 @@
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1141.0",
     "@aws-sdk/lib-dynamodb": "^3.1150.0",
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.5",
     "@types/aws-lambda": "^8.10.164",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",
@@ -24,6 +24,7 @@
     "vitest": "^5.0.4"
   },
   "dependencies": {
+    "@hono/aws-lambda": "^1.0.1",
     "@node-rs/argon2": "^2.2.1",
     "hono": "^4.13.13",
     "jsonwebtoken": "^9.0.3",
