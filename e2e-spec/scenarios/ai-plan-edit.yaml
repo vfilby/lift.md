@@ -66,7 +66,7 @@ tests:
         target: "ai-edit-input"
       - action: typeText
         target: "ai-edit-input"
-        text: "add face pulls"
+        value: "add face pulls"
       - action: tap
         target: "ai-edit-send"
       - action: waitFor
@@ -100,7 +100,7 @@ tests:
         target: "ai-edit-input"
       - action: typeText
         target: "ai-edit-input"
-        text: "please fail"
+        value: "please fail"
       - action: tap
         target: "ai-edit-send"
       - action: waitFor

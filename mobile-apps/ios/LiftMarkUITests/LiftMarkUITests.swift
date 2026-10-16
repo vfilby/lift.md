@@ -145,6 +145,13 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "ai-prompt-settings")
     }
 
+    /// Edit with AI sheet against the deterministic stub engine
+    /// (`--ai-engine-stub`): apply a proposal, see it on the detail view,
+    /// and surface an engine error. See spec/flows/ai-plan-editing.md.
+    func testAIPlanEdit() throws {
+        runner.runScenario(named: "ai-plan-edit")
+    }
+
     /// GH #279: first Settings → Account → Sign in tap must present the login
     /// sheet and keep it presented (no second tap).
     func testSettingsAccountLogin() throws {

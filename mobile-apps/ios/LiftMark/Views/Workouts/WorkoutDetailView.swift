@@ -5,10 +5,16 @@ struct WorkoutDetailView: View {
     var isEmbedded: Bool = false
     @Environment(WorkoutPlanStore.self) private var planStore
     @Environment(SessionStore.self) private var sessionStore
+    @Environment(AuthenticationStore.self) private var authStore
+    @Environment(FeatureFlagsStore.self) private var featureFlags
     @Environment(\.dismiss) private var dismiss
     @State private var showStartConfirm = false
     @State private var showReprocessConfirm = false
     @State private var showEditMarkdown = false
+    @State private var showEditAI = false
+    /// Hosts the `LoginView` sheet for the AI upsell row here, on the stably
+    /// mounted detail view (same reasoning as `SettingsView`, GH #279).
+    @State private var showLogin = false
     @State private var navigateToActiveWorkout = false
     @State private var editingPlanExercise: PlannedExercise?
     @State private var exportFile: ExportFile?
@@ -57,9 +63,12 @@ struct WorkoutDetailView: View {
                                 )
                             }
 
-                            // Edit & Reprocess buttons
+                            // Edit & Reprocess buttons, plus the AI row when gated in
                             if plan.sourceMarkdown != nil {
-                                editReprocessButtons
+                                VStack(spacing: LiftMarkTheme.spacingSM) {
+                                    editReprocessButtons
+                                    aiEditRow
+                                }
                             }
 
                             // Exercises heading
@@ -170,6 +179,12 @@ struct WorkoutDetailView: View {
             if let plan {
                 EditPlanMarkdownSheet(planId: plan.id, initialMarkdown: plan.sourceMarkdown ?? "")
             }
+        }
+        .sheet(isPresented: $showEditAI) {
+            EditPlanAISheet(planId: planId)
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginView()
         }
         .sheet(item: $editingPlanExercise) { exercise in
             let supersetChildren = (plan?.exercises.filter { $0.parentExerciseId == exercise.id }) ?? []
@@ -367,4 +382,84 @@ private extension WorkoutDetailView {
         planStore.reprocessPlan(id: plan.id, fromMarkdown: markdown)
     }
 
+}
+
+// MARK: - Edit with AI row
+
+private extension WorkoutDetailView {
+    var aiEditDecision: AIEditGate.Decision {
+        AIEditGate.decision(
+            flagOn: featureFlags.isEnabled(.aiPlanEditing),
+            hasMarkdown: plan?.sourceMarkdown != nil,
+            tier: authStore.currentUser?.tier,
+            stubActive: featureFlags.isAIEngineStubActive
+        )
+    }
+
+    /// Third full-width row under Edit/Reprocess: the entry button for Pro /
+    /// trial users (or the stub engine), the upsell for everyone else, nothing
+    /// while the `aiPlanEditing` flag is off. See `spec/screens/workout-detail.md`.
+    @ViewBuilder
+    var aiEditRow: some View {
+        switch aiEditDecision {
+        case .hidden:
+            EmptyView()
+        case .button:
+            Button {
+                showEditAI = true
+            } label: {
+                Label("Edit with AI", systemImage: "sparkles")
+                    .font(.lmSubheadline)
+                    .fontWeight(.medium)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, LiftMarkTheme.spacingSM)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .tint(LiftMarkTheme.primary)
+            .accessibilityIdentifier("edit-plan-ai-button")
+        case .upsell:
+            aiUpsellRow
+        }
+    }
+
+    var aiUpsellRow: some View {
+        let signedOut = !authStore.isAuthenticated
+        return Button {
+            if signedOut {
+                showLogin = true
+            }
+        } label: {
+            HStack(spacing: LiftMarkTheme.spacingSM) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(LiftMarkTheme.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Edit with AI")
+                        .font(.lmSubheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(LiftMarkTheme.label)
+                    Text(PlanEditError.subscriptionRequired.userFacingMessage)
+                        .font(.lmCaption)
+                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                }
+                Spacer()
+                if signedOut {
+                    Text("Sign in")
+                        .font(.lmSubheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(LiftMarkTheme.primary)
+                    Image(systemName: "chevron.right")
+                        .font(.lmCaption.weight(.semibold))
+                        .foregroundStyle(LiftMarkTheme.tertiaryLabel)
+                }
+            }
+            .padding(.horizontal, LiftMarkTheme.spacingMD)
+            .padding(.vertical, LiftMarkTheme.spacingSM)
+            .background(LiftMarkTheme.secondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+        }
+        .buttonStyle(.plain)
+        .disabled(!signedOut)
+        .accessibilityIdentifier("edit-plan-ai-upsell")
+    }
 }

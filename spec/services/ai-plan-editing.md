@@ -54,11 +54,17 @@ enum PlanEditEngineAvailability: Equatable {
     case unavailable(reason: String)     // human-readable, shown verbatim in the sheet
 }
 
+typealias PlanEditLimitIncreaseAction = @MainActor () -> Void
+
 protocol PlanEditEngine: Sendable {
     var kind: PlanEditEngineKind { get }
     var displayName: String { get }      // "Apple Private Cloud Compute", "Apple on-device", "LiftMark cloud"
     func availability() async -> PlanEditEngineAvailability
     func edit(_ request: PlanEditRequest) async throws -> PlanEditResult
+    // Quota affordances so the sheet never imports FoundationModels. Default
+    // implementations return false / nil; only the PCC engine overrides them.
+    var isApproachingQuotaLimit: Bool { get }
+    var limitIncreaseAction: PlanEditLimitIncreaseAction? { get }
 }
 ```
 
@@ -151,11 +157,14 @@ enum PlanEditError: Error, Equatable {
 
 ### `ApplePrivateCloudEngine` (`applePrivateCloud`)
 
-- Requires `#available(iOS 27, *)`. `availability()` maps
+- Requires `#available(iOS 27, *)`; on iOS 26 the engine is constructible but reports
+  `.unavailable("Apple Private Cloud Compute requires iOS 27.")`. `availability()` maps
   `PrivateCloudComputeLanguageModel.availability`: `.available` → `.available`;
-  `.unavailable(reason)` → `.unavailable` with a reason string per case (device not
-  eligible, Apple Intelligence not enabled, model not ready, other). If
-  `quotaUsage.isLimitReached` → `.quotaExhausted(resetAt: quotaUsage.resetDate)`.
+  `.unavailable(reason)` → `.unavailable` with a reason string per case. The iOS 27 SDK
+  defines only `deviceNotEligible` and `systemNotReady` for PCC (the "Apple Intelligence not
+  enabled" and "model not ready" cases exist on the on-device model only); unknown future
+  cases map to a generic "unavailable" string. If `quotaUsage.isLimitReached` →
+  `.quotaExhausted(resetAt: quotaUsage.resetDate)`.
 - One `LanguageModelSession(model: PrivateCloudComputeLanguageModel(), instructions:)` per
   `edit` call (stateless; the repair turn reuses the same session so the model sees its own
   prior output).
@@ -173,7 +182,9 @@ enum PlanEditError: Error, Equatable {
 - Uses the **compact** prompt. Before calling, computes
   `tokenCount(for: instructions) + tokenCount(for: prompt) + 1200` and compares to the
   model's `contextSize`; if it does not fit → `.planTooLarge` without calling the model.
-  (1200 is the reserved output budget; on-device plans must be short.)
+  (1200 is the reserved output budget; on-device plans must be short.) `tokenCount(for:)`
+  and `contextSize` are iOS 26.4 APIs; on 26.0–26.3 the engine estimates tokens as
+  UTF-8 bytes / 4 against a 4096 context.
 - Same structured output, validate, and repair behaviour. `maximumResponseTokens` = 1200.
 - Offline capable. No quota.
 
@@ -185,7 +196,9 @@ enum PlanEditError: Error, Equatable {
   pattern as `InboxPollerService`), body = the request above in snake_case JSON.
 - Response mapping: 200 → `PlanEditResult` (the server already validated the markdown, the
   client parses it again anyway to populate the diff); 402 → `.subscriptionRequired`;
-  429 → `.quotaExhausted(resetAt)`; 413 → `.planTooLarge`; 422 → `.outputDidNotParse`;
+  429 → `.quotaExhausted(resetAt: nil)` — `APIError.server` carries only the error message,
+  not the 429 body, so the sheet falls back to the `reset_at` of the last cached
+  `PlanEditQuota` for its copy; 413 → `.planTooLarge`; 422 → `.outputDidNotParse`;
   5xx/504 → `.model(message)`; transport failure → `.network`.
 - `availability()` is `.available` whenever signed in; quota state is only known after a
   call, and the last `PlanEditQuota` is cached in the session for the header label.
