@@ -35,8 +35,10 @@ The feature is visible only when **all** of:
 2. The plan has non-nil `sourceMarkdown` (same condition as the Edit button).
 3. The signed-in user's tier is `pro` or `trial`, **or** the stub engine is active (UI tests).
    A user who is signed out or on `free` sees the same row rendered as an upsell
-   (`edit-plan-ai-upsell`) that explains AI editing is part of Pro. Server-side, the cloud
-   engine returns 402 for `free` regardless of what the client shows.
+   (`edit-plan-ai-upsell`) that explains AI editing is part of Pro: signed-out users get a
+   "Sign in" action presenting the standard login sheet; signed-in `free` users get an
+   informational, non-interactive row until in-app purchase exists (plan doc, Phase 1).
+   Server-side, the cloud engine returns 402 for `free` regardless of what the client shows.
 
 ## Engines
 
@@ -403,8 +405,9 @@ collapsed into a single "N exercises unchanged" line.
 Plan markdown, the instruction, equipment names, and the compact recent-session block are
 sent to the selected engine. Apple engines: processed on device or on Apple's Private Cloud
 Compute, not stored. LiftMark cloud: processed by Amazon Bedrock in our AWS account, not
-stored or used for training; the server logs token counts only. The sheet's first-run
-footer states which engine is active and links to the privacy policy.
+stored or used for training; the server logs token counts only. The sheet shows a one-line
+footer naming the active engine whenever the transcript is empty. It gains a link to the
+privacy policy once a privacy page exists (none does today).
 
 ## Testing
 
