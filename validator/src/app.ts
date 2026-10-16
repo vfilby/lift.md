@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { LambdaEvent } from 'hono/aws-lambda';
+import type { LambdaEvent } from '@hono/aws-lambda';
 import { randomUUID } from 'node:crypto';
 import { parseWorkout } from './parser/index.js';
 import { authRouter } from './routes/auth/index.js';
