@@ -134,20 +134,27 @@ Implementations on any platform must attach these identifiers to the correspondi
 |----|-------------|---------|
 | `ai-edit-sheet` | View | Sheet container |
 | `ai-edit-close` | Button | Dismiss the sheet (confirms if a proposal is unapplied) |
+| `ai-edit-history` | Button | Open the read-only transcript sheet (present once a turn has been sent) |
+| `ai-edit-preview` | View | Live plan preview container (no proposal pending) |
+| `ai-edit-preview-row-{slug}` | View | One unchanged exercise row in the preview, slug = exercise name (`bench-press`) |
+| `ai-edit-diff` | View | The same preview container while a proposal is pending (shows the proposed plan with diff highlighting) |
+| `ai-edit-diff-row-{slug}` | View | One highlighted preview row, slug = kind + exercise name (`added-face-pull`) |
+| `ai-edit-status` | View | Status strip: thinking / error / latest summary / hint, plus the engine and quota caption |
+| `ai-edit-thinking` | View | Thinking indicator in the status strip |
+| `ai-edit-error` | Text | Error message in the status strip |
 | `ai-edit-engine-label` | Text | Active engine display name |
 | `ai-edit-quota-label` | Text | Quota state for the active engine, when known |
 | `ai-edit-quota-options` | Button | Apple limit-increase sheet (PCC engine only) |
-| `ai-edit-chip-{slug}` | Button | Quick-action chip (`make-it-shorter`, `swap-barbell-for-dumbbells`, `add-a-warm-up`, `progress-loads`, `thirty-minutes`) |
-| `ai-edit-input` | TextField | Instruction input |
-| `ai-edit-send` | Button | Send the instruction |
-| `ai-edit-cancel` | Button | Cancel the in-flight request |
-| `ai-edit-message-{index}` | View | Transcript message container (0-based) |
-| `ai-edit-diff` | View | Exercise-level diff for the latest proposal |
-| `ai-edit-diff-row-{slug}` | View | One diff row, slug = kind + exercise name (`added-face-pull`) |
-| `ai-edit-error` | Text | Error message in the transcript |
 | `ai-edit-apply` | Button | Persist the proposal |
 | `ai-edit-discard` | Button | Drop the proposal |
 | `ai-edit-undo` | Button | Restore the markdown persisted before the last Apply |
+| `ai-edit-chip-{slug}` | Button | Quick-action chip (`make-it-shorter`, `swap-barbell-for-dumbbells`, `add-a-warm-up`, `progress-loads`, `thirty-minutes`) |
+| `ai-edit-privacy-footer` | Text | One-line caption naming the engine the plan is sent to |
+| `ai-edit-input` | TextField | Instruction input |
+| `ai-edit-send` | Button | Send the instruction |
+| `ai-edit-cancel` | Button | Cancel the in-flight request |
+| `ai-edit-message-{index}` | View | Transcript row in the History sheet (0-based) |
+| `ai-edit-message-discarded` | Text | "Discarded" caption on a History row whose proposal was discarded or undone |
 
 ---
 

@@ -79,6 +79,15 @@ final class PlanEditSessionTests: XCTestCase {
         ])
         XCTAssertEqual(session.workingMarkdown, Self.withDips)
         XCTAssertEqual(session.pendingProposal?.markdown, Self.withDips)
+        XCTAssertEqual(session.workingPlan?.exercises.map(\.exerciseName).suffix(2), ["Face Pull", "Dips"])
+
+        // The preview diff is against what is persisted (the original here),
+        // so both chained additions are highlighted, not just the latest.
+        let added = session.pendingProposal?.diff.changedEntries.compactMap { entry -> String? in
+            if case .added(let exercise) = entry { return exercise.name }
+            return nil
+        }
+        XCTAssertEqual(added, ["Face Pull", "Dips"])
     }
 
     func testSendFailureLeavesWorkingMarkdownAndRecordsError() async {
@@ -244,6 +253,109 @@ final class PlanEditSessionTests: XCTestCase {
     }
 
     // MARK: - cancel
+
+    // MARK: - History after discard / undo (GH #464)
+
+    private func userTurns(in request: PlanEditRequest) -> [String] {
+        request.history.filter { $0.role == .user }.map(\.content)
+    }
+
+    func testDiscardThenSendOmitsDiscardedTurnsFromHistory() async {
+        engine.outcomes = [
+            .success(markdown: Self.withFacePull, summary: "Cut sets to 3."),
+            .success(markdown: Self.withDips),
+        ]
+
+        await session.send("make it shorter")
+        session.discard()
+        await session.send("add dips")
+
+        XCTAssertEqual(engine.requests.count, 2)
+        XCTAssertEqual(engine.requests[1].history, [], "the discarded shorten turns must not be replayed")
+        XCTAssertEqual(engine.requests[1].planMarkdown, PlanEditFixtures.pushDay)
+        XCTAssertEqual(session.messages.map(\.isDiscarded), [true, true, false, false])
+        XCTAssertEqual(session.messages.compactMap(\.turn).count, 2)
+    }
+
+    func testDiscardOfChainedProposalDiscardsEveryTurnSinceLastApply() async {
+        engine.outcomes = [
+            .success(markdown: Self.withFacePull, summary: "Added Face Pull."),
+            .success(markdown: Self.withDips, summary: "Added Dips."),
+            .success(markdown: Self.withFacePull, summary: "Cut sets."),
+            .success(markdown: Self.withDips),
+        ]
+
+        await session.send("add face pulls")
+        session.apply()
+        await session.send("add dips")
+        await session.send("make it shorter")
+        session.discard()
+        await session.send("add rows")
+
+        XCTAssertEqual(userTurns(in: engine.requests[3]), ["add face pulls"], "only the applied turn survives")
+        XCTAssertEqual(engine.requests[3].history.count, 2)
+        XCTAssertEqual(engine.requests[3].planMarkdown, Self.withFacePull)
+    }
+
+    func testUndoThenSendOmitsUndoneTurnsFromHistory() async {
+        engine.outcomes = [
+            .success(markdown: Self.withFacePull, summary: "Added Face Pull."),
+            .success(markdown: Self.withDips),
+        ]
+
+        await session.send("add face pulls")
+        session.apply()
+        session.undo()
+        await session.send("add dips")
+
+        XCTAssertEqual(engine.requests[1].history, [], "the undone apply's turns must not be replayed")
+        XCTAssertEqual(engine.requests[1].planMarkdown, PlanEditFixtures.pushDay)
+        XCTAssertEqual(session.messages.prefix(2).map(\.isDiscarded), [true, true])
+    }
+
+    func testUndoDiscardsOnlyTheUndoneApplyNotEarlierApplies() async {
+        engine.outcomes = [
+            .success(markdown: Self.withFacePull, summary: "Added Face Pull."),
+            .success(markdown: Self.withDips, summary: "Added Dips."),
+            .success(markdown: Self.withDips),
+        ]
+
+        await session.send("add face pulls")
+        session.apply()
+        await session.send("add dips")
+        session.apply()
+        session.undo()
+        await session.send("add rows")
+
+        XCTAssertEqual(userTurns(in: engine.requests[2]), ["add face pulls"])
+        XCTAssertEqual(engine.requests[2].planMarkdown, Self.withFacePull)
+    }
+
+    func testApplyThenSendKeepsAppliedTurnsInHistory() async {
+        engine.outcomes = [
+            .success(markdown: Self.withFacePull, summary: "Added Face Pull."),
+            .success(markdown: Self.withDips),
+        ]
+
+        await session.send("add face pulls")
+        session.apply()
+        await session.send("add dips")
+
+        XCTAssertEqual(engine.requests[1].history, [
+            PlanEditTurn(role: .user, content: "add face pulls"),
+            PlanEditTurn(role: .assistant, content: "Added Face Pull."),
+        ])
+        XCTAssertFalse(session.messages.contains(where: \.isDiscarded))
+    }
+
+    func testStatusReturnsToHintAfterDiscard() async {
+        engine.outcomes = [.success(markdown: Self.withFacePull, summary: "Added Face Pull.")]
+
+        await session.send("add face pulls")
+        XCTAssertEqual(session.status, .summary("Added Face Pull.", warnings: [], isEmptyDiff: false))
+        session.discard()
+        XCTAssertEqual(session.status, .hint)
+    }
 
     func testCancelAbortsInFlightCallAndRecordsCancelled() async {
         engine.holdUntilCancelled = true

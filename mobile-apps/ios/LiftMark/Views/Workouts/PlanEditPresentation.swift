@@ -39,9 +39,9 @@ enum AIEditGate {
     }
 }
 
-// MARK: - Header labels
+// MARK: - Labels
 
-/// Formats the engine/quota caption in the Edit with AI header. See
+/// Formats the engine/quota caption in the Edit with AI status strip. See
 /// `spec/flows/ai-plan-editing.md` ("Engine-specific notes"). Engine names
 /// always come from `PlanEditEngine.displayName`; this type only shapes the
 /// quota numbers it is handed.
@@ -54,6 +54,9 @@ enum PlanEditLabels {
     static let discardConfirm = "Discard"
     static let discardCancel = "Keep editing"
     static let inputPlaceholder = "Describe a change…"
+    static let hint = "Describe how you'd like to change this plan, or start with a suggestion."
+    static let previewUnavailable = "Preview unavailable"
+    static let discardedTurn = "Discarded"
 
     /// Server-side grace ceiling: `ceil(limit * 1.1)` (service spec, "Quota").
     static func graceCeiling(limit: Int) -> Int {
@@ -71,28 +74,33 @@ enum PlanEditLabels {
         return "\(max(0, quota.remaining)) of \(quota.limit) left today"
     }
 
-    /// The header caption's quota part: the provider's approaching-limit
+    /// The status caption's quota part: the provider's approaching-limit
     /// warning wins over the numeric label.
     static func quotaLabel(_ quota: PlanEditQuota?, isApproachingLimit: Bool) -> String? {
         if isApproachingLimit { return nearingAppleLimit }
         return quotaLabel(quota)
     }
 
-    /// Caption shown once with an empty transcript; names the active engine.
+    /// One-line caption under the quick-action chips; names the active engine.
     static func privacyFooter(engineName: String) -> String {
-        "Your plan, instruction, and equipment are sent to \(engineName) for this edit and are not stored."
+        "Your plan and instruction are sent to \(engineName) and not stored."
     }
 
-    /// "N exercises unchanged" / "1 exercise unchanged".
-    static func unchangedSummary(count: Int) -> String {
-        count == 1 ? "1 exercise unchanged" : "\(count) exercises unchanged"
+    /// History row caption: "No changes" / "1 change" / "N changes".
+    static func changeCount(_ diff: PlanDiff) -> String {
+        let count = diff.changedEntries.count + diff.headerChanges.count
+        switch count {
+        case 0: return "No changes"
+        case 1: return "1 change"
+        default: return "\(count) changes"
+        }
     }
 }
 
 // MARK: - Quick-action chips
 
-/// The chips shown on an empty transcript. Slugs are part of the
-/// accessibility-ID contract (`ai-edit-chip-{slug}`).
+/// The chips above the composer. Slugs are part of the accessibility-ID
+/// contract (`ai-edit-chip-{slug}`).
 struct PlanEditQuickAction: Identifiable, Equatable, Sendable {
     let slug: String
     let title: String
@@ -115,75 +123,32 @@ struct PlanEditQuickAction: Identifiable, Equatable, Sendable {
     ]
 }
 
-// MARK: - Diff rows
+// MARK: - Status strip
 
-/// Presentation of one `PlanDiffEntry` row: its accessibility slug, marker
-/// glyph, and the lines shown under the exercise name.
-struct PlanDiffRowPresentation: Equatable {
-    enum Kind: String {
-        case added
-        case removed
-        case changed
+/// What the status strip between the preview and the edit area shows: one
+/// of thinking, the latest error, the latest summary, or the opening hint.
+/// See `spec/screens/workout-detail.md` ("AI Edit Sheet", status strip).
+enum PlanEditStatus: Equatable {
+    /// No turn yet: "Describe how you'd like to change this plan…".
+    case hint
+    case thinking
+    case error(PlanEditError)
+    /// The latest assistant summary; `isEmptyDiff` adds the "No changes were
+    /// made" line and disables Apply.
+    case summary(String, warnings: [String], isEmptyDiff: Bool)
 
-        var marker: String {
-            switch self {
-            case .added: return "+"
-            case .removed: return "\u{2212}"
-            case .changed: return "~"
-            }
+    /// A discarded last turn shows the hint again: its summary no longer
+    /// describes the preview.
+    static func current(messages: [PlanEditMessage], isThinking: Bool) -> PlanEditStatus {
+        if isThinking { return .thinking }
+        guard let last = messages.last, !last.isDiscarded else { return .hint }
+        switch last.content {
+        case .error(let error):
+            return .error(error)
+        case .assistant(let summary, let diff, let warnings):
+            return .summary(summary, warnings: warnings, isEmptyDiff: diff.isEmpty)
+        case .user:
+            return .hint
         }
-    }
-
-    let kind: Kind
-    let name: String
-    let parent: String?
-    /// Set lines for added/removed; the *after* lines for changed.
-    let lines: [String]
-    /// The *before* lines for changed rows, empty otherwise.
-    let previousLines: [String]
-
-    var slug: String { "\(kind.rawValue)-\(Self.slugify(name))" }
-    var accessibilityIdentifier: String { "ai-edit-diff-row-\(slug)" }
-
-    init?(entry: PlanDiffEntry) {
-        switch entry {
-        case .added(let exercise):
-            kind = .added
-            name = exercise.name
-            parent = exercise.parent
-            lines = exercise.setLines
-            previousLines = []
-        case .removed(let exercise):
-            kind = .removed
-            name = exercise.name
-            parent = exercise.parent
-            lines = exercise.setLines
-            previousLines = []
-        case .changed(let before, let after):
-            kind = .changed
-            name = after.name
-            parent = after.parent
-            lines = after.setLines
-            previousLines = before.setLines
-        case .unchanged:
-            return nil
-        }
-    }
-
-    /// Lower-cased, non-alphanumerics collapsed to single hyphens, trimmed:
-    /// "Face Pull" → "face-pull".
-    static func slugify(_ name: String) -> String {
-        var out = ""
-        var pendingHyphen = false
-        for scalar in name.lowercased().unicodeScalars {
-            if CharacterSet.alphanumerics.contains(scalar) {
-                if pendingHyphen, !out.isEmpty { out.append("-") }
-                pendingHyphen = false
-                out.unicodeScalars.append(scalar)
-            } else {
-                pendingHyphen = true
-            }
-        }
-        return out
     }
 }

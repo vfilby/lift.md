@@ -79,14 +79,26 @@ Display full details of a workout plan template — exercises, sets, tags, metad
 
 ### AI Edit Sheet (`ai-edit-sheet`)
 
-Presented with `.sheet` hosted on `WorkoutDetailView` (stable host, see the Settings sign-in sheet note in `settings.md`). Layout, top to bottom:
+Presented with `.sheet` hosted on `WorkoutDetailView` (stable host, see the Settings sign-in sheet note in `settings.md`). The sheet is a **live preview over an edit area**, not a chat transcript (GH #461: the old transcript layout left most of the screen empty). Layout, top to bottom:
 
-1. **Header**: title "Edit with AI", close button (`ai-edit-close`), engine label (`ai-edit-engine-label`) and quota label (`ai-edit-quota-label`) as a caption line.
-2. **Transcript** (scrolling): user messages right-aligned, assistant messages left-aligned containing the summary, the diff (`ai-edit-diff`), and parser warnings; error messages (`ai-edit-error`) in the error tint. Empty transcript shows the quick-action chips (`ai-edit-chip-{slug}`) and a one-line privacy footer naming the active engine.
-3. **Proposal bar** (only while a proposal is unapplied): **Discard** (`ai-edit-discard`) and **Apply** (`ai-edit-apply`, primary). After an Apply, **Undo** (`ai-edit-undo`) appears in place of the bar until the next proposal.
-4. **Composer**: text field (`ai-edit-input`, multiline, placeholder "Describe a change…"), send (`ai-edit-send`, disabled when empty or thinking), cancel (`ai-edit-cancel`, shown only while thinking).
+1. **Header**: navigation title "Edit with AI", close button (`ai-edit-close`), and a **History** button (`ai-edit-history`, clock icon) that is present once at least one turn has been sent.
+2. **Plan preview** (top region, roughly the upper two-thirds, scrolls): the session's working plan rendered as its exercise list — plan name and tags, section headers (same divider style as the detail screen), superset groups, and one row per exercise with the exercise name, equipment, notes, and its sets as LMWF-style lines (`135 lbs x 5 @rest: 90s`). With no proposal pending the container is `ai-edit-preview` and every row is `ai-edit-preview-row-{slug}`.
+   - **While a proposal is pending** the preview shows the *proposed* plan with inline diff highlighting and the container is identified as `ai-edit-diff` instead. Highlighted rows carry `ai-edit-diff-row-{slug}` (slug = kind + exercise name, e.g. `added-face-pull`):
+     - **added** — success tint, leading `+` marker;
+     - **removed** — error tint, leading `−` marker, name and set lines struck through, kept at the position the exercise used to occupy;
+     - **changed** — warning tint, leading `~` marker, the previous set lines struck through above the new ones.
+     Unchanged rows render normally. Plan-level changes (rename, tags, units, notes) are listed as a caption block above the first section. Uses `Theme` semantic colours only (`success`, `destructive`, `warning`).
+   - A plan whose markdown does not parse shows "Preview unavailable" in place of the list.
+3. **Status strip** (between preview and edit area, part of the bottom region): exactly one of — the thinking indicator (`ai-edit-thinking`) while a call is in flight; the latest error (`ai-edit-error`, error tint) when the last turn failed; the latest assistant summary plus any parser warnings for the proposed plan ("No changes were made" when the diff is empty); or, before the first turn, the hint "Describe how you'd like to change this plan, or start with a suggestion." Below it, a caption line with the engine label (`ai-edit-engine-label`), the quota label (`ai-edit-quota-label`) and, when Apple offers a limit increase, **Show options** (`ai-edit-quota-options`).
+4. **Edit area** (bottom region, fixed, at least the lower third of the sheet; it never collapses — at large Dynamic Type sizes it grows and the preview shrinks and scrolls):
+   - **Proposal bar** (only while a proposal is unapplied): **Discard** (`ai-edit-discard`) and **Apply** (`ai-edit-apply`, primary; disabled when the diff is empty). After an Apply, **Undo** (`ai-edit-undo`) appears in its place until the next proposal.
+   - **Quick-action chips** (`ai-edit-chip-{slug}`): a horizontally scrolling row, always visible, disabled while thinking or when the engine is unavailable. Tapping a chip sends that instruction.
+   - **Privacy caption** (`ai-edit-privacy-footer`): one caption line naming the active engine.
+   - **Composer**: text field (`ai-edit-input`, multiline, placeholder "Describe a change…", disabled while thinking or locked), send (`ai-edit-send`, disabled when empty or thinking), cancel (`ai-edit-cancel`, shown only while thinking).
 
-Diff rows (`ai-edit-diff-row-{slug}`): added exercises with a green `+` and their set lines; removed with a red `−`; changed with an amber `~` and before/after set lines; unchanged exercises collapsed to "N exercises unchanged". Uses `Theme` semantic colours only.
+**History** (`ai-edit-history`) presents the transcript as a secondary sheet: one row per turn (`ai-edit-message-{index}`, 0-based) — user instructions right-aligned, assistant summaries left-aligned with a "N changes" caption, errors in the error tint. Turns that were discarded or undone are dimmed and captioned "Discarded" (they are not sent to the engine again, see the service spec). It is read-only; the preview is the surface for the current proposal.
+
+Closing with an unapplied proposal (close button or swipe) asks "Discard the unapplied edit?" (Discard / Keep editing).
 
 ### Exercise Cards
 - Numbered with section-colored index

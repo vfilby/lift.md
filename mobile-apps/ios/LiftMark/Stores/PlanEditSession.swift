@@ -24,6 +24,10 @@ struct PlanEditMessage: Identifiable, Equatable, Sendable {
 
     let id: UUID
     let content: Content
+    /// True once the proposal this turn belonged to was discarded or undone.
+    /// Kept in the transcript for History, excluded from the engine's
+    /// `history` (GH #464).
+    var isDiscarded = false
 
     init(id: UUID = UUID(), content: Content) {
         self.id = id
@@ -43,7 +47,9 @@ struct PlanEditMessage: Identifiable, Equatable, Sendable {
     }
 
     /// The turn this message contributes to the engine's `history`, if any.
+    /// Nil for errors and for discarded turns.
     var turn: PlanEditTurn? {
+        guard !isDiscarded else { return nil }
         switch content {
         case .user(let text): return PlanEditTurn(role: .user, content: text)
         case .assistant(let summary, _, _): return PlanEditTurn(role: .assistant, content: summary)
@@ -79,7 +85,12 @@ final class PlanEditSession {
 
     /// What the next instruction edits. Starts as `originalMarkdown`; becomes
     /// the proposal after each successful turn so edits chain.
-    private(set) var workingMarkdown: String
+    private(set) var workingMarkdown: String {
+        didSet { workingPlan = Self.parse(workingMarkdown) }
+    }
+    /// `workingMarkdown` parsed, for the live preview; nil when it does not
+    /// parse (the preview then shows "Preview unavailable").
+    private(set) var workingPlan: WorkoutPlan?
     /// Markdown last persisted via `apply()`; nil until the first Apply.
     private(set) var appliedMarkdown: String?
     private(set) var messages: [PlanEditMessage] = []
@@ -98,6 +109,12 @@ final class PlanEditSession {
     /// What `undo()` restores: the markdown persisted before the most recent
     /// Apply. One level only.
     private var undoMarkdown: String?
+    /// Messages before this index belong to applied proposals (or were already
+    /// discarded); from it onward is the current pending chain.
+    private var committedMessageCount = 0
+    /// `committedMessageCount` before the most recent Apply, so `undo()` can
+    /// discard that Apply's turns.
+    private var undoCommittedMessageCount: Int?
     private var inFlight: Task<PlanEditResult, Error>?
 
     init(
@@ -110,6 +127,7 @@ final class PlanEditSession {
         self.planId = planId
         self.originalMarkdown = originalMarkdown
         self.workingMarkdown = originalMarkdown
+        self.workingPlan = Self.parse(originalMarkdown)
         self.engine = engine
         self.context = context
         self.planStore = planStore
@@ -186,17 +204,21 @@ final class PlanEditSession {
     }
 
     /// Persist the proposal via `updatePlanMarkdown`. The sheet stays open.
+    /// The pending chain's turns become committed history.
     func apply() {
         guard let proposal = pendingProposal else { return }
         undoMarkdown = appliedMarkdown ?? originalMarkdown
+        undoCommittedMessageCount = committedMessageCount
         planStore.updatePlanMarkdown(id: planId, newMarkdown: proposal.markdown)
         appliedMarkdown = proposal.markdown
         workingMarkdown = proposal.markdown
         pendingProposal = nil
+        committedMessageCount = messages.count
     }
 
     /// Re-apply the markdown persisted before the most recent Apply. One
-    /// level; the next instruction edits the restored markdown.
+    /// level; the next instruction edits the restored markdown. The undone
+    /// Apply's turns, and anything sent since, are discarded (GH #464).
     func undo() {
         guard let previous = undoMarkdown else { return }
         planStore.updatePlanMarkdown(id: planId, newMarkdown: previous)
@@ -204,13 +226,17 @@ final class PlanEditSession {
         workingMarkdown = previous
         pendingProposal = nil
         undoMarkdown = nil
+        discardMessages(from: undoCommittedMessageCount ?? committedMessageCount)
+        undoCommittedMessageCount = nil
     }
 
     /// Drop the proposal; the next instruction edits the last applied (or
-    /// original) markdown.
+    /// original) markdown. The discarded chain's turns leave the engine
+    /// history so the model does not re-apply them (GH #464).
     func discard() {
         pendingProposal = nil
         workingMarkdown = appliedMarkdown ?? originalMarkdown
+        discardMessages(from: committedMessageCount)
     }
 
     /// Abort the in-flight call. `send` records "Cancelled." as an error.
@@ -220,9 +246,24 @@ final class PlanEditSession {
 
     // MARK: - Private
 
+    private static func parse(_ markdown: String) -> WorkoutPlan? {
+        MarkdownParser.parseWorkout(markdown).data
+    }
+
+    /// Mark `messages[start...]` discarded and move the commit point past them.
+    private func discardMessages(from start: Int) {
+        for index in messages.indices where index >= start {
+            messages[index].isDiscarded = true
+        }
+        committedMessageCount = messages.count
+    }
+
+    /// The diff shown for a proposal is always relative to the last applied
+    /// (or original) markdown, not the previous proposal, so chained edits
+    /// highlight everything that differs from what is persisted.
     private func accept(_ result: PlanEditResult) {
-        let before = MarkdownParser.parseWorkout(workingMarkdown).data
-        let after = MarkdownParser.parseWorkout(result.planMarkdown).data
+        let before = Self.parse(appliedMarkdown ?? originalMarkdown)
+        let after = Self.parse(result.planMarkdown)
         let diff: PlanDiff
         if let before, let after {
             diff = PlanDiffBuilder.diff(before: before, after: after)
