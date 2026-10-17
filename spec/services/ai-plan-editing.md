@@ -15,7 +15,8 @@ engines, and the server-fronted cloud engine.
 
 ## Scope and non-goals
 
-- ✅ Edit an existing plan from the Workout Detail screen via a chat-style sheet.
+- ✅ Edit an existing plan from the Workout Detail screen via a sheet that previews the plan
+  live and takes instructions underneath.
 - ✅ Three interchangeable engines behind one protocol: Apple Private Cloud Compute, Apple
   on-device, LiftMark cloud (Amazon Bedrock via the getlift.md API).
 - ✅ Automatic engine selection with a developer-mode override for device testing.
@@ -260,26 +261,38 @@ enum AIEngineOverride: String, CaseIterable { case auto, applePrivateCloud, appl
 | `planId`, `originalMarkdown` | The plan being edited and its markdown when the sheet opened. |
 | `workingMarkdown` | What the next instruction edits. Starts as `originalMarkdown`; becomes the proposal after each successful turn ("keep chatting" chains edits). |
 | `appliedMarkdown` | Markdown last persisted via Apply; `nil` until the first Apply. |
-| `messages: [PlanEditMessage]` | Transcript: `.user(text)`, `.assistant(summary, diff, warnings)`, `.error(PlanEditError)`. |
+| `messages: [PlanEditMessage]` | Transcript: `.user(text)`, `.assistant(summary, diff, warnings)`, `.error(PlanEditError)`. Each carries `isDiscarded`; discarded messages are kept for History but never sent to the engine. |
 | `pendingProposal: (markdown, diff)?` | The latest unapplied result, drives the Apply/Discard bar. |
 | `engine`, `availability`, `quota` | For the header labels. |
 | `isThinking` | True while an `edit` call is in flight; input is disabled. |
+| `workingPlan` | `workingMarkdown` parsed (`nil` when it does not parse); feeds the live preview. |
 
 Operations:
 
 - `send(instruction)`: appends the user message, builds the request from `workingMarkdown`
-  and the last 6 turns, calls the engine, then either sets `pendingProposal` + `workingMarkdown`
+  and the last 6 *live* turns, calls the engine, then either sets `pendingProposal` + `workingMarkdown`
   and appends the assistant message, or appends an error message. Failed turns do not change
-  `workingMarkdown`.
+  `workingMarkdown`. The proposal's diff is always taken against `appliedMarkdown ??
+  originalMarkdown` (what is persisted), not the previous proposal, so a chained edit's
+  preview highlights everything Apply would change.
 - `apply()`: `planStore.updatePlanMarkdown(id:newMarkdown:)` with the proposal; records
-  `appliedMarkdown`; clears `pendingProposal`. The sheet stays open so the user can keep
-  editing.
+  `appliedMarkdown`; clears `pendingProposal`; the turns since the previous Apply become
+  committed. The sheet stays open so the user can keep editing.
 - `undo()`: available after an Apply; re-applies the markdown that was persisted before the
   most recent Apply (one level, matching the plan doc's "one-tap undo"). Uses the same store
-  path.
-- `discard()`: drops `pendingProposal` and resets `workingMarkdown` to `appliedMarkdown ??
-  originalMarkdown`.
+  path. The turns of the undone Apply (and anything sent since) are marked discarded.
+- `discard()`: drops `pendingProposal`, resets `workingMarkdown` to `appliedMarkdown ??
+  originalMarkdown`, and marks the turns of the discarded proposal as discarded: the user
+  instruction and its assistant reply, plus any chained turns since the last Apply.
 - `cancel()`: cancels the in-flight task; the sheet shows "Cancelled" as an error message.
+
+**History sent to the engine (GH #464).** The `history` of a request contains only turns
+whose proposal was applied or that belong to the current pending chain. Discarded turns are
+excluded, otherwise the `# CONVERSATION` block still says "user: make it shorter / assistant:
+Cut sets to 3…" after a Discard and the model re-applies the discarded intent even though
+`# CURRENT PLAN` is the reverted markdown. Error turns were never sent. The History sheet
+still lists discarded turns, captioned "Discarded", so the user can see why they did not
+carry over.
 
 ## Diff (`PlanDiffBuilder`)
 
@@ -294,9 +307,17 @@ Operations:
 - Plan-level changes (name, tags, units, workout notes) are reported as `PlanDiff.headerChanges: [String]`.
 - `PlanDiff.isEmpty` is true when every entry is `.unchanged` and there are no header changes.
 
-The sheet renders one row per non-unchanged entry: added (green `+`), removed (red `−`),
-changed (amber `~` with the before/after set lines side by side). Unchanged exercises are
-collapsed into a single "N exercises unchanged" line.
+- Each `PlanDiffExercise` also records its enclosing `section` and whether its immediate
+  parent is a superset (`parentKind`), so the sheet can rebuild the plan's section/superset
+  structure from the entry list alone. `entries` is ordered like the *after* plan with removed
+  exercises flushed at the position they used to occupy.
+
+The sheet renders the diff *inline in the plan preview* (`PlanEditPreview`, built from
+`PlanDiff.entries`): every exercise is a row; added rows are success-tinted with a `+`
+marker, removed rows error-tinted with a `−` marker and struck through, changed rows
+warning-tinted with a `~` marker and the previous set lines struck through above the new
+ones. Unchanged rows render without highlighting. With no proposal pending the same preview
+is built from `PlanDiffBuilder.unchangedEntries(of:)` for the working plan.
 
 ## Cloud API
 
@@ -385,9 +406,11 @@ collapsed into a single "N exercises unchanged" line.
 ## iOS UI (summary; details in `screens/workout-detail.md`)
 
 - Entry: `edit-plan-ai-button` ("Edit with AI") in the Edit/Reprocess row of Workout Detail.
-- Sheet `ai-edit-sheet`: header with engine label and quota label; transcript; quick-action
-  chips on an empty transcript; text field + send; Apply/Discard bar when a proposal exists;
-  Undo after an Apply.
+- Sheet `ai-edit-sheet`: a live preview of the working plan (upper ~2/3, with inline diff
+  highlighting while a proposal is pending) over a fixed edit area (status strip with engine
+  and quota labels, Apply/Discard bar when a proposal exists or Undo after an Apply,
+  always-visible quick-action chips, privacy caption, text field + send). Earlier turns are
+  behind a History button.
 - All strings describing engines or quota come from the engine (`displayName`) or the
   `PlanEditQuota`, never hard-coded per engine in the view.
 
@@ -411,7 +434,7 @@ Plan markdown, the instruction, equipment names, and the compact recent-session 
 sent to the selected engine. Apple engines: processed on device or on Apple's Private Cloud
 Compute, not stored. LiftMark cloud: processed by Amazon Bedrock in our AWS account, not
 stored or used for training; the server logs token counts only. The sheet shows a one-line
-footer naming the active engine whenever the transcript is empty. It gains a link to the
+caption naming the active engine under the quick-action chips. It gains a link to the
 privacy policy once a privacy page exists (none does today).
 
 ## Testing
@@ -424,20 +447,26 @@ privacy policy once a privacy page exists (none does today).
   unit-normalised set equality; header changes; `isEmpty`.
 - `PlanEditSessionTests` with a `FakePlanEditEngine`: send success chains `workingMarkdown`;
   send failure leaves it; apply persists through a fake `WorkoutPlanStore`; undo restores;
-  discard resets; history is capped at 6 turns; cancel.
+  discard resets; history is capped at 6 turns; cancel; discard then send: engine request
+  history omits the discarded turns and `planMarkdown` is the reverted plan; undo then send:
+  history omits the undone turns; apply then send: history still includes the applied turns.
 - `PlanEditPromptTests`: user-message layout snapshot; bundled prompt files equal
   `spec/data/*.md` (read via `#filePath`).
 - `LiftMarkCloudEngineTests` with a fake `APIClientProtocol`: status → error mapping, quota
   decode, not-signed-in.
 - `StubPlanEditEngineTests`: deterministic output, `fail`, `quota`.
+- `PlanEditPresentationTests`: tier gate, quota captions, chip slugs, preview row slugs and
+  markers, status-strip selection (`PlanEditStatus`), and `PlanEditPreview` building —
+  section/superset grouping from entries, removed rows kept in place, `ai-edit-diff` vs
+  `ai-edit-preview` identifiers.
 
 ### iOS E2E (`e2e-spec/scenarios/ai-plan-edit.yaml`)
 
 Launch with `--enable-flag=workoutInbox --enable-flag=aiPlanEditing --ai-engine-stub`.
 Import a plan, open detail, tap `edit-plan-ai-button`, type "add face pulls" into
-`ai-edit-input`, tap `ai-edit-send`, wait for `ai-edit-apply`, assert the diff shows
-"Face Pull" as added, tap Apply, close the sheet, assert the detail view now lists
-"Face Pull". Second test: instruction "fail" shows `ai-edit-error`.
+`ai-edit-input`, tap `ai-edit-send`, wait for `ai-edit-apply`, assert the preview shows
+"Face Pull" as an added row (`ai-edit-diff-row-added-face-pull`), tap Apply, close the
+sheet, assert the detail view now lists "Face Pull". Second test: instruction "fail" shows `ai-edit-error`.
 
 ### Validator (`validator/tests/ai.test.ts`, Vitest)
 

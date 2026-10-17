@@ -1,51 +1,42 @@
 import SwiftUI
 
-// MARK: - Transcript message
+// MARK: - Status strip
 
-/// One transcript row: user text right-aligned, assistant summary + diff
-/// left-aligned, errors in the destructive tint. See
-/// `spec/screens/workout-detail.md` ("AI Edit Sheet").
-struct PlanEditMessageView: View {
-    let message: PlanEditMessage
-    /// True for the newest assistant message; only that diff carries the
-    /// `ai-edit-diff` identifier.
-    let isLatest: Bool
+/// The strip between the preview and the composer: what just happened
+/// (thinking / error / latest summary / opening hint) over a caption with the
+/// engine and quota labels. See `spec/screens/workout-detail.md`
+/// ("AI Edit Sheet", status strip).
+struct PlanEditStatusStrip: View {
+    let session: PlanEditSession
 
     var body: some View {
-        switch message.content {
-        case .user(let text):
-            HStack {
-                Spacer(minLength: LiftMarkTheme.spacingXL)
-                Text(text)
-                    .font(.lmBody)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, LiftMarkTheme.spacingMD)
-                    .padding(.vertical, LiftMarkTheme.spacingSM)
-                    .background(LiftMarkTheme.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+        VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
+            statusContent
+            caption
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, LiftMarkTheme.spacingMD)
+        .padding(.vertical, LiftMarkTheme.spacingSM)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ai-edit-status")
+    }
+
+    @ViewBuilder
+    private var statusContent: some View {
+        switch session.status {
+        case .hint:
+            Text(PlanEditLabels.hint)
+                .font(.lmSubheadline)
+                .foregroundStyle(LiftMarkTheme.secondaryLabel)
+        case .thinking:
+            HStack(spacing: LiftMarkTheme.spacingSM) {
+                ProgressView()
+                Text("Thinking…")
+                    .font(.lmSubheadline)
+                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
             }
-        case .assistant(let summary, let diff, let warnings):
-            HStack {
-                VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
-                    Text(summary)
-                        .font(.lmBody)
-                        .foregroundStyle(LiftMarkTheme.label)
-                    PlanDiffView(diff: diff, isLatest: isLatest)
-                    if !warnings.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(warnings, id: \.self) { warning in
-                                Label(warning, systemImage: "exclamationmark.triangle")
-                                    .font(.lmCaption2)
-                                    .foregroundStyle(LiftMarkTheme.warning)
-                            }
-                        }
-                    }
-                }
-                .padding(LiftMarkTheme.spacingMD)
-                .background(LiftMarkTheme.secondaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
-                Spacer(minLength: LiftMarkTheme.spacingXL)
-            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("ai-edit-thinking")
         case .error(let error):
             HStack(alignment: .top, spacing: LiftMarkTheme.spacingSM) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -54,106 +45,114 @@ struct PlanEditMessageView: View {
                     .font(.lmSubheadline)
                     .foregroundStyle(LiftMarkTheme.destructive)
                     .accessibilityIdentifier("ai-edit-error")
-                Spacer()
             }
-            .padding(LiftMarkTheme.spacingMD)
-            .background(LiftMarkTheme.destructive.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
-        }
-    }
-}
-
-// MARK: - Diff
-
-/// Exercise-level diff: one row per added/removed/changed exercise, header
-/// changes listed first, unchanged exercises collapsed to one line.
-struct PlanDiffView: View {
-    let diff: PlanDiff
-    var isLatest = true
-
-    private var rows: [PlanDiffRowPresentation] {
-        diff.changedEntries.compactMap(PlanDiffRowPresentation.init(entry:))
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
-            if diff.isEmpty {
+        case .summary(let summary, let warnings, let isEmptyDiff):
+            Text(summary)
+                .font(.lmSubheadline)
+                .foregroundStyle(LiftMarkTheme.label)
+                .lineLimit(3)
+            if isEmptyDiff {
                 Text(PlanEditLabels.noChanges)
-                    .font(.lmSubheadline)
+                    .font(.lmCaption)
                     .foregroundStyle(LiftMarkTheme.secondaryLabel)
-            } else {
-                ForEach(diff.headerChanges, id: \.self) { change in
-                    Label(change, systemImage: "doc.text")
-                        .font(.lmSubheadline)
-                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
-                }
-                ForEach(rows, id: \.slug) { row in
-                    PlanDiffRowView(row: row)
-                }
-                if diff.unchangedCount > 0 {
-                    Text(PlanEditLabels.unchangedSummary(count: diff.unchangedCount))
-                        .font(.lmCaption)
-                        .foregroundStyle(LiftMarkTheme.tertiaryLabel)
-                }
+            }
+            ForEach(warnings, id: \.self) { warning in
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.lmCaption2)
+                    .foregroundStyle(LiftMarkTheme.warning)
+                    .lineLimit(2)
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(isLatest ? "ai-edit-diff" : "ai-edit-diff-previous")
+    }
+
+    private var caption: some View {
+        HStack(spacing: LiftMarkTheme.spacingSM) {
+            Image(systemName: "sparkles")
+                .font(.lmCaption)
+                .foregroundStyle(LiftMarkTheme.primary)
+            Text(session.engine.displayName)
+                .font(.lmCaption)
+                .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                .accessibilityIdentifier("ai-edit-engine-label")
+            Spacer()
+            if let quotaLabel = PlanEditLabels.quotaLabel(
+                session.quota,
+                isApproachingLimit: session.engine.isApproachingQuotaLimit
+            ) {
+                Text(quotaLabel)
+                    .font(.lmCaption)
+                    .foregroundStyle(
+                        session.quota?.inGrace == true ? LiftMarkTheme.warning : LiftMarkTheme.secondaryLabel
+                    )
+                    .accessibilityIdentifier("ai-edit-quota-label")
+            }
+            if session.isQuotaExhausted, let showOptions = session.engine.limitIncreaseAction {
+                Button(PlanEditLabels.showOptions) {
+                    showOptions()
+                }
+                .font(.lmCaption)
+                .fontWeight(.semibold)
+                .accessibilityIdentifier("ai-edit-quota-options")
+            }
+        }
     }
 }
 
-struct PlanDiffRowView: View {
-    let row: PlanDiffRowPresentation
+// MARK: - Proposal bar
 
-    private var tint: Color {
-        switch row.kind {
-        case .added: return LiftMarkTheme.success
-        case .removed: return LiftMarkTheme.destructive
-        case .changed: return LiftMarkTheme.warning
-        }
-    }
+/// Discard / Apply while a proposal is unapplied; Undo after an Apply;
+/// nothing otherwise.
+struct PlanEditProposalBar: View {
+    let session: PlanEditSession
 
     var body: some View {
-        HStack(alignment: .top, spacing: LiftMarkTheme.spacingSM) {
-            Text(row.kind.marker)
-                .font(.lmMono)
-                .fontWeight(.bold)
-                .foregroundStyle(tint)
-                .frame(width: 14, alignment: .center)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: LiftMarkTheme.spacingXS) {
-                    Text(row.name)
+        if session.pendingProposal != nil {
+            HStack(spacing: LiftMarkTheme.spacingSM) {
+                Button {
+                    session.discard()
+                } label: {
+                    Text("Discard")
+                        .font(.lmSubheadline)
+                        .fontWeight(.medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, LiftMarkTheme.spacingSM)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .tint(LiftMarkTheme.primary)
+                .accessibilityIdentifier("ai-edit-discard")
+
+                Button {
+                    session.apply()
+                } label: {
+                    Text("Apply")
                         .font(.lmSubheadline)
                         .fontWeight(.semibold)
-                        .foregroundStyle(row.kind == .removed ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
-                        .strikethrough(row.kind == .removed)
-                    if let parent = row.parent {
-                        Text("in \(parent)")
-                            .font(.lmCaption2)
-                            .foregroundStyle(LiftMarkTheme.tertiaryLabel)
-                    }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, LiftMarkTheme.spacingSM)
                 }
-                if row.kind == .changed {
-                    setLines(row.previousLines, color: LiftMarkTheme.secondaryLabel, strike: true)
-                }
-                setLines(row.lines, color: LiftMarkTheme.secondaryLabel, strike: row.kind == .removed)
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .tint(LiftMarkTheme.primary)
+                .disabled(session.proposalIsEmpty)
+                .accessibilityIdentifier("ai-edit-apply")
             }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(row.accessibilityIdentifier)
-    }
-
-    @ViewBuilder
-    private func setLines(_ lines: [String], color: Color, strike: Bool) -> some View {
-        if !lines.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                    Text(line)
-                        .font(.lmCaption)
-                        .foregroundStyle(color)
-                        .strikethrough(strike)
-                }
+            .padding(.horizontal, LiftMarkTheme.spacingMD)
+        } else if session.canUndo {
+            Button {
+                session.undo()
+            } label: {
+                Label("Undo last apply", systemImage: "arrow.uturn.backward")
+                    .font(.lmSubheadline)
+                    .fontWeight(.medium)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, LiftMarkTheme.spacingSM)
             }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .tint(LiftMarkTheme.primary)
+            .accessibilityIdentifier("ai-edit-undo")
+            .padding(.horizontal, LiftMarkTheme.spacingMD)
         }
     }
 }
@@ -206,7 +205,7 @@ struct PlanEditComposer: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: LiftMarkTheme.spacingSM) {
             TextField(PlanEditLabels.inputPlaceholder, text: $text, axis: .vertical)
-                .lineLimit(1...4)
+                .lineLimit(1...3)
                 .font(.lmBody)
                 .focused(focus)
                 .disabled(!isEnabled || isThinking)
@@ -245,5 +244,97 @@ struct PlanEditComposer: View {
         .padding(.horizontal, LiftMarkTheme.spacingMD)
         .padding(.vertical, LiftMarkTheme.spacingSM)
         .background(LiftMarkTheme.background)
+    }
+}
+
+// MARK: - History
+
+/// Read-only transcript behind the History toolbar button: one row per
+/// turn, `ai-edit-message-{index}`. The preview is the surface for the
+/// current proposal; this only shows what was said.
+struct PlanEditHistorySheet: View {
+    let messages: [PlanEditMessage]
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {
+                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                        PlanEditHistoryRow(message: message)
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("ai-edit-message-\(index)")
+                    }
+                }
+                .padding(LiftMarkTheme.spacingMD)
+            }
+            .navigationTitle("History")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+/// Discarded/undone turns are dimmed and captioned so the user can see why
+/// they did not carry into later edits (GH #464).
+struct PlanEditHistoryRow: View {
+    let message: PlanEditMessage
+
+    var body: some View {
+        switch message.content {
+        case .user(let text):
+            HStack {
+                Spacer(minLength: LiftMarkTheme.spacingXL)
+                VStack(alignment: .trailing, spacing: LiftMarkTheme.spacingXS) {
+                    Text(text)
+                        .font(.lmBody)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, LiftMarkTheme.spacingMD)
+                        .padding(.vertical, LiftMarkTheme.spacingSM)
+                        .background(LiftMarkTheme.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+                    discardedCaption
+                }
+            }
+            .opacity(message.isDiscarded ? 0.6 : 1)
+        case .assistant(let summary, let diff, _):
+            HStack {
+                VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
+                    Text(summary)
+                        .font(.lmBody)
+                        .foregroundStyle(LiftMarkTheme.label)
+                    Text(PlanEditLabels.changeCount(diff))
+                        .font(.lmCaption)
+                        .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                    discardedCaption
+                }
+                .padding(LiftMarkTheme.spacingMD)
+                .background(LiftMarkTheme.secondaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+                Spacer(minLength: LiftMarkTheme.spacingXL)
+            }
+            .opacity(message.isDiscarded ? 0.6 : 1)
+        case .error(let error):
+            Label(error.userFacingMessage, systemImage: "exclamationmark.triangle.fill")
+                .font(.lmSubheadline)
+                .foregroundStyle(LiftMarkTheme.destructive)
+        }
+    }
+
+    @ViewBuilder
+    private var discardedCaption: some View {
+        if message.isDiscarded {
+            Label(PlanEditLabels.discardedTurn, systemImage: "arrow.uturn.backward")
+                .font(.lmCaption2)
+                .foregroundStyle(LiftMarkTheme.tertiaryLabel)
+                .accessibilityIdentifier("ai-edit-message-discarded")
+        }
     }
 }

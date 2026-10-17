@@ -5,14 +5,42 @@ import Foundation
 /// One exercise as the diff sees it: its name, the parent it lives under
 /// (superset or section), and the LMWF rendering of its sets.
 struct PlanDiffExercise: Equatable, Sendable {
+    enum ParentKind: Equatable, Sendable {
+        case section
+        case superset
+    }
+
     let name: String
     /// Name of the enclosing superset/section, nil at the top level.
     let parent: String?
+    /// Whether `parent` is a section or a superset; nil at the top level.
+    let parentKind: ParentKind?
+    /// Name of the enclosing section, walking up through a superset parent;
+    /// equals `parent` when `parentKind == .section`.
+    let section: String?
     let notes: String?
     let equipmentType: String?
     /// Sets rendered as LMWF lines (`- 135 lbs x 5 @rest: 90s`), so two sets
     /// that differ only in how the unit was written compare equal.
     let setLines: [String]
+
+    init(
+        name: String,
+        parent: String?,
+        parentKind: ParentKind? = nil,
+        section: String? = nil,
+        notes: String?,
+        equipmentType: String?,
+        setLines: [String]
+    ) {
+        self.name = name
+        self.parent = parent
+        self.parentKind = parentKind
+        self.section = section
+        self.notes = notes
+        self.equipmentType = equipmentType
+        self.setLines = setLines
+    }
 
     /// Same sets, notes, and equipment. The name is excluded: matched
     /// exercises already agree on it up to case and surrounding whitespace.
@@ -103,6 +131,13 @@ enum PlanDiffBuilder {
         return PlanDiff(entries: entries, headerChanges: headerChanges(before: before, after: after))
     }
 
+    /// Every exercise of `plan` as an `.unchanged` entry, in plan order. The
+    /// live preview uses this when no proposal is pending so one renderer
+    /// serves both states.
+    static func unchangedEntries(of plan: WorkoutPlan) -> [PlanDiffEntry] {
+        exercises(of: plan).map { .unchanged($0.exercise) }
+    }
+
     // MARK: - Private
 
     private struct Item {
@@ -121,10 +156,19 @@ enum PlanDiffBuilder {
         let byId = Dictionary(plan.exercises.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return plan.exercises.compactMap { exercise in
             guard !exercise.isStructuralHeader else { return nil }
-            let parentName = exercise.parentExerciseId.flatMap { byId[$0]?.exerciseName }
+            let parent = exercise.parentExerciseId.flatMap { byId[$0] }
+            let parentName = parent?.exerciseName
+            let parentKind: PlanDiffExercise.ParentKind? = parent.map {
+                $0.groupType == .superset ? .superset : .section
+            }
+            let section = parentKind == .superset
+                ? parent?.parentExerciseId.flatMap { byId[$0]?.exerciseName }
+                : parentName
             let diffExercise = PlanDiffExercise(
                 name: exercise.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines),
                 parent: parentName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                parentKind: parentKind,
+                section: section?.trimmingCharacters(in: .whitespacesAndNewlines),
                 notes: exercise.notes?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 equipmentType: exercise.equipmentType?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 setLines: exercise.sets.compactMap(LMWFSourceEditor.renderSetLine)
