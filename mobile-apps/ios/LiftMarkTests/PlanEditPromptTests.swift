@@ -97,6 +97,22 @@ final class PlanEditPromptTests: XCTestCase {
         }
     }
 
+    // MARK: - Repair message
+
+    func testRepairMessageAsksForTheEngineOutputFormat() {
+        let errors = ["Line 3: unknown set"]
+        let structured = PlanEditPrompt.repairMessage(previousOutput: "# P", errors: errors)
+        XCTAssertTrue(structured.contains("- Line 3: unknown set"))
+        XCTAssertTrue(structured.contains("as plan_markdown"))
+        XCTAssertFalse(structured.contains("SUMMARY:"))
+
+        let plain = PlanEditPrompt.repairMessage(previousOutput: "# P", errors: errors, format: .plainText)
+        XCTAssertTrue(plain.contains("- Line 3: unknown set"))
+        XCTAssertTrue(plain.contains("# P"))
+        XCTAssertTrue(plain.contains("`SUMMARY:`"))
+        XCTAssertFalse(plain.contains("plan_markdown"))
+    }
+
     // MARK: - Code fences
 
     func testStripOuterCodeFence() {

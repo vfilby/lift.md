@@ -36,6 +36,8 @@
 		15615339CA0E2673280C1920 /* GymRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31B16E393D3A17DD248E8361 /* GymRow.swift */; };
 		171A77010C55BAB7B42C3504 /* SetRowView+CurrentSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26179DCD91F5188CBAD04E26 /* SetRowView+CurrentSet.swift */; };
 		18381A31136AA88E47FDBB3F /* IDGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FAEA3C4A0613434170BEB23 /* IDGenerator.swift */; };
+		189B50E90A6563A614781694 /* PlanEditPlainTextOutputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E5A2EB856FC7A8278337CA /* PlanEditPlainTextOutputTests.swift */; };
+		18B4191F3675C27108915D21 /* AppleOnDeviceEngineLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7943B5DCCB221E04F5DFF9E4 /* AppleOnDeviceEngineLiveTests.swift */; };
 		19839745071F1D8161685D24 /* WorkoutPlanRepository+Assembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC352087A8B4A383CBD44198 /* WorkoutPlanRepository+Assembly.swift */; };
 		1B5342A07E100C2107B7E7AD /* WorkoutSessionNotesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E8F64AF7979970B3D836F0 /* WorkoutSessionNotesTests.swift */; };
 		1B621A64EF086245E9B40555 /* InboxPollerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B69488A30228C30A9AB3E5 /* InboxPollerService.swift */; };
@@ -460,6 +462,7 @@
 		62BC30CC7136FEBF11EFB81E /* DebugLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogsView.swift; sourceTree = "<group>"; };
 		633EFD13DA73A25165916034 /* EditPlanAISheetSubviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPlanAISheetSubviews.swift; sourceTree = "<group>"; };
 		63B1F2AD86F76C2935FF1FB2 /* ActiveWorkoutViewModel+AutoScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActiveWorkoutViewModel+AutoScroll.swift"; sourceTree = "<group>"; };
+		63E5A2EB856FC7A8278337CA /* PlanEditPlainTextOutputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditPlainTextOutputTests.swift; sourceTree = "<group>"; };
 		6444B91EE515C507F58962E0 /* ApplePrivateCloudEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplePrivateCloudEngine.swift; sourceTree = "<group>"; };
 		64A76A2194E3AF636AD5C75F /* StoreIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreIntegrationTests.swift; sourceTree = "<group>"; };
 		654972C6C1759CA67F11DCA9 /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
@@ -488,6 +491,7 @@
 		777DBE3773D5EB279EFB7089 /* MarkdownParserHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParserHelpers.swift; sourceTree = "<group>"; };
 		790A5CDE07EFFF281DAC47FA /* WorkoutExportIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutExportIntegrationTests.swift; sourceTree = "<group>"; };
 		790BF9E2E0D248724753225B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7943B5DCCB221E04F5DFF9E4 /* AppleOnDeviceEngineLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleOnDeviceEngineLiveTests.swift; sourceTree = "<group>"; };
 		79B30FE16C8238A00C2750CF /* InboxLMWFSourceOfTruthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxLMWFSourceOfTruthTests.swift; sourceTree = "<group>"; };
 		7A3122118DD1BBD6F81FF606 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
 		7B5EC7F0B6C547CD962D3AC7 /* WorkoutsViewSubviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutsViewSubviews.swift; sourceTree = "<group>"; };
@@ -1099,6 +1103,7 @@
 				22BF9842C8DDDD24BD9DC544 /* ActiveWorkoutAutoScrollTests.swift */,
 				8225A50909E6337E1FA95E80 /* ActiveWorkoutViewModelTests.swift */,
 				FD2CDC4A9F0168141B6F99C9 /* AnthropicServiceTests.swift */,
+				7943B5DCCB221E04F5DFF9E4 /* AppleOnDeviceEngineLiveTests.swift */,
 				71CC4A4FDCEB486218739935 /* AudioServiceTests.swift */,
 				6C1E8D269112E454A906DCCF /* AuthenticationStoreTests.swift */,
 				C4E57D80C4853D24794956E5 /* AuthSyncBannerViewTests.swift */,
@@ -1139,6 +1144,7 @@
 				9017628E208B7ED9FDC9E047 /* ParserConformanceTests.swift */,
 				72285970FF3F54891CBEFFC9 /* PlanDiffBuilderTests.swift */,
 				7C1D0BE8444D09C1715FD8D1 /* PlanEditEngineSelectorTests.swift */,
+				63E5A2EB856FC7A8278337CA /* PlanEditPlainTextOutputTests.swift */,
 				EE8F15CFAC746BF9E15FD21B /* PlanEditPresentationTests.swift */,
 				8D17D2CB85982299DA8101BB /* PlanEditPromptTests.swift */,
 				A3A8A26798F9287B4F838FD6 /* PlanEditSessionTests.swift */,
@@ -1654,6 +1660,7 @@
 				4E8031BB0D9B2414A29D3F73 /* ActiveWorkoutAutoScrollTests.swift in Sources */,
 				760749A6BBDB7081D1742346 /* ActiveWorkoutViewModelTests.swift in Sources */,
 				226D16CFBA394A8F1826506E /* AnthropicServiceTests.swift in Sources */,
+				18B4191F3675C27108915D21 /* AppleOnDeviceEngineLiveTests.swift in Sources */,
 				712B0C691B4ED8D1379D8774 /* AudioServiceTests.swift in Sources */,
 				A3D8DACE811C034EF5AFD9ED /* AuthSyncBannerViewTests.swift in Sources */,
 				AB59B2427C54B7DE6715E1A4 /* AuthenticationStoreTests.swift in Sources */,
@@ -1697,6 +1704,7 @@
 				083A02957C5374F617C3B256 /* ParserConformanceTests.swift in Sources */,
 				4F7670626F20D92124EDBA42 /* PlanDiffBuilderTests.swift in Sources */,
 				36B04FA53084FD1C1F2AD8B1 /* PlanEditEngineSelectorTests.swift in Sources */,
+				189B50E90A6563A614781694 /* PlanEditPlainTextOutputTests.swift in Sources */,
 				DA3A3106C898ECB82A12E348 /* PlanEditPresentationTests.swift in Sources */,
 				08064DE5BC91C775DFE2CDF6 /* PlanEditPromptTests.swift in Sources */,
 				3BD080407388DB2DD8485779 /* PlanEditSessionTests.swift in Sources */,
