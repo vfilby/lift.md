@@ -1,23 +1,6 @@
 import Foundation
 import FoundationModels
 
-// MARK: - Structured output
-
-/// The structured answer every Apple engine asks for. Mirrors the cloud
-/// engine's `submit_plan_edit` tool schema (`{ plan_markdown, summary }`).
-@Generable(description: "A revised lift.md workout plan and a short summary of the change.")
-struct PlanEditResponse {
-    @Guide(description: "The complete revised plan in lift.md markdown, every line, not just the change. No fences.")
-    var planMarkdown: String
-
-    @Guide(description: "One short paragraph describing what changed and any assumption made. Do not restate the plan.")
-    var summary: String
-
-    var draft: PlanEditDraft {
-        PlanEditDraft(planMarkdown: planMarkdown, summary: summary)
-    }
-}
-
 // MARK: - Shared Apple helpers
 
 /// Pieces both Apple engines share: availability reason strings, FoundationModels
@@ -96,22 +79,57 @@ enum ApplePlanEditSupport {
         }
         return error.localizedDescription
     }
+
+    // MARK: Failure diagnostics
+
+    /// Record the model's raw output in the device-local debug log so a parse
+    /// failure can be diagnosed from Settings → Debug Logs. Debug entries are
+    /// stored on the device only and never uploaded (service spec, "Failure
+    /// diagnostics").
+    static func logRawOutput(_ raw: String, engine: PlanEditEngineKind, reason: String) {
+        Logger.shared.debug(
+            .app,
+            "ai plan edit failed (\(engine.rawValue)): \(reason)",
+            metadata: ["engine": engine.rawValue, "raw_output": raw]
+        )
+    }
+
+    /// If a FoundationModels error carries the content the model produced
+    /// (iOS 27 `GeneratedContent.ParsingError` from guided generation), log it
+    /// the same way. No-op for every other error.
+    static func logRawOutputIfPresent(in error: Error, engine: PlanEditEngineKind) {
+        #if canImport(FoundationModels, _version: 2.0)
+        if #available(iOS 27, *), let parsing = error as? GeneratedContent.ParsingError {
+            logRawOutput(parsing.rawContent, engine: engine, reason: parsing.debugDescription)
+        }
+        #endif
+    }
 }
 
 // MARK: - Engine
 
 /// `appleOnDevice`: FoundationModels `SystemLanguageModel` (iOS 26+). Uses the
-/// compact prompt, checks the token budget before calling, and reserves 1200
-/// output tokens. Never auto-selected in this phase; reachable only through the
+/// compact prompt and a **plain-text** response (the plan followed by one
+/// `SUMMARY:` line) instead of guided generation: the ~3B on-device model
+/// cannot keep a multi-line plan intact inside a JSON string, which is what
+/// produced "Failed to parse generated content" (GH #462, #463). The output
+/// budget is whatever the context window leaves after the input, capped at
+/// 4000 tokens. Never auto-selected in this phase; reachable only through the
 /// developer override. See `spec/services/ai-plan-editing.md`.
 struct AppleOnDeviceEngine: PlanEditEngine {
-    static let reservedOutputTokens = 1200
-
     let kind: PlanEditEngineKind = .appleOnDevice
     let displayName = "Apple on-device"
 
+    /// Editing the user's own plan is a content transformation in Apple's
+    /// sense (rewrite/summarise), which is what the permissive configuration
+    /// exists for; it lowers the chance that exercise names or notes in a
+    /// user's plan trip the general-purpose guardrails.
+    static var model: SystemLanguageModel {
+        SystemLanguageModel(guardrails: .permissiveContentTransformations)
+    }
+
     func availability() async -> PlanEditEngineAvailability {
-        switch SystemLanguageModel.default.availability {
+        switch Self.model.availability {
         case .available:
             return .available
         case .unavailable(let reason):
@@ -121,25 +139,34 @@ struct AppleOnDeviceEngine: PlanEditEngine {
 
     func edit(_ request: PlanEditRequest) async throws -> PlanEditResult {
         try PlanEditPrompt.checkSizeLimits(request)
-        let model = SystemLanguageModel.default
+        let model = Self.model
         guard case .available = model.availability else {
             throw PlanEditError.engineUnavailable(await availabilityReason())
         }
 
         let instructions = PlanEditPrompt.compactSystemPrompt
         let prompt = PlanEditPrompt.userMessage(for: request)
+        // The most recent text the model produced, kept for the failure log.
+        var lastRawOutput: String?
 
         do {
-            let needed = try await Self.inputTokenCount(model: model, instructions: instructions, prompt: prompt)
-                + Self.reservedOutputTokens
-            guard needed <= model.contextSize else { throw PlanEditError.planTooLarge }
+            let inputTokens = try await Self.inputTokenCount(model: model, instructions: instructions, prompt: prompt)
+            guard let budget = PlanEditOutputBudget.compute(contextSize: model.contextSize, inputTokens: inputTokens)
+            else {
+                throw PlanEditError.planTooLarge
+            }
 
             let session = LanguageModelSession(model: model, instructions: instructions)
-            let options = GenerationOptions(maximumResponseTokens: Self.reservedOutputTokens)
-            let first = try await session.respond(to: prompt, generating: PlanEditResponse.self, options: options)
-            let validated = try await PlanEditValidation.validate(first.content.draft) { repairPrompt in
-                try await session.respond(to: repairPrompt, generating: PlanEditResponse.self, options: options)
-                    .content.draft
+            let options = GenerationOptions(maximumResponseTokens: budget)
+            let first = try await session.respond(to: prompt, options: options).content
+            lastRawOutput = first
+            let validated = try await PlanEditValidation.validate(
+                PlanEditPlainTextOutput.parse(first),
+                format: .plainText
+            ) { repairPrompt in
+                let second = try await session.respond(to: repairPrompt, options: options).content
+                lastRawOutput = second
+                return PlanEditPlainTextOutput.parse(second)
             }
             return PlanEditResult(
                 planMarkdown: validated.planMarkdown,
@@ -149,7 +176,12 @@ struct AppleOnDeviceEngine: PlanEditEngine {
                 quota: nil
             )
         } catch {
-            throw ApplePlanEditSupport.mapError(error)
+            let mapped = ApplePlanEditSupport.mapError(error)
+            if let lastRawOutput {
+                ApplePlanEditSupport.logRawOutput(lastRawOutput, engine: .appleOnDevice, reason: "\(mapped)")
+            }
+            ApplePlanEditSupport.logRawOutputIfPresent(in: error, engine: .appleOnDevice)
+            throw mapped
         }
     }
 

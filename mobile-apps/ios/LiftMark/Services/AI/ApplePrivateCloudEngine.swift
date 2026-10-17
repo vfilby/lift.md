@@ -8,6 +8,26 @@ import Foundation
 #if canImport(FoundationModels, _version: 2.0)
 import FoundationModels
 
+// MARK: - Structured output
+
+/// The structured answer the PCC engine asks for. Mirrors the cloud engine's
+/// `submit_plan_edit` tool schema (`{ plan_markdown, summary }`). The on-device
+/// engine deliberately does not use it (see `AppleOnDeviceEngine`).
+@Generable(description: "A revised lift.md workout plan and a short summary of the change.")
+struct PlanEditResponse {
+    @Guide(description: "The complete revised plan in lift.md markdown, every line, not just the change. No fences.")
+    var planMarkdown: String
+
+    @Guide(description: "One short paragraph describing what changed and any assumption made. Do not restate the plan.")
+    var summary: String
+
+    var draft: PlanEditDraft {
+        PlanEditDraft(planMarkdown: planMarkdown, summary: summary)
+    }
+}
+
+// MARK: - Engine
+
 /// `applePrivateCloud`: FoundationModels `PrivateCloudComputeLanguageModel`
 /// (iOS 27+). One session per `edit` call; the repair turn reuses that session
 /// so the model sees its own prior output. Uses the full prompt,
@@ -77,26 +97,19 @@ struct ApplePrivateCloudEngine: PlanEditEngine {
         }
 
         let prompt = PlanEditPrompt.userMessage(for: request)
+        // The most recent plan the model produced, kept for the failure log.
+        var lastRawOutput: String?
         do {
             let session = LanguageModelSession(
                 model: PrivateCloudComputeLanguageModel(),
                 instructions: PlanEditPrompt.systemPrompt
             )
-            let options = GenerationOptions(maximumResponseTokens: Self.maximumResponseTokens)
-            let contextOptions = ContextOptions(reasoningLevel: .light)
-            let first = try await session.respond(
-                to: prompt,
-                generating: PlanEditResponse.self,
-                options: options,
-                contextOptions: contextOptions
-            )
-            let validated = try await PlanEditValidation.validate(first.content.draft) { repairPrompt in
-                try await session.respond(
-                    to: repairPrompt,
-                    generating: PlanEditResponse.self,
-                    options: options,
-                    contextOptions: contextOptions
-                ).content.draft
+            let first = try await Self.draft(from: session, prompt: prompt)
+            lastRawOutput = first.planMarkdown
+            let validated = try await PlanEditValidation.validate(first) { repairPrompt in
+                let second = try await Self.draft(from: session, prompt: repairPrompt)
+                lastRawOutput = second.planMarkdown
+                return second
             }
             return PlanEditResult(
                 planMarkdown: validated.planMarkdown,
@@ -106,8 +119,25 @@ struct ApplePrivateCloudEngine: PlanEditEngine {
                 quota: nil
             )
         } catch {
-            throw Self.mapError(error)
+            let mapped = Self.mapError(error)
+            if let lastRawOutput {
+                ApplePlanEditSupport.logRawOutput(lastRawOutput, engine: .applePrivateCloud, reason: "\(mapped)")
+            }
+            ApplePlanEditSupport.logRawOutputIfPresent(in: error, engine: .applePrivateCloud)
+            throw mapped
         }
+    }
+
+    /// One guided-generation turn: `PlanEditResponse` with the 4000-token
+    /// output budget and light reasoning.
+    @available(iOS 27, *)
+    private static func draft(from session: LanguageModelSession, prompt: String) async throws -> PlanEditDraft {
+        try await session.respond(
+            to: prompt,
+            generating: PlanEditResponse.self,
+            options: GenerationOptions(maximumResponseTokens: maximumResponseTokens),
+            contextOptions: ContextOptions(reasoningLevel: .light)
+        ).content.draft
     }
 
     // MARK: - Mapping
