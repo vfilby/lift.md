@@ -87,10 +87,28 @@ struct PlanEditContext: Codable, Equatable, Sendable {
 struct PlanEditRequest: Equatable, Sendable {
     /// The current working markdown (see `PlanEditSession`).
     let planMarkdown: String
+    /// The plan when the sheet opened, so the model can restore something an
+    /// earlier turn changed by mistake (GH #469). Nil until the conversation
+    /// has changed the plan.
+    let originalMarkdown: String?
     let instruction: String
     /// At most the last 6 turns, oldest first.
     let history: [PlanEditTurn]
     let context: PlanEditContext
+
+    init(
+        planMarkdown: String,
+        originalMarkdown: String? = nil,
+        instruction: String,
+        history: [PlanEditTurn],
+        context: PlanEditContext
+    ) {
+        self.planMarkdown = planMarkdown
+        self.originalMarkdown = originalMarkdown
+        self.instruction = instruction
+        self.history = history
+        self.context = context
+    }
 }
 
 struct PlanEditQuota: Codable, Equatable, Sendable {

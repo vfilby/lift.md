@@ -119,6 +119,76 @@ describe('ai route helpers', () => {
     expect(minimal).not.toContain('# CONVERSATION');
   });
 
+  it('buildPlanEditUserMessage sends ORIGINAL PLAN and server-computed PLAN WARNINGS (GH #469)', async () => {
+    const { buildPlanEditUserMessage } = await import('../src/routes/ai.js');
+    const original = [
+      '# Arms',
+      '@units: lbs',
+      '',
+      '## Superset: Arms + Core',
+      '### Dumbbell Curl',
+      '- 30 x 10',
+      '### Bird Dog',
+      '- x 10 per side',
+      '',
+    ].join('\n');
+    const broken = [
+      '# Arms',
+      '@units: lbs',
+      '',
+      '## Superset: Arms + Core',
+      '### Dumbbell Curl',
+      '- 30 x 10',
+      '',
+    ].join('\n');
+
+    const message = buildPlanEditUserMessage({
+      plan_markdown: broken,
+      original_markdown: original,
+      instruction: 'Why did you remove bird dogs? That is core.',
+      history: [],
+      context: {},
+    });
+    const warning = message.match(/# PLAN WARNINGS\n- (.*)/)?.[1] ?? '';
+    expect(warning).toContain("Superset 'Superset: Arms + Core' contains only one exercise");
+    expect(message).toBe(
+      [
+        '# ORIGINAL PLAN',
+        original,
+        '',
+        '# CURRENT PLAN',
+        broken,
+        '',
+        '# PLAN WARNINGS',
+        `- ${warning}`,
+        '',
+        '# INSTRUCTION',
+        'Why did you remove bird dogs? That is core.',
+      ].join('\n'),
+    );
+
+    // ORIGINAL PLAN is omitted when it matches the current plan (modulo
+    // surrounding whitespace) or is blank; a clean plan has no warnings block.
+    for (const same of [VALID_PLAN, `\n${VALID_PLAN.trim()}\n\n`, '   ']) {
+      const m = buildPlanEditUserMessage({
+        plan_markdown: VALID_PLAN,
+        original_markdown: same,
+        instruction: 'x',
+        history: [],
+        context: {},
+      });
+      expect(m).not.toContain('# ORIGINAL PLAN');
+      expect(m).not.toContain('# PLAN WARNINGS');
+    }
+  });
+
+  it('system prompt tells the model to restore wrongly changed exercises from ORIGINAL PLAN', () => {
+    const prompt = readFileSync(join(here, '..', 'src', 'data', 'ai-plan-edit-system-prompt.md'), 'utf-8');
+    expect(prompt).toContain('restore that exercise exactly as it appears in `ORIGINAL PLAN`');
+    expect(prompt).toContain('The `PLAN WARNINGS` block');
+    expect(prompt).toContain('A superset must keep at least two exercises');
+  });
+
   it('stripOuterFence removes exactly one outer code fence', async () => {
     const { stripOuterFence } = await import('../src/routes/ai.js');
     expect(stripOuterFence('```markdown\n# A\n## B\n- x 5\n```')).toBe('# A\n## B\n- x 5');
@@ -149,6 +219,16 @@ describe('ai route helpers', () => {
 
     const ok = validatePlanEditBody({ plan_markdown: VALID_PLAN, instruction: 'x' });
     expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.body).not.toHaveProperty('original_markdown');
+    const withOriginal = validatePlanEditBody({
+      plan_markdown: EDITED_PLAN,
+      original_markdown: VALID_PLAN,
+      instruction: 'x',
+    });
+    expect(withOriginal.ok && withOriginal.body.original_markdown).toBe(VALID_PLAN);
+    expect(
+      validatePlanEditBody({ plan_markdown: VALID_PLAN, original_markdown: null, instruction: 'x' }).ok,
+    ).toBe(true);
 
     const bad = (body: unknown) => {
       const v = validatePlanEditBody(body);
@@ -167,6 +247,10 @@ describe('ai route helpers', () => {
     expect(
       bad({ plan_markdown: VALID_PLAN, instruction: 'x', context: { units: 'stone' } }).status,
     ).toBe(400);
+    expect(bad({ plan_markdown: VALID_PLAN, original_markdown: 42, instruction: 'x' })).toMatchObject({
+      status: 400,
+      error: 'original_markdown must be a string',
+    });
     expect(
       bad({ plan_markdown: VALID_PLAN, instruction: 'x', context: { equipment: 'barbell' } }).status,
     ).toBe(400);
@@ -175,6 +259,12 @@ describe('ai route helpers', () => {
     expect(bad({ plan_markdown: over(MAX_PLAN_BYTES), instruction: 'x' })).toMatchObject({
       status: 413,
       error: `plan_markdown exceeds maximum size of ${MAX_PLAN_BYTES} bytes`,
+    });
+    expect(
+      bad({ plan_markdown: VALID_PLAN, original_markdown: over(MAX_PLAN_BYTES), instruction: 'x' }),
+    ).toMatchObject({
+      status: 413,
+      error: `original_markdown exceeds maximum size of ${MAX_PLAN_BYTES} bytes`,
     });
     expect(bad({ plan_markdown: VALID_PLAN, instruction: over(MAX_INSTRUCTION_BYTES) })).toMatchObject(
       { status: 413, error: `instruction exceeds maximum size of ${MAX_INSTRUCTION_BYTES} bytes` },
@@ -642,6 +732,23 @@ live('POST /v1/ai/plan/edit', () => {
       expect(line).not.toContain('## Bench Press');
       expect(line).not.toContain('swap bench for dumbbell press');
     }
+  });
+
+  it('sends ORIGINAL PLAN and server-side PLAN WARNINGS to the model (GH #469)', async () => {
+    const { session_jwt } = await seedUser('restore');
+    fake.enqueue(ok(VALID_PLAN));
+    const singleMember = '# Push Day\n@units: lbs\n\n## Superset: Arms\n### Dumbbell Curl\n- 30 x 10\n';
+
+    const res = await edit(session_jwt, {
+      plan_markdown: singleMember,
+      original_markdown: VALID_PLAN,
+      instruction: 'put it back where it was',
+    });
+    expect(res.status).toBe(200);
+
+    const text = fake.calls[0].messages[0].content?.[0].text ?? '';
+    expect(text).toContain(`# ORIGINAL PLAN\n${VALID_PLAN}\n\n# CURRENT PLAN\n${singleMember}`);
+    expect(text).toMatch(/# PLAN WARNINGS\n- Line \d+: Superset 'Superset: Arms' contains only one exercise/);
   });
 
   it('strips one outer code fence from plan_markdown before parsing', async () => {

@@ -111,6 +111,25 @@ final class LiftMarkCloudEngineTests: XCTestCase {
         XCTAssertEqual(context["units"] as? String, "kg")
         XCTAssertEqual(context["equipment"] as? [String], ["cable"])
         XCTAssertEqual(context["recent_sessions"] as? String, "recent")
+        XCTAssertFalse(request.body.keys.contains("original_markdown"), "nil original is omitted")
+    }
+
+    func testOriginalMarkdownIsSentWhenSet() async throws {
+        let engine = makeEngine(signedIn: true)
+        api.responses = [.success(["plan_markdown": PlanEditFixtures.pushDay, "summary": "Restored."])]
+        let edited = PlanEditFixtures.pushDay + "\n\n## Face Pull\n- x 15\n"
+
+        _ = try await engine.edit(PlanEditRequest(
+            planMarkdown: edited,
+            originalMarkdown: PlanEditFixtures.pushDay,
+            instruction: "put it back",
+            history: [],
+            context: PlanEditContext(units: .lbs)
+        ))
+
+        let request = try XCTUnwrap(api.requests.first)
+        XCTAssertEqual(request.body["plan_markdown"] as? String, edited)
+        XCTAssertEqual(request.body["original_markdown"] as? String, PlanEditFixtures.pushDay)
     }
 
     func testSuccessWithoutOptionalFieldsStillDecodes() async throws {

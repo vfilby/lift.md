@@ -169,9 +169,10 @@ final class PlanEditSession {
         }
     }
 
-    /// Append the user message, call the engine with `workingMarkdown` and the
-    /// last 6 turns, then record either a proposal or an error. Failed turns
-    /// never change `workingMarkdown`.
+    /// Append the user message, call the engine with `workingMarkdown`, the
+    /// sheet-open markdown once the two differ (GH #469), and the last 6 turns,
+    /// then record either a proposal or an error. Failed turns never change
+    /// `workingMarkdown`.
     func send(_ instruction: String) async {
         let trimmed = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isThinking, !isInputLocked else { return }
@@ -181,6 +182,7 @@ final class PlanEditSession {
 
         let request = PlanEditRequest(
             planMarkdown: workingMarkdown,
+            originalMarkdown: workingMarkdown == originalMarkdown ? nil : originalMarkdown,
             instruction: trimmed,
             history: history,
             context: context

@@ -18,6 +18,7 @@ enum PlanEditPrompt {
     /// Throws `.planTooLarge` when any input exceeds its byte limit.
     static func checkSizeLimits(_ request: PlanEditRequest) throws {
         guard request.planMarkdown.utf8.count <= planMarkdownByteLimit,
+              (request.originalMarkdown?.utf8.count ?? 0) <= planMarkdownByteLimit,
               request.instruction.utf8.count <= instructionByteLimit,
               request.history.reduce(0, { $0 + $1.content.utf8.count }) <= historyByteLimit
         else {
@@ -54,8 +55,14 @@ enum PlanEditPrompt {
     /// Recent sessions:
     /// <compact block>
     ///
+    /// # ORIGINAL PLAN
+    /// <originalMarkdown verbatim, only when it differs from planMarkdown>
+    ///
     /// # CURRENT PLAN
     /// <planMarkdown verbatim>
+    ///
+    /// # PLAN WARNINGS
+    /// - <parser warning for planMarkdown>
     ///
     /// # CONVERSATION
     /// user: <turn>
@@ -64,7 +71,10 @@ enum PlanEditPrompt {
     /// # INSTRUCTION
     /// <instruction>
     /// ```
-    static func userMessage(for request: PlanEditRequest) -> String {
+    ///
+    /// - Parameter includeOriginal: False for the on-device engine, whose
+    ///   context window cannot hold two copies of a plan.
+    static func userMessage(for request: PlanEditRequest, includeOriginal: Bool = true) -> String {
         var blocks: [String] = []
 
         var contextLines = ["Units: \(request.context.units.rawValue)"]
@@ -78,7 +88,16 @@ enum PlanEditPrompt {
         }
         blocks.append("# USER CONTEXT\n" + contextLines.joined(separator: "\n"))
 
+        if includeOriginal, let original = originalBlockMarkdown(for: request) {
+            blocks.append("# ORIGINAL PLAN\n" + original)
+        }
+
         blocks.append("# CURRENT PLAN\n" + request.planMarkdown)
+
+        let warnings = MarkdownParser.parseWorkout(request.planMarkdown).warnings
+        if !warnings.isEmpty {
+            blocks.append("# PLAN WARNINGS\n" + warnings.map { "- \($0)" }.joined(separator: "\n"))
+        }
 
         if !request.history.isEmpty {
             let turns = request.history.map { "\($0.role.rawValue): \($0.content)" }
@@ -88,6 +107,17 @@ enum PlanEditPrompt {
         blocks.append("# INSTRUCTION\n" + request.instruction)
 
         return blocks.joined(separator: "\n\n")
+    }
+
+    /// `originalMarkdown` when it is worth sending: non-blank and different
+    /// from the current plan after trimming.
+    private static func originalBlockMarkdown(for request: PlanEditRequest) -> String? {
+        guard let original = request.originalMarkdown else { return nil }
+        let trimmed = original.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed != request.planMarkdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        else { return nil }
+        return original
     }
 
     /// The single repair turn sent when the first output does not parse. The
