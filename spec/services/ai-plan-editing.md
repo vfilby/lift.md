@@ -406,11 +406,12 @@ is built from `PlanDiffBuilder.unchangedEntries(of:)` for the working plan.
 ## iOS UI (summary; details in `screens/workout-detail.md`)
 
 - Entry: `edit-plan-ai-button` ("Edit with AI") in the Edit/Reprocess row of Workout Detail.
-- Sheet `ai-edit-sheet`: a live preview of the working plan (upper ~2/3, with inline diff
-  highlighting while a proposal is pending) over a fixed edit area (status strip with engine
-  and quota labels, Apply/Discard bar when a proposal exists or Undo after an Apply,
-  always-visible quick-action chips, privacy caption, text field + send). Earlier turns are
-  behind a History button.
+- Sheet `ai-edit-sheet`: a header caption with engine and quota labels, a scrolling transcript
+  (user turns, assistant turns with a compact inline diff, errors, thinking row; discarded
+  turns dimmed), and the edit controls beneath it (Apply/Discard bar when a proposal exists
+  or Undo after an Apply, always-visible quick-action chips, privacy caption, text field +
+  send). Holding an inline diff opens a read-only full preview of that turn's proposed plan
+  with the same highlighting (`ai-edit-preview-full`).
 - All strings describing engines or quota come from the engine (`displayName`) or the
   `PlanEditQuota`, never hard-coded per engine in the view.
 
@@ -449,24 +450,31 @@ privacy policy once a privacy page exists (none does today).
   send failure leaves it; apply persists through a fake `WorkoutPlanStore`; undo restores;
   discard resets; history is capped at 6 turns; cancel; discard then send: engine request
   history omits the discarded turns and `planMarkdown` is the reverted plan; undo then send:
-  history omits the undone turns; apply then send: history still includes the applied turns.
+  history omits the undone turns; apply then send: history still includes the applied turns;
+  an assistant turn records the proposed markdown it describes.
 - `PlanEditPromptTests`: user-message layout snapshot; bundled prompt files equal
   `spec/data/*.md` (read via `#filePath`).
 - `LiftMarkCloudEngineTests` with a fake `APIClientProtocol`: status → error mapping, quota
   decode, not-signed-in.
 - `StubPlanEditEngineTests`: deterministic output, `fail`, `quota`.
-- `PlanEditPresentationTests`: tier gate, quota captions, chip slugs, preview row slugs and
-  markers, status-strip selection (`PlanEditStatus`), and `PlanEditPreview` building —
-  section/superset grouping from entries, removed rows kept in place, `ai-edit-diff` vs
-  `ai-edit-preview` identifiers.
+- `PlanEditPresentationTests`: tier gate, quota captions, chip slugs, preview row slugs,
+  markers and parents, the "N exercises unchanged" caption, the inline diff
+  (`PlanEditInlineDiff`: changed rows only in diff order, unchanged count, header changes,
+  `isEmpty`), which transcript row carries `ai-edit-diff` (`latestAssistantIndex`), and
+  `PlanEditPreview` building — section/superset grouping from entries, removed rows kept in
+  place, the full preview built from an assistant turn's proposed markdown (nil for other
+  turns or unparseable markdown).
 
 ### iOS E2E (`e2e-spec/scenarios/ai-plan-edit.yaml`)
 
 Launch with `--enable-flag=workoutInbox --enable-flag=aiPlanEditing --ai-engine-stub`.
 Import a plan, open detail, tap `edit-plan-ai-button`, type "add face pulls" into
-`ai-edit-input`, tap `ai-edit-send`, wait for `ai-edit-apply`, assert the preview shows
-"Face Pull" as an added row (`ai-edit-diff-row-added-face-pull`), tap Apply, close the
-sheet, assert the detail view now lists "Face Pull". Second test: instruction "fail" shows `ai-edit-error`.
+`ai-edit-input`, tap `ai-edit-send`, wait for `ai-edit-apply`, assert the inline diff shows
+"Face Pull" as an added row (`ai-edit-diff-row-added-face-pull`), long-press `ai-edit-diff`,
+wait for `ai-edit-preview-full`, assert an unchanged row of the fixture is listed
+(`ai-edit-preview-row-bench-press`), tap `ai-edit-preview-done`, assert the full preview is
+gone, tap Apply, close the sheet, assert the detail view now lists "Face Pull". Second test:
+instruction "fail" shows `ai-edit-error`.
 
 ### Validator (`validator/tests/ai.test.ts`, Vitest)
 

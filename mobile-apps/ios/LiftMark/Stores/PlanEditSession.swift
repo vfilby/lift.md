@@ -18,7 +18,9 @@ extension WorkoutPlanStore: PlanEditPlanStoring {}
 struct PlanEditMessage: Identifiable, Equatable, Sendable {
     enum Content: Equatable, Sendable {
         case user(String)
-        case assistant(summary: String, diff: PlanDiff, warnings: [String])
+        /// `markdown` is the proposed plan the diff describes; the full
+        /// preview re-parses it when the inline diff is held.
+        case assistant(summary: String, diff: PlanDiff, warnings: [String], markdown: String)
         case error(PlanEditError)
     }
 
@@ -38,8 +40,8 @@ struct PlanEditMessage: Identifiable, Equatable, Sendable {
         PlanEditMessage(content: .user(text))
     }
 
-    static func assistant(summary: String, diff: PlanDiff, warnings: [String]) -> PlanEditMessage {
-        PlanEditMessage(content: .assistant(summary: summary, diff: diff, warnings: warnings))
+    static func assistant(summary: String, diff: PlanDiff, warnings: [String], markdown: String) -> PlanEditMessage {
+        PlanEditMessage(content: .assistant(summary: summary, diff: diff, warnings: warnings, markdown: markdown))
     }
 
     static func error(_ error: PlanEditError) -> PlanEditMessage {
@@ -52,7 +54,7 @@ struct PlanEditMessage: Identifiable, Equatable, Sendable {
         guard !isDiscarded else { return nil }
         switch content {
         case .user(let text): return PlanEditTurn(role: .user, content: text)
-        case .assistant(let summary, _, _): return PlanEditTurn(role: .assistant, content: summary)
+        case .assistant(let summary, _, _, _): return PlanEditTurn(role: .assistant, content: summary)
         case .error: return nil
         }
     }
@@ -276,7 +278,9 @@ final class PlanEditSession {
         }
         pendingProposal = PlanEditProposal(markdown: result.planMarkdown, diff: diff)
         workingMarkdown = result.planMarkdown
-        messages.append(.assistant(summary: result.summary, diff: diff, warnings: result.warnings))
+        messages.append(.assistant(
+            summary: result.summary, diff: diff, warnings: result.warnings, markdown: result.planMarkdown
+        ))
     }
 
     private func record(_ error: Error) {

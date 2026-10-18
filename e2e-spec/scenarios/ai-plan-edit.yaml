@@ -75,6 +75,21 @@ tests:
       - action: expect
         target: "ai-edit-diff-row-added-face-pull"
         assertion: "toExist"
+      # Hold the inline diff to open the full preview: the whole proposed plan,
+      # unchanged rows included. Done returns to the conversation.
+      - action: longPress
+        target: "ai-edit-diff"
+      - action: waitFor
+        target: "ai-edit-preview-full"
+        timeout: 5000
+      - action: expect
+        target: "ai-edit-preview-row-bench-press"
+        assertion: "toExist"
+      - action: tap
+        target: "ai-edit-preview-done"
+      - action: expect
+        target: "ai-edit-preview-full"
+        assertion: "notToExist"
       - action: tap
         target: "ai-edit-apply"
       - action: waitFor

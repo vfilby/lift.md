@@ -11,40 +11,43 @@ Service contract: `spec/services/ai-plan-editing.md`. Screen: `spec/screens/work
 ## Flow
 
 1. User opens a plan and taps **Edit with AI** (`edit-plan-ai-button`).
-2. The sheet opens showing the current plan as a live preview (`ai-edit-preview`) in its
-   upper region and the edit area (chips + composer) in its lower region.
-   `PlanEditEngineSelector` picks an engine (stub → override → Apple Private Cloud Compute →
-   LiftMark cloud). The status strip's caption shows the engine's display name
-   (`ai-edit-engine-label`) and, once known, quota (`ai-edit-quota-label`).
-   - If no engine is available the status strip shows the reason (`ai-edit-error`) and the
+2. The sheet opens as a conversation: an empty transcript with the opening hint above the
+   edit controls (chips + composer). `PlanEditEngineSelector` picks an engine (stub →
+   override → Apple Private Cloud Compute → LiftMark cloud). The header caption shows the
+   engine's display name (`ai-edit-engine-label`) and, once known, quota
+   (`ai-edit-quota-label`).
+   - If no engine is available the transcript shows the reason (`ai-edit-error`) and the
      input and chips are disabled. The user can close the sheet.
 3. Quick-action chips (`ai-edit-chip-{slug}`) are always visible above the composer:
    *Make it shorter*, *Swap barbell for dumbbells*, *Add a warm-up*, *Progress loads 2.5%*,
    *I only have 30 min*. Tapping a chip sends that instruction.
-4. User types an instruction (`ai-edit-input`) and taps send (`ai-edit-send`).
-   - Input and chips are disabled and the status strip shows the thinking indicator
-     (`ai-edit-thinking`) while the call runs. A cancel button (`ai-edit-cancel`) aborts it.
-5. On success the preview switches to the proposed plan with inline diff highlighting
-   (container `ai-edit-diff`; rows `ai-edit-diff-row-{slug}`), the status strip shows the
-   assistant's summary, and the proposal bar appears: **Apply** (`ai-edit-apply`), **Discard**
+4. User types an instruction (`ai-edit-input`) and taps send (`ai-edit-send`). The
+   instruction appears as a user turn in the transcript.
+   - Input and chips are disabled and a thinking row (`ai-edit-thinking`) trails the
+     transcript while the call runs. A cancel button (`ai-edit-cancel`) aborts it.
+5. On success an assistant turn is appended: the summary and a compact inline diff
+   (`ai-edit-diff`; rows `ai-edit-diff-row-{slug}`; unchanged exercises collapsed to a
+   count), and the proposal bar appears: **Apply** (`ai-edit-apply`), **Discard**
    (`ai-edit-discard`).
-   - If the diff is empty, the status strip says "No changes were made" and Apply is disabled.
-   - Parser warnings for the new plan are listed under the summary.
-6. The user may:
+   - If the diff is empty, the turn says "No changes were made" and Apply is disabled.
+   - Parser warnings for the new plan are listed under the diff.
+6. **Hold the diff** to open the full preview (`ai-edit-preview-full`): the whole proposed
+   plan with the same highlighting, unchanged rows included. **Done**
+   (`ai-edit-preview-done`) returns to the conversation. Any earlier turn's diff can be
+   held the same way (`ai-edit-diff-previous`).
+7. The user may:
    - **Apply**: the plan is persisted via `updatePlanMarkdown`. The detail view behind the
-     sheet updates. The preview loses its highlighting (it now shows the applied plan) and
-     **Undo** (`ai-edit-undo`) takes the proposal bar's place; it restores the previously
-     persisted markdown. The sheet stays open.
+     sheet updates. **Undo** (`ai-edit-undo`) takes the proposal bar's place; it restores
+     the previously persisted markdown. The sheet stays open and the transcript is kept.
    - **Keep editing**: send another instruction; it edits the current proposal, not the
-     original, so edits chain. The preview keeps highlighting relative to the last applied
-     (or original) plan.
-   - **Discard**: drops the proposal; the preview returns to the last applied (or original)
-     plan and the next instruction edits that.
-7. On failure the status strip shows the error (`ai-edit-error`) with the copy from the
-   service spec; the preview is unchanged. The input is re-enabled except for
-   `quotaExhausted` and `subscriptionRequired`, which disable it until the sheet is reopened.
-8. Earlier turns stay reachable through **History** (`ai-edit-history`), a read-only list of
-   the transcript (`ai-edit-message-{index}`).
+     original, so edits chain. Each new turn's diff is relative to the last applied (or
+     original) plan.
+   - **Discard**: drops the proposal; the discarded turns stay in the transcript, dimmed and
+     captioned "Discarded", and the next instruction edits the last applied (or original)
+     plan.
+8. On failure the error is appended to the transcript (`ai-edit-error`) with the copy from
+   the service spec. The input is re-enabled except for `quotaExhausted` and
+   `subscriptionRequired`, which disable it until the sheet is reopened.
 9. Closing the sheet (`ai-edit-close`) with an unapplied proposal asks "Discard the
    unapplied edit?" (Discard / Keep editing).
 
