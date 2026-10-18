@@ -2,8 +2,8 @@ import XCTest
 @testable import LiftMark
 
 /// View-logic helpers behind the Edit with AI entry row and sheet: the tier
-/// gate, the engine/quota caption, the quick-action chips, the status strip,
-/// and the live preview built from diff entries. See
+/// gate, the engine/quota caption, the quick-action chips, the inline diff,
+/// and the full preview built from diff entries. See
 /// `spec/services/ai-plan-editing.md` ("Gating", "Diff") and
 /// `spec/screens/workout-detail.md` ("AI Edit Sheet").
 final class PlanEditPresentationTests: XCTestCase {
@@ -83,15 +83,9 @@ final class PlanEditPresentationTests: XCTestCase {
         XCTAssertTrue(PlanEditLabels.privacyFooter(engineName: "LiftMark cloud").contains("LiftMark cloud"))
     }
 
-    func testChangeCountCaption() {
-        XCTAssertEqual(PlanEditLabels.changeCount(.empty), "No changes")
-        let one = PlanDiff(entries: [.added(exercise("Face Pull"))], headerChanges: [])
-        XCTAssertEqual(PlanEditLabels.changeCount(one), "1 change")
-        let three = PlanDiff(
-            entries: [.added(exercise("A")), .removed(exercise("B")), .unchanged(exercise("C"))],
-            headerChanges: ["Renamed"]
-        )
-        XCTAssertEqual(PlanEditLabels.changeCount(three), "3 changes")
+    func testUnchangedSummaryPluralises() {
+        XCTAssertEqual(PlanEditLabels.unchangedSummary(count: 1), "1 exercise unchanged")
+        XCTAssertEqual(PlanEditLabels.unchangedSummary(count: 4), "4 exercises unchanged")
     }
 
     // MARK: - Chips
@@ -140,6 +134,7 @@ final class PlanEditPresentationTests: XCTestCase {
         XCTAssertEqual(added.accessibilityIdentifier, "ai-edit-diff-row-added-face-pull")
         XCTAssertEqual(added.kind.marker, "+")
         XCTAssertEqual(added.lines, ["x 15"], "LMWF bullet is stripped for display")
+        XCTAssertNil(added.parent)
 
         let removed = PlanEditPreviewRow(id: 1, entry: .removed(exercise("Bench Press", sets: ["- 135 lbs x 5"])))
         XCTAssertEqual(removed.accessibilityIdentifier, "ai-edit-diff-row-removed-bench-press")
@@ -154,11 +149,68 @@ final class PlanEditPresentationTests: XCTestCase {
         XCTAssertEqual(changed.kind.marker, "~")
         XCTAssertEqual(changed.previousLines, ["185 lbs x 5"])
         XCTAssertEqual(changed.lines, ["190 lbs x 5"])
+        XCTAssertEqual(changed.parent, "A", "the inline diff names the enclosing group")
 
         let unchanged = PlanEditPreviewRow(id: 3, entry: .unchanged(exercise("Squat")))
         XCTAssertEqual(unchanged.kind, .unchanged)
         XCTAssertNil(unchanged.kind.marker)
         XCTAssertEqual(unchanged.accessibilityIdentifier, "ai-edit-preview-row-squat")
+    }
+
+    // MARK: - Inline diff
+
+    func testInlineDiffKeepsOnlyChangedRowsInOrderAndCountsTheRest() {
+        let diff = PlanDiff(
+            entries: [
+                .unchanged(exercise("Bench Press")),
+                .removed(exercise("Row")),
+                .unchanged(exercise("Curl")),
+                .changed(before: exercise("Squat", sets: ["- 185 x 5"]), after: exercise("Squat", sets: ["- 190 x 5"])),
+                .added(exercise("Face Pull")),
+            ],
+            headerChanges: ["Renamed to \u{201C}Day\u{201D}"]
+        )
+        let inline = PlanEditInlineDiff(diff: diff)
+
+        XCTAssertFalse(inline.isEmpty)
+        XCTAssertEqual(inline.headerChanges, ["Renamed to \u{201C}Day\u{201D}"])
+        XCTAssertEqual(inline.rows.map(\.name), ["Row", "Squat", "Face Pull"])
+        XCTAssertEqual(inline.rows.map(\.kind), [.removed, .changed, .added])
+        XCTAssertEqual(inline.rows.map(\.id), [0, 1, 2], "ids are ordinals among the shown rows")
+        XCTAssertEqual(inline.rows.map(\.accessibilityIdentifier), [
+            "ai-edit-diff-row-removed-row",
+            "ai-edit-diff-row-changed-squat",
+            "ai-edit-diff-row-added-face-pull",
+        ])
+        XCTAssertEqual(inline.unchangedCount, 2)
+    }
+
+    func testInlineDiffIsEmptyOnlyWithoutRowsOrHeaderChanges() {
+        XCTAssertTrue(PlanEditInlineDiff(diff: .empty).isEmpty)
+        let unchangedOnly = PlanDiff(entries: [.unchanged(exercise("A"))], headerChanges: [])
+        XCTAssertTrue(PlanEditInlineDiff(diff: unchangedOnly).isEmpty)
+        XCTAssertEqual(PlanEditInlineDiff(diff: unchangedOnly).unchangedCount, 1)
+        let headerOnly = PlanDiff(entries: [.unchanged(exercise("A"))], headerChanges: ["Tags removed"])
+        XCTAssertFalse(PlanEditInlineDiff(diff: headerOnly).isEmpty)
+    }
+
+    // MARK: - Transcript
+
+    func testLatestAssistantIndexTracksTheNewestAssistantTurn() {
+        let diff = PlanDiff(entries: [.added(exercise("Face Pull"))], headerChanges: [])
+        let first = PlanEditMessage.assistant(summary: "Added.", diff: diff, warnings: [], markdown: "# A")
+        var second = PlanEditMessage.assistant(summary: "Again.", diff: diff, warnings: [], markdown: "# B")
+
+        XCTAssertNil([PlanEditMessage]().latestAssistantIndex)
+        XCTAssertNil([PlanEditMessage.user("hi"), .error(.network)].latestAssistantIndex)
+        XCTAssertEqual([.user("hi"), first].latestAssistantIndex, 1)
+        XCTAssertEqual([.user("hi"), first, .user("more"), second, .error(.network)].latestAssistantIndex, 3)
+
+        second.isDiscarded = true
+        XCTAssertEqual(
+            [.user("hi"), first, .user("more"), second].latestAssistantIndex, 3,
+            "recency, not pending state, decides which diff is ai-edit-diff"
+        )
     }
 
     // MARK: - Preview
@@ -175,8 +227,6 @@ final class PlanEditPresentationTests: XCTestCase {
         let plan = parse(PlanEditFixtures.pushDay)
         let preview = PlanEditPreview(plan: plan, diff: nil)
 
-        XCTAssertFalse(preview.isDiff)
-        XCTAssertEqual(preview.accessibilityIdentifier, "ai-edit-preview")
         XCTAssertEqual(preview.title, plan.name)
         XCTAssertTrue(preview.headerChanges.isEmpty)
         let rows = preview.sections.flatMap(\.items).compactMap { item -> PlanEditPreviewRow? in
@@ -188,7 +238,7 @@ final class PlanEditPresentationTests: XCTestCase {
         XCTAssertEqual(rows.map(\.name), plan.exercises.filter { !$0.isStructuralHeader }.map(\.exerciseName))
     }
 
-    func testPreviewWithProposalIsTheDiffContainerAndKeepsRemovedRowsInPlace() {
+    func testPreviewWithProposalKeepsRemovedRowsInPlace() {
         let before = parse("""
         # Day
         ## Bench Press
@@ -210,8 +260,6 @@ final class PlanEditPresentationTests: XCTestCase {
         let diff = PlanDiffBuilder.diff(before: before, after: after)
         let preview = PlanEditPreview(plan: after, diff: diff)
 
-        XCTAssertTrue(preview.isDiff)
-        XCTAssertEqual(preview.accessibilityIdentifier, "ai-edit-diff")
         XCTAssertEqual(preview.sections.count, 1)
         XCTAssertNil(preview.sections[0].name)
         let rows = preview.sections[0].items.compactMap { item -> PlanEditPreviewRow? in
@@ -296,33 +344,34 @@ final class PlanEditPresentationTests: XCTestCase {
         XCTAssertEqual(preview.headerChanges, ["Renamed to \u{201C}Push Day\u{201D}"])
     }
 
-    // MARK: - Status strip
+    // MARK: - Full preview from a transcript turn
 
-    func testStatusPrefersThinkingThenLatestMessage() {
-        XCTAssertEqual(PlanEditStatus.current(messages: [], isThinking: false), .hint)
-        XCTAssertEqual(PlanEditStatus.current(messages: [.user("hi")], isThinking: true), .thinking)
-        XCTAssertEqual(PlanEditStatus.current(messages: [.user("hi")], isThinking: false), .hint)
+    func testPreviewFromAssistantMessageShowsTheProposedPlanWithItsDiff() {
+        let before = parse("# Day\n## Bench Press\n- 135 x 5\n## Row\n- 95 x 8\n")
+        let afterMarkdown = "# Day\n## Bench Press\n- 135 x 5\n## Face Pull\n- x 15\n"
+        let diff = PlanDiffBuilder.diff(before: before, after: parse(afterMarkdown))
+        let message = PlanEditMessage.assistant(summary: "Swapped.", diff: diff, warnings: [], markdown: afterMarkdown)
 
-        let diff = PlanDiff(entries: [.added(exercise("Face Pull"))], headerChanges: [])
-        let assistant = PlanEditMessage.assistant(summary: "Added Face Pull.", diff: diff, warnings: ["w"])
-        XCTAssertEqual(
-            PlanEditStatus.current(messages: [.user("hi"), assistant], isThinking: false),
-            .summary("Added Face Pull.", warnings: ["w"], isEmptyDiff: false)
-        )
-        let noop = PlanEditMessage.assistant(summary: "Nothing to do.", diff: .empty, warnings: [])
-        XCTAssertEqual(
-            PlanEditStatus.current(messages: [assistant, .user("again"), noop], isThinking: false),
-            .summary("Nothing to do.", warnings: [], isEmptyDiff: true)
-        )
-        XCTAssertEqual(
-            PlanEditStatus.current(messages: [assistant, .error(.network)], isThinking: false),
-            .error(.network)
-        )
-        XCTAssertEqual(
-            PlanEditStatus.current(messages: [.error(.network)], isThinking: true),
-            .thinking,
-            "a new turn hides the previous error"
-        )
+        guard let preview = PlanEditPreview(message: message) else {
+            return XCTFail("assistant turn with parseable markdown should preview")
+        }
+        XCTAssertEqual(preview.title, "Day")
+        let rows = preview.sections.flatMap(\.items).compactMap { item -> PlanEditPreviewRow? in
+            if case .exercise(let row) = item { return row }
+            return nil
+        }
+        XCTAssertEqual(rows.map(\.accessibilityIdentifier), [
+            "ai-edit-preview-row-bench-press",
+            "ai-edit-diff-row-added-face-pull",
+            "ai-edit-diff-row-removed-row",
+        ], "unchanged rows are included; a trailing removed exercise lands after the last match")
+    }
+
+    func testPreviewFromOtherTurnsOrBadMarkdownIsNil() {
+        XCTAssertNil(PlanEditPreview(message: .user("hi")))
+        XCTAssertNil(PlanEditPreview(message: .error(.network)))
+        let bad = PlanEditMessage.assistant(summary: "?", diff: .empty, warnings: [], markdown: "")
+        XCTAssertNil(PlanEditPreview(message: bad))
     }
 
     // MARK: - Session quota state

@@ -45,11 +45,12 @@ final class PlanEditSessionTests: XCTestCase {
 
         XCTAssertEqual(session.messages.count, 2)
         XCTAssertEqual(session.messages[0].content, .user("add face pulls"))
-        guard case .assistant(let summary, let diff, let warnings) = session.messages[1].content else {
+        guard case .assistant(let summary, let diff, let warnings, let markdown) = session.messages[1].content else {
             return XCTFail("expected assistant message, got \(session.messages[1])")
         }
         XCTAssertEqual(summary, "Added Face Pull.")
         XCTAssertEqual(warnings, ["w1"])
+        XCTAssertEqual(markdown, Self.withFacePull, "the turn records the proposal it describes for the full preview")
         XCTAssertEqual(diff.changedEntries.count, 1)
         guard case .added(let added)? = diff.changedEntries.first else {
             return XCTFail("expected an added entry")
@@ -348,13 +349,21 @@ final class PlanEditSessionTests: XCTestCase {
         XCTAssertFalse(session.messages.contains(where: \.isDiscarded))
     }
 
-    func testStatusReturnsToHintAfterDiscard() async {
+    func testDiscardKeepsTheTurnInTheTranscriptMarkedDiscarded() async {
         engine.outcomes = [.success(markdown: Self.withFacePull, summary: "Added Face Pull.")]
 
         await session.send("add face pulls")
-        XCTAssertEqual(session.status, .summary("Added Face Pull.", warnings: [], isEmptyDiff: false))
+        XCTAssertEqual(session.messages.latestAssistantIndex, 1)
+        XCTAssertFalse(session.messages[1].isDiscarded)
+
         session.discard()
-        XCTAssertEqual(session.status, .hint)
+
+        XCTAssertEqual(session.messages.count, 2, "discarded turns stay visible in the conversation")
+        XCTAssertTrue(session.messages.allSatisfy(\.isDiscarded))
+        XCTAssertEqual(
+            session.messages.latestAssistantIndex, 1,
+            "its inline diff can still be held for the full preview"
+        )
     }
 
     func testCancelAbortsInFlightCallAndRecordsCancelled() async {

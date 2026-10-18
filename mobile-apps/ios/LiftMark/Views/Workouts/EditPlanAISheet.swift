@@ -4,13 +4,13 @@ import SwiftUI
 /// See `spec/screens/workout-detail.md` ("AI Edit Sheet") and
 /// `spec/flows/ai-plan-editing.md`.
 ///
-/// Layout: a live preview of the working plan fills the upper region; the
-/// edit area (status strip, proposal bar, quick-action chips, composer) is a
-/// fixed lower region that never collapses and is at least a third of the
-/// sheet (GH #461). The view owns no editing state of its own:
-/// `PlanEditSession` holds the transcript, proposal, quota, and availability,
-/// and persists through `WorkoutPlanStore.updatePlanMarkdown` so the detail
-/// view behind the sheet refreshes on Apply.
+/// Layout: a header caption (engine, quota), the transcript (each assistant
+/// turn carries a compact inline diff; hold it for the full preview), then
+/// the edit controls: proposal bar, quick-action chips, privacy caption, and
+/// composer. The view owns no editing state of its own: `PlanEditSession`
+/// holds the transcript, proposal, quota, and availability, and persists
+/// through `WorkoutPlanStore.updatePlanMarkdown` so the detail view behind
+/// the sheet refreshes on Apply.
 struct EditPlanAISheet: View {
     let planId: String
 
@@ -24,8 +24,10 @@ struct EditPlanAISheet: View {
     @State private var session: PlanEditSession?
     @State private var draft = ""
     @State private var showDiscardConfirm = false
-    @State private var showHistory = false
     @FocusState private var inputFocused: Bool
+
+    /// Scroll anchor for the thinking row, which has no message id.
+    private static let thinkingAnchor = "ai-edit-thinking"
 
     private var hasUnappliedProposal: Bool {
         session?.pendingProposal != nil
@@ -35,13 +37,12 @@ struct EditPlanAISheet: View {
         NavigationStack {
             Group {
                 if let session {
-                    GeometryReader { geometry in
-                        VStack(spacing: 0) {
-                            PlanEditPreviewView(preview: preview(session))
-                            Divider()
-                            editArea(session)
-                                .frame(minHeight: geometry.size.height / 3, alignment: .bottom)
-                        }
+                    VStack(spacing: 0) {
+                        headerCaption(session)
+                        Divider()
+                        transcript(session)
+                        Divider()
+                        editControls(session)
                     }
                 } else {
                     ProgressView()
@@ -59,17 +60,6 @@ struct EditPlanAISheet: View {
                     }
                     .accessibilityIdentifier("ai-edit-close")
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    if let session, !session.messages.isEmpty {
-                        Button {
-                            showHistory = true
-                        } label: {
-                            Image(systemName: "clock.arrow.circlepath")
-                        }
-                        .accessibilityLabel("History")
-                        .accessibilityIdentifier("ai-edit-history")
-                    }
-                }
             }
             .alert(PlanEditLabels.discardTitle, isPresented: $showDiscardConfirm) {
                 Button(PlanEditLabels.discardCancel, role: .cancel) {}
@@ -78,9 +68,6 @@ struct EditPlanAISheet: View {
                     dismiss()
                 }
             }
-            .sheet(isPresented: $showHistory) {
-                PlanEditHistorySheet(messages: session?.messages ?? [])
-            }
         }
         .accessibilityIdentifier("ai-edit-sheet")
         .interactiveDismissDisabled(hasUnappliedProposal)
@@ -88,18 +75,99 @@ struct EditPlanAISheet: View {
         .onDisappear { session?.cancel() }
     }
 
-    // MARK: - Preview
+    // MARK: - Header
 
-    private func preview(_ session: PlanEditSession) -> PlanEditPreview? {
-        guard let plan = session.workingPlan else { return nil }
-        return PlanEditPreview(plan: plan, diff: session.pendingProposal?.diff)
+    private func headerCaption(_ session: PlanEditSession) -> some View {
+        HStack(spacing: LiftMarkTheme.spacingSM) {
+            Image(systemName: "sparkles")
+                .font(.lmCaption)
+                .foregroundStyle(LiftMarkTheme.primary)
+            Text(session.engine.displayName)
+                .font(.lmCaption)
+                .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                .accessibilityIdentifier("ai-edit-engine-label")
+            Spacer()
+            if let quotaLabel = PlanEditLabels.quotaLabel(
+                session.quota,
+                isApproachingLimit: session.engine.isApproachingQuotaLimit
+            ) {
+                Text(quotaLabel)
+                    .font(.lmCaption)
+                    .foregroundStyle(
+                        session.quota?.inGrace == true ? LiftMarkTheme.warning : LiftMarkTheme.secondaryLabel
+                    )
+                    .accessibilityIdentifier("ai-edit-quota-label")
+            }
+            if session.isQuotaExhausted, let showOptions = session.engine.limitIncreaseAction {
+                Button(PlanEditLabels.showOptions) {
+                    showOptions()
+                }
+                .font(.lmCaption)
+                .fontWeight(.semibold)
+                .accessibilityIdentifier("ai-edit-quota-options")
+            }
+        }
+        .padding(.horizontal, LiftMarkTheme.spacingMD)
+        .padding(.vertical, LiftMarkTheme.spacingSM)
     }
 
-    // MARK: - Edit area
+    // MARK: - Transcript
 
-    private func editArea(_ session: PlanEditSession) -> some View {
+    private func transcript(_ session: PlanEditSession) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {
+                    if session.messages.isEmpty {
+                        Text(PlanEditLabels.hint)
+                            .font(.lmSubheadline)
+                            .foregroundStyle(LiftMarkTheme.secondaryLabel)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    let latestDiff = session.messages.latestAssistantIndex
+                    ForEach(Array(session.messages.enumerated()), id: \.element.id) { index, message in
+                        PlanEditMessageView(message: message, isLatestDiff: index == latestDiff)
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("ai-edit-message-\(index)")
+                            .id(message.id)
+                    }
+                    if session.isThinking {
+                        thinkingRow
+                            .id(Self.thinkingAnchor)
+                    }
+                }
+                .padding(LiftMarkTheme.spacingMD)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: session.messages.count) {
+                scrollToEnd(proxy, session)
+            }
+            .onChange(of: session.isThinking) {
+                scrollToEnd(proxy, session)
+            }
+        }
+    }
+
+    private var thinkingRow: some View {
+        HStack(spacing: LiftMarkTheme.spacingSM) {
+            ProgressView()
+            Text("Thinking…")
+                .font(.lmSubheadline)
+                .foregroundStyle(LiftMarkTheme.secondaryLabel)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ai-edit-thinking")
+    }
+
+    private func scrollToEnd(_ proxy: ScrollViewProxy, _ session: PlanEditSession) {
+        let target: AnyHashable? = session.isThinking ? Self.thinkingAnchor : session.messages.last?.id
+        guard let target else { return }
+        withAnimation { proxy.scrollTo(target, anchor: .bottom) }
+    }
+
+    // MARK: - Edit controls
+
+    private func editControls(_ session: PlanEditSession) -> some View {
         VStack(spacing: 0) {
-            PlanEditStatusStrip(session: session)
             PlanEditProposalBar(session: session)
             PlanEditChipsRow(isEnabled: session.canSend) { action in
                 draft = ""
@@ -189,10 +257,5 @@ extension PlanEditSession {
             if case .error(.quotaExhausted) = message.content { return true }
             return false
         }
-    }
-
-    /// What the status strip shows right now.
-    var status: PlanEditStatus {
-        PlanEditStatus.current(messages: messages, isThinking: isThinking)
     }
 }

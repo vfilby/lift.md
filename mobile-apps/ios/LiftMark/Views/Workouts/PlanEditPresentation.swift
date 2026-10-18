@@ -41,14 +41,13 @@ enum AIEditGate {
 
 // MARK: - Labels
 
-/// Formats the engine/quota caption in the Edit with AI status strip. See
+/// Formats the engine/quota caption in the Edit with AI header. See
 /// `spec/flows/ai-plan-editing.md` ("Engine-specific notes"). Engine names
 /// always come from `PlanEditEngine.displayName`; this type only shapes the
 /// quota numbers it is handed.
 enum PlanEditLabels {
     static let nearingAppleLimit = "Nearing Apple's daily limit"
     static let showOptions = "Show options"
-    static let choosingEngine = "Choosing an engine…"
     static let noChanges = "No changes were made"
     static let discardTitle = "Discard the unapplied edit?"
     static let discardConfirm = "Discard"
@@ -57,6 +56,9 @@ enum PlanEditLabels {
     static let hint = "Describe how you'd like to change this plan, or start with a suggestion."
     static let previewUnavailable = "Preview unavailable"
     static let discardedTurn = "Discarded"
+    static let holdForFullPreview = "Hold for full preview"
+    static let showFullPreview = "Show full preview"
+    static let fullPreviewTitle = "Full preview"
 
     /// Server-side grace ceiling: `ceil(limit * 1.1)` (service spec, "Quota").
     static func graceCeiling(limit: Int) -> Int {
@@ -86,14 +88,10 @@ enum PlanEditLabels {
         "Your plan and instruction are sent to \(engineName) and not stored."
     }
 
-    /// History row caption: "No changes" / "1 change" / "N changes".
-    static func changeCount(_ diff: PlanDiff) -> String {
-        let count = diff.changedEntries.count + diff.headerChanges.count
-        switch count {
-        case 0: return "No changes"
-        case 1: return "1 change"
-        default: return "\(count) changes"
-        }
+    /// Inline diff caption for the collapsed unchanged exercises:
+    /// "N exercises unchanged" / "1 exercise unchanged".
+    static func unchangedSummary(count: Int) -> String {
+        count == 1 ? "1 exercise unchanged" : "\(count) exercises unchanged"
     }
 }
 
@@ -123,32 +121,16 @@ struct PlanEditQuickAction: Identifiable, Equatable, Sendable {
     ]
 }
 
-// MARK: - Status strip
+// MARK: - Transcript
 
-/// What the status strip between the preview and the edit area shows: one
-/// of thinking, the latest error, the latest summary, or the opening hint.
-/// See `spec/screens/workout-detail.md` ("AI Edit Sheet", status strip).
-enum PlanEditStatus: Equatable {
-    /// No turn yet: "Describe how you'd like to change this plan…".
-    case hint
-    case thinking
-    case error(PlanEditError)
-    /// The latest assistant summary; `isEmptyDiff` adds the "No changes were
-    /// made" line and disables Apply.
-    case summary(String, warnings: [String], isEmptyDiff: Bool)
-
-    /// A discarded last turn shows the hint again: its summary no longer
-    /// describes the preview.
-    static func current(messages: [PlanEditMessage], isThinking: Bool) -> PlanEditStatus {
-        if isThinking { return .thinking }
-        guard let last = messages.last, !last.isDiscarded else { return .hint }
-        switch last.content {
-        case .error(let error):
-            return .error(error)
-        case .assistant(let summary, let diff, let warnings):
-            return .summary(summary, warnings: warnings, isEmptyDiff: diff.isEmpty)
-        case .user:
-            return .hint
+extension Array where Element == PlanEditMessage {
+    /// Index of the newest assistant turn. Its inline diff is `ai-edit-diff`;
+    /// earlier ones are `ai-edit-diff-previous`. Discarded turns count: the
+    /// identifier tracks recency, not whether the proposal is still pending.
+    var latestAssistantIndex: Int? {
+        lastIndex { message in
+            if case .assistant = message.content { return true }
+            return false
         }
     }
 }

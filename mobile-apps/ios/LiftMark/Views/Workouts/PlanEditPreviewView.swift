@@ -1,12 +1,40 @@
 import SwiftUI
 
+// MARK: - Full preview sheet
+
+/// The sheet opened by holding an inline diff: that turn's proposed plan in
+/// full, with the same highlighting. Read-only; Apply and Discard stay on the
+/// Edit with AI sheet beneath. See `spec/screens/workout-detail.md`
+/// ("AI Edit Sheet", full preview).
+struct PlanEditFullPreviewSheet: View {
+    /// Nil when the proposed markdown does not parse.
+    let preview: PlanEditPreview?
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PlanEditPreviewView(preview: preview)
+                .navigationTitle(PlanEditLabels.fullPreviewTitle)
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                            .accessibilityIdentifier("ai-edit-preview-done")
+                    }
+                }
+        }
+    }
+}
+
 // MARK: - Preview
 
-/// The live plan preview filling the upper region of the Edit with AI sheet.
-/// Renders a `PlanEditPreview`; rows carry diff highlighting while a proposal
-/// is pending. See `spec/screens/workout-detail.md` ("AI Edit Sheet").
+/// A plan rendered as its sectioned exercise list, rows highlighted per the
+/// `PlanEditPreview`'s diff. Fills the full preview sheet.
 struct PlanEditPreviewView: View {
-    /// Nil when the working markdown does not parse.
+    /// Nil when the markdown does not parse.
     let preview: PlanEditPreview?
 
     var body: some View {
@@ -37,9 +65,8 @@ struct PlanEditPreviewView: View {
             }
             .padding(LiftMarkTheme.spacingMD)
         }
-        .scrollDismissesKeyboard(.interactively)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(preview?.accessibilityIdentifier ?? "ai-edit-preview")
+        .accessibilityIdentifier("ai-edit-preview-full")
     }
 
     private func header(_ preview: PlanEditPreview) -> some View {
@@ -93,11 +120,22 @@ struct PlanEditPreviewSupersetView: View {
 
 // MARK: - Row
 
-/// One exercise in the preview. Highlighted kinds tint the card and show a
-/// marker in the leading column; removed rows strike through their text and
-/// changed rows show the previous set lines struck through above the new ones.
+/// One exercise row. Highlighted kinds tint the row and show a marker in the
+/// leading column; removed rows strike through their text and changed rows
+/// show the previous set lines struck through above the new ones.
+///
+/// `.card` is the full preview's padded, tinted card. `.inline` is the bare
+/// form used inside a transcript bubble: no card, smaller set lines, and the
+/// enclosing superset or section named after the exercise since the bubble
+/// has no surrounding structure to place the row in.
 struct PlanEditPreviewRowView: View {
+    enum Style {
+        case card
+        case inline
+    }
+
     let row: PlanEditPreviewRow
+    var style: Style = .card
 
     @ScaledMetric(relativeTo: .subheadline) private var markerWidth: CGFloat = 16
 
@@ -111,6 +149,7 @@ struct PlanEditPreviewRowView: View {
     }
 
     private var isRemoved: Bool { row.kind == .removed }
+    private var isInline: Bool { style == .inline }
 
     var body: some View {
         HStack(alignment: .top, spacing: LiftMarkTheme.spacingSM) {
@@ -124,7 +163,7 @@ struct PlanEditPreviewRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: LiftMarkTheme.spacingSM) {
                     Text(row.name)
-                        .font(.lmCallout)
+                        .font(isInline ? .lmSubheadline : .lmCallout)
                         .fontWeight(.semibold)
                         .foregroundStyle(isRemoved ? LiftMarkTheme.secondaryLabel : LiftMarkTheme.label)
                         .strikethrough(isRemoved)
@@ -133,8 +172,13 @@ struct PlanEditPreviewRowView: View {
                             .font(.lmCaption)
                             .foregroundStyle(LiftMarkTheme.secondaryLabel)
                     }
+                    if isInline, let parent = row.parent {
+                        Text("in \(parent)")
+                            .font(.lmCaption2)
+                            .foregroundStyle(LiftMarkTheme.tertiaryLabel)
+                    }
                 }
-                if let notes = row.notes, !notes.isEmpty {
+                if !isInline, let notes = row.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.lmCaption)
                         .foregroundStyle(LiftMarkTheme.secondaryLabel)
@@ -148,9 +192,9 @@ struct PlanEditPreviewRowView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(LiftMarkTheme.spacingSM)
-        .background(tint.map { $0.opacity(0.12) } ?? LiftMarkTheme.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+        .padding(isInline ? 0 : LiftMarkTheme.spacingSM)
+        .background(isInline ? Color.clear : (tint.map { $0.opacity(0.12) } ?? LiftMarkTheme.secondaryBackground))
+        .clipShape(RoundedRectangle(cornerRadius: isInline ? 0 : LiftMarkTheme.cornerRadiusMD))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(row.accessibilityIdentifier)
     }
@@ -161,7 +205,7 @@ struct PlanEditPreviewRowView: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                     Text(line)
-                        .font(.lmSubheadline)
+                        .font(isInline ? .lmCaption : .lmSubheadline)
                         .monospacedDigit()
                         .foregroundStyle(color)
                         .strikethrough(strike)

@@ -2,10 +2,10 @@ import Foundation
 
 // MARK: - Preview
 
-/// The live plan preview in the Edit with AI sheet: the working plan as a
-/// sectioned exercise list, with diff highlighting while a proposal is
-/// pending. Built from `PlanDiffEntry`s so one renderer serves both states.
-/// See `spec/screens/workout-detail.md` ("AI Edit Sheet", plan preview).
+/// The full plan preview behind an inline diff in the Edit with AI sheet: a
+/// proposed plan as a sectioned exercise list with diff highlighting. Built
+/// from `PlanDiffEntry`s so a plan without a diff renders the same way.
+/// See `spec/screens/workout-detail.md` ("AI Edit Sheet", full preview).
 struct PlanEditPreview: Equatable {
     struct Section: Equatable, Identifiable {
         let id: Int
@@ -28,33 +28,35 @@ struct PlanEditPreview: Equatable {
 
     let title: String
     let tags: [String]
-    /// Plan-level changes, shown above the first section while a proposal is pending.
+    /// Plan-level changes, shown above the first section.
     let headerChanges: [String]
     let sections: [Section]
-    /// True while a proposal is pending: rows carry diff highlighting and the
-    /// container is `ai-edit-diff` rather than `ai-edit-preview`.
-    let isDiff: Bool
 
-    var accessibilityIdentifier: String { isDiff ? "ai-edit-diff" : "ai-edit-preview" }
-
-    /// The preview of `plan`; highlighted per `diff` when one is pending.
-    /// `plan` is the proposed plan in that case (the session's working plan).
+    /// The preview of `plan`, highlighted per `diff` when there is one; `plan`
+    /// is then the proposed plan the diff describes.
     init(plan: WorkoutPlan, diff: PlanDiff?) {
         let entries = diff?.entries ?? PlanDiffBuilder.unchangedEntries(of: plan)
         self.init(
             title: plan.name,
             tags: plan.tags,
             headerChanges: diff?.headerChanges ?? [],
-            entries: entries,
-            isDiff: diff != nil
+            entries: entries
         )
     }
 
-    init(title: String, tags: [String], headerChanges: [String], entries: [PlanDiffEntry], isDiff: Bool) {
+    /// The full preview behind an assistant turn's inline diff: that turn's
+    /// proposed plan with its highlighting. Nil for user and error turns, and
+    /// when the proposed markdown does not parse.
+    init?(message: PlanEditMessage) {
+        guard case .assistant(_, let diff, _, let markdown) = message.content,
+              let plan = MarkdownParser.parseWorkout(markdown).data else { return nil }
+        self.init(plan: plan, diff: diff)
+    }
+
+    init(title: String, tags: [String], headerChanges: [String], entries: [PlanDiffEntry]) {
         self.title = title
         self.tags = tags
         self.headerChanges = headerChanges
-        self.isDiff = isDiff
         self.sections = Self.group(entries)
     }
 
@@ -89,10 +91,30 @@ struct PlanEditPreview: Equatable {
     }
 }
 
+// MARK: - Inline diff
+
+/// The compact diff in an assistant turn's transcript bubble: only the
+/// highlighted rows, in diff order, with unchanged exercises collapsed to a
+/// count. See `spec/screens/workout-detail.md` ("AI Edit Sheet", inline diff).
+struct PlanEditInlineDiff: Equatable {
+    let headerChanges: [String]
+    let rows: [PlanEditPreviewRow]
+    let unchangedCount: Int
+
+    /// True when there is nothing to show but "No changes were made".
+    var isEmpty: Bool { headerChanges.isEmpty && rows.isEmpty }
+
+    init(diff: PlanDiff) {
+        headerChanges = diff.headerChanges
+        rows = diff.changedEntries.enumerated().map { PlanEditPreviewRow(id: $0.offset, entry: $0.element) }
+        unchangedCount = diff.unchangedCount
+    }
+}
+
 // MARK: - Row
 
-/// One exercise row of the preview: its diff kind, marker glyph, the lines
-/// shown under the name, and its accessibility identifier.
+/// One exercise row of the preview or inline diff: its diff kind, marker
+/// glyph, the lines shown under the name, and its accessibility identifier.
 struct PlanEditPreviewRow: Equatable, Identifiable {
     enum Kind: String {
         case unchanged
@@ -115,6 +137,9 @@ struct PlanEditPreviewRow: Equatable, Identifiable {
     let id: Int
     let kind: Kind
     let name: String
+    /// The enclosing superset or section, named in the inline diff where the
+    /// row has no surrounding structure to place it; nil at the top level.
+    let parent: String?
     let notes: String?
     let equipmentType: String?
     /// Set lines without the LMWF bullet (`135 lbs x 5 @rest: 90s`): the
@@ -138,6 +163,7 @@ struct PlanEditPreviewRow: Equatable, Identifiable {
         self.id = id
         let exercise = entry.exercise
         name = exercise.name
+        parent = exercise.parent
         notes = exercise.notes
         equipmentType = exercise.equipmentType
         lines = Self.displayLines(exercise.setLines)
