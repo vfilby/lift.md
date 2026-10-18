@@ -144,9 +144,11 @@ enum PlanEditError: Error, Equatable {
    <instruction>
    ```
 3. **Structured output.** Engines request `{ plan_markdown: String, summary: String }` via the
-   provider's structured-output mechanism (`@Generable` on Apple, Converse tool use on
-   Bedrock). Engines must not scrape code fences; if the model wraps `plan_markdown` in
-   fences anyway, strip one outer fence before parsing.
+   provider's structured-output mechanism (`@Generable` on Apple PCC, Converse tool use on
+   Bedrock). The on-device engine is the one exception: the ~3B on-device model cannot
+   reliably emit a multi-line plan inside one JSON string, so it uses the plain-text
+   contract described under `AppleOnDeviceEngine`. Engines must not scrape code fences; if
+   the model wraps the plan in fences anyway, strip one outer fence before parsing.
 4. **Validate, repair once, then fail.** Parse `plan_markdown` with the platform LMWF parser.
    On failure send exactly one repair turn: the previous output plus the parser error
    messages, asking for a corrected full document. If that also fails, throw
@@ -186,14 +188,57 @@ enum PlanEditError: Error, Equatable {
 
 ### `AppleOnDeviceEngine` (`appleOnDevice`)
 
-- Requires iOS 26 (`SystemLanguageModel.default`). Availability mapping as above (no quota).
-- Uses the **compact** prompt. Before calling, computes
-  `tokenCount(for: instructions) + tokenCount(for: prompt) + 1200` and compares to the
-  model's `contextSize`; if it does not fit → `.planTooLarge` without calling the model.
-  (1200 is the reserved output budget; on-device plans must be short.) `tokenCount(for:)`
-  and `contextSize` are iOS 26.4 APIs; on 26.0–26.3 the engine estimates tokens as
-  UTF-8 bytes / 4 against a 4096 context.
-- Same structured output, validate, and repair behaviour. `maximumResponseTokens` = 1200.
+- Requires iOS 26. Uses `SystemLanguageModel(guardrails: .permissiveContentTransformations)`
+  rather than `.default`: editing the user's own plan is a content-transformation task in
+  Apple's sense (rewrite/summarise), which is exactly what that configuration exists for,
+  and it lowers the chance that exercise names or notes in a user's plan trip the
+  general-purpose guardrails. Availability mapping as above (no quota).
+- Uses the **compact** prompt (`spec/data/ai-plan-edit-system-prompt-compact.md`), which
+  tells the model the exact output format below.
+- **Plain-text response, no guided generation.** The on-device model is small (~3B
+  parameters) and, when asked for `@Generable` output, it mangles the multi-line plan
+  inside the JSON string: it pads with hundreds of `\n`, nests the summary inside
+  `planMarkdown`, or runs out of output budget before the `summary` key, so decoding fails
+  with `GeneratedContent.ParsingError` ("Failed to parse generated content", GH #462). The
+  engine therefore calls the plain `respond(to:options:)` overload and the model returns:
+
+  ```
+  <the complete plan in lift.md markdown>
+  SUMMARY: <one sentence>
+  ```
+
+  `PlanEditPlainTextOutput.parse(_:)` (pure, in `PlanEditPrompt.swift`) turns that text
+  into a `PlanEditDraft`:
+  1. Strip one outer code fence from the whole text (`PlanEditPrompt.stripOuterCodeFence`),
+     in case the model fenced everything including the summary line.
+  2. Split on the **last** line that starts with `SUMMARY:` (case-insensitive, leading
+     whitespace allowed). Everything before it is the plan, the rest of that line is the
+     summary; anything after that line is ignored. An earlier `SUMMARY:` line inside the
+     plan text is left in the plan.
+  3. If there is no such line, the whole text is the plan and the summary is
+     `"Edited on device."`. An empty summary after the prefix also falls back to that
+     string.
+  4. Trim surrounding whitespace/newlines from the plan, strip one outer code fence again
+     (in case only the plan was fenced), then trim again.
+  The draft then goes through the shared validate/repair step. The repair turn is also
+  plain text: `PlanEditPrompt.repairMessage(previousOutput:errors:format: .plainText)`
+  asks for the corrected plan followed by a `SUMMARY:` line, and the answer is parsed the
+  same way.
+- **Dynamic output budget.** Before calling, the engine measures
+  `inputTokens = tokenCount(for: instructions) + tokenCount(for: prompt)` and computes
+  `available = contextSize - inputTokens - 64` (64 tokens of slack for the chat template).
+  `maximumResponseTokens = min(available, 4000)`. If `available < 600` → `.planTooLarge`
+  without calling the model (`PlanEditOutputBudget.compute(contextSize:inputTokens:)`,
+  pure). `tokenCount(for:)` is an iOS 26.4 API; on 26.0–26.3 the engine estimates tokens
+  as UTF-8 bytes / 4. `contextSize` is back-deployed and reports 4096 before iOS 27.
+- Same validate-once, repair-once behaviour as every engine.
+- **Failure diagnostics.** Whenever an `edit` call fails after the model has produced
+  output (the plain-text output did not parse even after repair, or a FoundationModels
+  error carries raw content), the engine logs the raw model output through
+  `Logger.shared.debug(.app, ...)`. The PCC engine does the same with
+  `GeneratedContent.ParsingError.rawContent`. Debug logs live only in the device-local
+  log store (Settings → Debug Logs) and are never sent anywhere, so the content stays on
+  the device.
 - Offline capable. No quota.
 
 ### `LiftMarkCloudEngine` (`liftMarkCloud`)
@@ -453,7 +498,24 @@ privacy policy once a privacy page exists (none does today).
   history omits the undone turns; apply then send: history still includes the applied turns;
   an assistant turn records the proposed markdown it describes.
 - `PlanEditPromptTests`: user-message layout snapshot; bundled prompt files equal
-  `spec/data/*.md` (read via `#filePath`).
+  `spec/data/*.md` (read via `#filePath`); the plain-text repair message asks for the
+  `SUMMARY:` format.
+- `PlanEditPlainTextOutputTests`: `parse(_:)` with and without a `SUMMARY:` line; fenced
+  output; trailing whitespace; a `SUMMARY:` line earlier in the plan stays in the plan;
+  empty summary falls back to "Edited on device."; `PlanEditOutputBudget.compute` caps at
+  4000, subtracts the 64-token slack, and returns `nil` below 600 available tokens.
+- `AppleOnDeviceEngineLiveTests` (local only, opt-in): skipped with `XCTSkip` unless the
+  test environment has `LIFTMARK_LIVE_AI=1` **and**
+  `SystemLanguageModel.default.availability == .available` in the simulator. Runs the real
+  engine against a six-exercise plan with "Make it shorter", "Switch out the core
+  exercise", "Swap barbell for dumbbells", and "Add a warm-up", asserting each result
+  parses. Nondeterministic by nature, so it never runs in CI. The opt-in is needed
+  because the default `make test-unit` destination is the iOS 26.0 simulator, and the
+  iOS 26.x simulator runtimes cannot run the model on a macOS 27 host even though they
+  report it available (the guardrail classifier and model-catalog assets fail to load, so
+  every request fails as a guardrail violation or `GenerationError` -1), so the class
+  would otherwise fail on every Mac with Apple Intelligence; run it against an iOS 27
+  simulator with `TEST_RUNNER_LIFTMARK_LIVE_AI=1 xcodebuild test …`.
 - `LiftMarkCloudEngineTests` with a fake `APIClientProtocol`: status → error mapping, quota
   decode, not-signed-in.
 - `StubPlanEditEngineTests`: deterministic output, `fail`, `quota`.

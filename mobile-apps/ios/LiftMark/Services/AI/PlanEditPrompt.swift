@@ -90,17 +90,30 @@ enum PlanEditPrompt {
         return blocks.joined(separator: "\n\n")
     }
 
-    /// The single repair turn sent when the first output does not parse.
-    static func repairMessage(previousOutput: String, errors: [String]) -> String {
+    /// The single repair turn sent when the first output does not parse. The
+    /// closing instruction names whichever output contract the engine uses.
+    static func repairMessage(
+        previousOutput: String,
+        errors: [String],
+        format: PlanEditOutputFormat = .structured
+    ) -> String {
         let errorLines = errors.map { "- \($0)" }.joined(separator: "\n")
+        let ask: String
+        switch format {
+        case .structured:
+            ask = "Return the corrected, complete plan as plan_markdown (no code fences) and keep the summary."
+        case .plainText:
+            ask = "Return the corrected, complete plan as plain markdown (no code fences), "
+                + "then one final line starting with `SUMMARY:`."
+        }
         return """
         The plan you returned did not parse as lift.md. Parser errors:
         \(errorLines)
 
-        Your previous plan_markdown:
+        Your previous plan:
         \(previousOutput)
 
-        Return the corrected, complete plan as plan_markdown (no code fences) and keep the summary.
+        \(ask)
         """
     }
 
@@ -124,6 +137,78 @@ enum PlanEditPrompt {
     }
 }
 
+// MARK: - Output contracts
+
+/// How an engine asks the model for its answer. Decides the wording of the
+/// repair turn; parsing the answer is the engine's job.
+enum PlanEditOutputFormat: Sendable {
+    /// `{ plan_markdown, summary }` via guided generation (Apple PCC) or tool
+    /// use (Bedrock).
+    case structured
+    /// The plan as plain markdown followed by one `SUMMARY:` line (Apple
+    /// on-device, whose small model cannot keep a multi-line plan intact inside
+    /// a JSON string).
+    case plainText
+}
+
+/// Parser for the plain-text contract (service spec, "AppleOnDeviceEngine"):
+///
+/// ```
+/// <complete plan in lift.md markdown>
+/// SUMMARY: <one sentence>
+/// ```
+enum PlanEditPlainTextOutput {
+    static let summaryPrefix = "SUMMARY:"
+    /// Used when the model omits the summary line or leaves it empty.
+    static let defaultSummary = "Edited on device."
+
+    /// Split the model's text on the *last* `SUMMARY:` line (case-insensitive,
+    /// leading whitespace allowed). Everything before it is the plan; an earlier
+    /// `SUMMARY:` line inside the plan stays in the plan. One outer code fence
+    /// is stripped from the whole text and again from the plan, so a fence
+    /// around everything or around just the plan both work.
+    static func parse(_ text: String) -> PlanEditDraft {
+        let unfenced = PlanEditPrompt.stripOuterCodeFence(text)
+        let lines = unfenced.split(separator: "\n", omittingEmptySubsequences: false)
+
+        var planLines = lines[...]
+        var summary = defaultSummary
+        if let index = lines.lastIndex(where: { isSummaryLine($0) }) {
+            let line = lines[index].drop(while: { $0 == " " || $0 == "\t" })
+            let rest = line.dropFirst(summaryPrefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !rest.isEmpty { summary = rest }
+            planLines = lines[..<index]
+        }
+
+        let joined = planLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        let plan = PlanEditPrompt.stripOuterCodeFence(joined).trimmingCharacters(in: .whitespacesAndNewlines)
+        return PlanEditDraft(planMarkdown: plan, summary: summary)
+    }
+
+    private static func isSummaryLine(_ line: Substring) -> Bool {
+        line.drop(while: { $0 == " " || $0 == "\t" }).uppercased().hasPrefix(summaryPrefix)
+    }
+}
+
+/// Output-token budget for the on-device model (service spec, "Dynamic output
+/// budget"). Pure so the arithmetic is unit-testable without a model.
+enum PlanEditOutputBudget {
+    /// Tokens the chat template adds around instructions and prompt.
+    static let templateSlackTokens = 64
+    /// Never ask for more than this, whatever the context allows.
+    static let maximumResponseTokens = 4000
+    /// Below this many available tokens a full plan rewrite cannot fit.
+    static let minimumResponseTokens = 600
+
+    /// `maximumResponseTokens` for one call, or `nil` when the input leaves too
+    /// little room for a complete plan (`.planTooLarge`).
+    static func compute(contextSize: Int, inputTokens: Int) -> Int? {
+        let available = contextSize - inputTokens - templateSlackTokens
+        guard available >= minimumResponseTokens else { return nil }
+        return min(available, maximumResponseTokens)
+    }
+}
+
 // MARK: - Validate once, repair once
 
 /// Engine-agnostic shape of one model answer.
@@ -142,10 +227,13 @@ struct PlanEditValidatedOutput: Equatable, Sendable {
 /// Shared "validate, repair once, then fail" step (service spec, Shared
 /// behaviour item 4). Parser warnings never trigger a repair.
 enum PlanEditValidation {
-    /// - Parameter repair: Sends the repair prompt on the *same* model session
-    ///   so the model sees its own prior output, and returns the second draft.
+    /// - Parameters:
+    ///   - format: Which output contract the repair turn should ask for.
+    ///   - repair: Sends the repair prompt on the *same* model session so the
+    ///     model sees its own prior output, and returns the second draft.
     static func validate(
         _ draft: PlanEditDraft,
+        format: PlanEditOutputFormat = .structured,
         repair: (String) async throws -> PlanEditDraft
     ) async throws -> PlanEditValidatedOutput {
         let first = PlanEditPrompt.stripOuterCodeFence(draft.planMarkdown)
@@ -154,7 +242,11 @@ enum PlanEditValidation {
             return PlanEditValidatedOutput(planMarkdown: first, summary: draft.summary, warnings: firstResult.warnings)
         }
 
-        let repairPrompt = PlanEditPrompt.repairMessage(previousOutput: first, errors: firstResult.errors)
+        let repairPrompt = PlanEditPrompt.repairMessage(
+            previousOutput: first,
+            errors: firstResult.errors,
+            format: format
+        )
         let second = try await repair(repairPrompt)
         let secondMarkdown = PlanEditPrompt.stripOuterCodeFence(second.planMarkdown)
         let secondResult = MarkdownParser.parseWorkout(secondMarkdown)
