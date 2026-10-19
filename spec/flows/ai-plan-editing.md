@@ -42,6 +42,11 @@ Service contract: `spec/services/ai-plan-editing.md`. Screen: `spec/screens/work
    - **Keep editing**: send another instruction; it edits the current proposal, not the
      original, so edits chain. Each new turn's diff is relative to the last applied (or
      original) plan.
+   - **Correct a bad edit** ("you removed Bird Dog, that's core"): the model also receives
+     the plan as it was when the sheet opened and the current plan's parser warnings, so it
+     puts the exercise back where it came from (same section or superset, same sets) and
+     fixes any warning the bad edit introduced, such as a superset left with one exercise
+     (GH #469).
    - **Discard**: drops the proposal; the discarded turns stay in the transcript, dimmed and
      captioned "Discarded", and the next instruction edits the last applied (or original)
      plan.

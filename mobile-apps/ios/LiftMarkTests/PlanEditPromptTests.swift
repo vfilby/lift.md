@@ -69,6 +69,80 @@ final class PlanEditPromptTests: XCTestCase {
         XCTAssertEqual(PlanEditPrompt.userMessage(for: request), expected)
     }
 
+    // MARK: - Original plan and warnings (GH #469)
+
+    func testUserMessageCarriesOriginalPlanAndCurrentPlanWarnings() throws {
+        // A stray `@rpe` modifier on its own line is a parser warning.
+        let current = "# Push Day\n\n## Bench Press\n- 135 x 5\n@rpe: 8"
+        let warnings = MarkdownParser.parseWorkout(current).warnings
+        try XCTSkipIf(warnings.isEmpty, "fixture no longer produces a parser warning")
+
+        let request = PlanEditRequest(
+            planMarkdown: current,
+            originalMarkdown: "# Push Day\n\n## Bench Press\n- 135 x 5\n\n## Bird Dog\n- x 10",
+            instruction: "put the bird dogs back",
+            history: [],
+            context: PlanEditContext(units: .lbs)
+        )
+
+        let expected = """
+        # USER CONTEXT
+        Units: lbs
+
+        # ORIGINAL PLAN
+        # Push Day
+
+        ## Bench Press
+        - 135 x 5
+
+        ## Bird Dog
+        - x 10
+
+        # CURRENT PLAN
+        # Push Day
+
+        ## Bench Press
+        - 135 x 5
+        @rpe: 8
+
+        # PLAN WARNINGS
+        \(warnings.map { "- \($0)" }.joined(separator: "\n"))
+
+        # INSTRUCTION
+        put the bird dogs back
+        """
+        XCTAssertEqual(PlanEditPrompt.userMessage(for: request), expected)
+
+        let onDevice = PlanEditPrompt.userMessage(for: request, includeOriginal: false)
+        XCTAssertFalse(onDevice.contains("# ORIGINAL PLAN"), "on-device omits the second copy of the plan")
+        XCTAssertTrue(onDevice.contains("# PLAN WARNINGS"), "on-device still sees the warnings")
+    }
+
+    func testOriginalPlanOmittedWhenItMatchesTheCurrentPlanOrIsBlank() {
+        for original in [PlanEditFixtures.pushDay, "\n" + PlanEditFixtures.pushDay + "\n\n", "  "] {
+            let request = PlanEditRequest(
+                planMarkdown: PlanEditFixtures.pushDay,
+                originalMarkdown: original,
+                instruction: "x",
+                history: [],
+                context: PlanEditContext(units: .lbs)
+            )
+            let message = PlanEditPrompt.userMessage(for: request)
+            XCTAssertFalse(message.contains("# ORIGINAL PLAN"))
+            XCTAssertFalse(message.contains("# PLAN WARNINGS"), "a clean plan has no warnings block")
+        }
+    }
+
+    func testSystemPromptsTellTheModelToRestoreWhereThingsCameFrom() {
+        let full = PlanEditPrompt.systemPrompt
+        XCTAssertTrue(full.contains("restore that exercise exactly as it appears in `ORIGINAL PLAN`"))
+        XCTAssertTrue(full.contains("The `PLAN WARNINGS` block"))
+        XCTAssertTrue(full.contains("A superset must keep at least two exercises"))
+        let compact = PlanEditPrompt.compactSystemPrompt
+        XCTAssertTrue(compact.contains("put the exercise back exactly where it was before"))
+        XCTAssertTrue(compact.contains("PLAN WARNINGS"))
+    }
+
     // MARK: - Size limits
 
     func testSizeLimitsAcceptTypicalRequest() {
@@ -78,6 +152,20 @@ final class PlanEditPromptTests: XCTestCase {
     func testPlanOverLimitThrowsPlanTooLarge() {
         let huge = String(repeating: "- 135 x 5\n", count: 4_000)   // ~40 KB
         XCTAssertThrowsError(try PlanEditPrompt.checkSizeLimits(PlanEditFixtures.request(plan: huge))) { error in
+            XCTAssertEqual(error as? PlanEditError, .planTooLarge)
+        }
+    }
+
+    func testOriginalPlanOverLimitThrowsPlanTooLarge() {
+        let huge = String(repeating: "- 135 x 5\n", count: 4_000)   // ~40 KB
+        let request = PlanEditRequest(
+            planMarkdown: PlanEditFixtures.pushDay,
+            originalMarkdown: huge,
+            instruction: "x",
+            history: [],
+            context: PlanEditContext(units: .lbs)
+        )
+        XCTAssertThrowsError(try PlanEditPrompt.checkSizeLimits(request)) { error in
             XCTAssertEqual(error as? PlanEditError, .planTooLarge)
         }
     }

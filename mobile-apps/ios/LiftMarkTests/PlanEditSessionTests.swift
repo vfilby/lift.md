@@ -61,7 +61,44 @@ final class PlanEditSessionTests: XCTestCase {
         XCTAssertEqual(engine.requests.count, 1)
         XCTAssertEqual(engine.requests[0].planMarkdown, PlanEditFixtures.pushDay)
         XCTAssertEqual(engine.requests[0].history, [])
+        XCTAssertNil(engine.requests[0].originalMarkdown, "nothing to restore before the first edit")
         XCTAssertEqual(engine.requests[0].context.equipment, ["barbell"])
+    }
+
+    // MARK: - Original markdown (GH #469)
+
+    func testChainedSendCarriesTheSheetOpenMarkdown() async {
+        engine.outcomes = [.success(markdown: Self.withFacePull), .success(markdown: Self.withDips)]
+
+        await session.send("add face pulls")
+        await session.send("you put that in the wrong place")
+
+        XCTAssertEqual(engine.requests[1].planMarkdown, Self.withFacePull)
+        XCTAssertEqual(engine.requests[1].originalMarkdown, PlanEditFixtures.pushDay)
+    }
+
+    func testApplyThenSendStillCarriesTheSheetOpenMarkdown() async {
+        engine.outcomes = [.success(markdown: Self.withFacePull), .success(markdown: Self.withDips)]
+
+        await session.send("add face pulls")
+        session.apply()
+        await session.send("why did you add that?")
+
+        XCTAssertEqual(
+            engine.requests[1].originalMarkdown, PlanEditFixtures.pushDay,
+            "the reference survives an Apply of the bad edit"
+        )
+    }
+
+    func testDiscardThenSendCarriesNoOriginalMarkdown() async {
+        engine.outcomes = [.success(markdown: Self.withFacePull), .success(markdown: Self.withDips)]
+
+        await session.send("add face pulls")
+        session.discard()
+        await session.send("add dips")
+
+        XCTAssertEqual(engine.requests[1].planMarkdown, PlanEditFixtures.pushDay)
+        XCTAssertNil(engine.requests[1].originalMarkdown, "back at the original, nothing to restore")
     }
 
     func testSecondSendEditsTheProposalNotTheOriginal() async {

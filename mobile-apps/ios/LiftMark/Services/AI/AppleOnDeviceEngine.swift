@@ -145,7 +145,7 @@ struct AppleOnDeviceEngine: PlanEditEngine {
         }
 
         let instructions = PlanEditPrompt.compactSystemPrompt
-        let prompt = PlanEditPrompt.userMessage(for: request)
+        let prompt = PlanEditPrompt.userMessage(for: request, includeOriginal: false)
         // The most recent text the model produced, kept for the failure log.
         var lastRawOutput: String?
 

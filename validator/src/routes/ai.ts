@@ -72,6 +72,8 @@ export interface PlanEditContext {
 
 export interface PlanEditRequestBody {
   plan_markdown: string;
+  /** The plan when the client's edit sheet opened (GH #469). Optional. */
+  original_markdown?: string;
   instruction: string;
   history: PlanEditTurn[];
   context: PlanEditContext;
@@ -145,6 +147,15 @@ export function validatePlanEditBody(raw: unknown): Validation {
   if (typeof r.instruction !== 'string' || r.instruction.trim() === '') {
     return invalid('instruction must be a non-empty string');
   }
+  if (
+    r.original_markdown !== undefined &&
+    r.original_markdown !== null &&
+    typeof r.original_markdown !== 'string'
+  ) {
+    return invalid('original_markdown must be a string');
+  }
+  const originalMarkdown =
+    typeof r.original_markdown === 'string' ? r.original_markdown : undefined;
 
   // History
   const history: PlanEditTurn[] = [];
@@ -201,6 +212,9 @@ export function validatePlanEditBody(raw: unknown): Validation {
   if (bytes(r.plan_markdown) > MAX_PLAN_BYTES) {
     return tooLarge(`plan_markdown exceeds maximum size of ${MAX_PLAN_BYTES} bytes`);
   }
+  if (originalMarkdown !== undefined && bytes(originalMarkdown) > MAX_PLAN_BYTES) {
+    return tooLarge(`original_markdown exceeds maximum size of ${MAX_PLAN_BYTES} bytes`);
+  }
   if (bytes(r.instruction) > MAX_INSTRUCTION_BYTES) {
     return tooLarge(`instruction exceeds maximum size of ${MAX_INSTRUCTION_BYTES} bytes`);
   }
@@ -234,6 +248,7 @@ export function validatePlanEditBody(raw: unknown): Validation {
     ok: true,
     body: {
       plan_markdown: r.plan_markdown,
+      ...(originalMarkdown !== undefined ? { original_markdown: originalMarkdown } : {}),
       instruction: r.instruction,
       history,
       context,
@@ -245,7 +260,9 @@ export function validatePlanEditBody(raw: unknown): Validation {
 
 /**
  * The user message, block by block in the mandated order; every block (and
- * every line inside USER CONTEXT) is omitted when empty.
+ * every line inside USER CONTEXT) is omitted when empty. ORIGINAL PLAN is
+ * sent only when it differs from the current plan; PLAN WARNINGS comes from
+ * our own parser, never from the client (GH #469).
  */
 export function buildPlanEditUserMessage(body: PlanEditRequestBody): string {
   const blocks: string[] = [];
@@ -260,7 +277,17 @@ export function buildPlanEditUserMessage(body: PlanEditRequestBody): string {
   if (recent) ctx.push(`Recent sessions:\n${recent}`);
   if (ctx.length > 0) blocks.push(`# USER CONTEXT\n${ctx.join('\n')}`);
 
+  const original = body.original_markdown;
+  if (original && original.trim() !== '' && original.trim() !== body.plan_markdown.trim()) {
+    blocks.push(`# ORIGINAL PLAN\n${original}`);
+  }
+
   blocks.push(`# CURRENT PLAN\n${body.plan_markdown}`);
+
+  const warnings = parseWorkout(body.plan_markdown).warnings;
+  if (warnings.length > 0) {
+    blocks.push(`# PLAN WARNINGS\n${warnings.map((w) => `- ${w}`).join('\n')}`);
+  }
 
   const turns = body.history.filter((t) => t.content.trim().length > 0);
   if (turns.length > 0) {

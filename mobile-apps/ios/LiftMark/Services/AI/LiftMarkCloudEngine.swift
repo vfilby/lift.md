@@ -5,12 +5,15 @@ import Foundation
 /// Body of `POST /v1/ai/plan/edit`. `APIClient` encodes keys in snake_case.
 struct PlanEditCloudRequest: Encodable, Equatable {
     let planMarkdown: String
+    /// Omitted from the JSON when nil.
+    let originalMarkdown: String?
     let instruction: String
     let history: [PlanEditTurn]
     let context: PlanEditContext
 
     init(_ request: PlanEditRequest) {
         planMarkdown = request.planMarkdown
+        originalMarkdown = request.originalMarkdown
         instruction = request.instruction
         history = request.history
         context = request.context

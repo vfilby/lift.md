@@ -84,6 +84,7 @@ struct PlanEditContext: Codable, Equatable {
 
 struct PlanEditRequest: Equatable {
     let planMarkdown: String             // the current working markdown (see Session)
+    let originalMarkdown: String?        // the plan when the sheet opened; nil when equal to planMarkdown
     let instruction: String
     let history: [PlanEditTurn]          // at most the last 6 turns, oldest first
     let context: PlanEditContext
@@ -133,8 +134,14 @@ enum PlanEditError: Error, Equatable {
    Recent sessions:
    <compact block>
 
+   # ORIGINAL PLAN
+   <originalMarkdown verbatim>
+
    # CURRENT PLAN
    <planMarkdown verbatim>
+
+   # PLAN WARNINGS
+   - <parser warning for planMarkdown>
 
    # CONVERSATION
    user: <turn>
@@ -143,6 +150,27 @@ enum PlanEditError: Error, Equatable {
    # INSTRUCTION
    <instruction>
    ```
+
+   `# ORIGINAL PLAN` is present only once the conversation has changed the plan
+   (`originalMarkdown` non-nil and different from `planMarkdown` after trimming). It is the
+   reference the model needs to put something back where it was (GH #469): without it the
+   model only sees the already-edited plan and one-line summaries, so an exercise removed by
+   mistake gets "restored" into whatever section the model guesses. The on-device engine
+   omits this block; its 4 096-token context cannot hold two copies of a plan plus the
+   answer.
+
+   `# PLAN WARNINGS` lists the LMWF parser warnings for `planMarkdown` (one `- ` line each,
+   exactly as the parser reports them) and is omitted when there are none. It tells the
+   model that an earlier turn left the plan in a flagged state (for example a superset with
+   only one exercise), so the next turn can fix it instead of carrying it forward. iOS
+   computes it with `MarkdownParser`; the cloud server computes it with its own
+   `parseWorkout()` and never trusts a client-supplied list.
+
+   The system prompts tell the model how to use both blocks: when the user says an earlier
+   edit was wrong, restore the affected exercise exactly as it appears in `ORIGINAL PLAN`
+   (same section or superset, same position, same sets), and fix any warning that the
+   original plan did not have, since an earlier edit caused it. Warnings already present in
+   the original plan are left alone unless the instruction asks.
 3. **Structured output.** Engines request `{ plan_markdown: String, summary: String }` via the
    provider's structured-output mechanism (`@Generable` on Apple PCC, Converse tool use on
    Bedrock). The on-device engine is the one exception: the ~3B on-device model cannot
@@ -157,8 +185,8 @@ enum PlanEditError: Error, Equatable {
 5. **Empty-change guard.** If the returned markdown equals the input after trimming
    trailing whitespace, the result still succeeds; the sheet shows "No changes were made"
    and disables Apply.
-6. **Size limits** on the client before any engine call: `planMarkdown` ≤ 32 KB,
-   `instruction` ≤ 2 KB, history ≤ 8 KB total. Over the limit → `.planTooLarge`.
+6. **Size limits** on the client before any engine call: `planMarkdown` and
+   `originalMarkdown` ≤ 32 KB each, `instruction` ≤ 2 KB, history ≤ 8 KB total. Over the limit → `.planTooLarge`.
 
 ### `ApplePrivateCloudEngine` (`applePrivateCloud`)
 
@@ -195,6 +223,8 @@ enum PlanEditError: Error, Equatable {
   general-purpose guardrails. Availability mapping as above (no quota).
 - Uses the **compact** prompt (`spec/data/ai-plan-edit-system-prompt-compact.md`), which
   tells the model the exact output format below.
+- Builds the user message without the `# ORIGINAL PLAN` block
+  (`PlanEditPrompt.userMessage(for:includeOriginal: false)`); `# PLAN WARNINGS` is kept.
 - **Plain-text response, no guided generation.** The on-device model is small (~3B
   parameters) and, when asked for `@Generable` output, it mangles the multi-line plan
   inside the JSON string: it pads with hundreds of `\n`, nests the summary inside
@@ -314,8 +344,8 @@ enum AIEngineOverride: String, CaseIterable { case auto, applePrivateCloud, appl
 
 Operations:
 
-- `send(instruction)`: appends the user message, builds the request from `workingMarkdown`
-  and the last 6 *live* turns, calls the engine, then either sets `pendingProposal` + `workingMarkdown`
+- `send(instruction)`: appends the user message, builds the request from `workingMarkdown`,
+  `originalMarkdown` (nil when it equals `workingMarkdown`), and the last 6 *live* turns, calls the engine, then either sets `pendingProposal` + `workingMarkdown`
   and appends the assistant message, or appends an error message. Failed turns do not change
   `workingMarkdown`. The proposal's diff is always taken against `appliedMarkdown ??
   originalMarkdown` (what is persisted), not the previous proposal, so a chained edit's
@@ -338,6 +368,15 @@ Cut sets to 3…" after a Discard and the model re-applies the discarded intent 
 `# CURRENT PLAN` is the reverted markdown. Error turns were never sent. The History sheet
 still lists discarded turns, captioned "Discarded", so the user can see why they did not
 carry over.
+
+**Restoring a wrong edit (GH #469).** Example: "Remove the triceps" also removes `Bird Dog`
+from `Superset: Arms + Core`, leaving `Dumbbell Curl` alone in the superset (parser warning).
+The user replies "Why did you remove bird dogs? That's core." The next request carries the
+plan as the sheet opened it in `# ORIGINAL PLAN` and the single-member-superset warning in
+`# PLAN WARNINGS`, so the model can put `Bird Dog` back inside `Superset: Arms + Core` with
+its original sets, which also clears the warning. It no longer has to guess a section such
+as Warm-Up or Cool-Down. `originalMarkdown` is the plan when the sheet opened, not the last
+applied markdown, so the reference survives an Apply of the bad edit.
 
 ## Diff (`PlanDiffBuilder`)
 
@@ -373,6 +412,7 @@ is built from `PlanDiffBuilder.unchangedEntries(of:)` for the working plan.
 ```jsonc
 {
   "plan_markdown": "# Push Day\n...",              // required, ≤ 32 768 bytes
+  "original_markdown": "# Push Day\n...",          // optional, ≤ 32 768 bytes; the plan when the sheet opened
   "instruction": "swap bench for dumbbell press",   // required, ≤ 2 048 bytes
   "history": [ { "role": "user", "content": "..." }, { "role": "assistant", "content": "..." } ], // optional, ≤ 6 turns, ≤ 8 192 bytes total
   "context": {                                      // optional
@@ -432,6 +472,10 @@ is built from `PlanDiffBuilder.unchangedEntries(of:)` for the working plan.
   `submit_plan_edit` whose input schema is `{ plan_markdown: string, summary: string }` and
   `toolChoice: { tool: { name: "submit_plan_edit" } }`; `inferenceConfig.maxTokens` from env,
   `temperature: 0.2`. The client is injected so tests use a fake.
+- `original_markdown` is optional, so clients that predate it keep working; the server
+  includes `# ORIGINAL PLAN` only when it is present, non-blank, and differs from
+  `plan_markdown` after trimming. `# PLAN WARNINGS` comes from `parseWorkout(plan_markdown)`
+  on the server.
 - Route flow: auth → tier check → body validation → quota reserve → build messages → model
   call → extract tool input → `parseWorkout()` → on error one repair turn (assistant tool
   use + tool result with the errors, asking for a corrected document) → on second failure
@@ -496,8 +540,14 @@ privacy policy once a privacy page exists (none does today).
   discard resets; history is capped at 6 turns; cancel; discard then send: engine request
   history omits the discarded turns and `planMarkdown` is the reverted plan; undo then send:
   history omits the undone turns; apply then send: history still includes the applied turns;
-  an assistant turn records the proposed markdown it describes.
-- `PlanEditPromptTests`: user-message layout snapshot; bundled prompt files equal
+  an assistant turn records the proposed markdown it describes; the first send carries
+  `originalMarkdown == nil`, a chained send carries the sheet-open markdown, and after an
+  Apply it is still the sheet-open markdown (GH #469).
+- `PlanEditPromptTests`: user-message layout snapshot (including `# ORIGINAL PLAN` and
+  `# PLAN WARNINGS`); `# ORIGINAL PLAN` omitted when equal to the current plan after
+  trimming and when `includeOriginal: false`; `# PLAN WARNINGS` omitted for a clean plan;
+  `originalMarkdown` over 32 KB → `.planTooLarge`; the system prompts carry the
+  restore-to-original and fix-caused-warnings rules; bundled prompt files equal
   `spec/data/*.md` (read via `#filePath`); the plain-text repair message asks for the
   `SUMMARY:` format.
 - `PlanEditPlainTextOutputTests`: `parse(_:)` with and without a `SUMMARY:` line; fenced
@@ -517,7 +567,8 @@ privacy policy once a privacy page exists (none does today).
   would otherwise fail on every Mac with Apple Intelligence; run it against an iOS 27
   simulator with `TEST_RUNNER_LIFTMARK_LIVE_AI=1 xcodebuild test …`.
 - `LiftMarkCloudEngineTests` with a fake `APIClientProtocol`: status → error mapping, quota
-  decode, not-signed-in.
+  decode, not-signed-in; the body encodes `original_markdown` when set and omits the key when
+  nil.
 - `StubPlanEditEngineTests`: deterministic output, `fail`, `quota`.
 - `PlanEditPresentationTests`: tier gate, quota captions, chip slugs, preview row slugs,
   markers and parents, the "N exercises unchanged" caption, the inline diff
@@ -543,7 +594,11 @@ instruction "fail" shows `ai-edit-error`.
 With a fake Bedrock client and DDB Local:
 
 - 401 without auth; 402 for `free`; 403 for PAT without `ai:edit`.
-- 400/413 body validation.
+- 400/413 body validation, including a non-string or over-32 KB `original_markdown`.
+- `buildPlanEditUserMessage`: `# ORIGINAL PLAN` present when it differs, omitted when absent
+  or equal; `# PLAN WARNINGS` lists the server parser's warnings for `plan_markdown` (a
+  single-member superset) and is omitted for a clean plan; the system prompt carries the
+  restore-to-original rule (GH #469).
 - Happy path returns parsed markdown, quota decrements, audit entry recorded without content.
 - Repair turn: first output invalid, second valid → 200 with `attempts: 2`.
 - Both invalid → 422 and quota released.
