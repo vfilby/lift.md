@@ -81,3 +81,20 @@ describe('warning examples emit the documented warnings (spec TC-W01..W03)', () 
     expect(result.data!.exercises[0].sets).toHaveLength(3);
   });
 });
+
+describe('malformed header examples (spec TC-W04 / TC-E35, GH #472)', () => {
+  it('TC-W04 header missing its space after the first set warns with a fix', () => {
+    const result = parse('warnings', 'tc-header-missing-space-after-sets.md');
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('Line 6: Header "##Squat" is missing a space after "##". Write "## Squat".');
+    expect(result.fixes).toEqual([{ line: 6, original: '##Squat', replacement: '## Squat' }]);
+    expect(result.data!.exercises.map((e) => e.sets.length)).toEqual([3]);
+  });
+
+  it('TC-E35 header missing its space is the first error and carries a fix', () => {
+    const result = parse('errors', 'tc-header-missing-space.md');
+    expect(result.errors[0]).toBe('Line 1: Header "#push day" is missing a space after "#". Write "# push day".');
+    expect(result.errors[1]).toMatch(/^No workout header found/);
+    expect(result.fixes).toEqual([{ line: 1, original: '#push day', replacement: '# push day' }]);
+  });
+});

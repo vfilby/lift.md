@@ -59,6 +59,7 @@ Every workout follows this hierarchical structure:
 
 ### Required
 - Any header level (H1-H6) - The header text is the workout name
+- At least one space between the `#` marks and the name. `#Push Day` (no space) is **not** a header — it is plain text, exactly as in Markdown. Parsers report such a line as `MALFORMED_HEADER` with the corrected text (`# Push Day`); see Validation Rules.
 
 ### Optional Metadata
 - `@tags: [tag1, tag2, ...]` - Comma-separated tags for organization
@@ -826,6 +827,18 @@ Short sprints with full recovery.
 10. ✅ Rest time must be positive number with valid unit (s/sec/m/min) (if provided)
 11. ✅ Default units must be "lbs" or "kg" (if provided)
 12. ✅ Distance must be positive number with valid unit (meters/km/miles/mi/feet/ft/yards/yd) (if provided)
+13. ✅ Header lines must have whitespace between the `#` marks and the header text (`# Name`, never `#Name`)
+
+### Malformed headers (`MALFORMED_HEADER`)
+
+A line that starts with one to six `#` immediately followed by a non-space, non-`#` character (`#Push Day`, `##Bench Press`) is a **malformed header**: the author almost certainly meant a header but left out the space, and the line silently parses as plain text. Parsers MUST detect this and point at the exact line with the corrected text, because the alternative — a generic "no workout header" message — gives the author nothing to act on (GH #472):
+
+- **While looking for the workout header.** If no header qualifies as the workout header, every malformed header line in the document is reported as a blocking `MALFORMED_HEADER` error, each with its line number, *before* the generic `No workout header found` error.
+- **After an exercise's first set.** A malformed header there is reported as a `MALFORMED_HEADER` warning instead of `IGNORED_LINE`, and the message notes that the set lines below it count toward the exercise above until it is fixed.
+
+Message form: `Header "#Push Day" is missing a space after "#". Write "# Push Day".` — the quoted original is truncated like other line previews; the suggested text is the full line with a single space inserted after the `#` marks.
+
+**Quick fix.** Each `MALFORMED_HEADER` diagnostic carries a machine-applicable fix — `{ line, original, replacement }` where `original` is the trimmed offending line and `replacement` is the corrected line — so an editor can offer a one-tap correction. The fix is only applied when the line still matches `original`.
 
 ### Warnings (non-blocking)
 - ⚠️ Duplicate exercise names (suggests merge or rename)
@@ -837,6 +850,7 @@ Short sprints with full recovery.
 - ⚠️ `EXERCISE_NAME_SUGGESTION` — fuzzy "did you mean?" hint for likely typos near a canonical name
 - ⚠️ `STANDALONE_MODIFIER` — a set modifier (`@rest`, `@dropset`, `@perside`, `@rpe`, `@tempo`, `@amrap`) written on its own line where it has no effect: under the workout or a section/superset header, or after an exercise's first set. An exercise-level `@rest:` default (before the first set) does not warn. The warning points at the line and suggests appending the modifier to each set (for `@rest`, it also points to the exercise-level default).
 - ⚠️ `IGNORED_LINE` — a non-empty, non-set line after an exercise's first set (between or after its sets). The text is not captured anywhere; the warning points at the line.
+- ⚠️ `MALFORMED_HEADER` — a header-shaped line with no space after the `#` marks (`##Squat`) found after an exercise's first set. Reported instead of `IGNORED_LINE`; see "Malformed headers" above. (When the document has no workout header at all, the same check produces blocking errors.)
 - ⚠️ `SINGLE_MEMBER_SUPERSET` — a superset block that contains only one exercise. A superset pairs two or more exercises performed back-to-back, so a one-member superset is almost always an authoring mistake that is otherwise invisible in the source markdown. The warning points at the superset block line and names the lone member. The file still parses (it is a warning, not an error); the fix is to add another exercise to the superset or convert it to a regular exercise/section.
 
 ### Error Examples
@@ -846,6 +860,17 @@ Short sprints with full recovery.
 ## Squats
 - 225 x 5
 ```
+❌ No workout header found. Must have a header (# Workout Name) with exercises below it.
+
+**Invalid - Header missing the space after `#`:**
+```markdown
+#Push Day
+
+##Bench Press
+- 135 x 5
+```
+❌ Line 1: Header "#Push Day" is missing a space after "#". Write "# Push Day".
+❌ Line 3: Header "##Bench Press" is missing a space after "##". Write "## Bench Press".
 ❌ No workout header found. Must have a header (# Workout Name) with exercises below it.
 
 **Invalid - No exercises:**
@@ -980,6 +1005,7 @@ Focus on *depth* and **power**
 4. **UTF-8 Encoding**: Support international characters
 5. **Partial Parse**: Continue parsing after non-critical errors
 6. **Error Recovery**: Provide helpful error messages with line numbers
+7. **Near-miss Detection**: A header-shaped line missing the space after `#` is reported as `MALFORMED_HEADER` with the corrected text and a machine-applicable quick fix (see Validation Rules)
 
 ### Parsing Steps
 
@@ -2045,6 +2071,18 @@ Keep your back flat on the working sets.
 ```
 Parses successfully with 3 sets; one `IGNORED_LINE` warning on line 6.
 
+**TC-W04: Header missing its space after the first set**
+```markdown
+# Push Day
+
+## Bench Press
+- 135 lbs x 5
+- 185 lbs x 5
+##Squat
+- 225 lbs x 5
+```
+Parses successfully with one exercise (Bench Press, 3 sets — the `225 lbs x 5` line counts toward it); one `MALFORMED_HEADER` warning on line 6 (`Header "##Squat" is missing a space after "##". Write "## Squat".`) carrying a quick fix `{ line: 6, original: "##Squat", replacement: "## Squat" }`; no `IGNORED_LINE` warning.
+
 ### Invalid Test Cases — Structure Errors
 
 **TC-E01: Empty file**
@@ -2340,6 +2378,18 @@ Forgot to add sets here.
 - 70 lbs x 100 meters
 ```
 ❌ Line 3: Invalid set format: "70 lbs x 100 meters". Combined weight and distance is not supported.
+
+**TC-E35: Headers missing the space after `#` (GH #472)**
+```markdown
+#push day
+
+## bench press
+- 3 x 100
+```
+❌ Line 1: Header "#push day" is missing a space after "#". Write "# push day".
+❌ No workout header found. Must have a header (# Workout Name) with exercises below it.
+
+The `MALFORMED_HEADER` error comes first and carries quick fix `{ line: 1, original: "#push day", replacement: "# push day" }`. Applying it yields a valid workout. A document with several such lines (e.g. `#push day` and `##bench press`) reports one error per line, each with its own fix.
 
 ### Invalid Test Cases — Combined/Edge Errors
 

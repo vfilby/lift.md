@@ -100,11 +100,15 @@ final class ParserConformanceTests: XCTestCase {
     func testWarningExamplesEmitDocumentedWarnings() throws {
         let standalone = "on its own line and has no effect"
         let ignored = "Line ignored"
+        let malformed = "is missing a space after"
         let cases: [(file: String, marker: String, lines: [Int])] = [
             ("tc-misplaced-default-rest.md", standalone, [2, 5, 18]),
             ("tc-standalone-modifiers-everywhere.md", standalone, [2, 5, 9, 18]),
             ("tc-standalone-modifiers-everywhere.md", ignored, []),
             ("tc-text-after-sets-ignored.md", ignored, [6]),
+            // Spec TC-W04 (GH #472): MALFORMED_HEADER replaces IGNORED_LINE for `##Squat`
+            ("tc-header-missing-space-after-sets.md", malformed, [6]),
+            ("tc-header-missing-space-after-sets.md", ignored, []),
         ]
         for testCase in cases {
             let result = try parseExample("warnings", testCase.file)

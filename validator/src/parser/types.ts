@@ -11,6 +11,22 @@ export interface ParseResult {
   data: WorkoutPlan | null;
   errors: string[];
   warnings: string[];
+  /**
+   * Machine-applicable corrections for diagnostics with an unambiguous repair
+   * (currently MALFORMED_HEADER, e.g. `#push day` → `# push day`). Mirrors the
+   * iOS parser's `LMWFParseResult.fixes` (GH #472).
+   */
+  fixes: QuickFix[];
+}
+
+/** One line-level correction the parser can offer for a diagnostic. */
+export interface QuickFix {
+  /** 1-based line in the document with CRLF/CR normalized to LF. */
+  line: number;
+  /** Trimmed text currently on `line`; the fix applies only while it still matches. */
+  original: string;
+  /** The full corrected line (without the original's indentation). */
+  replacement: string;
 }
 
 export interface ParseError {
@@ -94,6 +110,7 @@ export interface ParseContext {
   exerciseHeaderLevel: number | null;
   errors: ParseError[];
   warnings: ParseWarning[];
+  fixes: QuickFix[];
   /** Line numbers of `@rest:` lines consumed as an exercise-level default rest. */
   exerciseRestDefaultLines: Set<number>;
 }

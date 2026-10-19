@@ -2242,3 +2242,75 @@ describe('Exercise-level default @rest', () => {
     expect(long.filter((w) => w.includes('Very long rest'))).toHaveLength(1);
   });
 });
+
+// MARK: - MALFORMED_HEADER (GH #472)
+
+describe('MALFORMED_HEADER', () => {
+  const malformed = (items: string[]) => items.filter((w) => w.includes('is missing a space after'));
+
+  it('reports a header missing its space when no workout header is found (spec TC-E35)', () => {
+    const result = parseWorkout(`#push day\n\n## bench press\n- 3 x 100`);
+    expect(result.success).toBe(false);
+    expect(result.errors).toEqual([
+      'Line 1: Header "#push day" is missing a space after "#". Write "# push day".',
+      'No workout header found. Must have a header (# Workout Name) with exercises below it.',
+    ]);
+    expect(result.fixes).toEqual([{ line: 1, original: '#push day', replacement: '# push day' }]);
+  });
+
+  it('reports every malformed header line, each with its own fix', () => {
+    const result = parseWorkout(`#Push Day\n\n##Bench Press\n- 135 x 5`);
+    expect(malformed(result.errors)).toEqual([
+      'Line 1: Header "#Push Day" is missing a space after "#". Write "# Push Day".',
+      'Line 3: Header "##Bench Press" is missing a space after "##". Write "## Bench Press".',
+    ]);
+    expect(result.fixes.map((f) => f.line)).toEqual([1, 3]);
+    expect(result.fixes[1]).toEqual({ line: 3, original: '##Bench Press', replacement: '## Bench Press' });
+  });
+
+  it('applying the fix yields a valid workout', () => {
+    const md = `#push day\n\n## bench press\n- 3 x 100`;
+    const { fixes } = parseWorkout(md);
+    const lines = md.split('\n');
+    for (const f of fixes) lines[f.line - 1] = f.replacement;
+    const fixed = parseWorkout(lines.join('\n'));
+    expect(fixed.success).toBe(true);
+    expect(fixed.data?.name).toBe('push day');
+    expect(fixed.fixes).toEqual([]);
+  });
+
+  it('still reports the plain no-header error, with no fixes, when nothing is header-shaped', () => {
+    const result = parseWorkout(`Just text\n- 225 x 5`);
+    expect(result.errors).toEqual([
+      'No workout header found. Must have a header (# Workout Name) with exercises below it.',
+    ]);
+    expect(result.fixes).toEqual([]);
+  });
+
+  it('ignores seven or more # and a bare #', () => {
+    const result = parseWorkout(`#######nope\n#\n- 225 x 5`);
+    expect(malformed(result.errors)).toEqual([]);
+    expect(result.fixes).toEqual([]);
+  });
+
+  it("after an exercise's first set it is a warning instead of IGNORED_LINE (spec TC-W04)", () => {
+    const result = parseWorkout(`# Push Day\n\n## Bench Press\n- 135 lbs x 5\n- 185 lbs x 5\n##Squat\n- 225 lbs x 5`);
+    expect(result.success).toBe(true);
+    expect(result.warnings).toEqual([
+      'Line 6: Header "##Squat" is missing a space after "##". Write "## Squat". ' +
+        'Until it is fixed, the set lines below it count toward the exercise above.',
+    ]);
+    expect(result.fixes).toEqual([{ line: 6, original: '##Squat', replacement: '## Squat' }]);
+    expect(result.data!.exercises).toHaveLength(1);
+    expect(result.data!.exercises[0].sets).toHaveLength(3);
+  });
+
+  it('preserves the header marks and trims the text in the replacement', () => {
+    const result = parseWorkout(`###Leg   Day  \n- 5 x 5`);
+    expect(result.fixes).toEqual([{ line: 1, original: '###Leg   Day', replacement: '### Leg   Day' }]);
+  });
+
+  it('a valid workout with no malformed lines has no fixes', () => {
+    expect(parseWorkout(`# W\n## Row\n- 135 x 10`).fixes).toEqual([]);
+  });
+});
