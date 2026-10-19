@@ -1,0 +1,68 @@
+name: "Import - Fix button repairs a header missing its space"
+
+# GH #472 (TestFlight): a user typed `#push day` (no space after `#`) and got
+# only "No workout header found" with nothing pointing at the line. The parser
+# now reports the exact line with a quick fix, and the editor's status row
+# offers a Fix button that applies it. This scenario types the report verbatim
+# into the import modal and drives the real Fix button.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+
+tests:
+  - name: "malformed header shows a line-numbered error with a Fix button; Fix makes the plan valid"
+    steps:
+      - action: waitFor
+        target: "button-import-workout"
+        timeout: 5000
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "input-markdown"
+        timeout: 10000
+      - action: replaceText
+        target: "input-markdown"
+        value: "#push day\n\n## bench press\n- 3 x 100"
+      # The error row points at line 1 and the corrected header.
+      - action: waitFor
+        target: "import-markdown-error"
+        timeout: 5000
+      - action: waitForText
+        text: "Line 1: Header \"#push day\" is missing a space after \"#\". Write \"# push day\"."
+        timeout: 5000
+      - action: expect
+        target: "button-import"
+        assertion: "toExist"
+      # Apply the quick fix.
+      - action: tap
+        target: "import-markdown-fix-button"
+      - action: waitForNot
+        target: "import-markdown-error"
+        timeout: 5000
+      - action: waitForText
+        text: "push day - 1 exercises, 1 sets"
+        timeout: 5000
+      - action: expect
+        target: "import-markdown-fix-button"
+        assertion: "notToExist"
+      # The repaired text imports as a real plan.
+      - action: tap
+        target: "button-import"
+      - action: waitForText
+        text: "OK"
+        timeout: 10000
+      - action: tapText
+        text: "OK"
+      - action: waitForText
+        text: "push day"
+        timeout: 10000

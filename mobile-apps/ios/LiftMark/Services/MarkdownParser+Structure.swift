@@ -86,9 +86,21 @@ extension MarkdownParser {
 
     /// Warn on a non-empty, non-set line inside an exercise's set list (after its first
     /// set). Such text is skipped without being captured anywhere. Standalone modifiers are
-    /// excluded — they already get STANDALONE_MODIFIER.
+    /// excluded — they already get STANDALONE_MODIFIER. A header missing its space
+    /// (`##Squat`) gets MALFORMED_HEADER instead, since the set lines below it are being
+    /// counted toward the exercise above (GH #472).
     static func warnIfIgnoredLine(_ context: ParseContext, line: ParsedLine) {
         guard !line.trimmed.isEmpty, !isStandaloneModifier(line) else { return }
+        if let fix = malformedHeaderFix(for: line) {
+            context.fixes.append(fix)
+            context.warnings.append(ParseWarning(
+                line: line.lineNumber,
+                message: malformedHeaderMessage(fix)
+                    + " Until it is fixed, the set lines below it count toward the exercise above.",
+                code: "MALFORMED_HEADER"
+            ))
+            return
+        }
         context.warnings.append(ParseWarning(
             line: line.lineNumber,
             message: "Line ignored: \"\(warningPreview(line.trimmed))\" is not a set and is not captured. "
@@ -96,6 +108,43 @@ extension MarkdownParser {
                 + "or append per-set notes to the end of a set line.",
             code: "IGNORED_LINE"
         ))
+    }
+
+    // MARK: - Malformed Headers (GH #472)
+
+    /// `#push day` — header marks immediately followed by text. Markdown (and this parser)
+    /// treat it as plain text, which the author almost never intends.
+    nonisolated(unsafe) private static let malformedHeaderRegex = /^(#{1,6})([^#\s].*)$/
+
+    /// The one-space correction for a header-shaped line missing its space, or nil.
+    static func malformedHeaderFix(for line: ParsedLine) -> LMWFQuickFix? {
+        guard line.headerLevel == nil,
+              let match = line.trimmed.wholeMatch(of: Self.malformedHeaderRegex) else { return nil }
+        return LMWFQuickFix(
+            line: line.lineNumber,
+            original: line.trimmed,
+            replacement: "\(match.1) \(String(match.2).trimmingCharacters(in: .whitespaces))"
+        )
+    }
+
+    static func malformedHeaderMessage(_ fix: LMWFQuickFix) -> String {
+        let marks = fix.original.prefix { $0 == "#" }
+        return "Header \"\(warningPreview(fix.original))\" is missing a space after \"\(marks)\". "
+            + "Write \"\(fix.replacement)\"."
+    }
+
+    /// When no workout header was found, report every malformed header line as a blocking
+    /// error (with a quick fix) so the user sees exactly which line to repair.
+    static func reportMalformedHeaders(_ context: ParseContext) {
+        for line in context.lines {
+            guard let fix = malformedHeaderFix(for: line) else { continue }
+            context.fixes.append(fix)
+            context.errors.append(ParseError(
+                line: line.lineNumber,
+                message: malformedHeaderMessage(fix),
+                code: "MALFORMED_HEADER"
+            ))
+        }
     }
 
     /// Check if a header has child exercise headers (with sets)

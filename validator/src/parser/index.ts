@@ -14,10 +14,20 @@ import type {
   DistanceUnit,
   GroupType,
   ExerciseBlockResult,
+  QuickFix,
 } from './types.js';
 import { resolveAlias, fuzzyMatch } from './exercise-suggestions.js';
 
-export type { ParseResult, WorkoutPlan, PlannedExercise, PlannedSet, WeightUnit, DistanceUnit, GroupType } from './types.js';
+export type {
+  ParseResult,
+  QuickFix,
+  WorkoutPlan,
+  PlannedExercise,
+  PlannedSet,
+  WeightUnit,
+  DistanceUnit,
+  GroupType,
+} from './types.js';
 
 // MARK: - Public API
 
@@ -29,6 +39,7 @@ export function parseWorkout(markdown: string): ParseResult {
     exerciseHeaderLevel: null,
     errors: [],
     warnings: [],
+    fixes: [],
     exerciseRestDefaultLines: new Set(),
   };
   const workoutId = generateId();
@@ -36,11 +47,18 @@ export function parseWorkout(markdown: string): ParseResult {
   // Find workout header
   const workoutHeaderLine = findWorkoutHeader(context);
   if (!workoutHeaderLine) {
+    // Point at header-shaped lines missing their space (`#push day`) first —
+    // they are the usual reason nothing qualified (GH #472).
+    reportMalformedHeaders(context);
     return {
       success: false,
       data: null,
-      errors: ['No workout header found. Must have a header (# Workout Name) with exercises below it.'],
+      errors: [
+        ...context.errors.map((e) => `Line ${e.line}: ${e.message}`),
+        'No workout header found. Must have a header (# Workout Name) with exercises below it.',
+      ],
       warnings: [],
+      fixes: context.fixes,
     };
   }
 
@@ -82,6 +100,7 @@ export function parseWorkout(markdown: string): ParseResult {
       data: null,
       errors: context.errors.map((e) => `Line ${e.line}: ${e.message}`),
       warnings: context.warnings.map((w) => `Line ${w.line}: ${w.message}`),
+      fixes: context.fixes,
     };
   }
 
@@ -120,6 +139,7 @@ export function parseWorkout(markdown: string): ParseResult {
     data: workout,
     errors: [],
     warnings: context.warnings.map((w) => `Line ${w.line}: ${w.message}`),
+    fixes: context.fixes,
   };
 }
 
@@ -277,6 +297,18 @@ function warnRestRange(rest: number, context: ParseContext, lineNumber: number):
 /// excluded — they already get STANDALONE_MODIFIER.
 function warnIfIgnoredLine(context: ParseContext, line: ParsedLine): void {
   if (line.trimmed.length === 0 || isStandaloneModifier(line)) return;
+  // A header missing its space (`##Squat`) gets MALFORMED_HEADER instead, since the
+  // set lines below it are being counted toward the exercise above (GH #472).
+  const fix = malformedHeaderFix(line);
+  if (fix) {
+    context.fixes.push(fix);
+    context.warnings.push({
+      line: line.lineNumber,
+      message: `${malformedHeaderMessage(fix)} Until it is fixed, the set lines below it count toward the exercise above.`,
+      code: 'MALFORMED_HEADER',
+    });
+    return;
+  }
   context.warnings.push({
     line: line.lineNumber,
     message:
@@ -284,6 +316,36 @@ function warnIfIgnoredLine(context: ParseContext, line: ParsedLine): void {
       `between the exercise header and its first set, or append per-set notes to the end of a set line.`,
     code: 'IGNORED_LINE',
   });
+}
+
+// MARK: - Malformed Headers (GH #472)
+
+/// `#push day` — header marks immediately followed by text. Markdown (and this parser)
+/// treat it as plain text, which the author almost never intends.
+const malformedHeaderRegex = /^(#{1,6})([^#\s].*)$/;
+
+/// The one-space correction for a header-shaped line missing its space, or null.
+function malformedHeaderFix(line: ParsedLine): QuickFix | null {
+  if (line.headerLevel != null) return null;
+  const match = line.trimmed.match(malformedHeaderRegex);
+  if (!match) return null;
+  return { line: line.lineNumber, original: line.trimmed, replacement: `${match[1]} ${match[2].trim()}` };
+}
+
+function malformedHeaderMessage(fix: QuickFix): string {
+  const marks = /^#+/.exec(fix.original)![0];
+  return `Header "${preview(fix.original)}" is missing a space after "${marks}". Write "${fix.replacement}".`;
+}
+
+/// When no workout header was found, report every malformed header line as a blocking
+/// error (with a quick fix) so the user sees exactly which line to repair.
+function reportMalformedHeaders(context: ParseContext): void {
+  for (const line of context.lines) {
+    const fix = malformedHeaderFix(line);
+    if (!fix) continue;
+    context.fixes.push(fix);
+    context.errors.push({ line: line.lineNumber, message: malformedHeaderMessage(fix), code: 'MALFORMED_HEADER' });
+  }
 }
 
 // MARK: - Workout Header Detection

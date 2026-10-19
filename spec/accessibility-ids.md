@@ -127,6 +127,18 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `set-{set.id}` | View | Individual set display |
 | `edit-plan-ai-button` | Button | "Edit with AI" — opens the AI edit sheet (Pro, `aiPlanEditing` flag) |
 | `edit-plan-ai-upsell` | Button | Same row rendered for signed-out / free users; explains AI editing is part of Pro |
+| `edit-plan-markdown-button` | Button | "Edit" — opens the Edit Plan Markdown sheet |
+
+### Edit Plan Markdown Sheet (presented from Workout Detail)
+
+| ID | Element Type | Purpose |
+|----|-------------|---------|
+| `edit-plan-markdown-sheet` | View | Sheet container |
+| `edit-plan-markdown-editor` | TextEditor | Raw LMWF markdown editor |
+| `edit-plan-markdown-error` | View | Inline parse error row (first error); absent when the text parses |
+| `edit-plan-markdown-fix-button` | Button | "Fix" — applies the parser's quick fixes to the editor text (GH #472); absent when there are none |
+| `edit-plan-save-button` | Button | Save; disabled while there is a parse error or no change |
+| `edit-plan-cancel-button` | Button | Cancel (asks to discard when there are changes) |
 
 ### AI Edit Sheet (presented from Workout Detail)
 
@@ -210,6 +222,8 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `button-generate` | TouchableOpacity | Generate workout via Anthropic API |
 | `button-open-claude` | TouchableOpacity | Copy prompt and open Claude.ai |
 | `input-markdown` | TextInput | Markdown input field |
+| `import-markdown-error` | View | Inline parse error row (first error); absent when the text parses |
+| `import-markdown-fix-button` | Button | "Fix" — applies the parser's quick fixes to the markdown field (GH #472); absent when there are none |
 
 ---
 

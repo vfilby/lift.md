@@ -63,8 +63,8 @@ LiftMark registers as a handler for markdown (`.md`) and plain-text files. Users
 - `promptText` — memoized combination of base LMWF prompt + available equipment from default gym + workout history context + custom prompt addition from settings
 
 ## Error/Empty States
-- **Parse error**: Alert with error messages from parser
-- **Parse warnings**: Alert with Continue/Cancel options
+- **Parse error**: inline red row below the editor (`import-markdown-error`) showing the first parser error; the Import button is disabled while it is shown. When the parser supplies quick fixes (e.g. `MALFORMED_HEADER` for `#push day`), the row has a trailing **Fix** button (`import-markdown-fix-button`) that applies them to the editor text (GH #472). Same `LMWFParseStatusView` as the Edit Plan Markdown sheet — see `spec/screens/workout-detail.md`.
+- **Parse warnings**: inline orange captions under the green success row; Import stays enabled. Warnings with quick fixes also get the Fix button.
 - **No API key (Generate)**: Alert with options: Cancel, Open in Claude (console), Go to Settings
 - **Generation failure**: Alert with error message
 - **Copy failure**: Alert "Failed to copy prompt"

@@ -13,6 +13,41 @@ struct LMWFParseResult {
     /// regenerating the whole document and flattening header levels. Empty on
     /// parse failure and for callers that don't need it.
     var exerciseSpans: [Int: LMWFSourceSpan] = [:]
+    /// Machine-applicable corrections for diagnostics with an unambiguous repair
+    /// (currently `MALFORMED_HEADER`, e.g. `#push day` → `# push day`). Editors
+    /// surface these as a one-tap "Fix" (GH #472). Present on both success and
+    /// failure results.
+    var fixes: [LMWFQuickFix] = []
+}
+
+/// One line-level correction the parser can offer for a diagnostic.
+struct LMWFQuickFix: Equatable {
+    /// 1-based line in the document with CRLF/CR normalized to LF.
+    let line: Int
+    /// The trimmed text currently on `line`. The fix only applies while the line
+    /// still reads this, so a stale fix never overwrites edited text.
+    let original: String
+    /// The full corrected line (without the original's indentation).
+    let replacement: String
+
+    /// Apply `fixes` to `markdown`. Line endings are normalized to LF (as the
+    /// parser does); each fix replaces its line only if the trimmed text still
+    /// equals `original`, keeping any leading indentation.
+    static func applying(_ fixes: [LMWFQuickFix], to markdown: String) -> String {
+        guard !fixes.isEmpty else { return markdown }
+        var lines = markdown
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: "\n")
+        for fix in fixes {
+            let index = fix.line - 1
+            guard lines.indices.contains(index),
+                  lines[index].trimmingCharacters(in: .whitespaces) == fix.original else { continue }
+            let indent = lines[index].prefix { $0 == " " || $0 == "\t" }
+            lines[index] = indent + fix.replacement
+        }
+        return lines.joined(separator: "\n")
+    }
 }
 
 /// The source-line footprint of one exercise (or group) inside a markdown
@@ -67,6 +102,7 @@ class ParseContext {
     var exerciseHeaderLevel: Int?
     var errors: [ParseError] = []
     var warnings: [ParseWarning] = []
+    var fixes: [LMWFQuickFix] = []
     /// Line numbers of `@rest:` lines consumed as an exercise-level default rest.
     var exerciseRestDefaultLines: Set<Int> = []
     /// Source spans collected during parsing, keyed by exercise `orderIndex`.

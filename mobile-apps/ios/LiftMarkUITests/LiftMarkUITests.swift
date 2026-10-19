@@ -78,6 +78,12 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "import-flow-robust")
     }
 
+    /// GH #472: `#push day` (no space after `#`) must produce a line-numbered
+    /// error with a Fix button that repairs the header in place.
+    func testImportFixMalformedHeader() throws {
+        runner.runScenario(named: "import-fix-malformed-header")
+    }
+
     func testWorkoutFlow() throws {
         runner.runScenario(named: "workout-flow")
     }
