@@ -29,7 +29,7 @@
     "@node-rs/argon2": "^2.2.1",
     "hono": "^4.13.13",
     "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^10.0.11",
+    "nodemailer": "^10.1.2",
     "ulid": "^3.0.2"
   }
 }
