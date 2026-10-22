@@ -12,7 +12,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1152.0",
-    "@aws-sdk/lib-dynamodb": "^3.1150.0",
+    "@aws-sdk/lib-dynamodb": "^3.1152.0",
     "@hono/node-server": "^2.1.5",
     "@types/aws-lambda": "^8.10.164",
     "@types/jsonwebtoken": "^9.0.10",
