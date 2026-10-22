@@ -532,18 +532,24 @@
           <div class="field-body">
             <textarea class="text-field" readonly rows="2">Focus on compound movements and progressive overload for strength gains.</textarea>
           </div>
-          <!-- API Key -->
-          <div class="field-label" style="border-top: 1px solid var(--grey5);">API Key</div>
+          <!-- AI Provider Keys (ordered, reorderable) -->
+          <div class="field-label" style="border-top: 1px solid var(--grey5);">AI Provider Keys</div>
           <div class="field-body">
             <div class="field-body-row">
-              <input class="masked-field" value="sk-ant-••••••••••••" readonly>
-              <button class="btn-sm btn-sm-primary">Save</button>
-              <button class="btn-sm btn-sm-danger">Remove</button>
+              <span>1. Anthropic <small style="color:var(--grey)">claude-haiku-4-5-20251001 &middot; ••••a1b2</small></span>
+              <span style="margin-left:auto;color:var(--green)">&#9679; Verified</span>
+            </div>
+            <div class="field-body-row">
+              <span>2. Ollama <small style="color:var(--grey)">qwen2.5:0.5b &middot; http://192.168.1.10:11434</small></span>
+              <span style="margin-left:auto">&#9679; Not verified</span>
+            </div>
+            <div class="field-body-row">
+              <button class="btn-sm btn-sm-primary">+ Add Key</button>
             </div>
           </div>
         </div>
         <div style="padding:4px 0 0 4px">
-          <span class="anno-inline">input-custom-prompt &middot; input-api-key &middot; save/remove-api-key-button</span>
+          <span class="anno-inline">input-custom-prompt &middot; ai-key-row-{index} &middot; add-ai-key-button</span>
         </div>
       </div>
 

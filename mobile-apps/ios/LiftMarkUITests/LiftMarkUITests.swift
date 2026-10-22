@@ -151,6 +151,12 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "ai-prompt-settings")
     }
 
+    /// BYOK provider key list: add (unverified Ollama), malformed-key error,
+    /// reorder, persistence, delete. See spec/screens/settings.md.
+    func testBYOKProviderKeys() throws {
+        runner.runScenario(named: "byok-provider-keys")
+    }
+
     /// Edit with AI sheet against the deterministic stub engine
     /// (`--ai-engine-stub`): apply a proposal, see it on the detail view,
     /// and surface an engine error. See spec/flows/ai-plan-editing.md.

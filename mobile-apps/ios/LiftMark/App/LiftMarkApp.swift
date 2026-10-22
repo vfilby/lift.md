@@ -6,6 +6,7 @@ struct LiftMarkApp: App {
     @State private var planStore = WorkoutPlanStore()
     @State private var sessionStore = SessionStore()
     @State private var settingsStore = SettingsStore()
+    @State private var aiKeyStore = AIKeyStore()
     @State private var gymStore = GymStore()
     @State private var equipmentStore = EquipmentStore()
     @State private var syncStatusStore = SyncStatusStore()
@@ -41,6 +42,7 @@ struct LiftMarkApp: App {
             // and under --live-backend a surviving session would auto-restore.
             // No-op for scenarios that never sign in.
             TokenStore().clear()
+            AIKeyStore.clearPersisted()
         }
 
         // Build auth + inbox-poller from a single APIClient + TokenStore so
@@ -182,6 +184,7 @@ struct LiftMarkApp: App {
                 .environment(planStore)
                 .environment(sessionStore)
                 .environment(settingsStore)
+                .environment(aiKeyStore)
                 .environment(gymStore)
                 .environment(equipmentStore)
                 .environment(syncStatusStore)
@@ -193,6 +196,7 @@ struct LiftMarkApp: App {
                     planStore.loadPlans()
                     sessionStore.loadSessions()
                     settingsStore.loadSettings()
+                    aiKeyStore.load(legacyAnthropicStatus: settingsStore.settings?.anthropicApiKeyStatus)
                     gymStore.loadGyms()
                     handleLaunchArguments()
                     LiveActivityService.shared.cleanupOrphanedActivities()

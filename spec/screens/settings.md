@@ -17,7 +17,7 @@ Central configuration hub for the app. Manages appearance, workout preferences, 
   2. **Preferences** — Appearance (theme selector)
   3. **Workout** — Nav link to Workout Settings + Gym Management
   4. **Integrations** (iOS only) — iCloud Sync nav, HealthKit toggle, Live Activities toggle
-  5. **AI Assistance** — Custom prompt text, API key management, button options
+  5. **AI Assistance** — Prompt toggles, custom prompt text, ordered AI provider key list (BYOK), button options
   6. **Data Management** — Backup export/import
   7. **Developer** (hidden by default, activated via easter egg) — Debug Logs nav link, Database export
   8. **About** — Version + Build info, Disclaimer, Open Source acknowledgements
@@ -37,10 +37,9 @@ Central configuration hub for the app. Manages appearance, workout preferences, 
 | HealthKit switch | `switch-healthkit` | Switch |
 | Live Activities switch | `switch-live-activities` | Switch |
 | Custom prompt input | `input-custom-prompt` | TextInput |
-| API key input | `input-api-key` | TextInput |
-| Toggle API key visibility | `toggle-api-key-visibility` | TouchableOpacity |
-| Save API key | `save-api-key-button` | TouchableOpacity |
-| Remove API key | `remove-api-key-button` | TouchableOpacity |
+| AI keys empty state | `ai-keys-empty` | Text |
+| AI key row | `ai-key-row-{index}` | Button |
+| Add AI key | `add-ai-key-button` | Button |
 | Open Claude console | `open-claude-button` | TouchableOpacity |
 | Show Open in Claude toggle | `switch-show-open-in-claude` | Switch |
 | Button options section | `button-options-section` | View |
@@ -56,12 +55,40 @@ Central configuration hub for the app. Manages appearance, workout preferences, 
 - **Toggle HealthKit** → see HealthKit Integration Behavior below
 - **Toggle Live Activities** → see Live Activities Toggle Behavior below
 - **Edit custom prompt** → saves on blur
-- **Enter API key + Save** → validates `sk-ant-` prefix, saves securely
-- **Remove API key** → confirmation alert → removes key
+- **Tap Add Key** → opens the Add Key sheet (see AI Provider Keys below)
+- **Tap a key row** → opens the same sheet in edit mode
+- **Reorder keys** → drag a row, or use its context menu's Move Up / Move Down
+- **Delete key** → swipe to delete, the context menu's Delete, or Delete in the edit sheet
 - **Tap Open in Claude** → opens `https://console.anthropic.com`
 - **Export Database** → see Database Export Behavior below
 - **Import Database** → see Database Import Behavior below
 - **Tap Debug Logs** → navigates to `/settings/debug-logs`
+
+### AI Provider Keys (BYOK)
+
+Instead of a fixed set of text boxes, the user builds an **ordered list** of provider keys. The provider layer, validation, and fallback rules are specified in `spec/services/ai-providers.md`.
+
+**List** (inside the AI Assistance section, after Custom Prompt):
+- Header "AI Provider Keys". When the list isn't empty, it's followed by the hint "Generation tries keys top to bottom." If the last store mutation failed (Keychain write error), an inline destructive error `ai-keys-error` ("Couldn't update keys: …") also appears under the header.
+- Each row (`ai-key-row-{index}`) shows the provider name, the model (or the provider default), a masked key hint (`••••` plus the last 4 characters; for Ollama, the server URL), and a status dot with a label: **Verified** (green), **Not verified** (secondary), or **Invalid** (red). The row is a single accessibility element. Its label is "{n}. {Provider}, {model}" and its value is the status label.
+- Rows support drag-to-reorder (`onMove`) and swipe-to-delete (`onDelete`). The context menu has Move Up (`ai-key-move-up`), Move Down (`ai-key-move-down`), and Delete (`ai-key-delete`). Move Up is hidden on the first row and Move Down on the last.
+- When the list is empty, `ai-keys-empty` reads "Add a key from Anthropic, OpenAI, Gemini, or a local Ollama server to generate workouts in-app."
+- The "Add Key" button (`add-ai-key-button`) comes last.
+
+**Add / Edit Key sheet** (`ai-key-sheet`), presented as a sheet with its own NavigationStack (title "Add Key" or "Edit Key"). The sheet is hosted by `SettingsView`, which is stably mounted, not by the lazy list rows, so it presents reliably even when the Add Key row is scrolled off-screen.
+1. Provider picker (`picker-ai-provider`): Anthropic, OpenAI (ChatGPT), Google Gemini, Ollama (self-hosted). Changing the provider clears the key and model fields, any verification error, and the fetched model list, and cancels any in-flight verification. A secret is never carried over to another provider, e.g. as a Bearer token to a LAN host.
+2. For key-requiring providers: an API key field (`input-ai-api-key`) whose placeholder is the provider's key prefix (`sk-ant-…`, `sk-…`, `AIza…`), plus a visibility toggle (`toggle-api-key-visibility`). For Ollama: a server URL field (`input-ai-base-url`, default `http://localhost:11434`) and an optional "Token (optional)" key field, with the hint "Run Ollama with OLLAMA_HOST=0.0.0.0 and enter this computer's LAN address."
+3. Model field (`input-ai-model`), with the provider default as placeholder. Next to it, a "Load models" button (`button-load-ai-models`) runs the free verification call and fills a menu (`menu-ai-model`) of the provider's models for one-tap selection. In edit mode, models load automatically when the sheet appears.
+4. Inline error text (`ai-key-error`).
+5. Toolbar: Cancel (`button-cancel-ai-key`), plus Save (`button-save-ai-key`), which is disabled while verifying or when a required field is empty. In edit mode, a destructive Delete button (`button-delete-ai-key`) also appears.
+
+**Save behavior:**
+1. Format check. On failure, show the provider-specific format error in `ai-key-error` and keep the sheet open.
+2. Run the free verification call. While it runs, Save shows a spinner.
+3. `verified`: for Ollama, if the chosen model (or `model:latest`) isn't in the server's model list, show "Model "{model}" isn't installed on this Ollama server. Pick one from the list.", fill the model menu, and keep the sheet open. Otherwise save and dismiss. Hosted providers aren't checked this way, because they accept aliases their list endpoints omit. `invalid`: show "{Provider} rejected this key." (plus the provider's message, if any) and keep the sheet open. `unverified`: save with status `unverified` and dismiss. The row then shows "Not verified" until first use.
+4. Editing a key re-runs verification and keeps the key's position in the list. Adding appends to the end.
+5. Cancel, Delete, or dismissing the sheet cancels any in-flight verification, and a cancelled verification never saves.
+6. For Ollama, the installed-model check runs only when verification succeeded (`verified`). An unreachable server is saved `unverified`. A reachable server with no models shows "No models are installed on this Ollama server. Run "ollama pull {model}" first."
 
 ### Developer Mode Activation
 
@@ -227,7 +254,8 @@ Tapping "Import Workouts" opens a file picker for `.db` files. After selection, 
 ## Error/Empty States
 - **Settings not loaded**: LoadingView with "Loading settings..."
 - **Error from settings/gym store**: Alert dialog
-- **Invalid API key format**: Alert "Anthropic API keys must start with sk-ant-..."
+- **Invalid API key format**: Inline `ai-key-error` in the Add Key sheet with the provider-specific format hint
+- **Key rejected by provider**: Inline `ai-key-error`; key not saved
 - **Invalid database file**: Alert "Selected file is not a valid LiftMark database"
 - **Export/import failure**: Alert with error message
 

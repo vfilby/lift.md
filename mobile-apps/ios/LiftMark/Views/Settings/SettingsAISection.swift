@@ -2,9 +2,9 @@ import SwiftUI
 
 struct SettingsAISection: View {
     @Environment(SettingsStore.self) private var settingsStore
-    @State private var showApiKey = false
-    @State private var apiKeyText = ""
-    @FocusState private var apiKeyFocused: Bool
+    @Environment(AIKeyStore.self) private var aiKeyStore
+    /// Presented by `SettingsView` (stably mounted), not by these lazy list rows.
+    @Binding var editorTarget: AIKeyEditorTarget?
 
     var body: some View {
         Group {
@@ -19,8 +19,9 @@ struct SettingsAISection: View {
         Group {
             togglesGroup
             customPromptGroup(settings: settings)
-            apiKeyGroup
-            apiKeyStatusBadge(status: settings.anthropicApiKeyStatus)
+            keysHeader
+            keyRows
+            addKeyButton
         }
     }
 
@@ -67,79 +68,104 @@ struct SettingsAISection: View {
         }
     }
 
-    private var apiKeyGroup: some View {
-        VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
-            Text("API Key")
+    // MARK: - AI Provider Keys
+
+    private var keysHeader: some View {
+        VStack(alignment: .leading, spacing: LiftMarkTheme.spacingXS) {
+            Text("AI Provider Keys")
                 .font(.lmCaption)
                 .foregroundStyle(.secondary)
-            HStack(spacing: LiftMarkTheme.spacingSM) {
-                if showApiKey {
-                    TextField("API Key", text: $apiKeyText)
-                        .textContentType(.password)
-                        .autocorrectionDisabled()
-                        .focused($apiKeyFocused)
-                } else {
-                    SecureField("Anthropic API Key", text: $apiKeyText)
-                        .focused($apiKeyFocused)
-                }
-                Button {
-                    let wasFocused = apiKeyFocused
-                    showApiKey.toggle()
-                    if wasFocused {
-                        DispatchQueue.main.async { apiKeyFocused = true }
-                    }
-                } label: {
-                    Image(systemName: showApiKey ? "eye.slash" : "eye")
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("toggle-api-key-visibility")
-
-                Button {
-                    saveApiKey()
-                } label: {
-                    Text("Save")
-                        .font(.lmSubheadline.weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(LiftMarkTheme.primary)
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("save-api-key-button")
-
-                Button {
-                    removeApiKey()
-                } label: {
-                    Text("Remove")
-                        .font(.lmSubheadline.weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .overlay(
-                            Capsule()
-                                .stroke(LiftMarkTheme.destructive, lineWidth: 1.5)
-                        )
-                        .foregroundStyle(LiftMarkTheme.destructive)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("remove-api-key-button")
+            if let error = aiKeyStore.lastError {
+                Text("Couldn't update keys: \(error.localizedDescription)")
+                    .font(.lmCaption)
+                    .foregroundStyle(LiftMarkTheme.destructive)
+                    .accessibilityIdentifier("ai-keys-error")
+            }
+            if aiKeyStore.keys.isEmpty {
+                Text("Add a key from Anthropic, OpenAI, Gemini, or a local Ollama server to generate workouts in-app.")
+                    .font(.lmCaption)
+                    .foregroundStyle(LiftMarkTheme.tertiaryLabel)
+                    .accessibilityIdentifier("ai-keys-empty")
+            } else {
+                Text("Generation tries keys top to bottom.")
+                    .font(.lmCaption)
+                    .foregroundStyle(LiftMarkTheme.tertiaryLabel)
             }
         }
-        .accessibilityIdentifier("input-api-key")
     }
 
-    @ViewBuilder
-    private func apiKeyStatusBadge(status: ApiKeyStatus?) -> some View {
-        if let status {
-            HStack {
+    private var keyRows: some View {
+        ForEach(Array(aiKeyStore.keys.enumerated()), id: \.element.id) { index, key in
+            Button {
+                editorTarget = AIKeyEditorTarget(key: key, isNew: false)
+            } label: {
+                keyRow(key, index: index)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(index + 1). \(key.provider.displayName), \(key.effectiveModel)")
+            .accessibilityValue(statusLabel(key.status))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("ai-key-row-\(index)")
+            .contextMenu { keyContextMenu(key, index: index) }
+        }
+        .onMove { aiKeyStore.move(fromOffsets: $0, toOffset: $1) }
+        .onDelete { aiKeyStore.remove(atOffsets: $0) }
+    }
+
+    private func keyRow(_ key: AIProviderKey, index: Int) -> some View {
+        HStack(spacing: LiftMarkTheme.spacingSM) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(index + 1). \(key.provider.displayName)")
+                    .font(.lmBody)
+                Text("\(key.effectiveModel) · \(key.maskedHint)")
+                    .font(.lmCaption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            HStack(spacing: LiftMarkTheme.spacingXS) {
                 Circle()
-                    .fill(apiKeyStatusColor(status))
+                    .fill(statusColor(key.status))
                     .frame(width: 8, height: 8)
-                Text(apiKeyStatusLabel(status))
+                Text(statusLabel(key.status))
                     .font(.lmCaption)
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func keyContextMenu(_ key: AIProviderKey, index: Int) -> some View {
+        if index > 0 {
+            Button { aiKeyStore.moveUp(id: key.id) } label: {
+                Label("Move Up", systemImage: "arrow.up")
+            }
+            .accessibilityIdentifier("ai-key-move-up")
+        }
+        if index < aiKeyStore.keys.count - 1 {
+            Button { aiKeyStore.moveDown(id: key.id) } label: {
+                Label("Move Down", systemImage: "arrow.down")
+            }
+            .accessibilityIdentifier("ai-key-move-down")
+        }
+        Button(role: .destructive) { aiKeyStore.remove(id: key.id) } label: {
+            Label("Delete", systemImage: "trash")
+        }
+        .accessibilityIdentifier("ai-key-delete")
+    }
+
+    private var addKeyButton: some View {
+        Button {
+            editorTarget = AIKeyEditorTarget(key: AIProviderKey(provider: .anthropic), isNew: true)
+        } label: {
+            Label("Add Key", systemImage: "plus.circle")
+                .frame(minHeight: 44)
+        }
+        .accessibilityIdentifier("add-ai-key-button")
     }
 
     // MARK: - Toggle Binding
@@ -155,44 +181,21 @@ struct SettingsAISection: View {
         )
     }
 
-    // MARK: - API Key Actions
+    // MARK: - Status Display
 
-    private func saveApiKey() {
-        let trimmed = apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        do {
-            try SecureStorage.storeApiKey(trimmed)
-            guard var updated = settingsStore.settings else { return }
-            updated.anthropicApiKeyStatus = .verified
-            settingsStore.updateSettings(updated)
-        } catch {
-            guard var updated = settingsStore.settings else { return }
-            updated.anthropicApiKeyStatus = .invalid
-            settingsStore.updateSettings(updated)
-        }
-    }
-
-    private func removeApiKey() {
-        try? SecureStorage.removeApiKey()
-        apiKeyText = ""
-        guard var updated = settingsStore.settings else { return }
-        updated.anthropicApiKeyStatus = .notSet
-        settingsStore.updateSettings(updated)
-    }
-
-    private func apiKeyStatusColor(_ status: ApiKeyStatus) -> Color {
+    private func statusColor(_ status: AIKeyStatus) -> Color {
         switch status {
         case .verified: return LiftMarkTheme.success
         case .invalid: return LiftMarkTheme.destructive
-        case .notSet: return LiftMarkTheme.secondaryLabel
+        case .unverified: return LiftMarkTheme.secondaryLabel
         }
     }
 
-    private func apiKeyStatusLabel(_ status: ApiKeyStatus) -> String {
+    private func statusLabel(_ status: AIKeyStatus) -> String {
         switch status {
         case .verified: return "Verified"
         case .invalid: return "Invalid"
-        case .notSet: return "Not Set"
+        case .unverified: return "Not verified"
         }
     }
 }

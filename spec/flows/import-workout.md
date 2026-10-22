@@ -4,7 +4,7 @@
 
 - App is running and user is authenticated.
 - For file share entry: a `.txt`, `.md`, or `.markdown` file is shared via iOS share sheet.
-- For AI generation: optionally, an Anthropic API key is configured in Settings.
+- For AI generation: optionally, one or more AI provider keys (Anthropic, OpenAI, Gemini, Ollama) are configured in Settings.
 
 ## Entry Points
 
@@ -46,7 +46,7 @@ The modal presents:
    - Equipment context from the default gym.
    - Recent workout history.
    - Custom prompt additions from settings.
-4. `generateWorkout()` is called via `anthropicService`.
+4. `AIProviderService.generateWorkout(prompt:keys:)` is called with the user's ordered provider keys.
 5. On success: the generated markdown populates the text input field. The user reviews, optionally edits, and then imports.
 6. On failure: an error alert is shown describing the issue (rate limit, invalid key, server error, network error).
 

@@ -146,7 +146,7 @@ An `ActiveWorkoutBanner` component is rendered above the stack navigator. When a
 
 4. **AI Assistance**
    - **Workout Prompts**: Custom prompt text input (`input-custom-prompt`).
-   - **Anthropic API Key**: Secure text input (`input-api-key`), visibility toggle (`toggle-api-key-visibility`), save button (`save-api-key-button`), remove button (`remove-api-key-button`), and link to Anthropic console (`open-claude-button`).
+   - **AI Provider Keys**: Ordered, reorderable list of BYOK keys (`ai-key-row-{index}`) and an "Add Key" button (`add-ai-key-button`). The button opens the Add Key sheet: provider picker, key/URL/model inputs, Save/Cancel. See `spec/screens/settings.md`.
    - **Button Options** (`button-options-section`): Toggle for "Show Open in Claude button" (`switch-show-open-in-claude`). Only visible when API key is set.
 
 5. **Data Management**
@@ -280,7 +280,7 @@ Each exercise shows:
 **Content**:
 - **Header**: Cancel button (`button-cancel`), title, Import button (`button-import`, disabled when empty or processing).
 - **AI Prompt Section**: Expandable prompt viewer with Copy button (`button-copy-prompt`).
-  - Generate button (`button-generate`): Visible when API key is set. Calls Anthropic API to generate a workout.
+  - Generate button (`button-generate`): Visible when at least one usable AI provider key is set. Calls the providers in list order to generate a workout.
   - Open in Claude button (`button-open-claude`): Copies prompt and opens Claude.ai.
 - **Markdown Input** (`input-markdown`): Multi-line text input for LMWF markdown.
 - **Quick Guide**: Reference card for LMWF syntax.

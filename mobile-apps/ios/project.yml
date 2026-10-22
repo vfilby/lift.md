@@ -57,6 +57,7 @@ targets:
         INFOPLIST_KEY_NSHealthShareUsageDescription: "lift.md reads your workout history to track progress."
         INFOPLIST_KEY_NSHealthUpdateUsageDescription: "lift.md saves your completed workouts to Apple Health."
         INFOPLIST_KEY_NSSupportsLiveActivities: true
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "lift.md connects to your Ollama server on the local network to generate workouts."
         CODE_SIGN_ENTITLEMENTS: LiftMark/LiftMark.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
@@ -93,6 +94,9 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes:
           - remote-notification
+        # Plain-HTTP to local addresses only (self-hosted Ollama); public internet stays ATS-strict.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     preBuildScripts:
       - name: Generate BuildInfo
         script: |
