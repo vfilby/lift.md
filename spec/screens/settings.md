@@ -57,7 +57,7 @@ Central configuration hub for the app. Manages appearance, workout preferences, 
 - **Edit custom prompt** → saves on blur
 - **Tap Add Key** → opens the Add Key sheet (see AI Provider Keys below)
 - **Tap a key row** → opens the same sheet in edit mode
-- **Reorder keys** → drag a row, or use its context menu's Move Up / Move Down
+- **Reorder keys** → long-press a row and use its context menu's Move Up / Move Down
 - **Delete key** → swipe to delete, the context menu's Delete, or Delete in the edit sheet
 - **Tap Open in Claude** → opens `https://console.anthropic.com`
 - **Export Database** → see Database Export Behavior below
@@ -71,7 +71,7 @@ Instead of a fixed set of text boxes, the user builds an **ordered list** of pro
 **List** (inside the AI Assistance section, after Custom Prompt):
 - Header "AI Provider Keys". When the list isn't empty, it's followed by the hint "Generation tries keys top to bottom." If the last store mutation failed (Keychain write error), an inline destructive error `ai-keys-error` ("Couldn't update keys: …") also appears under the header.
 - Each row (`ai-key-row-{index}`) shows the provider name, the model (or the provider default), a masked key hint (`••••` plus the last 4 characters; for Ollama, the server URL), and a status dot with a label: **Verified** (green), **Not verified** (secondary), or **Invalid** (red). The row is a single accessibility element. Its label is "{n}. {Provider}, {model}" and its value is the status label.
-- Rows support drag-to-reorder (`onMove`) and swipe-to-delete (`onDelete`). The context menu has Move Up (`ai-key-move-up`), Move Down (`ai-key-move-down`), and Delete (`ai-key-delete`). Move Up is hidden on the first row and Move Down on the last.
+- Rows support swipe-to-delete (`onDelete`). Reordering is via the row's context menu (long-press): Move Up (`ai-key-move-up`), Move Down (`ai-key-move-down`), plus Delete (`ai-key-delete`). Move Up is hidden on the first row and Move Down on the last. There is no drag-to-reorder: Settings never enters edit mode, so an `onMove` handle would be unreachable.
 - When the list is empty, `ai-keys-empty` reads "Add a key from Anthropic, OpenAI, Gemini, or a local Ollama server to generate workouts in-app."
 - The "Add Key" button (`add-ai-key-button`) comes last.
 

@@ -109,7 +109,8 @@ struct SettingsAISection: View {
             .accessibilityIdentifier("ai-key-row-\(index)")
             .contextMenu { keyContextMenu(key, index: index) }
         }
-        .onMove { aiKeyStore.move(fromOffsets: $0, toOffset: $1) }
+        // Settings never enters edit mode, so drag-to-reorder (`onMove`) would be
+        // unreachable; reordering is the row's context menu (Move Up / Move Down).
         .onDelete { aiKeyStore.remove(atOffsets: $0) }
     }
 

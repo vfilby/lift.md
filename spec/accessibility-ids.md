@@ -105,7 +105,7 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `input-custom-prompt` | TextInput | Custom AI prompt addition input |
 | `ai-keys-empty` | Text | Empty-state hint shown when no AI provider keys are configured |
 | `ai-keys-error` | Text | Inline error when saving/reordering/deleting keys fails |
-| `ai-key-row-{index}` | Button | AI provider key row (0-based list order); tap to edit. Accessibility label "{n}. {Provider}", value = status (Verified / Not verified / Invalid) |
+| `ai-key-row-{index}` | Button | AI provider key row (0-based list order); tap to edit. Accessibility label "{n}. {Provider}, {model}", value = status (Verified / Not verified / Invalid) |
 | `ai-key-move-up` / `ai-key-move-down` | Button | Context-menu reorder actions on a key row |
 | `ai-key-delete` | Button | Context-menu delete action on a key row |
 | `add-ai-key-button` | Button | Open the Add Key sheet |
