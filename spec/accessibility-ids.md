@@ -103,10 +103,24 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `live-activities-status-label` | Text | Shows Live Activities permission status or instructions |
 | `live-activities-open-settings` | Button | Opens app system Settings (visible only when disabled at OS level) |
 | `input-custom-prompt` | TextInput | Custom AI prompt addition input |
-| `input-api-key` | TextInput | Anthropic API key input |
-| `toggle-api-key-visibility` | TouchableOpacity | Show/hide API key text |
-| `save-api-key-button` | TouchableOpacity | Save the entered API key |
-| `remove-api-key-button` | TouchableOpacity | Remove the stored API key |
+| `ai-keys-empty` | Text | Empty-state hint shown when no AI provider keys are configured |
+| `ai-keys-error` | Text | Inline error when saving/reordering/deleting keys fails |
+| `ai-key-row-{index}` | Button | AI provider key row (0-based list order); tap to edit. Accessibility label "{n}. {Provider}, {model}", value = status (Verified / Not verified / Invalid) |
+| `ai-key-move-up` / `ai-key-move-down` | Button | Context-menu reorder actions on a key row |
+| `ai-key-delete` | Button | Context-menu delete action on a key row |
+| `add-ai-key-button` | Button | Open the Add Key sheet |
+| `ai-key-sheet` | View | Add/Edit Key sheet root |
+| `picker-ai-provider` | Picker | Provider selection (Anthropic, OpenAI, Gemini, Ollama) |
+| `input-ai-api-key` | SecureField / TextField | API key input (optional token for Ollama) |
+| `toggle-api-key-visibility` | Button | Show/hide API key text in the sheet |
+| `input-ai-base-url` | TextField | Ollama server URL (Ollama only) |
+| `input-ai-model` | TextField | Model id (blank = provider default) |
+| `menu-ai-model` | Menu | Pick from the models returned by verification |
+| `button-load-ai-models` | Button | Run the free verification call and load the provider's models |
+| `ai-key-error` | Text | Inline validation / verification error |
+| `button-save-ai-key` | Button | Validate, verify, and save the key |
+| `button-cancel-ai-key` | Button | Dismiss the sheet without saving |
+| `button-delete-ai-key` | Button | Delete the key being edited (edit mode only) |
 | `open-claude-button` | TouchableOpacity | Open Anthropic console in browser |
 | `button-options-section` | View | Section for button option settings |
 | `switch-show-open-in-claude` | Switch | Toggle "always show Open in Claude" button |
@@ -219,7 +233,7 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `button-cancel` | TouchableOpacity | Cancel and dismiss the modal |
 | `button-import` | TouchableOpacity | Import the entered markdown |
 | `button-copy-prompt` | TouchableOpacity | Copy AI prompt to clipboard |
-| `button-generate` | TouchableOpacity | Generate workout via Anthropic API |
+| `button-generate` | TouchableOpacity | Generate a workout via the user's ordered AI provider keys |
 | `button-open-claude` | TouchableOpacity | Copy prompt and open Claude.ai |
 | `input-markdown` | TextInput | Markdown input field |
 | `import-markdown-error` | View | Inline parse error row (first error); absent when the text parses |

@@ -3,7 +3,7 @@
 ## Preconditions
 
 - The import modal is open.
-- For Path A: An Anthropic API key is configured and verified in Settings.
+- For Path A: At least one AI provider key (Anthropic, OpenAI, Gemini, or Ollama) that isn't marked invalid is configured in Settings.
 - For Path B: No API key is configured, or the "Open in Claude" button is enabled.
 
 ## Path A: In-App Generation (API Key Configured)
@@ -19,9 +19,9 @@
    - Available equipment from the default gym.
    - Workout history (last 5 sessions in compact format).
    - Custom prompt additions from user settings.
-4. `anthropicService.generateWorkout()` sends the request via `fetch` to the Anthropic Messages API.
-   - Model: `claude-haiku-4-5-20251001` (default).
-   - Max tokens: 4096.
+4. `AIProviderService.generateWorkout(prompt:keys:)` sends the prompt to the first usable key in the user's ordered list, falling back to the next key on failure (see `spec/services/ai-providers.md`).
+   - Each key uses its own configured model, or the provider default.
+   - Keys rejected with an auth error are marked `invalid`. Keys that succeed while `unverified` are marked `verified`.
 5. On success: the generated LMWF markdown populates the text input field in the import modal.
 6. The user reviews the generated workout, optionally edits it, and then proceeds with the standard import flow.
 
@@ -29,8 +29,9 @@
 
 | Scenario | Behavior |
 |---|---|
-| No API key configured | User is prompted to add a key in Settings |
-| Invalid API key | Error alert indicating the key is invalid |
+| No API key configured | Generate button hidden; user is prompted to add a key in Settings |
+| Invalid API key | Key marked invalid, next key tried; if none left, error names the provider |
+| Several keys all fail | One error line per provider tried |
 | Rate limit exceeded | Error alert indicating rate limit |
 | Server error (5xx) | Error alert with server error description |
 | Network error | Error alert indicating connectivity issue |
@@ -59,10 +60,11 @@
 
 ## API Key Management
 
-- The API key is stored in secure storage (not in the SQLite database).
-- The key is verified against the Anthropic API on save.
-- Key status is tracked as one of: `verified`, `invalid`, or `not_set`.
-- Key status determines which buttons are shown in the import modal ("Generate with Claude" vs. "Open in Claude").
+- Keys are stored in secure storage (Keychain), not in the SQLite database.
+- Users add keys one at a time through an "Add Key" sheet: pick a provider, then enter the key (or, for Ollama, a server URL) and an optional model.
+- On save, the format is checked offline, then the key is verified with the provider's **free** list-models endpoint. No tokens are spent.
+- Key status is one of: `verified`, `unverified` (couldn't verify yet; checked on first use), or `invalid`.
+- The list is ordered and the user can reorder it. Order sets which provider is tried first.
 
 ## Variations
 

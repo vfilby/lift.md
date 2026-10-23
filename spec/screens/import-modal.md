@@ -1,7 +1,7 @@
 # Import Workout Modal
 
 ## Purpose
-Modal for importing workouts via LiftMark Workout Format (LMWF) markdown. Supports manual paste, AI-generated prompts (copy to clipboard or generate directly via Anthropic API), and file pre-fill from external imports (share sheet, "Open In", or `liftmark://` deep links).
+Modal for importing workouts via LiftMark Workout Format (LMWF) markdown. Supports manual paste, AI-generated prompts (copy to clipboard or generate directly via the user's BYOK provider: Anthropic, OpenAI, Gemini, or Ollama), and file pre-fill from external imports (share sheet, "Open In", or `liftmark://` deep links).
 
 ## Route
 `/modal/import` — Presented as a modal. Accepts optional `prefilledMarkdown` and `fileName` search params.
@@ -52,7 +52,7 @@ LiftMark registers as a handler for markdown (`.md`) and plain-text files. Users
 - **Tap Import** → parses markdown via LMWF parser → if warnings: alert with Continue/Cancel → saves plan → success alert → navigates back
 - **Tap AI prompt toggle** → expands/collapses prompt preview section
 - **Tap Copy** → copies full AI prompt (with equipment, history, custom additions) to clipboard
-- **Tap "Generate with Claude"** (visible when API key set) → calls Anthropic API → populates markdown field with result
+- **Tap "Generate"** (visible when a usable provider key is set) → calls the first working provider in the user's ordered key list → populates markdown field with result
 - **Tap "Open in Claude"** (visible when no API key or showOpenInClaudeButton enabled) → copies prompt to clipboard → opens claude.ai/new in browser
 - **Edit markdown field** → updates local state
 

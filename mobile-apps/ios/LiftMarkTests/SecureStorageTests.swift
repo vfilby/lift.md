@@ -1,64 +1,48 @@
 import XCTest
 @testable import LiftMark
 
+/// Real Keychain round-trips for the generic accessors and the legacy Anthropic item.
 final class SecureStorageTests: XCTestCase {
+    private let account = "liftmark_tests_secure_storage"
 
-    // MARK: - validateAnthropicApiKey
-
-    func testValidKeyFormat() {
-        let validKey = "sk-ant-" + String(repeating: "a", count: 95)
-        XCTAssertTrue(SecureStorage.validateAnthropicApiKey(validKey))
+    override func tearDown() {
+        try? SecureStorage.delete(key: account)
+        super.tearDown()
     }
 
-    func testValidKeyWithMixedChars() {
-        let validKey = "sk-ant-" + String(repeating: "aB1_-", count: 20)
-        XCTAssertTrue(SecureStorage.validateAnthropicApiKey(validKey))
+    func testStoreRetrieveOverwriteDelete() throws {
+        try SecureStorage.store(key: account, value: "first")
+        XCTAssertEqual(SecureStorage.retrieve(key: account), "first")
+        try SecureStorage.store(key: account, value: "second")
+        XCTAssertEqual(SecureStorage.retrieve(key: account), "second")
+        try SecureStorage.delete(key: account)
+        XCTAssertNil(SecureStorage.retrieve(key: account))
     }
 
-    func testRejectsEmptyString() {
-        XCTAssertFalse(SecureStorage.validateAnthropicApiKey(""))
+    func testDeleteMissingItemIsNotAnError() {
+        XCTAssertNoThrow(try SecureStorage.delete(key: account))
     }
 
-    func testRejectsWhitespaceOnly() {
-        XCTAssertFalse(SecureStorage.validateAnthropicApiKey("   "))
+    func testLegacyAnthropicKeyReadAndRemove() throws {
+        let previous = SecureStorage.getLegacyAnthropicApiKey()
+        defer { if let previous { try? SecureStorage.store(key: "anthropic_api_key", value: previous) } }
+
+        try SecureStorage.store(key: "anthropic_api_key", value: "sk-ant-legacy")
+        XCTAssertEqual(SecureStorage.getLegacyAnthropicApiKey(), "sk-ant-legacy")
+        try SecureStorage.removeLegacyAnthropicApiKey()
+        XCTAssertNil(SecureStorage.getLegacyAnthropicApiKey())
     }
 
-    func testRejectsWrongPrefix() {
-        let key = "sk-wrong-" + String(repeating: "a", count: 95)
-        XCTAssertFalse(SecureStorage.validateAnthropicApiKey(key))
-    }
+    func testKeychainAIKeyStorageRoundTrip() throws {
+        let storage = KeychainAIKeyStorage()
+        let previous = storage.loadList()
+        defer {
+            if let previous { try? storage.saveList(previous) } else { try? storage.deleteList() }
+        }
 
-    func testRejectsTooShortKey() {
-        let key = "sk-ant-" + String(repeating: "a", count: 50)
-        XCTAssertFalse(SecureStorage.validateAnthropicApiKey(key))
-    }
-
-    func testRejectsKeyWithSpecialChars() {
-        let key = "sk-ant-" + String(repeating: "a", count: 90) + "!@#$%"
-        XCTAssertFalse(SecureStorage.validateAnthropicApiKey(key))
-    }
-
-    func testTrimsWhitespaceBeforeValidation() {
-        let validKey = "  sk-ant-" + String(repeating: "a", count: 95) + "  "
-        XCTAssertTrue(SecureStorage.validateAnthropicApiKey(validKey))
-    }
-
-    func testRejectsRandomString() {
-        XCTAssertFalse(SecureStorage.validateAnthropicApiKey("not-an-api-key"))
-    }
-
-    func testKeyExactly95CharsAfterPrefix() {
-        let key = "sk-ant-" + String(repeating: "x", count: 95)
-        XCTAssertTrue(SecureStorage.validateAnthropicApiKey(key))
-    }
-
-    func testKeyMoreThan95CharsAfterPrefix() {
-        let key = "sk-ant-" + String(repeating: "x", count: 200)
-        XCTAssertTrue(SecureStorage.validateAnthropicApiKey(key))
-    }
-
-    func testKey94CharsAfterPrefixFails() {
-        let key = "sk-ant-" + String(repeating: "x", count: 94)
-        XCTAssertFalse(SecureStorage.validateAnthropicApiKey(key))
+        try storage.saveList("[]")
+        XCTAssertEqual(storage.loadList(), "[]")
+        try storage.deleteList()
+        XCTAssertNil(storage.loadList())
     }
 }

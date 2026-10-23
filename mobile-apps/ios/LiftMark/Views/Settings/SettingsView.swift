@@ -12,6 +12,9 @@ struct SettingsView: View {
     /// launch-settling re-render (GH #279). `SettingsAccountSection` receives
     /// this as a binding and flips it from its Sign in button.
     @State private var showingLogin = false
+    /// Same reasoning for the AI key editor: `SettingsAISection` rows are lazy
+    /// List cells that get recycled off-screen, so the sheet lives here.
+    @State private var aiKeyEditorTarget: AIKeyEditorTarget?
 
     var body: some View {
         Group {
@@ -54,6 +57,9 @@ struct SettingsView: View {
         // the first-tap presentation (GH #279).
         .sheet(isPresented: $showingLogin) {
             LoginView()
+        }
+        .sheet(item: $aiKeyEditorTarget) { target in
+            AIKeyEditorSheet(original: target.key, isNew: target.isNew)
         }
         #if os(iOS)
         .scrollDismissesKeyboard(.interactively)
@@ -170,7 +176,7 @@ struct SettingsView: View {
                 case .gyms:
                     SettingsGymSection()
                 case .ai:
-                    SettingsAISection()
+                    SettingsAISection(editorTarget: $aiKeyEditorTarget)
                 case .data:
                     SettingsDataSection()
                 case .privacy:
@@ -218,7 +224,7 @@ struct SettingsView: View {
             }
 
             Section("AI Assistance") {
-                SettingsAISection()
+                SettingsAISection(editorTarget: $aiKeyEditorTarget)
             }
 
             Section("Data Management") {
