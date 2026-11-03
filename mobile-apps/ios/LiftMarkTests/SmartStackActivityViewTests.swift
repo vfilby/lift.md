@@ -95,8 +95,10 @@ final class SmartStackActivityViewTests: XCTestCase {
     func testRegularLayoutShownWhenItFits() {
         for state in [active, rest] {
             let regular = idealHeight(state, .regular)
-            XCTAssertEqual(renderedLayout(state, offeredHeight: regular + 2), .regular, "isRestTimer=\(state.isRestTimer)")
-            XCTAssertEqual(renderedLayout(state, offeredHeight: regular + 40), .regular, "isRestTimer=\(state.isRestTimer)")
+            for slack in [2.0, 40.0] {
+                XCTAssertEqual(renderedLayout(state, offeredHeight: regular + slack), .regular,
+                               "isRestTimer=\(state.isRestTimer) slack=\(slack)")
+            }
         }
     }
 
