@@ -197,7 +197,10 @@ struct ActiveExerciseCard: View {
                         onUnlog: { onUnlogSet(setIndex) },
                         onWeightChanged: setIndex == currentSetIndex ? { newWeight in
                             currentWeightText = newWeight
-                        } : nil
+                        } : nil,
+                        suggestedWeight: ActiveWorkoutViewModel.suggestedWeight(
+                            forSetAt: setIndex, in: exercise.sets,
+                            currentSetIndex: currentSetIndex, currentWeight: Double(currentWeightText))
                     )
 
                     // Timed-exercise timer — pinned directly under the active set

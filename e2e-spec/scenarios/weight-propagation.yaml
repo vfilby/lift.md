@@ -1,0 +1,86 @@
+name: "Weight Propagation"
+
+# GH #5 / regression GH #489: changing one set's weight carries over to the
+# remaining pending sets of that exercise planned at the same weight, both live
+# while editing and after the set is completed. The 100 lb back-off set keeps
+# its own target. Machine Row (not a barbell) so no plate-math text appears.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+  - action: waitFor
+    target: "button-import-workout"
+    timeout: 5000
+  - action: tryCatch
+    try:
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "input-markdown"
+        timeout: 10000
+    catch:
+      - action: tap
+        target: "button-import-workout"
+  - action: waitFor
+    target: "input-markdown"
+    timeout: 10000
+  - action: replaceText
+    target: "input-markdown"
+    fixture: "weight-propagation-workout.md"
+  - action: tap
+    target: "button-import"
+  - action: waitForText
+    text: "OK"
+    timeout: 10000
+  - action: tapText
+    text: "OK"
+  - action: waitForText
+    text: "Weight Propagation Test"
+    timeout: 10000
+
+tests:
+  - name: "changing a set's weight updates remaining equal-weight sets"
+    steps:
+      - action: tapText
+        text: "Weight Propagation Test"
+      - action: waitFor
+        target: "start-workout-button"
+        timeout: 5000
+      - action: tap
+        target: "start-workout-button"
+      - action: waitFor
+        target: "active-workout-screen"
+        timeout: 10000
+      - action: expect
+        text: "95 lbs"
+        assertion: "notToExist"
+      # Set 1: 92.5 -> 95. Sets 2 and 3 (also 92.5) follow; set 4 (100) doesn't.
+      - action: tapText
+        text: "Increase weight by 2.5"
+      - action: expect
+        text: "95 lbs"
+        assertion: "toExist"
+      - action: expect
+        text: "100 lbs"
+        assertion: "toExist"
+      # Complete set 1 at 95. Set 2 must now start at 95, so one more step
+      # makes it 97.5 — which set 3 then shows live.
+      - action: tap
+        target: "set-complete-button"
+      - action: tapText
+        text: "Increase weight by 2.5"
+      - action: expect
+        text: "97.5 lbs"
+        assertion: "toExist"
+      - action: expect
+        text: "100 lbs"
+        assertion: "toExist"

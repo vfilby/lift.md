@@ -60,9 +60,9 @@ extension SetRowView {
 
                             modifierBadges
                         } else {
-                            // Pending - show targets
+                            // Pending - show targets, with any carried-over weight (GH #489)
                             let target = set.entries.first?.target
-                            if let weight = target?.weight?.value, let unit = target?.weight?.unit {
+                            if let weight = suggestedWeight ?? target?.weight?.value, let unit = target?.weight?.unit {
                                 Text("\(formatWeight(weight)) \(unit.rawValue)")
                                     .font(.lmSubheadline.monospacedDigit())
                                     .foregroundStyle(LiftMarkTheme.tertiaryLabel)
