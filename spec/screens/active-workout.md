@@ -62,7 +62,7 @@ Exercise notes (form cues, e.g. "Step into a deep lunge… 5 reps per side.") re
 
 ### Set Completion
 - **Tap current set** → no-op (already expanded)
-- **Edit weight/reps fields** → updates edit values; weight propagates to remaining pending sets in same exercise
+- **Edit weight/reps fields** → updates edit values; weight propagates to remaining pending sets in same exercise that share the edited set's target weight (see Weight Propagation below)
 - **Inline weight on reps-only sets (GH #194)**: a set logged as reps-only / bodyweight (no target weight) shows a compact **"add weight"** affordance (`set-add-weight-button`) in place of the weight field. Tapping it reveals the weight stepper/field inline so a weight can be logged without editing the exercise definition. The entered weight is saved against the user's default weight unit (`UserSettings.defaultWeightUnit`) since the set started unitless. Leaving the field blank logs no weight (the set stays reps-only) — adding weight is opt-in per set. The same affordance appears in the inline edit form for an already-logged reps-only set.
 - **Complete button visibility**: The checkmark complete button is hidden when `targetTime != nil` (timed sets). Timed sets are completed exclusively via the ExerciseTimerView Done button. The Skip button remains visible for all set types.
 - **Tap "Complete"** → records actual values from input fields, advances to next set
@@ -71,6 +71,25 @@ Exercise notes (form cues, e.g. "Step into a deep lunge… 5 reps per side.") re
   - If rest seconds defined and auto-start disabled: shows Start/Skip rest suggestion
   - If all sets complete: triggers Finish flow
 - **Tap "Skip"** → marks set as skipped, advances
+
+### Weight Propagation (GH #5, regression GH #489)
+Changing a set's weight carries over to the remaining sets of that exercise that were planned at the same weight, so the user doesn't re-enter it on every set (e.g. 3 × 92.5 → bump set 1 to 95 → sets 2 and 3 show 95).
+
+- **Scope**: only *pending* sets that come **after** the edited set in the **same exercise** and whose **target weight equals** the edited set's target weight (same value and unit). Sets planned at a different weight (pyramids, ramps, back-off sets) keep their own target. Completed and skipped sets never change. Sets with no target weight are not affected.
+- **Live while editing**: as the user changes the current set's weight (typing or the +/− stepper), those pending rows display the new weight immediately.
+- **Carried by completion**: once a set is completed, each later pending set with the same target weight is *suggested* the actual weight of the most recent completed set before it with that target weight. The suggestion is shown on the pending row and pre-fills the weight field when the set becomes current. It is derived from the session's logged sets, so it survives app relaunch and resuming the session; editing that completed set's weight re-derives the suggestion. Skipped sets don't contribute.
+- **Targets are untouched**: propagation never rewrites the session's (or plan's) target weight — "Target: …" still shows the planned weight, and the summary/history keep the plan. The value logged is whatever is in the field when the set is completed (see Set Completion).
+- Superset cards apply the same rule per member exercise (sets of other exercises in the superset are never affected).
+- **Implementation**: pure function `ActiveWorkoutViewModel.suggestedWeight(forSetAt:in:currentSetIndex:currentWeight:)`; `SetRowView.suggestedWeight` renders it on pending rows and seeds the weight field when the row becomes current.
+
+#### Tests
+- Unit (`ActiveWorkoutWeightPropagationTests`):
+  - editing the current set (index 0, target 92.5) to 95 → later pending sets with target 92.5 suggest 95; a later set with target 100 suggests nil; the current set itself suggests nil.
+  - live weight is ignored when the current set comes after the queried set, or its target weight differs, or the live value is nil.
+  - after set 0 (target 92.5) completes at 95 with no live edit → sets 1 and 2 suggest 95; a set whose most recent same-target completed set was logged at target → suggests that value (92.5).
+  - the most recent completed same-target set wins (set 0 @95, set 1 @97.5 → set 2 suggests 97.5); skipped sets are ignored.
+  - target weights in different units don't match (92.5 lbs vs 92.5 kg); completed/skipped queried sets and sets with no target weight suggest nil.
+- E2E (`e2e-spec/scenarios/weight-propagation.yaml`, fixture `weight-propagation-workout.md`: Machine Row 3 × 92.5 then 100 × 3): tap "Increase weight by 2.5" on set 1 → "95 lbs" shown (pending sets 2–3) and "100 lbs" still shown; complete set 1, tap increase on set 2 → "97.5 lbs" shown (set 2 started at the carried-over 95; set 3 follows live) and "100 lbs" still shown.
 
 ### Drop Set Recording
 - Drop sets (`isDropset == true`) display a full-width **"Add Drop"** button below the current entry inputs. The button is 44pt tall with a bordered outline style (`destructive` color with 0.3 opacity stroke) to provide a clear, distinct tap target that won't be confused with the "Complete Set" button below it.

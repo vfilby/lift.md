@@ -172,7 +172,8 @@ struct SupersetCard: View {
 
                 // Interleaved sets
                 let interleaved = interleavedSets
-                let firstPendingSetId = interleaved.first(where: { $0.set.status == .pending })?.set.id
+                let firstPending = interleaved.first(where: { $0.set.status == .pending })
+                let firstPendingSetId = firstPending?.set.id
                 ForEach(Array(interleaved.enumerated()), id: \.element.set.id) { _, item in
                     let isCurrent = item.set.id == firstPendingSetId
 
@@ -201,7 +202,13 @@ struct SupersetCard: View {
                         onUnlog: { onUnlogSet(item.exerciseIndex, item.setIndex) },
                         onWeightChanged: isCurrent ? { newWeight in
                             currentWeightText = newWeight
-                        } : nil
+                        } : nil,
+                        // Propagation stays within the member exercise (GH #489).
+                        suggestedWeight: ActiveWorkoutViewModel.suggestedWeight(
+                            forSetAt: item.setIndex, in: item.exercise.sets,
+                            currentSetIndex: firstPending?.exerciseIndex == item.exerciseIndex
+                                ? firstPending?.setIndex : nil,
+                            currentWeight: Double(currentWeightText))
                     )
 
                     // Timed-exercise timer — pinned directly under the active

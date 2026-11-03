@@ -104,6 +104,12 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "rest-timer-auto-scroll")
     }
 
+    /// GH #489: changing a set's weight carries over to the remaining sets
+    /// planned at the same weight.
+    func testWeightPropagation() throws {
+        runner.runScenario(named: "weight-propagation")
+    }
+
     func testHistoryFlow() throws {
         runner.runScenario(named: "history-flow-robust")
     }
