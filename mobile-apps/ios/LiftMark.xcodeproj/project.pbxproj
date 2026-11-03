@@ -14,6 +14,7 @@
 		058A5827B2ABC70C093B59B9 /* CKRecordMapper+Gyms.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDC5D55D282FEAC90A7F990 /* CKRecordMapper+Gyms.swift */; };
 		06EE4DED95E7B9EE13AF33F1 /* RestTimerTickTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DEB10F36ACE6291531A52C /* RestTimerTickTests.swift */; };
 		0705F5FA06427587A436B761 /* InboxItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1EFBC8A65FA33DF6A782E26 /* InboxItem.swift */; };
+		07757FCF2C8A08CF87145305 /* SmartStackActivityViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46437B27B6AC42835BC02B6 /* SmartStackActivityViewTests.swift */; };
 		08064DE5BC91C775DFE2CDF6 /* PlanEditPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D17D2CB85982299DA8101BB /* PlanEditPromptTests.swift */; };
 		083A02957C5374F617C3B256 /* ParserConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9017628E208B7ED9FDC9E047 /* ParserConformanceTests.swift */; };
 		0A1408CC7EF27C2FCA9FAEF2 /* SessionLMWFEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A259EFF7FFA8F1DD3070318 /* SessionLMWFEncoder.swift */; };
@@ -168,6 +169,7 @@
 		789A92F54B181AE5B0F2E526 /* CloudKitSyncProtectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8B0A4526BD762457DD4ABF /* CloudKitSyncProtectionTests.swift */; };
 		7AB5F2F72412312FF135E237 /* ExerciseHistoryRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD62A5DD7A3746F10518F287 /* ExerciseHistoryRepositoryTests.swift */; };
 		7ABA2DD0D0BF49F6BC338660 /* ActiveWorkoutWeightPropagationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D70AA405F546C93AE7CFB6 /* ActiveWorkoutWeightPropagationTests.swift */; };
+		7B4601E5B7D33FC3EBE078FB /* SmartStackActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C654C3AF6172E4E2C61DDAB8 /* SmartStackActivityView.swift */; };
 		7C90C1A92BE487A6425D9FD5 /* CrashReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EFB75FAACD87D8A4AA1F8F7 /* CrashReporter.swift */; };
 		7D298DEAA05518F3DC66D53A /* SetEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB9A5D9D4A27C0A81A9292F /* SetEntry.swift */; };
 		808A3DC210664F94AE68D4FD /* SettingsDeveloperSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565A9B08E30D7C1D7E6E94BD /* SettingsDeveloperSection.swift */; };
@@ -227,6 +229,7 @@
 		AB59B2427C54B7DE6715E1A4 /* AuthenticationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1E8D269112E454A906DCCF /* AuthenticationStoreTests.swift */; };
 		AC1C76AE5D2D02839866D62A /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32C3C9DD2398AC651AD5E001 /* Typography.swift */; };
 		AE4EB6EC971EF1017EE4BD3E /* DatabaseSeedLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37B6A4D35C21B1F5A03FFCE /* DatabaseSeedLoader.swift */; };
+		B035F05A4D5CE4D27A1959D3 /* SmartStackActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C654C3AF6172E4E2C61DDAB8 /* SmartStackActivityView.swift */; };
 		B083728BFDB63818EF40A8EF /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BA685EEE79F8F9BE670D3F58 /* Inter-SemiBold.ttf */; };
 		B24A5E45EBCB75DEE61DC2AC /* AdaptiveSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38E018F88DC33EB2158C6AC /* AdaptiveSplitView.swift */; };
 		B32B1213805C0FDA52C6DE0F /* MigrationGoldenShapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4809E1673A516FC331DFC5 /* MigrationGoldenShapes.swift */; };
@@ -313,6 +316,7 @@
 		EF8C60C32DCD834946E260BE /* StubPlanEditEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4DDE11A14E2504EF4B7F72 /* StubPlanEditEngine.swift */; };
 		F0D9AF4CEA40EB9E5811878F /* EditPlanMarkdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFE17786DC0564D38BF1802 /* EditPlanMarkdownSheet.swift */; };
 		F0F1CB732AF37230C12C9B34 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32C3C9DD2398AC651AD5E001 /* Typography.swift */; };
+		F344025E5768315CBEFA27C0 /* NavigationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8046CE513A0BB5DA0C3ED /* NavigationCoordinatorTests.swift */; };
 		F37EC6ABED84F7A871698B2A /* PlateCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBE5F077F0F3EA293E45AE5 /* PlateCalculator.swift */; };
 		F41896189B5278E358E52ADE /* ActiveWorkoutViewModel+WeightPropagation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890094B011E36D050150D6BE /* ActiveWorkoutViewModel+WeightPropagation.swift */; };
 		F4ED8A631DF3AD44DE49CD23 /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 21BE97A74F617CCDCB45D15A /* JetBrainsMono-Medium.ttf */; };
@@ -605,6 +609,7 @@
 		C3CB86B68F041A69E6F4E6B7 /* CKRecordMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKRecordMapperTests.swift; sourceTree = "<group>"; };
 		C3E789B9A675739D485DEB8B /* Enums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Enums.swift; sourceTree = "<group>"; };
 		C4E57D80C4853D24794956E5 /* AuthSyncBannerViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSyncBannerViewTests.swift; sourceTree = "<group>"; };
+		C654C3AF6172E4E2C61DDAB8 /* SmartStackActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartStackActivityView.swift; sourceTree = "<group>"; };
 		C660980B93EFC4A5B3B4C2D8 /* AuthenticationStore+Refresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AuthenticationStore+Refresh.swift"; sourceTree = "<group>"; };
 		C70744D9027695A5A6176D54 /* LiftMark.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LiftMark.entitlements; sourceTree = "<group>"; };
 		C826AE567713686B32DDE784 /* RestTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerView.swift; sourceTree = "<group>"; };
@@ -660,6 +665,7 @@
 		EADAA4A9258171076A1B482F /* CKSyncEngineManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKSyncEngineManagerTests.swift; sourceTree = "<group>"; };
 		EB6A5CEC71262021C683101D /* LMWFParseStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMWFParseStatusView.swift; sourceTree = "<group>"; };
 		EC7055EA2B5CF16CA09CB3AA /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
+		EDB8046CE513A0BB5DA0C3ED /* NavigationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinatorTests.swift; sourceTree = "<group>"; };
 		EE8F15CFAC746BF9E15FD21B /* PlanEditPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditPresentationTests.swift; sourceTree = "<group>"; };
 		EEE12770F5439352D3BD23AC /* MarkdownParserTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParserTypes.swift; sourceTree = "<group>"; };
 		F137B212FEE18D030DBC9C70 /* WorkoutPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPlan.swift; sourceTree = "<group>"; };
@@ -667,6 +673,7 @@
 		F33E7AC1F974FF1C4952C4B7 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 		F367406D6EAEEB16A1D945D6 /* SetRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetRowView.swift; sourceTree = "<group>"; };
 		F37B6A4D35C21B1F5A03FFCE /* DatabaseSeedLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseSeedLoader.swift; sourceTree = "<group>"; };
+		F46437B27B6AC42835BC02B6 /* SmartStackActivityViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartStackActivityViewTests.swift; sourceTree = "<group>"; };
 		F50385B7B4FDD8D7D894B9BD /* SessionDateDisplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDateDisplayTests.swift; sourceTree = "<group>"; };
 		F5F4306EFB81F0C2668F42D9 /* TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStore.swift; sourceTree = "<group>"; };
 		F60A15DD48ACEE99146D8D6B /* MarkdownParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParser.swift; sourceTree = "<group>"; };
@@ -1181,6 +1188,7 @@
 				6581EE7985E65BA6E5926046 /* MarkdownParserMalformedHeaderTests.swift */,
 				0EE4CFAF846AA2F5EA32856A /* MarkdownParserStrayLineTests.swift */,
 				BE23FF382474D10663FDF662 /* MarkdownParserTests.swift */,
+				EDB8046CE513A0BB5DA0C3ED /* NavigationCoordinatorTests.swift */,
 				602B65899BCBD9026FEB621C /* OutboxPusherServiceTests.swift */,
 				9017628E208B7ED9FDC9E047 /* ParserConformanceTests.swift */,
 				72285970FF3F54891CBEFFC9 /* PlanDiffBuilderTests.swift */,
@@ -1199,6 +1207,7 @@
 				15DD705455651A8CB95DA707 /* SetMeasurementTests.swift */,
 				5110D42846BCE10A32F2EF2F /* SettingsSectionTests.swift */,
 				E207DFAAFEC931BC9C910783 /* ShareSheetTests.swift */,
+				F46437B27B6AC42835BC02B6 /* SmartStackActivityViewTests.swift */,
 				64A76A2194E3AF636AD5C75F /* StoreIntegrationTests.swift */,
 				09E8620AC734B9A30E7C2D45 /* StubPlanEditEngineTests.swift */,
 				58BA4F2232025DD4B5E50533 /* SyncSessionGuardTests.swift */,
@@ -1221,6 +1230,7 @@
 			children = (
 				249A50EECD997068FD7E5641 /* Fonts */,
 				0803F94CFA4719C27968C80F /* Theme */,
+				C654C3AF6172E4E2C61DDAB8 /* SmartStackActivityView.swift */,
 				05B7BEBFD01C2F49EF43CD34 /* WorkoutActivityAttributes.swift */,
 			);
 			path = Shared;
@@ -1400,9 +1410,9 @@
 			projectRoot = "";
 			targets = (
 				C85473E4DFB8A8D106D9E91F /* LiftMark */,
-				53E0790CA861717F717694E6 /* LiveWorkouts */,
 				EA955531AB00AA017EFBAF52 /* LiftMarkTests */,
 				F8ECB0187FF2B538943D49D0 /* LiftMarkUITests */,
+				53E0790CA861717F717694E6 /* LiveWorkouts */,
 			);
 		};
 /* End PBXProject section */
@@ -1660,6 +1670,7 @@
 				477624438ABA426BFB9F103B /* SettingsStore.swift in Sources */,
 				697ACE9A93DBDD78F0B11F3B /* SettingsView.swift in Sources */,
 				BDF8B36AB77641C02F745A82 /* ShareSheet.swift in Sources */,
+				B035F05A4D5CE4D27A1959D3 /* SmartStackActivityView.swift in Sources */,
 				EF8C60C32DCD834946E260BE /* StubPlanEditEngine.swift in Sources */,
 				9A7F698F044594B23FF93F06 /* SupersetCard.swift in Sources */,
 				67F8E833AB970E7C0B0D3E7F /* SyncChange.swift in Sources */,
@@ -1760,6 +1771,7 @@
 				0D3B054A1D935A34E0F078EC /* MarkdownParserStrayLineTests.swift in Sources */,
 				755252BEE04425DE12067D61 /* MarkdownParserTests.swift in Sources */,
 				B32B1213805C0FDA52C6DE0F /* MigrationGoldenShapes.swift in Sources */,
+				F344025E5768315CBEFA27C0 /* NavigationCoordinatorTests.swift in Sources */,
 				DE74148FDCE6F320FA2C3DD8 /* OutboxPusherServiceTests.swift in Sources */,
 				083A02957C5374F617C3B256 /* ParserConformanceTests.swift in Sources */,
 				4F7670626F20D92124EDBA42 /* PlanDiffBuilderTests.swift in Sources */,
@@ -1779,6 +1791,7 @@
 				EF4E02A74682DBE3A2A2E1B1 /* SetMeasurementTests.swift in Sources */,
 				57F8502ACA1B48E1533E8EE8 /* SettingsSectionTests.swift in Sources */,
 				589768848F8054BCABF48594 /* ShareSheetTests.swift in Sources */,
+				07757FCF2C8A08CF87145305 /* SmartStackActivityViewTests.swift in Sources */,
 				5AFB4BC3349F22E53C712DCB /* StoreIntegrationTests.swift in Sources */,
 				5BC93F62EFF1D40E660D5478 /* StubPlanEditEngineTests.swift in Sources */,
 				12D96B58A9C05219A259D752 /* SyncSessionGuardTests.swift in Sources */,
@@ -1808,6 +1821,7 @@
 			files = (
 				632B08C759934F9473839948 /* LiveWorkoutsBundle.swift in Sources */,
 				3343180981AC06FEAE101E03 /* LiveWorkoutsLiveActivity.swift in Sources */,
+				7B4601E5B7D33FC3EBE078FB /* SmartStackActivityView.swift in Sources */,
 				AC1C76AE5D2D02839866D62A /* Typography.swift in Sources */,
 				CD2B1A71D7CC2E49364685BD /* WorkoutActivityAttributes.swift in Sources */,
 			);

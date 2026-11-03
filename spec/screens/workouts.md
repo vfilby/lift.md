@@ -55,7 +55,7 @@ Always visible at the top of the screen, between the header and the search bar. 
 - **Swipe inbox row left** → reveals Add to Plans + Start
 - **Swipe inbox row right** → reveals Discard
 - **Tap Inbox → Add to Plans** → promotes item to a plan, removes from inbox, deletes server row
-- **Tap Inbox → Start** → promotes (as above) and opens the new plan's detail screen so the user can tap Start there (v1)
+- **Tap Inbox → Start** → promotes (as above), starts a session from the new plan, and pushes Active Workout onto the Plans tab's navigation stack (GH #210); never routes through another tab (GH #487)
 - **Tap Inbox → Discard** → removes from local inbox + deletes server row (no confirmation; can re-push externally)
 - **Type in search** → filters plans by query
 - **Toggle "Show Filters"** → expands/collapses filter card

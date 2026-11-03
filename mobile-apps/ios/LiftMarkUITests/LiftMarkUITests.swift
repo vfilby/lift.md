@@ -206,6 +206,12 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "beta-inbox")
     }
 
+    /// Local (no backend) inbox Start flow: a seeded row's Start must land in
+    /// Active Workout, not a blank screen (GH #487).
+    func testInboxStart() throws {
+        runner.runScenario(named: "inbox-start")
+    }
+
     func testBetaOutbox() throws {
         runner.runScenario(named: "beta-outbox")
     }

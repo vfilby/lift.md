@@ -24,6 +24,12 @@ struct InboxSectionView: View {
     /// independent of any reload that happens while it's open — if the
     /// underlying row vanishes the sheet still renders until dismissed.
     @State private var previewing: PreviewPayload?
+    /// True from the preview sheet's appearance until its dismissal has
+    /// finished (`onDismiss`). A Start requested from the sheet's footer
+    /// navigates only once this clears, so the push never races the sheet's
+    /// dismissal animation (GH #487).
+    @State private var previewSheetOnScreen = false
+    @State private var pendingNavigation: (() -> Void)?
 
     private let repository: InboxItemRepository
     private let apiClient: APIClientProtocol
@@ -65,7 +71,13 @@ struct InboxSectionView: View {
         .onReceive(NotificationCenter.default.publisher(for: InboxPollerService.inboxDidChange)) { _ in
             reload()
         }
-        .sheet(item: $previewing) { payload in
+        .sheet(item: $previewing, onDismiss: {
+            previewSheetOnScreen = false
+            if let navigate = pendingNavigation {
+                pendingNavigation = nil
+                navigate()
+            }
+        }) { payload in
             InboxPreviewSheet(
                 plan: payload.plan,
                 createdAtServer: payload.createdAtServer,
@@ -80,6 +92,7 @@ struct InboxSectionView: View {
                     Task { await promote(byId: payload.inboxId, openDetail: true) }
                 }
             )
+            .onAppear { previewSheetOnScreen = true }
         }
     }
 
@@ -301,11 +314,26 @@ struct InboxSectionView: View {
         // session can't be created so the user still lands somewhere useful
         // (GH #210). `startSession` cancels any in-progress session first.
         if openDetail {
+            let planId = plan.id
             if sessionStore.startSession(from: plan) != nil {
-                navCoordinator.navigateToActiveWorkout()
+                navigateOnceSheetIsGone { navCoordinator.navigateToActiveWorkout() }
             } else {
-                navCoordinator.navigateToPlan(id: plan.id)
+                navigateOnceSheetIsGone { navCoordinator.navigateToPlan(id: planId) }
             }
+        }
+    }
+
+    /// Runs `navigate` now, or — if the preview sheet is still on screen
+    /// (including its dismissal animation) — from the sheet's `onDismiss`.
+    /// Pushing while the sheet is animating away is a second way the Start
+    /// push could land in a half-presented state (GH #487). Main-actor only, so there is no race
+    /// between the check here and `onDismiss` clearing the flag.
+    @MainActor
+    private func navigateOnceSheetIsGone(_ navigate: @escaping () -> Void) {
+        if previewSheetOnScreen {
+            pendingNavigation = navigate
+        } else {
+            navigate()
         }
     }
 

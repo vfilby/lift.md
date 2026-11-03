@@ -142,6 +142,21 @@ The small-family layout must show "what's up next" so the watch card is useful m
 - No progress bar in either state — vertical space is limited; the percentage in the active-set layout is sufficient.
 - The small-family layout uses system fonts, not the app's custom fonts: the watch renders the view on-device and the custom fonts bundled in the widget extension are not available there.
 
+##### Small-family sizing and spacing
+
+The Smart Stack card is a fixed size that varies by watch model (e.g. 184×80.5 pt on a 45 mm watch, including system content margins), and the card does not grow to fit its content: anything taller than the offered height spills over the card below it in the stack (issue #488 — the rest card overlapped the Now Playing card). The layout must therefore adapt to the height the system offers rather than assume one:
+
+- **Two layouts, richest that fits**: the view offers a **regular** (three-row) and a **compact** (two-row) layout and shows the regular one only when its ideal height fits the offered height; otherwise it shows the compact one (`ViewThatFits(in: .vertical)`).
+  - Regular active set: top row; weight × reps; "Next: [exercise name]" + percentage (the rows described above).
+  - Compact active set: top row; weight × reps (left), percentage (right). The next exercise name is dropped.
+  - Regular rest: top row; "Next: [exercise name]"; next set detail beneath it.
+  - Compact rest: top row; next exercise name (left, no "Next:" prefix, truncates first), next set detail (right, never truncated in favor of the name).
+- **Fill, don't stack**: the view fills the space it is offered. The top row is pinned to the top and the remaining rows are grouped into a details block pinned to the bottom, separated by a flexible gap (minimum 4 pt), so extra height becomes breathing room between the header and the details.
+- **Grouping**: in the regular rest layout the next exercise name (primary color, semibold) and its set detail (secondary color) form one tightly grouped pair beneath the header, rather than two equal, tightly packed captions.
+- **Sizes**: the top row uses `.headline`. Active-set weight × reps uses `.body` bold (not `.title3`, which is too tall for the card). Rest details use `.footnote`; active set info, next exercise, and percentage use `.caption`.
+- **No overflow**: every text is single-line and may shrink (minimum scale factor 0.75) rather than wrap.
+- The small-family view lives in `Shared/SmartStackActivityView.swift` and takes only the `ContentState`, so it is compiled into the app target and covered by unit tests (the widget extension has no test target).
+
 ### Update Throttling
 
 `updateWorkoutLiveActivity()` throttles ordinary content refreshes to at most one per second to avoid excessive Live Activity churn during rapid set logging. However, two transitions are considered significant and must bypass the throttle so they are never dropped:
@@ -231,6 +246,11 @@ All operations silently catch and discard errors. Live Activities are an optiona
 - The small-family active-set layout must include the current exercise name, set info, weight × reps, next exercise name (when present), and progress percentage.
 - The small-family rest layout must include the countdown timer and the next exercise name with its set detail (when present).
 - The small-family views must use only system fonts (custom widget fonts are unavailable on the watch).
+- `SmartStackActivityViewTests` (168 pt width), for active-set and rest states:
+  - The compact layout's ideal height is strictly less than the regular layout's.
+  - When offered at least the regular layout's ideal height, the view renders the regular layout.
+  - When offered less than the regular layout's ideal height (but at least the compact layout's), the view renders the compact layout, which fits within the offered height.
+  - Long exercise names do not increase either layout's ideal height (single-line text).
 
 ### Cursor Advance on Skip
 - Skipping the last pending set of an exercise resolves the current exercise to the next exercise with pending sets; the resolved active-set state must name that next exercise, not the skipped one.
