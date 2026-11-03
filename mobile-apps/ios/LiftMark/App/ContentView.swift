@@ -35,7 +35,7 @@ struct ContentView: View {
             .tag(AppTab.home)
             .accessibilityIdentifier("tab-home")
 
-            NavigationStack {
+            NavigationStack(path: $navCoordinator.plansNavPath) {
                 WorkoutsView()
             }
             .environment(navCoordinator)

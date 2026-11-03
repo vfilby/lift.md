@@ -316,6 +316,7 @@
 		EF8C60C32DCD834946E260BE /* StubPlanEditEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4DDE11A14E2504EF4B7F72 /* StubPlanEditEngine.swift */; };
 		F0D9AF4CEA40EB9E5811878F /* EditPlanMarkdownSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFE17786DC0564D38BF1802 /* EditPlanMarkdownSheet.swift */; };
 		F0F1CB732AF37230C12C9B34 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32C3C9DD2398AC651AD5E001 /* Typography.swift */; };
+		F344025E5768315CBEFA27C0 /* NavigationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8046CE513A0BB5DA0C3ED /* NavigationCoordinatorTests.swift */; };
 		F37EC6ABED84F7A871698B2A /* PlateCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBE5F077F0F3EA293E45AE5 /* PlateCalculator.swift */; };
 		F41896189B5278E358E52ADE /* ActiveWorkoutViewModel+WeightPropagation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890094B011E36D050150D6BE /* ActiveWorkoutViewModel+WeightPropagation.swift */; };
 		F4ED8A631DF3AD44DE49CD23 /* JetBrainsMono-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 21BE97A74F617CCDCB45D15A /* JetBrainsMono-Medium.ttf */; };
@@ -664,6 +665,7 @@
 		EADAA4A9258171076A1B482F /* CKSyncEngineManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKSyncEngineManagerTests.swift; sourceTree = "<group>"; };
 		EB6A5CEC71262021C683101D /* LMWFParseStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMWFParseStatusView.swift; sourceTree = "<group>"; };
 		EC7055EA2B5CF16CA09CB3AA /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
+		EDB8046CE513A0BB5DA0C3ED /* NavigationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinatorTests.swift; sourceTree = "<group>"; };
 		EE8F15CFAC746BF9E15FD21B /* PlanEditPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditPresentationTests.swift; sourceTree = "<group>"; };
 		EEE12770F5439352D3BD23AC /* MarkdownParserTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownParserTypes.swift; sourceTree = "<group>"; };
 		F137B212FEE18D030DBC9C70 /* WorkoutPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPlan.swift; sourceTree = "<group>"; };
@@ -1186,6 +1188,7 @@
 				6581EE7985E65BA6E5926046 /* MarkdownParserMalformedHeaderTests.swift */,
 				0EE4CFAF846AA2F5EA32856A /* MarkdownParserStrayLineTests.swift */,
 				BE23FF382474D10663FDF662 /* MarkdownParserTests.swift */,
+				EDB8046CE513A0BB5DA0C3ED /* NavigationCoordinatorTests.swift */,
 				602B65899BCBD9026FEB621C /* OutboxPusherServiceTests.swift */,
 				9017628E208B7ED9FDC9E047 /* ParserConformanceTests.swift */,
 				72285970FF3F54891CBEFFC9 /* PlanDiffBuilderTests.swift */,
@@ -1768,6 +1771,7 @@
 				0D3B054A1D935A34E0F078EC /* MarkdownParserStrayLineTests.swift in Sources */,
 				755252BEE04425DE12067D61 /* MarkdownParserTests.swift in Sources */,
 				B32B1213805C0FDA52C6DE0F /* MigrationGoldenShapes.swift in Sources */,
+				F344025E5768315CBEFA27C0 /* NavigationCoordinatorTests.swift in Sources */,
 				DE74148FDCE6F320FA2C3DD8 /* OutboxPusherServiceTests.swift in Sources */,
 				083A02957C5374F617C3B256 /* ParserConformanceTests.swift in Sources */,
 				4F7670626F20D92124EDBA42 /* PlanDiffBuilderTests.swift in Sources */,

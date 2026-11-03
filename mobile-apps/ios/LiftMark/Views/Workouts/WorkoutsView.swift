@@ -117,6 +117,10 @@ struct WorkoutsView: View {
                 WorkoutDetailView(planId: id)
             case .gymDetail(let id):
                 GymDetailView(gymId: id)
+            case .activeWorkout:
+                // Inbox Start pushes here via
+                // `NavigationCoordinator.navigateToActiveWorkout()` (GH #487).
+                ActiveWorkoutView()
             default:
                 EmptyView()
             }

@@ -45,6 +45,11 @@ struct LiftMarkApp: App {
             AIKeyStore.clearPersisted()
         }
 
+        #if DEBUG
+        // Before the poller is built so its initial pending count sees the row.
+        Self.seedInboxItemFromLaunchArgs()
+        #endif
+
         // Build auth + inbox-poller from a single APIClient + TokenStore so
         // they share session state. Initializing here (rather than as
         // property-initializer defaults) keeps the wiring obvious and lets
@@ -126,6 +131,38 @@ struct LiftMarkApp: App {
     #endif
 
     #if DEBUG
+    /// Test seam: `--seed-inbox-item` inserts one pending inbox row (a small
+    /// LMWF plan, id `seed-inbox-item`) straight into the local table so UI
+    /// tests can drive the inbox actions — Discard / Add / Start — without a
+    /// backend or a signed-in session. Runs after `--reset-data` and before
+    /// the poller is built. See spec/services/workout-inbox.md (GH #487).
+    private static func seedInboxItemFromLaunchArgs() {
+        guard ProcessInfo.processInfo.arguments.contains("--seed-inbox-item") else { return }
+        let lmwf = """
+        # Inbox Seed Day
+        @units: lbs
+
+        ## Bench Press
+        - 135 x 5
+        - 155 x 5
+
+        ## Back Squat
+        - 185 x 5
+        """
+        let item = InboxItem(
+            id: "seed-inbox-item",
+            fetchedAt: Date(),
+            createdAtServer: Date(),
+            sourceTokenId: nil,
+            lmwfText: lmwf
+        )
+        do {
+            try InboxItemRepository().upsert(item)
+        } catch {
+            Logger.shared.warn(.database, "inbox seed failed: \(error)")
+        }
+    }
+
     /// Test seam for the auth-sync banner (GH #143 banner fix).
     /// `--seed-outbox-pending <n>` seeds `n` stranded outbox rows;
     /// `--seed-session-expired` flips the lapsed-session flag. Together they
