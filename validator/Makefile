@@ -95,6 +95,18 @@ diff-prod: bundle website-build
 	cd cdk && npx cdk diff --profile liftmark-prod --strict \
 	    LmwfProdEdgeStack LmwfProdValidatorStack
 
+# DNS foundation stack (prod account, us-east-1): vanity-domain hosted zones,
+# wildcard certs and the getlift.md Migadu mail records. It is a dependency of
+# LmwfProdValidatorStack, so deploy-prod (here and in CI) already rolls it out;
+# these targets diff/deploy it on its own without bundling the app. It is
+# never destroyed by destroy-prod — it owns registrar delegation.
+diff-dns:
+	cd cdk && npx cdk diff --profile liftmark-prod --strict LmwfDnsFoundationStack
+
+deploy-dns:
+	cd cdk && npx cdk deploy --profile liftmark-prod --require-approval any-change \
+	    LmwfDnsFoundationStack
+
 # Deploy metadata: commit SHA + ISO 8601 UTC timestamp, surfaced via the
 # /version endpoint and X-Validator-Version response header.
 BUILD_COMMIT    := $(shell git rev-parse HEAD)

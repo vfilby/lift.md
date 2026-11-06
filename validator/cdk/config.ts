@@ -190,6 +190,27 @@ export interface VanityDomain {
    * to hold stable NS, then flip to `true` once delegation is live.
    */
   issueCert: boolean;
+  /**
+   * Hosted mail (Migadu) for the apex. When set, the DNS foundation stack
+   * publishes the full Migadu record set for the domain — MX, SPF + ownership
+   * TXT, DMARC, DKIM CNAMEs, autoconfig/autodiscover and the client SRV
+   * records (see spec/services/lmwf-validator.md → "Mail for getlift.md").
+   * Leave undefined for domains that don't receive mail.
+   */
+  mail?: MigaduMail;
+}
+
+/** Migadu hosted-mail settings for one apex domain. */
+export interface MigaduMail {
+  /** Token in the `hosted-email-verify=<token>` apex TXT (Migadu admin → DNS). */
+  verifyToken: string;
+  /**
+   * DMARC policy published at `_dmarc.<domain>`. Migadu's suggested default is
+   * `v=DMARC1; p=quarantine;`. SPF is always strict (`-all`) because Migadu is
+   * the only authorised sender for these domains — the validator's own
+   * transactional mail goes out via SES as `noreply@<env.domainName>`.
+   */
+  dmarcPolicy: string;
 }
 
 /**
@@ -206,6 +227,11 @@ export interface VanityDomain {
 export const VANITY_DOMAINS: readonly VanityDomain[] = [
   // Registered + delegated to the zone's AWS nameservers (2026-06-02), so the
   // wildcard cert can now validate via DNS.
-  { domain: 'getlift.md', issueCert: true },
+  {
+    domain: 'getlift.md',
+    issueCert: true,
+    // Mailboxes hosted at Migadu (2026-11-06); token from Migadu admin → DNS.
+    mail: { verifyToken: 'vdssjzd2', dmarcPolicy: 'v=DMARC1; p=quarantine;' },
+  },
   { domain: 'liftmd.app', issueCert: true },
 ];

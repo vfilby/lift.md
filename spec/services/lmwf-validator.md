@@ -177,6 +177,45 @@ autofill until they update. It is the sole thing still *served* from
 | **`beta.getlift.md`** | **Beta (all-in-one)** | Serves | Serves | Serves |
 | **`beta.liftmark.app`** | Legacy beta → redirect | **301 → `beta.getlift.md`** | **308 → `beta.getlift.md`** | 301 → `beta.getlift.md` (test installs only; reauth acceptable) |
 
+### Mail for `getlift.md` (Migadu)
+
+Mailboxes for `getlift.md` (e.g. `hello@getlift.md`) are hosted at **Migadu**;
+the validator does NOT send mail as `getlift.md` (prod transactional mail goes
+out via SES as `noreply@liftmark.app`, see Deployment), so Migadu is the sole
+authorised sender for the apex and SPF can be strict (`-all`).
+
+The mail records live in the `getlift.md` Route 53 zone and are published by
+the `LmwfDnsFoundationStack` (`validator/cdk/dns-stack.ts`) from the `mail`
+block on the domain's `VANITY_DOMAINS` entry (`validator/cdk/config.ts`). They
+are the standard Migadu record set, all at TTL 3000s:
+
+| Name | Type | Value |
+|---|---|---|
+| `getlift.md` | MX | `10 aspmx1.migadu.com.`, `20 aspmx2.migadu.com.` |
+| `getlift.md` | TXT | `hosted-email-verify=<token>` (Migadu ownership proof) and `v=spf1 include:spf.migadu.com -all` — one record set, two values (Route 53 allows a single TXT set per name) |
+| `_dmarc.getlift.md` | TXT | `v=DMARC1; p=quarantine;` |
+| `key1`/`key2`/`key3._domainkey.getlift.md` | CNAME | `keyN.getlift.md._domainkey.migadu.com.` (DKIM, Migadu-rotated) |
+| `autoconfig.getlift.md` | CNAME | `autoconfig.migadu.com.` (Thunderbird-style autoconfig) |
+| `_autodiscover._tcp.getlift.md` | SRV | `0 1 443 autodiscover.migadu.com.` (Outlook autodiscover) |
+| `_submissions._tcp.getlift.md` | SRV | `0 1 465 smtp.migadu.com.` |
+| `_imaps._tcp.getlift.md` | SRV | `0 1 993 imap.migadu.com.` |
+| `_pop3s._tcp.getlift.md` | SRV | `0 1 995 pop.migadu.com.` |
+
+Invariants (covered by `validator/cdk/dns-stack.test.ts`):
+- A domain with a `mail` block gets exactly this record set in its own zone;
+  a domain without one gets no mail records (`liftmd.app` stays mail-less).
+- The apex TXT set carries both the verify token and the SPF string, and the
+  SPF string ends in `-all`.
+- No mail record is ever created for a domain whose `VANITY_DOMAINS` entry
+  lacks `mail` — adding Migadu to another domain is a config change only.
+
+The DNS foundation stack is a dependency of `LmwfProdValidatorStack`, so the
+`deploy-prod` CI stage rolls it out on every push to `main` (CDK deploys
+dependency stacks unless `--exclusively`). Mail record changes therefore ship
+through the normal PR → merge → prod deploy path; `make diff-dns` /
+`make deploy-dns` (from `validator/`, prod SSO profile) exist to preview or
+apply the stack on its own without bundling the app.
+
 ### CloudFront WAF (body-size policy)
 
 The CloudFront-scoped WAFv2 web ACL (`lmwf-<env>-cloudfront`, defined in

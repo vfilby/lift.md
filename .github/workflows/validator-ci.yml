@@ -79,6 +79,12 @@ jobs:
           cache-dependency-path: validator/package-lock.json
       - if: needs.changes.outputs.validator == 'true'
         run: npm ci
+      # cdk/*.test.ts synthesise real stacks (aws-cdk-lib/assertions), so the
+      # test matrix leg also needs the CDK workspace's deps.
+      - name: Install CDK deps
+        if: needs.changes.outputs.validator == 'true' && matrix.check == 'test'
+        working-directory: validator/cdk
+        run: npm ci --no-audit --no-fund
       - name: ${{ matrix.check }}
         if: needs.changes.outputs.validator == 'true'
         run: npm run ${{ matrix.check }}
