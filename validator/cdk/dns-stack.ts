@@ -2,7 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import { Construct } from 'constructs';
-import type { VanityDomain } from './config';
+import type { MigaduMail, VanityDomain } from './config';
 
 export interface LmwfDnsFoundationStackProps extends cdk.StackProps {
   /** Vanity / redirect domains to create a zone (+ optional wildcard cert) for. */
@@ -44,7 +44,7 @@ export class LmwfDnsFoundationStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LmwfDnsFoundationStackProps) {
     super(scope, id, props);
 
-    for (const { domain, issueCert } of props.domains) {
+    for (const { domain, issueCert, mail } of props.domains) {
       const cid = domainToConstructId(domain);
 
       const zone = new route53.HostedZone(this, `${cid}Zone`, {
@@ -66,6 +66,10 @@ export class LmwfDnsFoundationStack extends cdk.Stack {
         });
       }
 
+      if (mail) {
+        addMigaduRecords(this, cid, zone, mail);
+      }
+
       new cdk.CfnOutput(this, `${cid}ZoneId`, {
         value: zone.hostedZoneId,
         description: `Hosted zone ID for ${domain}`,
@@ -77,6 +81,96 @@ export class LmwfDnsFoundationStack extends cdk.Stack {
       });
     }
   }
+}
+
+/** Migadu's DNS guide publishes every record at 3000s; mirror it exactly. */
+const MIGADU_TTL = cdk.Duration.seconds(3000);
+
+/**
+ * Publish the standard Migadu hosted-mail record set in `zone` (apex =
+ * `zone.zoneName`). One construct per record name+type so Route 53 never sees
+ * two record sets for the same pair — in particular the apex TXT carries both
+ * the ownership token and the SPF string as two values of a single set.
+ */
+function addMigaduRecords(
+  scope: Construct,
+  cid: string,
+  zone: route53.IHostedZone,
+  mail: MigaduMail,
+): void {
+  const domain = zone.zoneName;
+  const migaduSrv = (port: number, host: string): route53.SrvRecordValue => ({
+    priority: 0,
+    weight: 1,
+    port,
+    hostName: `${host}.migadu.com.`,
+  });
+
+  new route53.MxRecord(scope, `${cid}MailMx`, {
+    zone,
+    ttl: MIGADU_TTL,
+    values: [
+      { priority: 10, hostName: 'aspmx1.migadu.com.' },
+      { priority: 20, hostName: 'aspmx2.migadu.com.' },
+    ],
+  });
+
+  new route53.TxtRecord(scope, `${cid}MailApexTxt`, {
+    zone,
+    ttl: MIGADU_TTL,
+    values: [`hosted-email-verify=${mail.verifyToken}`, 'v=spf1 include:spf.migadu.com -all'],
+  });
+
+  new route53.TxtRecord(scope, `${cid}MailDmarc`, {
+    zone,
+    ttl: MIGADU_TTL,
+    recordName: '_dmarc',
+    values: [mail.dmarcPolicy],
+  });
+
+  // DKIM: Migadu rotates signing keys behind these three CNAMEs.
+  for (const n of [1, 2, 3]) {
+    new route53.CnameRecord(scope, `${cid}MailDkim${n}`, {
+      zone,
+      ttl: MIGADU_TTL,
+      recordName: `key${n}._domainkey`,
+      domainName: `key${n}.${domain}._domainkey.migadu.com.`,
+    });
+  }
+
+  // Client auto-configuration (Thunderbird-style autoconfig + Outlook autodiscover).
+  new route53.CnameRecord(scope, `${cid}MailAutoconfig`, {
+    zone,
+    ttl: MIGADU_TTL,
+    recordName: 'autoconfig',
+    domainName: 'autoconfig.migadu.com.',
+  });
+  new route53.SrvRecord(scope, `${cid}MailAutodiscover`, {
+    zone,
+    ttl: MIGADU_TTL,
+    recordName: '_autodiscover._tcp',
+    values: [migaduSrv(443, 'autodiscover')],
+  });
+
+  // Client service discovery (RFC 6186).
+  new route53.SrvRecord(scope, `${cid}MailSubmissions`, {
+    zone,
+    ttl: MIGADU_TTL,
+    recordName: '_submissions._tcp',
+    values: [migaduSrv(465, 'smtp')],
+  });
+  new route53.SrvRecord(scope, `${cid}MailImaps`, {
+    zone,
+    ttl: MIGADU_TTL,
+    recordName: '_imaps._tcp',
+    values: [migaduSrv(993, 'imap')],
+  });
+  new route53.SrvRecord(scope, `${cid}MailPop3s`, {
+    zone,
+    ttl: MIGADU_TTL,
+    recordName: '_pop3s._tcp',
+    values: [migaduSrv(995, 'pop')],
+  });
 }
 
 /**
