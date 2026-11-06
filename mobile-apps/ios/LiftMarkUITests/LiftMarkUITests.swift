@@ -78,12 +78,36 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "import-flow-robust")
     }
 
+    /// GH #472: `#push day` (no space after `#`) must produce a line-numbered
+    /// error with a Fix button that repairs the header in place.
+    func testImportFixMalformedHeader() throws {
+        runner.runScenario(named: "import-fix-malformed-header")
+    }
+
     func testWorkoutFlow() throws {
         runner.runScenario(named: "workout-flow")
     }
 
     func testActiveWorkout() throws {
         runner.runScenario(named: "active-workout-focused")
+    }
+
+    /// GH #433: completing a set that makes a timed set current must scroll
+    /// that set's exercise timer on screen.
+    func testTimerAutoScroll() throws {
+        runner.runScenario(named: "timer-auto-scroll")
+    }
+
+    /// GH #444: completing a set must not auto-scroll the rest timer it just
+    /// started off-screen.
+    func testRestTimerAutoScroll() throws {
+        runner.runScenario(named: "rest-timer-auto-scroll")
+    }
+
+    /// GH #489: changing a set's weight carries over to the remaining sets
+    /// planned at the same weight.
+    func testWeightPropagation() throws {
+        runner.runScenario(named: "weight-propagation")
     }
 
     func testHistoryFlow() throws {
@@ -133,6 +157,19 @@ final class LiftMarkUITests: XCTestCase {
         runner.runScenario(named: "ai-prompt-settings")
     }
 
+    /// BYOK provider key list: add (unverified Ollama), malformed-key error,
+    /// reorder, persistence, delete. See spec/screens/settings.md.
+    func testBYOKProviderKeys() throws {
+        runner.runScenario(named: "byok-provider-keys")
+    }
+
+    /// Edit with AI sheet against the deterministic stub engine
+    /// (`--ai-engine-stub`): apply a proposal, see it on the detail view,
+    /// and surface an engine error. See spec/flows/ai-plan-editing.md.
+    func testAIPlanEdit() throws {
+        runner.runScenario(named: "ai-plan-edit")
+    }
+
     /// GH #279: first Settings → Account → Sign in tap must present the login
     /// sheet and keep it presented (no second tap).
     func testSettingsAccountLogin() throws {
@@ -167,6 +204,12 @@ final class LiftMarkUITests: XCTestCase {
 
     func testBetaInbox() throws {
         runner.runScenario(named: "beta-inbox")
+    }
+
+    /// Local (no backend) inbox Start flow: a seeded row's Start must land in
+    /// Active Workout, not a blank screen (GH #487).
+    func testInboxStart() throws {
+        runner.runScenario(named: "inbox-start")
     }
 
     func testBetaOutbox() throws {

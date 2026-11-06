@@ -316,4 +316,16 @@ enum ActiveWorkoutViewModel {
             ex.sets.contains { $0.id == triggeringSetId }
         }
     }
+
+    /// The rest timer that survives the user starting (or resuming) the hold
+    /// timer of the timed set `timedSetId`: always none. Starting the hold means
+    /// the rest is over, and leaving the rest timer running lets it keep
+    /// ticking and play its countdown/completion tones mid-hold, which sounds
+    /// like the hold ended early (GH #435, #436). Applies regardless of which
+    /// card owns the rest timer.
+    static func restTimer(
+        _ restTimer: RestTimerState?, afterStartingTimedSet timedSetId: String
+    ) -> RestTimerState? {
+        nil
+    }
 }

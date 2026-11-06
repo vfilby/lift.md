@@ -112,13 +112,19 @@ Trailing text after all modifiers on a set line is captured as set notes.
 ### Line Preprocessing
 
 - Normalizes line endings: CRLF and CR are converted to LF.
-- Parses headers (lines starting with `#`), list items (lines starting with `-`), and metadata lines (lines starting with `@`).
+- Parses headers (one to six `#` followed by at least one space, then text), list items (lines starting with `-`), and metadata lines (lines starting with `@`). Everything else is plain text.
+- A **malformed header** is a trimmed line matching `^#{1,6}[^#\s]` — header marks with no space before the text (`#push day`). It is plain text to the structural parser, but it is also recorded so it can be reported as `MALFORMED_HEADER` (below) with the corrected line (`# push day`).
+
+### Quick Fixes
+
+`LMWFParseResult.fixes` (`[LMWFQuickFix]`) lists machine-applicable corrections for diagnostics that have an unambiguous repair. Each fix is `{ line, original, replacement }`: a 1-based line number in the normalized document, the trimmed text currently on that line, and the full corrected line. `LMWFQuickFix.applying(_:to:)` applies a batch to a markdown string: it normalizes line endings, and for each fix replaces the line **only if** its trimmed text still equals `original` (indentation is preserved), so a stale fix never clobbers text the user has since changed. Today the only producer is `MALFORMED_HEADER`; both parsers (Swift and the TypeScript validator) emit identical fixes. `errors` and `warnings` remain plain strings for existing consumers.
 
 ## Validation Errors (Blocking)
 
 These prevent a successful parse and must be reported in the errors array:
 
 - No workout header found in the document.
+- `MALFORMED_HEADER` — reported *before* the no-workout-header error, once per malformed header line in the document, whenever no workout header is found. Message: `Line N: Header "#push day" is missing a space after "#". Write "# push day".` Each carries a quick fix. (GH #472: the generic message alone gave the user nothing to act on.)
 - No exercises found in the workout.
 - Exercise has no sets.
 - Negative weight value.
@@ -136,6 +142,9 @@ These are reported but do not prevent parsing:
 - Very short rest period (less than 10 seconds).
 - Very long rest period (greater than 600 seconds).
 - Unknown modifier (unrecognized @-prefixed token on a set line).
+- `STANDALONE_MODIFIER` — a set modifier on its own line where it has no effect.
+- `IGNORED_LINE` — a non-empty, non-set line after an exercise's first set; the text is not captured.
+- `MALFORMED_HEADER` — a malformed header (see Line Preprocessing) after an exercise's first set. Reported instead of `IGNORED_LINE`, with the same message as the error form plus: `Until it is fixed, the set lines below it count toward the exercise above.` Carries a quick fix.
 
 ## Dependencies
 

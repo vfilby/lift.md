@@ -184,7 +184,7 @@ Maps to the `WorkoutPlan` entity in the data model.
 
 **Record ID**: Fixed value `"user-settings"` (singleton).
 
-**Note**: `anthropicApiKey` is NEVER synced. It is stored in platform-native secure storage only. `anthropicApiKeyStatus` is also not synced — each device verifies independently.
+**Note**: AI provider keys (the `ai_provider_keys` Keychain list, and the legacy `anthropicApiKey`) are NEVER synced. It is stored in platform-native secure storage only. `anthropicApiKeyStatus` is also not synced — each device verifies independently.
 
 ### Record Type: `Gym`
 

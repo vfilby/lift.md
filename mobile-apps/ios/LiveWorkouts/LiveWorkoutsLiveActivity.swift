@@ -115,81 +115,11 @@ struct LiveWorkoutContentView: View {
     var body: some View {
         switch activityFamily {
         case .small:
-            smartStackView
+            SmartStackActivityView(state: context.state)
         case .medium:
             lockScreenView
         @unknown default:
             lockScreenView
-        }
-    }
-
-    // MARK: Apple Watch Smart Stack (small family)
-
-    // System fonts only: the watch renders this view on-device and the custom
-    // fonts bundled in the widget extension are not available there.
-    @ViewBuilder
-    private var smartStackView: some View {
-        let state = context.state
-
-        if state.isRestTimer {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Rest")
-                        .font(.headline)
-                    Spacer()
-                    if let timerEnd = state.timerEndDate {
-                        Text(timerEnd, style: .timer)
-                            .font(.headline.monospacedDigit())
-                            .foregroundStyle(timerEnd > Date() ? .green : .red)
-                            .multilineTextAlignment(.trailing)
-                    }
-                }
-
-                if let nextName = state.nextExerciseName {
-                    Text("Next: \(nextName)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    if let detail = state.nextSetDetail {
-                        Text(detail)
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(state.exerciseName)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Spacer()
-                    if !state.setInfo.isEmpty {
-                        Text(state.setInfo)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if !state.weightReps.isEmpty {
-                    Text(state.weightReps)
-                        .font(.title3.monospacedDigit().bold())
-                }
-
-                HStack(alignment: .firstTextBaseline) {
-                    if let nextName = state.nextExerciseName {
-                        Text("Next: \(nextName)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    Text("\(Int(state.progress * 100))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
     }
 

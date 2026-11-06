@@ -1,0 +1,75 @@
+name: "Rest Timer Auto-Scroll"
+
+# GH #444: completing the last set of an exercise starts its rest timer and
+# collapses the card (timer under the header). Auto-scroll then moves focus to
+# the next exercise; it must not push the running rest timer off-screen. The
+# next exercise is long enough that scrolling its card top to the top of the
+# viewport would hide the rest timer. The assertion uses toBeOnScreen, which
+# never scrolls.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+  - action: waitFor
+    target: "button-import-workout"
+    timeout: 5000
+  - action: tryCatch
+    try:
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "input-markdown"
+        timeout: 10000
+    catch:
+      - action: tap
+        target: "button-import-workout"
+  - action: waitFor
+    target: "input-markdown"
+    timeout: 10000
+  - action: replaceText
+    target: "input-markdown"
+    fixture: "rest-timer-auto-scroll-workout.md"
+  - action: tap
+    target: "button-import"
+  - action: waitForText
+    text: "OK"
+    timeout: 10000
+  - action: tapText
+    text: "OK"
+  - action: waitForText
+    text: "Rest Scroll Test"
+    timeout: 10000
+
+tests:
+  - name: "completing a set keeps its running rest timer on screen"
+    steps:
+      - action: tapText
+        text: "Rest Scroll Test"
+      - action: waitFor
+        target: "start-workout-button"
+        timeout: 5000
+      - action: tap
+        target: "start-workout-button"
+      - action: waitFor
+        target: "active-workout-screen"
+        timeout: 10000
+      - action: expect
+        target: "rest-timer-stop-button"
+        assertion: "notToExist"
+      # Finish Push-ups: its rest timer starts and focus moves to Bench Press.
+      - action: tap
+        target: "set-complete-button"
+      # The running rest timer must be on screen without any manual scrolling.
+      - action: expect
+        target: "rest-timer-stop-button"
+        assertion: "toBeOnScreen"
+        timeout: 5000

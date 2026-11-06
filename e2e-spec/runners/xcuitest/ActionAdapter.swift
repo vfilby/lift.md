@@ -493,8 +493,8 @@ class ActionAdapter {
     /// "a". `typeText` then appends the real content, leaving `a# Push Day…` —
     /// which fails LMWF header validation, disables the Import button, and
     /// strands the import (observed in nightly testHistoryExport/testPlanExport
-    /// as "Timed out waiting for text 'OK'"). We wait for the keyboard to
-    /// settle, then verify the field holds the intended text and retry once on
+    /// as "Timed out waiting for text 'OK'"). We wait for the field to take
+    /// focus, then verify it holds the intended text and retry once on
     /// mismatch. On a final mismatch the best-effort text is left in place —
     /// never a cleared field.
     ///
@@ -503,17 +503,22 @@ class ActionAdapter {
     /// the scenario-level dropped-tap retries), so the field never gains
     /// keyboard focus and the first synthesized keystroke aborts the test with
     /// "Neither element nor any descendant has keyboard focus" (nightly
-    /// testActiveWorkout, 2026-08-14). The keyboard wait doubles as the focus
-    /// probe — re-tap on a miss, with `hasKeyboardFocus` covering
-    /// hardware-keyboard setups where the software keyboard never appears.
+    /// testActiveWorkout, 2026-08-14). So we wait for the field to report
+    /// keyboard focus and re-tap on a miss.
+    ///
+    /// The focus probe reads the field's own `hasKeyboardFocus` rather than
+    /// waiting on `app.keyboards`: the first keyboard bring-up of a run is
+    /// slow on CI, and a keyboard query issued while it spins up timed out
+    /// XCUITest's snapshot evaluation ("Failed to get matching snapshots:
+    /// Timed out while evaluating UI query" — nightly testActiveWorkout,
+    /// 2026-11-02), an unrecoverable failure. The field's focus state also
+    /// covers hardware-keyboard setups where no software keyboard appears.
     func robustReplaceText(_ el: XCUIElement, with text: String) {
         for attempt in 1...3 {
             el.tap()
-            // Let the keyboard come up so the first keystroke keeps its
-            // modifier — and so a dropped tap is caught here instead of as a
-            // failed-to-synthesize-event abort on the first keystroke.
-            if app.keyboards.firstMatch.waitForExistence(timeout: UITestTiming.scaled(5))
-                || hasKeyboardFocus(el) {
+            // Catch a dropped tap here instead of as a failed-to-synthesize-
+            // event abort on the first keystroke.
+            if waitForKeyboardFocus(el, timeout: UITestTiming.scaled(5)) {
                 break
             }
             NSLog("[robustReplaceText] no keyboard focus after tap (attempt \(attempt)); re-tapping")
@@ -535,12 +540,13 @@ class ActionAdapter {
         }
     }
 
-    /// Whether the element currently owns keyboard focus. XCUIElement exposes
-    /// this only via the private-but-stable `hasKeyboardFocus` attribute (no
-    /// public API). Used as a fallback focus signal for hardware-keyboard
-    /// setups where the software keyboard never appears on screen.
-    private func hasKeyboardFocus(_ el: XCUIElement) -> Bool {
-        (el.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
+    /// Waits until the element owns keyboard focus. XCUIElement exposes this
+    /// only via the private-but-stable `hasKeyboardFocus` attribute (no public
+    /// API), which the predicate reads through KVC.
+    private func waitForKeyboardFocus(_ el: XCUIElement, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "hasKeyboardFocus == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: el)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
     /// Secure fields (password inputs) read back one bullet per character, so
@@ -646,6 +652,25 @@ class ActionAdapter {
                 scrollToHittable(el)
                 XCTAssertTrue(el.isHittable, "Expected '\(desc)' to be visible (hittable)")
             }
+
+        case "toBeOnScreen":
+            // Unlike toBeVisible, never scroll: the element must already be in
+            // the viewport (e.g. brought there by the app's own auto-scroll).
+            let timeout = TimeInterval(action.timeout ?? 5000) / 1000.0
+            let found: XCUIElement?
+            if let target = action.target {
+                found = waitForAnyElement(byId: target, timeout: timeout)
+            } else {
+                let el = try resolveElement(action)
+                found = el.waitForExistence(timeout: UITestTiming.scaled(timeout)) ? el : nil
+            }
+            guard let el = found else {
+                XCTFail("Expected '\(desc)' to be on screen but it was not found")
+                return
+            }
+            XCTAssertTrue(
+                waitForHittable(el, timeout: timeout),
+                "Expected '\(desc)' to be on screen without scrolling")
 
         case "toExist":
             if let target = action.target {

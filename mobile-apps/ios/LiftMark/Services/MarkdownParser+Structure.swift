@@ -22,6 +22,131 @@ extension MarkdownParser {
         return nil
     }
 
+    // MARK: - Stray Line Warnings
+
+    /// Set-modifier keywords. These only take effect when appended to a set line.
+    private static let setModifierKeywords: Set<String> = ["rest", "dropset", "perside", "rpe", "tempo", "amrap"]
+
+    /// True for a non-set, non-header line that begins with a set modifier (e.g. `@rest: 180s`).
+    static func isStandaloneModifier(_ line: ParsedLine) -> Bool {
+        guard !line.isList, line.headerLevel == nil, line.trimmed.hasPrefix("@") else { return false }
+        // Same key shape as the validator's `^@(\w+)` (ASCII word characters)
+        let key = line.trimmed.dropFirst().prefix { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
+        return setModifierKeywords.contains(key.lowercased())
+    }
+
+    private static func warningPreview(_ text: String) -> String {
+        text.count > 80 ? "\(text.prefix(77))..." : text
+    }
+
+    /// Warn on every non-set line inside the workout block that begins with a set
+    /// modifier and has no effect — e.g. `@rest: 180s` under the workout or a
+    /// section/superset header, or after an exercise's first set (GH #425). An
+    /// exercise-level `@rest:` default (consumed by parseExerciseMetadata) is exempt.
+    static func warnStandaloneModifiers(_ context: ParseContext, workoutHeaderIndex: Int) {
+        for line in context.lines.dropFirst(workoutHeaderIndex + 1) {
+            if let level = line.headerLevel, let workoutLevel = context.workoutHeaderLevel, level <= workoutLevel {
+                break
+            }
+            guard isStandaloneModifier(line), !context.exerciseRestDefaultLines.contains(line.lineNumber) else {
+                continue
+            }
+            let text = warningPreview(line.trimmed)
+            let restHint = line.metadataKey == "rest"
+                ? " To set a default rest for every set of one exercise, put \"@rest:\" directly under "
+                    + "that exercise's header, before its first set."
+                : ""
+            context.warnings.append(ParseWarning(
+                line: line.lineNumber,
+                message: "Modifier \"\(text)\" is on its own line and has no effect — modifiers only apply when "
+                    + "appended to a set line (e.g., \"- 135 lbs x 5 \(text)\"). "
+                    + "Add it to each set it should apply to." + restHint,
+                code: "STANDALONE_MODIFIER"
+            ))
+        }
+    }
+
+    /// Warn on rest periods that look like typos (shared by set-level and exercise-level @rest).
+    static func warnRestRange(_ rest: Int, context: ParseContext, lineNumber: Int) {
+        if rest < 10 {
+            context.warnings.append(ParseWarning(
+                line: lineNumber,
+                message: "Very short rest period (\(rest)s). Double-check for typos.",
+                code: "SHORT_REST"
+            ))
+        }
+        if rest > 600 {
+            context.warnings.append(ParseWarning(
+                line: lineNumber,
+                message: "Very long rest period (\(rest)s). Double-check for typos.",
+                code: "LONG_REST"
+            ))
+        }
+    }
+
+    /// Warn on a non-empty, non-set line inside an exercise's set list (after its first
+    /// set). Such text is skipped without being captured anywhere. Standalone modifiers are
+    /// excluded — they already get STANDALONE_MODIFIER. A header missing its space
+    /// (`##Squat`) gets MALFORMED_HEADER instead, since the set lines below it are being
+    /// counted toward the exercise above (GH #472).
+    static func warnIfIgnoredLine(_ context: ParseContext, line: ParsedLine) {
+        guard !line.trimmed.isEmpty, !isStandaloneModifier(line) else { return }
+        if let fix = malformedHeaderFix(for: line) {
+            context.fixes.append(fix)
+            context.warnings.append(ParseWarning(
+                line: line.lineNumber,
+                message: malformedHeaderMessage(fix)
+                    + " Until it is fixed, the set lines below it count toward the exercise above.",
+                code: "MALFORMED_HEADER"
+            ))
+            return
+        }
+        context.warnings.append(ParseWarning(
+            line: line.lineNumber,
+            message: "Line ignored: \"\(warningPreview(line.trimmed))\" is not a set and is not captured. "
+                + "Put exercise notes between the exercise header and its first set, "
+                + "or append per-set notes to the end of a set line.",
+            code: "IGNORED_LINE"
+        ))
+    }
+
+    // MARK: - Malformed Headers (GH #472)
+
+    /// `#push day` — header marks immediately followed by text. Markdown (and this parser)
+    /// treat it as plain text, which the author almost never intends.
+    nonisolated(unsafe) private static let malformedHeaderRegex = /^(#{1,6})([^#\s].*)$/
+
+    /// The one-space correction for a header-shaped line missing its space, or nil.
+    static func malformedHeaderFix(for line: ParsedLine) -> LMWFQuickFix? {
+        guard line.headerLevel == nil,
+              let match = line.trimmed.wholeMatch(of: Self.malformedHeaderRegex) else { return nil }
+        return LMWFQuickFix(
+            line: line.lineNumber,
+            original: line.trimmed,
+            replacement: "\(match.1) \(String(match.2).trimmingCharacters(in: .whitespaces))"
+        )
+    }
+
+    static func malformedHeaderMessage(_ fix: LMWFQuickFix) -> String {
+        let marks = fix.original.prefix { $0 == "#" }
+        return "Header \"\(warningPreview(fix.original))\" is missing a space after \"\(marks)\". "
+            + "Write \"\(fix.replacement)\"."
+    }
+
+    /// When no workout header was found, report every malformed header line as a blocking
+    /// error (with a quick fix) so the user sees exactly which line to repair.
+    static func reportMalformedHeaders(_ context: ParseContext) {
+        for line in context.lines {
+            guard let fix = malformedHeaderFix(for: line) else { continue }
+            context.fixes.append(fix)
+            context.errors.append(ParseError(
+                line: line.lineNumber,
+                message: malformedHeaderMessage(fix),
+                code: "MALFORMED_HEADER"
+            ))
+        }
+    }
+
     /// Check if a header has child exercise headers (with sets)
     private static func hasChildExercises(_ context: ParseContext, headerIndex: Int, headerLevel: Int) -> Bool {
         let exerciseLevel = headerLevel + 1

@@ -29,6 +29,8 @@ Display full details of a workout plan template — exercises, sets, tags, metad
 | Set row | `set-{set.id}` | View |
 | YouTube link | `youtube-link-{exerciseName}` | Link |
 | Edit markdown button | `edit-plan-markdown-button` | Button |
+| Edit with AI button | `edit-plan-ai-button` | Button |
+| Edit with AI upsell row | `edit-plan-ai-upsell` | Button |
 | Reprocess button | `reprocess-plan-button` | Button |
 | Exercise edit button | `edit-plan-exercise-{exerciseName}` | Button |
 
@@ -41,7 +43,10 @@ Display full details of a workout plan template — exercises, sets, tags, metad
   - If active session exists: alert with "Resume Workout" option
   - **Critical**: After tapping "Start Workout", the app MUST navigate to the Active Workout screen (`/workout/active`) and display the workout exercises with their sets. The active workout screen must be fully functional — showing exercise names, set targets (weight, reps, time), and input controls. If the session is created but navigation fails or the active workout screen does not appear, this is a blocking bug.
 - **Tap "Edit"** → opens Edit Plan Markdown sheet pre-populated with `sourceMarkdown`. User can edit the markdown text with real-time parse validation (same as import flow). Save updates `sourceMarkdown` and reprocesses the plan. Cancel discards changes.
+  - **Parse status row** (`LMWFParseStatusView`, shared with the import modal): the text is parsed on every change, untrimmed, so reported line numbers match the editor's lines. On failure a red row (`edit-plan-markdown-error`) shows the **first** error; on success a green row shows `{name} - N exercises, M sets` followed by each warning in orange. Save is disabled while an error is shown.
+  - **Fix button (GH #472)**: when the parse result carries quick fixes (see `spec/services/lmwf-parser.md` → Quick Fixes), the error row — or, on success, the warnings block — shows a trailing **Fix** button (`edit-plan-markdown-fix-button`). Tapping it applies every fix to the editor text in place (e.g. `#push day` → `# push day`), which re-triggers parsing; the row then turns green or shows the next remaining error. The button is hidden when there is nothing to fix. The TestFlight report behind this was a user who typed `#push day` and got only "No workout header found" with nothing pointing at the missing space.
 - **Tap "Reprocess"** → confirmation alert → re-parses plan from original `sourceMarkdown` (no editing)
+- **Tap "Edit with AI"** → opens the AI Edit sheet (`ai-edit-sheet`) for this plan. See `spec/services/ai-plan-editing.md` for the engine contract and `spec/flows/ai-plan-editing.md` for the step-by-step flow. The button is shown only when `sourceMarkdown != nil`, the `aiPlanEditing` developer flag is on, and the signed-in user's tier is `pro` or `trial` (or the stub engine is active). When the flag is on but the user is signed out or on `free`, the same slot renders `edit-plan-ai-upsell`, which explains that AI editing is part of LiftMark Pro and, when signed out, offers Sign in. Applying an AI proposal goes through `updatePlanMarkdown` exactly like the markdown editor, so the detail view behind the sheet refreshes on Apply.
 - **Tap pencil icon on exercise card** → opens Edit Exercise sheet (same Form/Markdown dual-tab sheet as active workout) pre-populated with the exercise's data. Save updates the exercise within the plan.
   - **Critical (GH #264)**: Persisting an exercise edit MUST NOT regenerate the whole plan from the model. It splices **only the edited exercise's block** back into the plan's `sourceMarkdown` and re-parses that spliced text (`LMWFSourceEditor.replacingExercise` → `updatePlanMarkdown`). Everything the user did not edit — other exercises, section/superset **header levels**, blank lines, comments, and unknown `@metadata` — is preserved verbatim. Regenerating the entire document (the old behavior) flattened every header to `##`, so `## Warmup` / `### Band Side Step` collapsed to two `##` headers, breaking the section nesting and producing a parse error the user then had to hand-repair. An exercise edit must be equivalent to replacing that one section of the source markdown with the user's edited version, at its original header level.
   - Superset edits splice the entire superset block (parent header + all child headers) at their original levels; section-child edits splice just that child's block. The header level(s) come from the source itself, so non-standard nesting (e.g. a superset whose children skip a level) round-trips unchanged.
@@ -72,6 +77,45 @@ Display full details of a workout plan template — exercises, sets, tags, metad
   - **Edit** (`edit-plan-markdown-button`): Opens Edit Plan Markdown sheet
   - **Reprocess** (`reprocess-plan-button`): Shows confirmation alert, then reprocesses from stored markdown
 - Both buttons use secondary styling (same as the previous single Reprocess button)
+- When the `aiPlanEditing` flag is on, a third full-width row sits beneath them: **Edit with AI** (`edit-plan-ai-button`, sparkles icon, secondary styling) or the `edit-plan-ai-upsell` variant.
+
+### AI Edit Sheet (`ai-edit-sheet`)
+
+Presented with `.sheet` hosted on `WorkoutDetailView` (stable host, see the Settings sign-in sheet note in `settings.md`). The sheet is a **conversation**: a transcript of the session's turns, each assistant turn carrying a compact inline diff, over the edit controls. The full plan is never laid out on the sheet itself; it is one hold away from any diff (see "Full preview" below). Layout, top to bottom:
+
+1. **Header**: navigation title "Edit with AI", close button (`ai-edit-close`), then a caption row with the engine label (`ai-edit-engine-label`), the quota label (`ai-edit-quota-label`) and, when Apple offers a limit increase, **Show options** (`ai-edit-quota-options`).
+2. **Transcript** (scrolls, fills the remaining height, auto-scrolls to the newest row): one row per turn, `ai-edit-message-{index}` (0-based).
+   - Before the first turn: the hint "Describe how you'd like to change this plan, or start with a suggestion."
+   - **User** turns: right-aligned bubble in the primary tint.
+   - **Assistant** turns: left-aligned bubble with the summary, the **inline diff**, and any parser warnings for the proposed plan.
+   - **Errors**: the error copy from the service spec in the error tint (`ai-edit-error`).
+   - **Thinking**: a trailing "Thinking…" row with a spinner (`ai-edit-thinking`) while a call is in flight.
+   - Turns that were discarded or undone stay in the transcript, dimmed and captioned "Discarded" (`ai-edit-message-discarded`); they are not sent to the engine again (GH #464, see the service spec).
+3. **Proposal bar** (only while a proposal is unapplied): **Discard** (`ai-edit-discard`) and **Apply** (`ai-edit-apply`, primary; disabled when the diff is empty). After an Apply, **Undo** (`ai-edit-undo`) appears in its place until the next proposal.
+4. **Quick-action chips** (`ai-edit-chip-{slug}`): a horizontally scrolling row, always visible, disabled while thinking or when the engine is unavailable. Tapping a chip sends that instruction.
+5. **Privacy caption** (`ai-edit-privacy-footer`): one caption line naming the active engine.
+6. **Composer**: text field (`ai-edit-input`, multiline, placeholder "Describe a change…", disabled while thinking or locked), send (`ai-edit-send`, disabled when empty or thinking), cancel (`ai-edit-cancel`, shown only while thinking).
+
+#### Inline diff
+
+Each assistant turn's bubble shows an exercise-level diff of its proposal relative to the last applied (or original) plan, compact enough to read in the conversation:
+
+- Plan-level changes (rename, tags, units, notes) are listed first as caption lines.
+- One row per **added** (success tint, leading `+`), **removed** (error tint, leading `−`, name and set lines struck through) or **changed** (warning tint, leading `~`, previous set lines struck through above the new ones) exercise, with the enclosing superset or section named when there is one. Rows carry `ai-edit-diff-row-{kind}-{slug}` (e.g. `added-face-pull`).
+- Unchanged exercises are collapsed to one caption: "N exercises unchanged".
+- An empty diff reads "No changes were made".
+- A trailing caption "Hold for full preview" names the gesture.
+
+The newest assistant turn's diff is `ai-edit-diff`; earlier ones are `ai-edit-diff-previous`. Uses `Theme` semantic colours only (`success`, `destructive`, `warning`).
+
+#### Full preview (hold the diff)
+
+- **Trigger**: press and hold (system default long-press duration) anywhere on an inline diff, with medium haptic feedback. Scrolling the transcript is unaffected, and a short tap does nothing. VoiceOver exposes the same thing as the custom action "Show full preview".
+- **Presents** a secondary sheet (`ai-edit-preview-full`, title "Full preview", **Done** `ai-edit-preview-done`) with that turn's proposed plan rendered as its exercise list: plan name and tags, section headers (same divider style as the detail screen), superset groups, and one row per exercise with the exercise name, equipment, notes, and its sets as LMWF-style lines (`135 lbs x 5 @rest: 90s`). Rows carry the same highlighting and identifiers as the inline diff; unchanged rows render normally as `ai-edit-preview-row-{slug}`. Removed exercises are kept at the position they used to occupy. Plan-level changes are listed as a caption block above the first section.
+- Every assistant turn's diff can be expanded, including applied and discarded ones, so an earlier proposal can be re-read in full. A proposal whose markdown does not parse shows "Preview unavailable" in place of the list.
+- The sheet is read-only; Apply and Discard stay on the Edit with AI sheet beneath it.
+
+Closing with an unapplied proposal (close button or swipe) asks "Discard the unapplied edit?" (Discard / Keep editing).
 
 ### Exercise Cards
 - Numbered with section-colored index

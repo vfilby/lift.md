@@ -59,7 +59,7 @@ Manual testing checklist for CloudKit sync using CKSyncEngine. Run on real devic
 - [ ] On Device B, verify hasAcceptedDisclaimer is NOT synced (Device B should still require acceptance)
 - [ ] On Device A, enable developer mode
 - [ ] On Device B, verify developer mode is NOT enabled (local-only field)
-- [ ] Verify anthropicApiKey is never visible in CloudKit Dashboard records
+- [ ] Verify no AI provider key (Anthropic, OpenAI, Gemini, Ollama) is ever visible in CloudKit Dashboard records
 
 ## 6. Gym Management
 

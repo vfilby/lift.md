@@ -1,0 +1,221 @@
+name: "BYOK provider keys"
+
+# Settings → AI Provider Keys (spec/screens/settings.md "AI Provider Keys (BYOK)").
+# Exercises the add-key sheet, offline format validation, the "unverified"
+# deferred-verification path, reordering, persistence, and deletion — all
+# without network credentials. Ollama keys point at a closed loopback port, so
+# the free verification call fails fast with "connection refused" and the key
+# is saved as "Not verified". Provider request/response contracts, verification
+# outcomes, and ordered fallback are covered by unit tests (AIProvider*Tests,
+# AIKeyStoreTests); real endpoints by the opt-in AIProviderLiveTests.
+#
+# Tests share state: --reset-data runs only on the scenario's first launch.
+
+setup:
+  - action: launchApp
+    newInstance: true
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+  - action: tap
+    target: "tab-settings"
+  - action: waitFor
+    target: "settings-screen"
+    timeout: 5000
+  # AI section sits below Appearance/Workout/Gym/Integrations; the key list is
+  # under the prompt toggles. `expect toExist` scroll-searches the remainder.
+  - action: scroll
+    target: "settings-screen"
+    direction: "up"
+  - action: delay
+    ms: 300
+  - action: scroll
+    target: "settings-screen"
+    direction: "up"
+  - action: delay
+    ms: 300
+  - action: scroll
+    target: "settings-screen"
+    direction: "up"
+  - action: delay
+    ms: 500
+  - action: expect
+    target: "add-ai-key-button"
+    assertion: "toExist"
+
+tests:
+  - name: "empty state, then an Ollama key saves as not verified"
+    steps:
+      - action: expect
+        target: "ai-keys-empty"
+        assertion: "toExist"
+      - action: tap
+        target: "add-ai-key-button"
+      - action: waitFor
+        target: "picker-ai-provider"
+        timeout: 5000
+      - action: tap
+        target: "picker-ai-provider"
+      - action: tapText
+        text: "Ollama (self-hosted)"
+      - action: waitFor
+        target: "input-ai-base-url"
+        timeout: 5000
+      - action: replaceText
+        target: "input-ai-base-url"
+        value: "http://127.0.0.1:9"
+      - action: replaceText
+        target: "input-ai-model"
+        value: "model-a"
+      - action: tap
+        target: "button-save-ai-key"
+      - action: waitForNot
+        target: "button-save-ai-key"
+        timeout: 20000
+      - action: waitFor
+        target: "ai-key-row-0"
+        timeout: 5000
+      - action: expect
+        target: "ai-key-row-0"
+        assertion: "toHaveText"
+        value: "Not verified"
+      - action: expect
+        target: "ai-keys-empty"
+        assertion: "notToExist"
+
+  - name: "malformed key shows an inline error and is not saved"
+    steps:
+      - action: tap
+        target: "add-ai-key-button"
+      - action: waitFor
+        target: "input-ai-api-key"
+        timeout: 5000
+      - action: replaceText
+        target: "input-ai-api-key"
+        value: "sk-not-a-real-key"
+      - action: tap
+        target: "button-save-ai-key"
+      - action: waitFor
+        target: "ai-key-error"
+        timeout: 5000
+      - action: tap
+        target: "button-cancel-ai-key"
+      - action: waitForNot
+        target: "button-cancel-ai-key"
+        timeout: 5000
+      - action: expect
+        target: "ai-key-row-1"
+        assertion: "notToExist"
+
+  - name: "second key appends and can be moved to the top"
+    steps:
+      - action: tap
+        target: "add-ai-key-button"
+      - action: waitFor
+        target: "picker-ai-provider"
+        timeout: 5000
+      - action: tap
+        target: "picker-ai-provider"
+      - action: tapText
+        text: "Ollama (self-hosted)"
+      - action: waitFor
+        target: "input-ai-base-url"
+        timeout: 5000
+      - action: replaceText
+        target: "input-ai-base-url"
+        value: "http://localhost:9"
+      - action: replaceText
+        target: "input-ai-model"
+        value: "model-b"
+      - action: tap
+        target: "button-save-ai-key"
+      - action: waitForNot
+        target: "button-save-ai-key"
+        timeout: 20000
+      - action: waitFor
+        target: "ai-key-row-1"
+        timeout: 5000
+      - action: waitForText
+        text: "2. Ollama, model-b"
+        timeout: 5000
+      - action: longPress
+        target: "ai-key-row-1"
+      - action: tap
+        target: "ai-key-move-up"
+      - action: waitForText
+        text: "1. Ollama, model-b"
+        timeout: 5000
+      - action: waitForText
+        text: "2. Ollama, model-a"
+        timeout: 5000
+
+  - name: "keys persist across relaunch and delete from the edit sheet"
+    steps:
+      - action: launchApp
+        newInstance: true
+      - action: tryCatch
+        try:
+          - action: waitFor
+            target: "home-screen"
+            timeout: 30000
+        catch:
+          - action: waitFor
+            target: "max-lift-tile-0"
+            timeout: 5000
+      - action: tap
+        target: "tab-settings"
+      - action: waitFor
+        target: "settings-screen"
+        timeout: 5000
+      # AI section sits below Appearance/Workout/Gym/Integrations; the key list is
+      # under the prompt toggles. `expect toExist` scroll-searches the remainder.
+      - action: scroll
+        target: "settings-screen"
+        direction: "up"
+      - action: delay
+        ms: 300
+      - action: scroll
+        target: "settings-screen"
+        direction: "up"
+      - action: delay
+        ms: 300
+      - action: scroll
+        target: "settings-screen"
+        direction: "up"
+      - action: delay
+        ms: 500
+      - action: expect
+        target: "add-ai-key-button"
+        assertion: "toExist"
+      # Rows are list cells: scroll-search so they're in the hierarchy.
+      - action: expect
+        target: "ai-key-row-1"
+        assertion: "toExist"
+      - action: expect
+        target: "ai-key-row-0"
+        assertion: "toExist"
+      - action: waitForText
+        text: "1. Ollama, model-b"
+        timeout: 5000
+      - action: tap
+        target: "ai-key-row-0"
+      - action: waitFor
+        target: "button-delete-ai-key"
+        timeout: 5000
+      - action: tap
+        target: "button-delete-ai-key"
+      - action: waitForNot
+        target: "button-delete-ai-key"
+        timeout: 5000
+      - action: waitForText
+        text: "1. Ollama, model-a"
+        timeout: 5000
+      - action: expect
+        target: "ai-key-row-1"
+        assertion: "notToExist"

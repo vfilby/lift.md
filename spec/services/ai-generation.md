@@ -2,33 +2,18 @@
 
 ## Purpose
 
-Generate personalized workout plans using the Claude API. This combines user context (workout history, gym equipment, preferences) with a structured prompt to produce LMWF-formatted workout plans.
+Generate personalized workout plans using a bring-your-own-key LLM provider: Anthropic, OpenAI, Gemini, or a self-hosted Ollama server. The provider layer is specified in `spec/services/ai-providers.md`. This combines user context (workout history, gym equipment, preferences) with a structured prompt to produce LMWF-formatted workout plans.
 
 ## Generation Paths
 
 There are two user-facing paths for AI workout generation:
 
-1. **In-app generation**: The user provides an Anthropic API key in settings. The app calls the Claude API directly to generate a workout, parse it, and present the result for review.
+1. **In-app generation**: The user adds one or more provider keys in Settings, as an ordered list. The app calls the providers directly, trying keys in order until one succeeds, then parses the workout and presents it for review.
 2. **Open in Claude**: The app assembles the same structured prompt, copies it to the clipboard, and opens Claude.ai in the browser. The user pastes the prompt, receives a workout in LMWF format, and imports the result back into the app.
 
 ## API Configuration
 
-- Endpoint: `https://api.anthropic.com/v1/messages`
-- Default model: `claude-haiku-4-5-20251001`
-- Available models: Haiku 4.5, Sonnet 4.5
-- Max tokens: 4096
-
-## API Error Handling
-
-| HTTP Status | Meaning |
-|---|---|
-| 401 | Invalid API key |
-| 429 | Rate limit exceeded |
-| 400 | Invalid request |
-| 500+ | Server unavailable |
-| Network error | Connection check message presented to user |
-
-API errors are translated into user-friendly messages based on HTTP status code. Network failures produce a connection check message.
+Endpoints, default models, token limits, the error mapping, and the ordered-fallback rules are all specified per provider in `spec/services/ai-providers.md`. Errors are translated into user-friendly messages that name the provider that failed.
 
 ## Context Assembly
 

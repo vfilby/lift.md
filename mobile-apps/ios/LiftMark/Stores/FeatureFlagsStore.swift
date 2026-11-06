@@ -5,6 +5,10 @@ import Foundation
 ///
 /// Read with `flags.isEnabled(.workoutInbox)`. Write with `flags.set(...)`.
 /// Toggling triggers a recompute of every view that read the flag.
+///
+/// Also owns the one non-boolean developer setting, `engineOverride`
+/// (`AIEngineOverride`), which lives alongside the flags because it is
+/// removed with the `aiPlanEditing` flag.
 @MainActor
 @Observable
 final class FeatureFlagsStore {
@@ -15,9 +19,23 @@ final class FeatureFlagsStore {
     /// having to plumb a publisher. Keyed by `FeatureFlag.rawValue`.
     private var values: [String: Bool] = [:]
 
+    /// Developer override for the AI plan-editing engine. `auto` lets
+    /// `PlanEditEngineSelector` pick. Persisted under
+    /// `AIEngineOverride.defaultsKey`; never synced.
+    var engineOverride: AIEngineOverride {
+        didSet { defaults.set(engineOverride.rawValue, forKey: AIEngineOverride.defaultsKey) }
+    }
+
+    /// True when the app was launched with `--ai-engine-stub` (UI tests). The
+    /// stub engine satisfies the AI editing tier gate regardless of auth.
+    var isAIEngineStubActive: Bool {
+        launchArguments.contains(StubPlanEditEngine.launchArgument)
+    }
+
     init(defaults: UserDefaults = .standard, launchArguments: [String] = ProcessInfo.processInfo.arguments) {
         self.defaults = defaults
         self.launchArguments = Set(launchArguments)
+        self.engineOverride = Self.resolveInitialOverride(defaults: defaults, launchArguments: launchArguments)
         for flag in FeatureFlag.allCases {
             values[flag.rawValue] = resolveInitialValue(for: flag)
         }
@@ -45,5 +63,16 @@ final class FeatureFlagsStore {
             return flag.defaultValue
         }
         return defaults.bool(forKey: flag.defaultsKey)
+    }
+
+    private static func resolveInitialOverride(defaults: UserDefaults, launchArguments: [String]) -> AIEngineOverride {
+        if let fromArgs = AIEngineOverride.fromLaunchArguments(launchArguments) {
+            return fromArgs
+        }
+        guard let raw = defaults.string(forKey: AIEngineOverride.defaultsKey),
+              let stored = AIEngineOverride(rawValue: raw) else {
+            return .auto
+        }
+        return stored
     }
 }

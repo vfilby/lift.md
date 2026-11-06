@@ -7,8 +7,7 @@ struct ImportView: View {
     var initialContent: String = ""
 
     @State private var markdownText = ""
-    @State private var parseResult: ParseResult?
-    @State private var parseError: String?
+    @State private var parseStatus: LMWFParseStatus?
     @State private var showImportSuccess = false
     @State private var importedPlanName = ""
     @State private var showDiscardConfirm = false
@@ -18,7 +17,7 @@ struct ImportView: View {
     @Environment(SettingsStore.self) private var settingsStore
 
     private var canImport: Bool {
-        !markdownText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && parseError == nil
+        !markdownText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && parseStatus?.error == nil
     }
 
     var body: some View {
@@ -84,49 +83,11 @@ struct ImportView: View {
                         }
                     )
 
-                // Parse result / error
-                if let error = parseError {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(LiftMarkTheme.destructive)
-                        Text(error)
-                            .font(.lmCaption)
-                            .foregroundStyle(LiftMarkTheme.destructive)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, LiftMarkTheme.spacingSM)
-                    .background(LiftMarkTheme.destructive.opacity(0.1))
-                }
-
-                if let result = parseResult {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(LiftMarkTheme.success)
-                        Text("\(result.name) - \(result.exerciseCount) exercises, \(result.setCount) sets")
-                            .font(.lmCaption)
-                            .foregroundStyle(LiftMarkTheme.success)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, LiftMarkTheme.spacingSM)
-                    .background(LiftMarkTheme.success.opacity(0.1))
-
-                    if !result.warnings.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(result.warnings, id: \.self) { warning in
-                                HStack(spacing: 4) {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .font(.lmCaption2)
-                                        .foregroundStyle(LiftMarkTheme.warning)
-                                    Text(warning)
-                                        .font(.lmCaption2)
-                                        .foregroundStyle(LiftMarkTheme.warning)
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, LiftMarkTheme.spacingXS)
+                // Parse error / success + warnings, with a Fix button when the
+                // parser offered quick fixes (GH #472)
+                if let status = parseStatus {
+                    LMWFParseStatusView(status: status, idPrefix: "import-markdown") { fixes in
+                        markdownText = LMWFQuickFix.applying(fixes, to: markdownText)
                     }
                 }
             }
@@ -154,7 +115,7 @@ struct ImportView: View {
                 }
             }
             .onChange(of: markdownText) {
-                parseMarkdown()
+                parseStatus = LMWFParseStatus.parse(markdownText)
             }
             .alert("Discard Changes?", isPresented: $showDiscardConfirm) {
                 Button("Cancel", role: .cancel) {}
@@ -195,30 +156,6 @@ struct ImportView: View {
         #endif
     }
 
-    private func parseMarkdown() {
-        let trimmed = markdownText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            parseResult = nil
-            parseError = nil
-            return
-        }
-
-        let result = MarkdownParser.parseWorkout(trimmed)
-
-        if !result.errors.isEmpty {
-            parseError = result.errors.first ?? "Parse error"
-            parseResult = nil
-        } else {
-            parseError = nil
-            parseResult = ParseResult(
-                name: result.data?.name ?? "Untitled",
-                exerciseCount: result.data?.displayExerciseCount ?? 0,
-                setCount: result.data?.plannedSetCount ?? 0,
-                warnings: result.warnings
-            )
-        }
-    }
-
     private func importWorkout() {
         let result = MarkdownParser.parseWorkout(markdownText)
         guard var plan = result.data else { return }
@@ -228,13 +165,4 @@ struct ImportView: View {
         showImportSuccess = true
     }
 
-}
-
-// MARK: - Parse Result
-
-private struct ParseResult {
-    let name: String
-    let exerciseCount: Int
-    let setCount: Int
-    let warnings: [String]
 }

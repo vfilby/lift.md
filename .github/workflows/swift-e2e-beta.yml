@@ -141,8 +141,8 @@ jobs:
           echo "==> seeded $EMAIL, planted inbox workout, minted session"
 
       # ── Build the app (mirrors swift-nightly.yml) ──
-      - name: Select Xcode 26
-        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+      - name: Select Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
 
       - name: Install XcodeGen
         run: |

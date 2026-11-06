@@ -48,8 +48,8 @@ jobs:
           # tested commit and map it to a build number for the promotion gate.
           fetch-depth: 0
 
-      - name: Select Xcode 26
-        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+      - name: Select Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
 
       - name: Install XcodeGen
         run: |

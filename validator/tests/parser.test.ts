@@ -2072,3 +2072,245 @@ describe('Exercise Name Suggestions', () => {
     expect(aliasWarnings[0]).toMatch(/^Line 3:/);
   });
 });
+
+// MARK: - Standalone modifiers / ignored lines (GH #425)
+
+describe('STANDALONE_MODIFIER warning', () => {
+  const standalone = (warnings: string[]) =>
+    warnings.filter((w) => w.includes('on its own line and has no effect'));
+
+  it('warns on a bare @rest under the workout header and does not apply it to sets', () => {
+    const md = `# Upper\n@rest: 90s\n\n## Bench Press\n- 185 lbs x 8`;
+    const result = parseWorkout(md);
+    expect(result.success).toBe(true);
+    const w = standalone(result.warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^Line 2:/);
+    expect(w[0]).toContain('"@rest: 90s"');
+    expect(w[0]).toContain('"- 135 lbs x 5 @rest: 90s"');
+    expect(w[0]).toContain("directly under that exercise's header");
+    expect(result.data!.exercises[0].sets[0].restSeconds).toBeNull();
+  });
+
+  it('does not add the exercise-default hint for non-rest modifiers', () => {
+    const w = standalone(parseWorkout(`# W\n@dropset\n## Bench Press\n- 185 x 8`).warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).not.toContain("exercise's header");
+  });
+
+  it('warns on a bare modifier under a superset header', () => {
+    const md = `# W\n## Superset: Arms\n@rest: 60s\n### Curl\n- 30 x 12\n### Pushdown\n- 40 x 12`;
+    const w = standalone(parseWorkout(md).warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^Line 3:/);
+  });
+
+  it('warns on a bare modifier between and after sets (not IGNORED_LINE)', () => {
+    const md = `# W\n## Leg Extension\n- 100 x 12\n@dropset\n- 70 x 10\n@rest: 60s`;
+    const result = parseWorkout(md);
+    const w = standalone(result.warnings);
+    expect(w).toHaveLength(2);
+    expect(w[0]).toMatch(/^Line 4:/);
+    expect(w[1]).toMatch(/^Line 6:/);
+    expect(result.warnings.some((x) => x.includes('Line ignored'))).toBe(false);
+    expect(result.data!.exercises[0].sets[1].isDropset).toBe(false);
+  });
+
+  it('recognizes every modifier keyword case-insensitively, with or without a value', () => {
+    const md = `# W\n## Plank\n- 60s\n@REST: 2m\n@dropset\n@perside\n@rpe: 8\n@tempo: 3-0-1-0\n@amrap`;
+    expect(standalone(parseWorkout(md).warnings)).toHaveLength(6);
+  });
+
+  it('does not warn for modifiers attached to set lines', () => {
+    const md = `# W\n## Bench\n- 185 x 8 @rest: 180s\n- 135 x 10 @dropset`;
+    expect(standalone(parseWorkout(md).warnings)).toHaveLength(0);
+  });
+
+  it('does not warn for unknown metadata (forward compatible) or @type', () => {
+    const md = `# W\n@program: 5/3/1\n@restday: no\n## Bench Press\n@type: barbell\n@video: https://x\n- 185 x 8`;
+    expect(parseWorkout(md).warnings).toEqual([]);
+  });
+
+  it('ignores lines outside the workout block', () => {
+    const md = `# Log\n@rest: 60s\n# Push Day\n## Bench Press\n- 185 x 8`;
+    // "# Log" has no exercises below it, so "# Push Day" is the workout.
+    const result = parseWorkout(md);
+    expect(result.data?.name).toBe('Push Day');
+    expect(standalone(result.warnings)).toHaveLength(0);
+  });
+});
+
+describe('IGNORED_LINE warning', () => {
+  const ignored = (warnings: string[]) => warnings.filter((w) => w.includes('Line ignored'));
+
+  it('warns on prose between and after sets', () => {
+    const md = `# W\n## Row\n- 135 x 10\nKeep your back flat.\n- 155 x 8\n\nFinisher next.`;
+    const result = parseWorkout(md);
+    expect(result.success).toBe(true);
+    const w = ignored(result.warnings);
+    expect(w).toHaveLength(2);
+    expect(w[0]).toMatch(/^Line 4:/);
+    expect(w[0]).toContain('"Keep your back flat."');
+    expect(w[1]).toMatch(/^Line 7:/);
+    expect(result.data!.exercises[0].sets).toHaveLength(2);
+  });
+
+  it('does not warn on prose under a section/superset header (out of scope for IGNORED_LINE)', () => {
+    const md = `# W\n## Warmup\nEasy pace.\n### Jog\n- 5m`;
+    expect(ignored(parseWorkout(md).warnings)).toHaveLength(0);
+  });
+
+  it('does not warn for exercise notes before the first set or blank lines', () => {
+    const md = `# W\nWorkout notes.\n\n## Row\nNotes here.\n\n- 135 x 10\n\n- 155 x 8\n`;
+    expect(ignored(parseWorkout(md).warnings)).toHaveLength(0);
+  });
+
+  it('truncates long ignored lines in the message', () => {
+    const long = 'x'.repeat(200);
+    const md = `# W\n## Row\n- 135 x 10\n${long}`;
+    const w = ignored(parseWorkout(md).warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).not.toContain(long);
+    expect(w[0]).toContain('...');
+  });
+});
+
+describe('Exercise-level default @rest', () => {
+  const rests = (md: string, i = 0) => parseWorkout(md).data!.exercises[i].sets.map((s) => s.restSeconds);
+  const standalone = (warnings: string[]) =>
+    warnings.filter((w) => w.includes('on its own line and has no effect'));
+
+  it('applies to every set without its own @rest; set-level @rest overrides', () => {
+    const md = `# W\n## Bench Press\n@rest: 180s\n- 135 x 5 @rest: 90s\n- 185 x 5\n- 225 x 5`;
+    expect(rests(md)).toEqual([90, 180, 180]);
+    expect(standalone(parseWorkout(md).warnings)).toEqual([]);
+  });
+
+  it('accepts minutes, is case-insensitive, and coexists with @type and notes in any order', () => {
+    const md = `# W\n## Bench Press\nControl the bar.\n@REST: 3m\n@type: barbell\n- 185 x 5`;
+    const ex = parseWorkout(md).data!.exercises[0];
+    expect(ex.sets[0].restSeconds).toBe(180);
+    expect(ex.equipmentType).toBe('barbell');
+    expect(ex.notes).toBe('Control the bar.');
+  });
+
+  it('is not applied to @dropset sets unless they carry their own @rest', () => {
+    const md = `# W\n## Curl\n@rest: 60s\n- 40 x 10\n- 30 x 12 @dropset\n- 20 x 15 @dropset @rest: 120s`;
+    expect(rests(md)).toEqual([60, null, 120]);
+  });
+
+  it('only applies to its own exercise', () => {
+    const md = `# W\n## Bench Press\n@rest: 90s\n- 185 x 5\n## Squat\n- 225 x 5`;
+    expect(rests(md, 1)).toEqual([null]);
+  });
+
+  it('works on an exercise inside a superset, while a superset-level @rest still warns', () => {
+    const md = `# W\n## Superset: Arms\n@rest: 90s\n### Curl\n@rest: 30s\n- 30 x 12\n### Pushdown\n- 40 x 12`;
+    const result = parseWorkout(md);
+    const sets = result.data!.exercises.filter((e) => e.sets.length > 0).map((e) => e.sets[0].restSeconds);
+    expect(sets).toEqual([30, null]);
+    const w = standalone(result.warnings);
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^Line 3:/);
+  });
+
+  it('after the first set it is a standalone modifier, not a default', () => {
+    const md = `# W\n## Row\n- 135 x 8\n@rest: 120s\n- 135 x 8`;
+    expect(rests(md)).toEqual([null, null]);
+    expect(standalone(parseWorkout(md).warnings)).toHaveLength(1);
+  });
+
+  it('last @rest line wins when repeated (same as @type)', () => {
+    expect(rests(`# W\n## Bench Press\n@rest: 60s\n@rest: 90s\n- 185 x 5`)).toEqual([90]);
+  });
+
+  it('rejects an invalid value with INVALID_REST', () => {
+    for (const value of ['abc', '-30s', '90s between sets']) {
+      const result = parseWorkout(`# W\n## Bench Press\n@rest: ${value}\n- 185 x 5`);
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toMatch(/^Line 3: Invalid rest time format/);
+      expect(standalone(result.warnings)).toEqual([]);
+    }
+  });
+
+  it('emits SHORT_REST / LONG_REST once on the @rest line, not per set', () => {
+    const short = parseWorkout(`# W\n## Bench Press\n@rest: 5s\n- 185 x 5\n- 185 x 5`).warnings;
+    expect(short.filter((w) => w.includes('Very short rest'))).toEqual([
+      'Line 3: Very short rest period (5s). Double-check for typos.',
+    ]);
+    const long = parseWorkout(`# W\n## Bench Press\n@rest: 11m\n- 185 x 5\n- 185 x 5`).warnings;
+    expect(long.filter((w) => w.includes('Very long rest'))).toHaveLength(1);
+  });
+});
+
+// MARK: - MALFORMED_HEADER (GH #472)
+
+describe('MALFORMED_HEADER', () => {
+  const malformed = (items: string[]) => items.filter((w) => w.includes('is missing a space after'));
+
+  it('reports a header missing its space when no workout header is found (spec TC-E35)', () => {
+    const result = parseWorkout(`#push day\n\n## bench press\n- 3 x 100`);
+    expect(result.success).toBe(false);
+    expect(result.errors).toEqual([
+      'Line 1: Header "#push day" is missing a space after "#". Write "# push day".',
+      'No workout header found. Must have a header (# Workout Name) with exercises below it.',
+    ]);
+    expect(result.fixes).toEqual([{ line: 1, original: '#push day', replacement: '# push day' }]);
+  });
+
+  it('reports every malformed header line, each with its own fix', () => {
+    const result = parseWorkout(`#Push Day\n\n##Bench Press\n- 135 x 5`);
+    expect(malformed(result.errors)).toEqual([
+      'Line 1: Header "#Push Day" is missing a space after "#". Write "# Push Day".',
+      'Line 3: Header "##Bench Press" is missing a space after "##". Write "## Bench Press".',
+    ]);
+    expect(result.fixes.map((f) => f.line)).toEqual([1, 3]);
+    expect(result.fixes[1]).toEqual({ line: 3, original: '##Bench Press', replacement: '## Bench Press' });
+  });
+
+  it('applying the fix yields a valid workout', () => {
+    const md = `#push day\n\n## bench press\n- 3 x 100`;
+    const { fixes } = parseWorkout(md);
+    const lines = md.split('\n');
+    for (const f of fixes) lines[f.line - 1] = f.replacement;
+    const fixed = parseWorkout(lines.join('\n'));
+    expect(fixed.success).toBe(true);
+    expect(fixed.data?.name).toBe('push day');
+    expect(fixed.fixes).toEqual([]);
+  });
+
+  it('still reports the plain no-header error, with no fixes, when nothing is header-shaped', () => {
+    const result = parseWorkout(`Just text\n- 225 x 5`);
+    expect(result.errors).toEqual([
+      'No workout header found. Must have a header (# Workout Name) with exercises below it.',
+    ]);
+    expect(result.fixes).toEqual([]);
+  });
+
+  it('ignores seven or more # and a bare #', () => {
+    const result = parseWorkout(`#######nope\n#\n- 225 x 5`);
+    expect(malformed(result.errors)).toEqual([]);
+    expect(result.fixes).toEqual([]);
+  });
+
+  it("after an exercise's first set it is a warning instead of IGNORED_LINE (spec TC-W04)", () => {
+    const result = parseWorkout(`# Push Day\n\n## Bench Press\n- 135 lbs x 5\n- 185 lbs x 5\n##Squat\n- 225 lbs x 5`);
+    expect(result.success).toBe(true);
+    expect(result.warnings).toEqual([
+      'Line 6: Header "##Squat" is missing a space after "##". Write "## Squat". ' +
+        'Until it is fixed, the set lines below it count toward the exercise above.',
+    ]);
+    expect(result.fixes).toEqual([{ line: 6, original: '##Squat', replacement: '## Squat' }]);
+    expect(result.data!.exercises).toHaveLength(1);
+    expect(result.data!.exercises[0].sets).toHaveLength(3);
+  });
+
+  it('preserves the header marks and trims the text in the replacement', () => {
+    const result = parseWorkout(`###Leg   Day  \n- 5 x 5`);
+    expect(result.fixes).toEqual([{ line: 1, original: '###Leg   Day', replacement: '### Leg   Day' }]);
+  });
+
+  it('a valid workout with no malformed lines has no fixes', () => {
+    expect(parseWorkout(`# W\n## Row\n- 135 x 10`).fixes).toEqual([]);
+  });
+});

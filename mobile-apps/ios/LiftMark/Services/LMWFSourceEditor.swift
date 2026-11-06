@@ -111,7 +111,7 @@ enum LMWFSourceEditor {
         }
         appendNotes(exercise.notes, to: &lines)
         for set in exercise.sets {
-            if let line = renderSet(set) {
+            if let line = renderSetLine(set) {
                 lines.append(line)
             }
         }
@@ -126,7 +126,7 @@ enum LMWFSourceEditor {
     /// Render one set line, or `nil` when the set carries no numeric target
     /// (nothing meaningful to emit). Mirrors the LMWF the parser accepts and the
     /// completed-session encoder produces.
-    private static func renderSet(_ set: PlannedSet) -> String? {
+    static func renderSetLine(_ set: PlannedSet) -> String? {
         let target = set.entries.first?.target
         var tokens: [String] = []
 

@@ -91,7 +91,7 @@ Both `ack` and `DELETE` are state-changing and require `workouts:write` (a read-
 
 Resource endpoints (`/v1/workouts/*`) accept session JWT **OR** PAT — see `validator/src/middleware/auth.ts`. Pushes from the web portal use the session; pushes from Claude Code use a PAT.
 
-**PAT scope allowlist.** `POST /v1/tokens` validates requested scopes against a server-side allowlist (`ALLOWED_SCOPES` in `validator/src/routes/tokens.ts`) — currently exactly the scopes the API enforces: `workouts:read`, `workouts:write`. Unknown scopes are rejected with `400`, and the array is length-capped. This keeps any future privileged scope deny-by-default for self-service token creation (a user cannot pre-mint a token carrying a scope the server hasn't yet wired up).
+**PAT scope allowlist.** `POST /v1/tokens` validates requested scopes against a server-side allowlist (`ALLOWED_SCOPES` in `validator/src/routes/tokens.ts`) — currently exactly the scopes the API enforces: `workouts:read`, `workouts:write`, and `ai:edit` (AI plan editing, see `ai-plan-editing.md`; never a default scope). Unknown scopes are rejected with `400`, and the array is length-capped. This keeps any future privileged scope deny-by-default for self-service token creation (a user cannot pre-mint a token carrying a scope the server hasn't yet wired up).
 
 ### Web portal inbox table
 
@@ -172,9 +172,26 @@ Row actions (swipe or context menu):
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Discard         | Local row deleted; `DELETE /v1/workouts/:inbox_id` fired. On network failure: row stays gone locally; server row dies on next sync (or is reaped by TTL). |
 | Add to Plans    | Promote: parse `lmwf_text` via `MarkdownParser`, set the plan's `sourceMarkdown = lmwf_text`, insert the `WorkoutPlan`; delete the inbox row; `DELETE` the server row.                                                       |
-| Start Workout   | Promote (as above), then immediately start a session from the new plan (`SessionStore.startSession`) and navigate straight to **Active Workout** — the user does not stop at the plan detail screen (GH #210). `startSession` cancels any in-progress session first, so Start replaces a workout already underway. If the session fails to start, fall back to opening the new plan's detail screen so the user still lands somewhere actionable. |
+| Start Workout   | Promote (as above), then immediately start a session from the new plan (`SessionStore.startSession`) and navigate straight to **Active Workout** — the user does not stop at the plan detail screen (GH #210). Active Workout is pushed onto the **Plans tab's own navigation stack** (`NavigationCoordinator.plansNavPath`), the tab the inbox lives on, exactly as plan detail's Start does; it must never route through another tab, because pushing onto an off-screen tab's stack renders SwiftUI's blank unresolved-destination placeholder (GH #487). When Start comes from the preview sheet, the push waits until the sheet has finished dismissing. `startSession` cancels any in-progress session first, so Start replaces a workout already underway. If the session fails to start, fall back to opening the new plan's detail screen so the user still lands somewhere actionable. |
 
-Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) — workout name, tags, default unit, description, and a card per exercise listing each set's target weight/reps/time/RPE plus per-set modifier chips (drop, per-side, rest, tempo). Footer holds the same three actions; selecting one dismisses the sheet and runs the action on the parent (`InboxSectionView` owns the queue/server reconciliation).
+Tap on a row (not swipe) opens a read-only detail sheet (`InboxPreviewSheet`) — workout name, tags, default unit, description, and a card per exercise listing each set's target weight/reps/time/RPE plus per-set modifier chips (drop, per-side, rest, tempo). Exercises are grouped exactly as the plan detail screen groups them (`PlanDisplayBuilder.sections(for:)`): a section header (e.g. `## Warm-Up`, no "superset" in the name) renders as a section divider above its children, and a superset parent renders as a SUPERSET-labelled group around its children. Structural headers (`PlannedExercise.isStructuralHeader` — the zero-set section/superset container rows) never get their own exercise card (GH #443); a single-member superset renders its lone child as a plain card. Footer holds the same three actions; selecting one dismisses the sheet and runs the action on the parent (`InboxSectionView` owns the queue/server reconciliation).
+
+#### Start navigation (GH #487)
+
+- `NavigationCoordinator.navigateToActiveWorkout()` resets `plansNavPath`, appends `AppDestination.activeWorkout`,
+  and selects the Plans tab. It leaves `homeNavPath` untouched. `WorkoutsView` resolves `.activeWorkout` to
+  `ActiveWorkoutView` in its `navigationDestination(for: AppDestination.self)`.
+- `InboxSectionView` tracks whether the preview sheet is on screen (set on the sheet's appear, cleared in
+  `onDismiss`). A Start navigation requested while the sheet is on screen is held and performed from `onDismiss`;
+  otherwise it runs immediately. The session itself is started right away in both cases.
+- Test seam: `--seed-inbox-item` (DEBUG only) inserts one pending row with id `seed-inbox-item` before the poller
+  is built, so the Start flow can run without a backend.
+- Tests:
+  - `NavigationCoordinatorTests`: `navigateToActiveWorkout()` leaves exactly one entry on `plansNavPath`, selects
+    `.plans`, and does not modify `homeNavPath`.
+  - E2E `inbox-start.yaml` (`testInboxStart`): launch with `--reset-data --enable-flag=workoutInbox
+    --seed-inbox-item`, open the seeded row's preview, tap Start, and require `active-workout-screen` plus
+    `active-workout-header` on screen and the plan name visible.
 
 ### Conflict + dedup rules
 

@@ -8,6 +8,7 @@ import Foundation
 enum FeatureFlag: String, CaseIterable, Identifiable {
     case workoutInbox
     case useBetaApi
+    case aiPlanEditing
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
         switch self {
         case .workoutInbox: return "Workout Inbox"
         case .useBetaApi: return "Use Beta API"
+        case .aiPlanEditing: return "AI Plan Editing"
         }
     }
 
@@ -27,6 +29,9 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
         case .useBetaApi:
             return "Route account + sync API calls to the beta environment instead of prod. "
                 + "Toggling signs you out — tokens from one env don't work in the other."
+        case .aiPlanEditing:
+            return "Shows \"Edit with AI\" on Workout Detail. "
+                + "Turning it off resets the AI engine override to Automatic."
         }
     }
 
@@ -37,6 +42,7 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
     var parent: FeatureFlag? {
         switch self {
         case .useBetaApi: return .workoutInbox  // beta API only serves account + sync, which the inbox drives
+        case .aiPlanEditing: return .workoutInbox  // the LiftMark cloud engine talks to the same account API
         case .workoutInbox: return nil
         }
     }
@@ -58,6 +64,7 @@ enum FeatureFlag: String, CaseIterable, Identifiable {
         switch self {
         case .workoutInbox: return false
         case .useBetaApi: return false
+        case .aiPlanEditing: return false
         }
     }
 

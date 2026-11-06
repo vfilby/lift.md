@@ -16,7 +16,9 @@
 | SessionStatus | `in_progress`, `completed`, `canceled` | WorkoutSession lifecycle |
 | GroupType | `superset`, `section` | Exercise grouping. `superset` = performed together; `section` = organizational heading |
 | Theme | `light`, `dark`, `auto` | UI theme preference |
-| ApiKeyStatus | `verified`, `invalid`, `not_set` | Anthropic API key verification state |
+| ApiKeyStatus | `verified`, `invalid`, `not_set` | Legacy Anthropic key status; read only by the one-time migration (see `spec/services/ai-providers.md`) |
+| AIProvider | `anthropic`, `openai`, `gemini`, `ollama` | BYOK LLM provider |
+| AIKeyStatus | `verified`, `unverified`, `invalid` | Per-provider-key verification state |
 | ChartMetricType | `maxWeight`, `totalVolume`, `reps`, `time` | Exercise history chart metric selector |
 | Trend | `improving`, `stable`, `declining` | Exercise progress direction (based on last 5 sessions, >5% threshold) |
 
@@ -228,8 +230,8 @@ Singleton record for user preferences.
 | theme | Theme | Yes | auto | |
 | notificationsEnabled | boolean | Yes | true | |
 | customPromptAddition | string | No | — | Appended to AI workout generation prompts |
-| anthropicApiKey | string | No | — | Stored in platform secure storage (e.g., Keychain), NOT in database |
-| anthropicApiKeyStatus | ApiKeyStatus | No | not_set | Status stored in database |
+| anthropicApiKey | string | No | — | Legacy. Migrated into the Keychain provider-key list (`ai_provider_keys`), NOT in database |
+| anthropicApiKeyStatus | ApiKeyStatus | No | not_set | Legacy. Read only by the one-time migration; no longer written |
 | healthKitEnabled | boolean | Yes | false | Sync to Apple Health |
 | liveActivitiesEnabled | boolean | Yes | true | Show on lock screen |
 | keepScreenAwake | boolean | Yes | true | During active workouts |
@@ -241,7 +243,7 @@ Singleton record for user preferences.
 
 **Business rules**:
 - Exactly one record exists; initialized on first launch.
-- anthropicApiKey is verified via API call before storing; status reflects last verification result.
+- BYOK provider keys (`AIProviderKey`: provider, key, model, Ollama base URL, `AIKeyStatus`) live as an ordered list in the Keychain, never in the database. See `spec/services/ai-providers.md`.
 - The actual API key must be stored in platform-native secure storage, not in the main database.
 
 ---

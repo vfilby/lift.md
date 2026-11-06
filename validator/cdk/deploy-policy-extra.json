@@ -39,6 +39,32 @@
       "Resource": "arn:aws:ses:*:*:identity/*"
     },
     {
+      "Sid": "BedrockSpendBudget",
+      "Effect": "Allow",
+      "Action": [
+        "budgets:ViewBudget",
+        "budgets:ModifyBudget",
+        "budgets:DescribeBudget",
+        "budgets:CreateBudget",
+        "budgets:UpdateBudget",
+        "budgets:DeleteBudget"
+      ],
+      "Resource": "arn:aws:budgets::*:budget/lmwf-*"
+    },
+    {
+      "Sid": "BedrockSpendBudget",
+      "Effect": "Allow",
+      "Action": [
+        "budgets:ViewBudget",
+        "budgets:ModifyBudget",
+        "budgets:DescribeBudget",
+        "budgets:CreateBudget",
+        "budgets:UpdateBudget",
+        "budgets:DeleteBudget"
+      ],
+      "Resource": "arn:aws:budgets::*:budget/lmwf-*"
+    },
+    {
       "Sid": "WAFv2WebAcl",
       "Effect": "Allow",
       "Action": [

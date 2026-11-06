@@ -27,6 +27,11 @@ struct SetRowView: View {
     let onSave: (Double?, Int?, Int?) -> Void
     var onUnlog: (() -> Void)?
     var onWeightChanged: ((String) -> Void)?
+    /// Weight carried over from an earlier set of the same exercise planned at
+    /// the same weight (GH #489). Shown on the pending row and pre-fills the
+    /// weight field in place of the target. See
+    /// `ActiveWorkoutViewModel.suggestedWeight(forSetAt:in:currentSetIndex:currentWeight:)`.
+    var suggestedWeight: Double?
 
     // The input-field state below is non-private so the row-content helpers in
     // SetRowView+CurrentSet.swift, SetRowView+CompletedRow.swift, and
@@ -76,7 +81,7 @@ struct SetRowView: View {
         .onAppear {
             let target = set.entries.first?.target
             let actual = set.entries.first?.actual
-            if let weight = target?.weight?.value ?? actual?.weight?.value {
+            if let weight = startingWeight {
                 weightText = formatWeight(weight)
                 onWeightChanged?(weightText)
             }
@@ -87,6 +92,26 @@ struct SetRowView: View {
                 timeText = DurationFormat.mmss(time)
             }
         }
+        // Rows appear once, so re-seed the weight field when a carried-over
+        // weight changes before the user gets to this set (GH #489).
+        .onChange(of: suggestedWeight) { _, _ in
+            guard !isCurrent, set.status == .pending, let weight = startingWeight else { return }
+            weightText = formatWeight(weight)
+        }
+        // Becoming current: start from the carried-over weight and report the
+        // field to the card — onAppear ran while pending, without a callback.
+        .onChange(of: isCurrent) { _, nowCurrent in
+            guard nowCurrent else { return }
+            if set.status == .pending, let weight = startingWeight {
+                weightText = formatWeight(weight)
+            }
+            onWeightChanged?(weightText)
+        }
+    }
+
+    /// Weight the field starts at: the carried-over weight, else target, else actual.
+    var startingWeight: Double? {
+        suggestedWeight ?? set.entries.first?.target?.weight?.value ?? set.entries.first?.actual?.weight?.value
     }
 
     /// Step size for +/- buttons. Coarser steps for long holds so users

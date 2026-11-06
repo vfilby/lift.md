@@ -103,10 +103,24 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `live-activities-status-label` | Text | Shows Live Activities permission status or instructions |
 | `live-activities-open-settings` | Button | Opens app system Settings (visible only when disabled at OS level) |
 | `input-custom-prompt` | TextInput | Custom AI prompt addition input |
-| `input-api-key` | TextInput | Anthropic API key input |
-| `toggle-api-key-visibility` | TouchableOpacity | Show/hide API key text |
-| `save-api-key-button` | TouchableOpacity | Save the entered API key |
-| `remove-api-key-button` | TouchableOpacity | Remove the stored API key |
+| `ai-keys-empty` | Text | Empty-state hint shown when no AI provider keys are configured |
+| `ai-keys-error` | Text | Inline error when saving/reordering/deleting keys fails |
+| `ai-key-row-{index}` | Button | AI provider key row (0-based list order); tap to edit. Accessibility label "{n}. {Provider}, {model}", value = status (Verified / Not verified / Invalid) |
+| `ai-key-move-up` / `ai-key-move-down` | Button | Context-menu reorder actions on a key row |
+| `ai-key-delete` | Button | Context-menu delete action on a key row |
+| `add-ai-key-button` | Button | Open the Add Key sheet |
+| `ai-key-sheet` | View | Add/Edit Key sheet root |
+| `picker-ai-provider` | Picker | Provider selection (Anthropic, OpenAI, Gemini, Ollama) |
+| `input-ai-api-key` | SecureField / TextField | API key input (optional token for Ollama) |
+| `toggle-api-key-visibility` | Button | Show/hide API key text in the sheet |
+| `input-ai-base-url` | TextField | Ollama server URL (Ollama only) |
+| `input-ai-model` | TextField | Model id (blank = provider default) |
+| `menu-ai-model` | Menu | Pick from the models returned by verification |
+| `button-load-ai-models` | Button | Run the free verification call and load the provider's models |
+| `ai-key-error` | Text | Inline validation / verification error |
+| `button-save-ai-key` | Button | Validate, verify, and save the key |
+| `button-cancel-ai-key` | Button | Dismiss the sheet without saving |
+| `button-delete-ai-key` | Button | Delete the key being edited (edit mode only) |
 | `open-claude-button` | TouchableOpacity | Open Anthropic console in browser |
 | `button-options-section` | View | Section for button option settings |
 | `switch-show-open-in-claude` | Switch | Toggle "always show Open in Claude" button |
@@ -125,6 +139,48 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `superset-{index}` | View | Superset group container |
 | `exercise-{exercise.id}` | View | Exercise container |
 | `set-{set.id}` | View | Individual set display |
+| `edit-plan-ai-button` | Button | "Edit with AI" — opens the AI edit sheet (Pro, `aiPlanEditing` flag) |
+| `edit-plan-ai-upsell` | Button | Same row rendered for signed-out / free users; explains AI editing is part of Pro |
+| `edit-plan-markdown-button` | Button | "Edit" — opens the Edit Plan Markdown sheet |
+
+### Edit Plan Markdown Sheet (presented from Workout Detail)
+
+| ID | Element Type | Purpose |
+|----|-------------|---------|
+| `edit-plan-markdown-sheet` | View | Sheet container |
+| `edit-plan-markdown-editor` | TextEditor | Raw LMWF markdown editor |
+| `edit-plan-markdown-error` | View | Inline parse error row (first error); absent when the text parses |
+| `edit-plan-markdown-fix-button` | Button | "Fix" — applies the parser's quick fixes to the editor text (GH #472); absent when there are none |
+| `edit-plan-save-button` | Button | Save; disabled while there is a parse error or no change |
+| `edit-plan-cancel-button` | Button | Cancel (asks to discard when there are changes) |
+
+### AI Edit Sheet (presented from Workout Detail)
+
+| ID | Element Type | Purpose |
+|----|-------------|---------|
+| `ai-edit-sheet` | View | Sheet container |
+| `ai-edit-close` | Button | Dismiss the sheet (confirms if a proposal is unapplied) |
+| `ai-edit-engine-label` | Text | Active engine display name |
+| `ai-edit-quota-label` | Text | Quota state for the active engine, when known |
+| `ai-edit-quota-options` | Button | Apple limit-increase sheet (PCC engine only) |
+| `ai-edit-message-{index}` | View | Transcript row (0-based): user instruction, assistant summary + inline diff, or error |
+| `ai-edit-message-discarded` | Text | "Discarded" caption on a transcript row whose proposal was discarded or undone |
+| `ai-edit-thinking` | View | Thinking indicator row at the end of the transcript |
+| `ai-edit-error` | Text | Error message row in the transcript |
+| `ai-edit-diff` | View | Inline diff of the newest assistant turn; hold to open the full preview |
+| `ai-edit-diff-previous` | View | Inline diff of an earlier assistant turn; hold to open the full preview |
+| `ai-edit-diff-row-{slug}` | View | One highlighted exercise row (inline diff and full preview), slug = kind + exercise name (`added-face-pull`) |
+| `ai-edit-preview-full` | View | Full preview sheet container (the proposed plan with diff highlighting) |
+| `ai-edit-preview-row-{slug}` | View | One unchanged exercise row in the full preview, slug = exercise name (`bench-press`) |
+| `ai-edit-preview-done` | Button | Dismiss the full preview sheet |
+| `ai-edit-apply` | Button | Persist the proposal |
+| `ai-edit-discard` | Button | Drop the proposal |
+| `ai-edit-undo` | Button | Restore the markdown persisted before the last Apply |
+| `ai-edit-chip-{slug}` | Button | Quick-action chip (`make-it-shorter`, `swap-barbell-for-dumbbells`, `add-a-warm-up`, `progress-loads`, `thirty-minutes`) |
+| `ai-edit-privacy-footer` | Text | One-line caption naming the engine the plan is sent to |
+| `ai-edit-input` | TextField | Instruction input |
+| `ai-edit-send` | Button | Send the instruction |
+| `ai-edit-cancel` | Button | Cancel the in-flight request |
 
 ---
 
@@ -139,6 +195,9 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `active-workout-finish-button` | TouchableOpacity | Finish the workout |
 | `active-workout-progress` | View | Progress bar and text container |
 | `active-workout-scroll` | ScrollView | Scrollable exercise content |
+| `exercise-notes-{index}` | Text | Exercise notes on an active card; long-press opens the enlarged view (GH #432) |
+| `enlarged-view` | View | Full-screen enlarged notes view |
+| `enlarged-view-close` | Button | Closes the enlarged notes view |
 
 ---
 
@@ -174,9 +233,11 @@ Implementations on any platform must attach these identifiers to the correspondi
 | `button-cancel` | TouchableOpacity | Cancel and dismiss the modal |
 | `button-import` | TouchableOpacity | Import the entered markdown |
 | `button-copy-prompt` | TouchableOpacity | Copy AI prompt to clipboard |
-| `button-generate` | TouchableOpacity | Generate workout via Anthropic API |
+| `button-generate` | TouchableOpacity | Generate a workout via the user's ordered AI provider keys |
 | `button-open-claude` | TouchableOpacity | Copy prompt and open Claude.ai |
 | `input-markdown` | TextInput | Markdown input field |
+| `import-markdown-error` | View | Inline parse error row (first error); absent when the text parses |
+| `import-markdown-fix-button` | Button | "Fix" — applies the parser's quick fixes to the markdown field (GH #472); absent when there are none |
 
 ---
 

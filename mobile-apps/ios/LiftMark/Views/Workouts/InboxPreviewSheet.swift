@@ -37,8 +37,18 @@ struct InboxPreviewSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: LiftMarkTheme.spacingMD) {
                     headerCard
-                    ForEach(Array(plan.exercises.enumerated()), id: \.offset) { _, exercise in
-                        exerciseCard(exercise)
+                    ForEach(Array(exerciseSections.enumerated()), id: \.offset) { _, section in
+                        if let sectionName = section.name {
+                            WorkoutSectionHeader(name: sectionName)
+                        }
+                        ForEach(section.items) { item in
+                            switch item {
+                            case .single(let exercise):
+                                exerciseCard(exercise)
+                            case .superset(let parent, let children):
+                                supersetGroup(parent: parent, children: children)
+                            }
+                        }
                     }
                 }
                 .padding(LiftMarkTheme.spacingMD)
@@ -56,6 +66,13 @@ struct InboxPreviewSheet: View {
                 actionFooter
             }
         }
+    }
+
+    /// Same grouping as the plan detail screen, so structural headers
+    /// (section / superset containers with no sets) render as dividers and
+    /// group labels rather than as empty 0-set exercise cards (GH #443).
+    var exerciseSections: [ExerciseDisplaySection] {
+        PlanDisplayBuilder.sections(for: plan)
     }
 
     // MARK: - Header
@@ -124,9 +141,6 @@ struct InboxPreviewSheet: View {
     @ViewBuilder
     private func exerciseCard(_ exercise: PlannedExercise) -> some View {
         VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
-            // Group badge (superset / section) — renders EmptyView when not grouped.
-            groupBadge(for: exercise)
-
             HStack(alignment: .firstTextBaseline, spacing: LiftMarkTheme.spacingSM) {
                 Text(exercise.exerciseName)
                     .font(.lmHeadline)
@@ -162,27 +176,31 @@ struct InboxPreviewSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
     }
 
-    @ViewBuilder
-    private func groupBadge(for exercise: PlannedExercise) -> some View {
-        switch exercise.groupType {
-        case .superset:
-            Text("SUPERSET")
-                .font(.lmCaption2.bold())
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .foregroundStyle(.purple)
-                .background(Color.purple.opacity(0.12))
-                .clipShape(Capsule())
-        case .section:
-            Text((exercise.groupName ?? "Section").uppercased())
-                .font(.lmCaption2.bold())
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .foregroundStyle(LiftMarkTheme.primary)
-                .background(LiftMarkTheme.primary.opacity(0.12))
-                .clipShape(Capsule())
-        case .none:
-            EmptyView()
+    /// A superset renders as one labelled group: the parent supplies the
+    /// SUPERSET badge + name, its children render as regular cards beneath.
+    private func supersetGroup(parent: PlannedExercise, children: [PlannedExercise]) -> some View {
+        VStack(alignment: .leading, spacing: LiftMarkTheme.spacingSM) {
+            HStack(spacing: LiftMarkTheme.spacingSM) {
+                Text("SUPERSET")
+                    .font(.lmCaption2.bold())
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .foregroundStyle(.purple)
+                    .background(Color.purple.opacity(0.12))
+                    .clipShape(Capsule())
+                Text(parent.exerciseName)
+                    .font(.lmSubheadline)
+                    .foregroundStyle(LiftMarkTheme.secondaryLabel)
+            }
+            ForEach(Array(children.enumerated()), id: \.offset) { _, child in
+                exerciseCard(child)
+            }
+        }
+        .padding(.leading, LiftMarkTheme.spacingSM)
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(Color.purple.opacity(0.4))
+                .frame(width: 3)
         }
     }
 

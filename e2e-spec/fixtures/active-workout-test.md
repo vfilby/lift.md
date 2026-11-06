@@ -3,6 +3,7 @@
 @units: lbs
 
 ## Bench Press
+Retract the shoulder blades and keep the feet planted. Touch the lower chest on every rep.
 - 135 x 5 @rest:90
 - 155 x 5 @rest:90
 - 175 x 3

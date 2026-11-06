@@ -14,6 +14,11 @@ struct SettingsFeatureFlagsSection: View {
             if flags.isEnabled(flag) {
                 ForEach(flag.children) { child in
                     FeatureFlagRow(flag: child, isChild: true)
+                    // The AI engine override is the one sanctioned non-boolean
+                    // developer setting; it rides beneath its flag while on.
+                    if child == .aiPlanEditing, flags.isEnabled(child) {
+                        AIEngineOverrideRow()
+                    }
                 }
             }
         }
@@ -45,8 +50,9 @@ private struct FeatureFlagRow: View {
 
     /// Per-flag side effects when the toggle flips. Most flags need no
     /// extra action; `useBetaApi` forces a sign-out so env-specific
-    /// tokens + caches don't collide with the new environment. Disabling a
-    /// parent cascades its children off (running their side effects too) so a
+    /// tokens + caches don't collide with the new environment, and
+    /// `aiPlanEditing` resets the engine override. Disabling a parent
+    /// cascades its children off (running their side effects too) so a
     /// hidden child can't keep silently affecting behavior.
     private func handleToggle(to newValue: Bool) {
         let old = flags.isEnabled(flag)
@@ -67,8 +73,34 @@ private struct FeatureFlagRow: View {
         switch flag {
         case .useBetaApi:
             Task { await authStore.logout() }
+        case .aiPlanEditing:
+            if !enabled {
+                flags.engineOverride = .auto
+            }
         case .workoutInbox:
             break
         }
+    }
+}
+
+/// `Picker` for `AIEngineOverride`, nested under the `aiPlanEditing` flag.
+private struct AIEngineOverrideRow: View {
+    @Environment(FeatureFlagsStore.self) private var flags
+
+    var body: some View {
+        @Bindable var flags = flags
+        VStack(alignment: .leading, spacing: 4) {
+            Picker("AI engine", selection: $flags.engineOverride) {
+                ForEach(AIEngineOverride.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            Text("Force one engine for device testing. "
+                 + "Automatic picks Apple Private Cloud Compute, then LiftMark cloud.")
+                .font(.lmCaption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.leading, 40)
+        .accessibilityIdentifier("ai-engine-override-picker")
     }
 }

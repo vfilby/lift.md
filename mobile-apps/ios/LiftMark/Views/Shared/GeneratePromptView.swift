@@ -12,6 +12,7 @@ struct GeneratePromptView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(SettingsStore.self) private var settingsStore
     @Environment(GymStore.self) private var gymStore
+    @Environment(AIKeyStore.self) private var aiKeyStore
 
     @State private var intent: String = ""
     @State private var selectedGymId: String?
@@ -28,7 +29,7 @@ struct GeneratePromptView: View {
     }
 
     private var canGenerate: Bool {
-        settings?.anthropicApiKeyStatus == .verified
+        aiKeyStore.hasUsableKey
             && !intent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !isGenerating
     }
@@ -66,7 +67,7 @@ struct GeneratePromptView: View {
                     }
                     .accessibilityIdentifier("button-copy-prompt")
 
-                    if settings?.anthropicApiKeyStatus == .verified {
+                    if aiKeyStore.hasUsableKey {
                         Button {
                             generate()
                         } label: {
@@ -228,22 +229,20 @@ struct GeneratePromptView: View {
     }
 
     private func generate() {
-        guard let apiKey = SecureStorage.getApiKey() else {
-            generationError = "API key missing. Add one in Settings."
-            return
-        }
         let prompt = builtPrompt
+        let keys = aiKeyStore.keys
         isGenerating = true
         generationError = nil
         Task {
-            let result = await AnthropicService.shared.generateWorkout(apiKey: apiKey, prompt: prompt)
+            let outcome = await AIProviderService.shared.generateWorkout(prompt: prompt, keys: keys)
             await MainActor.run {
                 isGenerating = false
-                if let markdown = result.workout {
+                aiKeyStore.apply(statusUpdates: outcome.statusUpdates)
+                if let markdown = outcome.workout {
                     onGenerated(markdown)
                     dismiss()
                 } else {
-                    generationError = result.error?.message ?? "Generation failed"
+                    generationError = outcome.error?.message ?? "Generation failed"
                 }
             }
         }

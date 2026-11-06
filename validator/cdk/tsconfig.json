@@ -10,6 +10,9 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true
   },
-  "include": ["*.ts", "../src/infra/**/*.ts"],
+  // Only the table schema module is shared with the CDK app. The rest of
+  // src/ is ESM (import.meta) and is type-checked by the validator's own
+  // tsconfig, not under this commonjs config.
+  "include": ["*.ts", "../src/infra/tables.ts"],
   "exclude": ["node_modules", "dist"]
 }

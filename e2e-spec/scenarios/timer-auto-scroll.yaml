@@ -1,0 +1,74 @@
+name: "Timer Auto-Scroll"
+
+# GH #433: when completing a set makes a timed set current, the list must
+# scroll that set's exercise timer into view. The fixture's timed exercise has
+# long form notes, so scrolling only to the top of its card leaves the timer
+# below the fold. The assertion uses toBeOnScreen, which never scrolls.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+  - action: tryCatch
+    try:
+      - action: waitFor
+        target: "home-screen"
+        timeout: 30000
+    catch:
+      - action: waitFor
+        target: "max-lift-tile-0"
+        timeout: 5000
+  - action: waitFor
+    target: "button-import-workout"
+    timeout: 5000
+  - action: tryCatch
+    try:
+      - action: tap
+        target: "button-import-workout"
+      - action: waitFor
+        target: "input-markdown"
+        timeout: 10000
+    catch:
+      - action: tap
+        target: "button-import-workout"
+  - action: waitFor
+    target: "input-markdown"
+    timeout: 10000
+  - action: replaceText
+    target: "input-markdown"
+    fixture: "timer-auto-scroll-workout.md"
+  - action: tap
+    target: "button-import"
+  - action: waitForText
+    text: "OK"
+    timeout: 10000
+  - action: tapText
+    text: "OK"
+  - action: waitForText
+    text: "Timer Scroll Test"
+    timeout: 10000
+
+tests:
+  - name: "completing a set scrolls the next timed set's timer into view"
+    steps:
+      - action: tapText
+        text: "Timer Scroll Test"
+      - action: waitFor
+        target: "start-workout-button"
+        timeout: 5000
+      - action: tap
+        target: "start-workout-button"
+      - action: waitFor
+        target: "active-workout-screen"
+        timeout: 10000
+      # The stretch is not current yet, so its card is collapsed and has no timer.
+      - action: expect
+        target: "exercise-timer-start-button"
+        assertion: "notToExist"
+      # Finish Push-ups: the stretch (timed) becomes the current set.
+      - action: tap
+        target: "set-complete-button"
+      # Its timer must be on screen without any manual scrolling.
+      - action: expect
+        target: "exercise-timer-start-button"
+        assertion: "toBeOnScreen"
+        timeout: 5000

@@ -13,6 +13,8 @@ struct SupersetCard: View {
     let onSaveSet: (Int, Int, Double?, Int?, Int?) -> Void  // exerciseIndex, setIndex, weight, reps, time
     let onUnlogSet: (Int, Int) -> Void  // exerciseIndex, setIndex
     let onDismissRest: () -> Void
+    /// Hold timer of the given timed set was started/resumed (GH #435).
+    let onStartTimedSet: (String) -> Void
     var restTimerGeneration: Int = 0
 
     /// Weight text from the currently editing set, captured so the inline
@@ -90,7 +92,7 @@ struct SupersetCard: View {
             RestTimerView(totalSeconds: restState.seconds) {
                 onDismissRest()
             }
-            .id(restTimerGeneration)
+            .id(ActiveWorkoutViewModel.restTimerScrollId(generation: restTimerGeneration))
         }
     }
 
@@ -159,6 +161,10 @@ struct SupersetCard: View {
                                 .foregroundStyle(LiftMarkTheme.secondaryLabel)
                                 .italic()
                         }
+                        // Long press → readable enlarged copy (GH #432).
+                        .enlargeNotesOnLongPress(
+                            title: child.exercise.exerciseName, notes: notes,
+                            accessibilityIdentifier: "exercise-notes-\(child.exerciseIndex)")
                         .padding(.leading, 32)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -166,7 +172,8 @@ struct SupersetCard: View {
 
                 // Interleaved sets
                 let interleaved = interleavedSets
-                let firstPendingSetId = interleaved.first(where: { $0.set.status == .pending })?.set.id
+                let firstPending = interleaved.first(where: { $0.set.status == .pending })
+                let firstPendingSetId = firstPending?.set.id
                 ForEach(Array(interleaved.enumerated()), id: \.element.set.id) { _, item in
                     let isCurrent = item.set.id == firstPendingSetId
 
@@ -195,7 +202,13 @@ struct SupersetCard: View {
                         onUnlog: { onUnlogSet(item.exerciseIndex, item.setIndex) },
                         onWeightChanged: isCurrent ? { newWeight in
                             currentWeightText = newWeight
-                        } : nil
+                        } : nil,
+                        // Propagation stays within the member exercise (GH #489).
+                        suggestedWeight: ActiveWorkoutViewModel.suggestedWeight(
+                            forSetAt: item.setIndex, in: item.exercise.sets,
+                            currentSetIndex: firstPending?.exerciseIndex == item.exerciseIndex
+                                ? firstPending?.setIndex : nil,
+                            currentWeight: Double(currentWeightText))
                     )
 
                     // Timed-exercise timer — pinned directly under the active
@@ -204,11 +217,14 @@ struct SupersetCard: View {
                     // can't be re-timed after being skipped + unlogged.
                     if isCurrent,
                        let targetTime = item.set.entries.first?.target?.time, targetTime > 0 {
-                        ExerciseTimerView(targetSeconds: targetTime) { elapsedSeconds in
+                        ExerciseTimerView(
+                            targetSeconds: targetTime,
+                            onStart: { onStartTimedSet(item.set.id) }
+                        ) { elapsedSeconds in
                             let weight = Double(currentWeightText)
                             onCompleteSet(item.exerciseIndex, item.setIndex, weight, nil, elapsedSeconds)
                         }
-                        .id(item.set.id)
+                        .id(ActiveWorkoutViewModel.exerciseTimerScrollId(setId: item.set.id))
                     }
 
                     // Rest timer rendered directly below the set that

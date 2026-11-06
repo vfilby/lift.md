@@ -37,6 +37,7 @@ The "Create Plan" button MUST be placed **inside the ScrollView** as the last co
 - **Tap resume banner** → navigates to `/workout/active`
 - **Tap plan card** → navigates to `/workout/{plan.id}`
 - **Tap "Create Plan" button** → navigates to `/modal/import`
+- **Tap max lift tile** → presents the exercise history sheet (same view as the history detail "Show details" sheet) for that tile's exercise
 - **Long-press max lift tile** (400ms delay) → opens ExercisePickerModal with haptic feedback
 - **Select exercise in picker** → updates `homeTiles` in settings for that tile index
 

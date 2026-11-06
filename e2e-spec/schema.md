@@ -118,8 +118,13 @@ Runners must confirm the input actually gained keyboard focus before
 synthesizing keystrokes, retrying the focusing tap on a miss — on a loaded CI
 host the tap is occasionally dropped, and typing into an unfocused field
 aborts the test (XCUITest: "Neither element nor any descendant has keyboard
-focus"). Runners must also verify the field holds the intended text after
-typing and retry once on mismatch (guards against dropped-keystroke flakes). Secure text fields
+focus"). The focus check must read the input's own focus state, not search the
+app for the on-screen keyboard: the first keyboard bring-up of a run is slow on
+a loaded CI host, and a keyboard query issued while it spins up can exceed
+XCUITest's snapshot timeout ("Failed to get matching snapshots: Timed out while
+evaluating UI query"), which fails the test outright. Runners must also verify
+the field holds the intended text after typing and retry once on mismatch
+(guards against dropped-keystroke flakes). Secure text fields
 (password inputs) cannot be read back as plaintext — their value renders as one
 bullet per character — so runners verify by character count instead of
 equality. On a final mismatch the typed best-effort text must be left in
@@ -208,8 +213,15 @@ Assert a condition on an element.
 | `text`      | yes*     | Visible text to match (*or use `target`)     |
 | `assertion` | yes      | One of the assertion types below             |
 | `value`     | no       | Expected value for `toHaveText`              |
+| `timeout`   | no       | Max wait in ms for `toBeOnScreen` (default 5000) |
 
-**Assertion types**: `toBeVisible`, `toHaveText`, `toExist`, `notToBeVisible`, `notToExist`
+**Assertion types**: `toBeVisible`, `toBeOnScreen`, `toHaveText`, `toExist`, `notToBeVisible`, `notToExist`
+
+`toBeVisible` may scroll the element into view before asserting (runners make
+the target hittable first). `toBeOnScreen` never scrolls: it waits (up to
+`timeout`) for the element to be visible in the current viewport and fails if
+it is only reachable by scrolling. Use it to verify that the app itself brought
+something into view (e.g. auto-scroll to the exercise timer, GH #433).
 
 ### scroll
 

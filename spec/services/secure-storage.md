@@ -2,50 +2,36 @@
 
 ## Purpose
 
-Securely store and retrieve the user's Anthropic API key using the platform's secure storage mechanism (iOS Keychain). The API key is never stored in the database or in plaintext on disk.
+Securely store and retrieve secrets using the platform's secure storage mechanism (iOS Keychain). API keys are never stored in the database or in plaintext on disk.
+
+The BYOK provider key list (Anthropic, OpenAI, Gemini, Ollama) is stored as one Keychain item through the generic accessors below. See `spec/services/ai-providers.md`. The Anthropic-specific API in this file is **legacy**: it is kept only so the one-time migration into the provider list can read and delete the old item.
 
 ## Public API
 
-### `validateAnthropicApiKey(apiKey): boolean`
+Key format validation lives with the provider definitions (`AIProvider.isValidKeyFormat`, `spec/services/ai-providers.md`), not in secure storage.
 
-Validates that a string matches the expected Anthropic API key format.
+### `getLegacyAnthropicApiKey(): string | null`
 
-**Validation regex:** `/^sk-ant-[a-zA-Z0-9_-]{95,}$/`
-
-Returns `true` if valid, `false` otherwise.
-
-### `storeApiKey(apiKey): Promise<void>`
-
-Stores the API key in secure storage after validation.
-
-**Logic:**
-1. Trim whitespace from input.
-2. Validate format using `validateAnthropicApiKey`.
-3. If invalid, throw an error with message describing the expected format.
-4. Write to secure storage under the key `anthropic_api_key`.
-5. If storage fails, throw an error.
-
-### `getApiKey(): Promise<string | null>`
-
-Retrieves the stored API key.
+Retrieves the legacy Anthropic API key (account `anthropic_api_key`). Used only by the provider-list migration.
 
 Returns the key string if present, or `null` if no key is stored. Swallows all errors and returns `null` on failure (defensive — never crashes the app for a missing key).
 
-### `removeApiKey(): Promise<void>`
+### `removeLegacyAnthropicApiKey(): void`
 
-Deletes the API key from secure storage. Throws on failure.
+Deletes the legacy Anthropic key from secure storage. Throws on failure; a missing item is not an error.
 
-### `hasApiKey(): Promise<boolean>`
+### Generic accessors: `store(key, value)`, `retrieve(key)`, `delete(key)`
 
-Convenience method. Calls `getApiKey()` and returns `true` if the result is non-null and non-empty.
+Store, read, or delete an arbitrary UTF-8 string under a Keychain account. The provider key list uses account `ai_provider_keys`.
 
 ## Storage Details
 
 | Property | Value |
 |----------|-------|
-| Storage key | `anthropic_api_key` |
+| Storage key (provider list) | `ai_provider_keys` |
+| Storage key (legacy, migrated away) | `anthropic_api_key` |
 | Platform mechanism | iOS Keychain (via platform secure storage API) |
-| Accessibility | After first unlock |
+| Accessibility | When unlocked, this device only (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`) |
 
 ## Dependencies
 
@@ -53,7 +39,6 @@ Convenience method. Calls `getApiKey()` and returns `true` if the result is non-
 
 ## Error Handling
 
-- `storeApiKey` throws on invalid format or storage failure.
-- `getApiKey` never throws — returns `null` on any error.
-- `removeApiKey` throws on failure.
-- `hasApiKey` never throws — returns `false` on any error.
+- `store` throws on encoding or storage failure.
+- `retrieve` / `getLegacyAnthropicApiKey` never throw; they return `null` on any error.
+- `delete` / `removeLegacyAnthropicApiKey` throw on failure (a missing item is not a failure).

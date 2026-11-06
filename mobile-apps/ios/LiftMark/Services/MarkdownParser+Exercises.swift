@@ -79,13 +79,17 @@ extension MarkdownParser {
         context.currentIndex += 1
 
         // Parse metadata and notes
-        let (equipmentType, notes) = parseExerciseMetadata(context, exerciseHeaderLevel: headerLevel)
+        let metadata = parseExerciseMetadata(context, exerciseHeaderLevel: headerLevel)
+        let notes = metadata.notes
 
         // Parse sets
         let parsedSets = parseSets(context, exerciseHeaderLevel: headerLevel, exerciseId: exerciseId)
 
-        // Auto-detect per-side keywords in exercise notes flag timed sets as isPerSide
-        let sets = applyPerSideFromNotes(parsedSets, notes: notes)
+        // Apply the exercise-level default rest, then auto-detect per-side keywords
+        // in exercise notes to flag timed sets as isPerSide
+        let sets = applyPerSideFromNotes(
+            applyDefaultRest(parsedSets, defaultRest: metadata.defaultRest), notes: notes
+        )
 
         if sets.isEmpty {
             context.errors.append(ParseError(
@@ -108,10 +112,23 @@ extension MarkdownParser {
             exerciseName: exerciseName,
             orderIndex: orderIndex,
             notes: notes,
-            equipmentType: equipmentType,
+            equipmentType: metadata.equipmentType,
             sets: sets
         )
         return .single(exercise)
+    }
+
+    /// Apply an exercise-level default rest to sets without their own @rest.
+    /// Drop sets are excluded: a drop is performed immediately, so a rest timer
+    /// between drops would be wrong (an explicit set-level @rest still applies).
+    private static func applyDefaultRest(_ sets: [PlannedSet], defaultRest: Int?) -> [PlannedSet] {
+        guard let defaultRest else { return sets }
+        return sets.map { set in
+            guard set.restSeconds == nil, !set.isDropset else { return set }
+            var modified = set
+            modified.restSeconds = defaultRest
+            return modified
+        }
     }
 
     /// Flag timed sets as per-side when the exercise notes contain a per-side keyword
@@ -298,12 +315,19 @@ extension MarkdownParser {
         }
     }
 
-    /// Parse exercise metadata (@type, freeform notes)
+    private struct ExerciseMetadata {
+        let equipmentType: String?
+        let notes: String?
+        let defaultRest: Int?
+    }
+
+    /// Parse exercise metadata (@type, default @rest, freeform notes)
     private static func parseExerciseMetadata(
         _ context: ParseContext,
         exerciseHeaderLevel: Int
-    ) -> (equipmentType: String?, notes: String?) {
+    ) -> ExerciseMetadata {
         var equipmentType: String?
+        var defaultRest: Int?
         var noteLines: [String] = []
 
         while context.currentIndex < context.lines.count {
@@ -323,6 +347,8 @@ extension MarkdownParser {
             if line.isMetadata {
                 if line.metadataKey == "type" {
                     equipmentType = line.metadataValue
+                } else if line.metadataKey == "rest" {
+                    defaultRest = parseDefaultRest(line, context: context) ?? defaultRest
                 }
                 // Ignore unknown metadata (forward compatible)
                 context.currentIndex += 1
@@ -334,9 +360,26 @@ extension MarkdownParser {
             }
         }
 
-        return (
+        return ExerciseMetadata(
             equipmentType: equipmentType,
-            notes: noteLines.isEmpty ? nil : noteLines.joined(separator: "\n")
+            notes: noteLines.isEmpty ? nil : noteLines.joined(separator: "\n"),
+            defaultRest: defaultRest
         )
+    }
+
+    /// Parse an exercise-level `@rest:` default. The value must be exactly a duration.
+    private static func parseDefaultRest(_ line: ParsedLine, context: ParseContext) -> Int? {
+        context.exerciseRestDefaultLines.insert(line.lineNumber)
+        let value = line.metadataValue ?? ""
+        guard let rest = parseRestTime(value) else {
+            context.errors.append(ParseError(
+                line: line.lineNumber,
+                message: "Invalid rest time format: \(value). Expected format: \"180s\" or \"3m\"",
+                code: "INVALID_REST"
+            ))
+            return nil
+        }
+        warnRestRange(rest, context: context, lineNumber: line.lineNumber)
+        return rest
     }
 }

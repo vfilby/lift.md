@@ -1,0 +1,46 @@
+name: "Inbox — Start opens the active workout"
+
+# GH #487: Start from the inbox landed on a blank screen (back button + tab
+# bar, empty content) because the push went to the Home tab's navigation stack
+# while the Plans tab was on screen. Active Workout must be pushed onto the
+# Plans tab's own stack, after the preview sheet has gone.
+#
+# The row is seeded locally (--seed-inbox-item, id `seed-inbox-item`) so the
+# flow needs no backend and no signed-in session; the server DELETE after
+# promotion is skipped when unauthenticated. See spec/services/workout-inbox.md.
+
+setupOnce:
+  - action: launchApp
+    newInstance: true
+    launchArgs:
+      - "--reset-data"
+      - "--enable-flag=workoutInbox"
+      - "--seed-inbox-item"
+
+tests:
+  - name: "Start from the preview sheet lands in Active Workout"
+    steps:
+      - action: tap
+        target: "tab-workouts"
+      - action: waitFor
+        target: "inbox-row-seed-inbox-item"
+        timeout: 15000
+      - action: tap
+        target: "inbox-row-seed-inbox-item"
+      - action: waitFor
+        target: "inbox-preview-start"
+        timeout: 10000
+      - action: tap
+        target: "inbox-preview-start"
+      # The live workout, with its own header. Active Workout hides the nav
+      # bar, so a back button over empty content is the placeholder, not the
+      # workout.
+      - action: waitFor
+        target: "active-workout-screen"
+        timeout: 15000
+      - action: expect
+        target: "active-workout-header"
+        assertion: "toBeOnScreen"
+      - action: waitForText
+        text: "Inbox Seed Day"
+        timeout: 5000

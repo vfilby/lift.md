@@ -57,6 +57,9 @@ const exampleLmwf = `# Push Day
             <label style="font-weight: normal; display: inline;">
               <input type="checkbox" id="scope-read" checked /> workouts:read
             </label>
+            <label style="font-weight: normal; display: inline;">
+              <input type="checkbox" id="scope-ai-edit" /> ai:edit
+            </label>
           </div>
           <div class="row-actions">
             <button type="submit" class="btn btn-small">Create</button>
@@ -437,6 +440,7 @@ const exampleLmwf = `# Push Day
         const scopes = [];
         if (document.getElementById('scope-write').checked) scopes.push('workouts:write');
         if (document.getElementById('scope-read').checked) scopes.push('workouts:read');
+        if (document.getElementById('scope-ai-edit').checked) scopes.push('ai:edit');
         if (scopes.length === 0) {
           newTokenMsg.innerHTML = '<div class="inline-msg err">Select at least one scope.</div>';
           return;

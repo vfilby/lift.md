@@ -52,19 +52,31 @@ enum MarkdownParser {
 
         // Find workout header
         guard let workoutHeaderLine = findWorkoutHeader(context) else {
+            // Point at header-shaped lines missing their space (`#push day`) first —
+            // they are the usual reason nothing qualified (GH #472).
+            reportMalformedHeaders(context)
+            var errors = context.errors.map { "Line \($0.line): \($0.message)" }
+            errors.append("No workout header found. Must have a header (# Workout Name) with exercises below it.")
             return LMWFParseResult(
                 success: false,
                 data: nil,
-                errors: ["No workout header found. Must have a header (# Workout Name) with exercises below it."],
-                warnings: []
+                errors: errors,
+                warnings: [],
+                fixes: context.fixes
             )
         }
+
+        let workoutHeaderIndex = context.currentIndex
 
         // Parse workout metadata and notes
         let section = parseWorkoutSection(context, headerLine: workoutHeaderLine)
 
         // Parse exercises
         var exercises = parseExercises(context, workoutPlanId: workoutId)
+
+        // Flag set modifiers written on their own line anywhere in the workout block
+        // (runs after exercise parsing so exercise-level `@rest:` defaults are known)
+        warnStandaloneModifiers(context, workoutHeaderIndex: workoutHeaderIndex)
 
         // Apply default weight unit to sets that have a weight but no explicit unit
         applyDefaultWeightUnit(section.defaultWeightUnit, to: &exercises)
@@ -92,7 +104,8 @@ enum MarkdownParser {
             data: workout,
             errors: [],
             warnings: context.warnings.map { "Line \($0.line): \($0.message)" },
-            exerciseSpans: context.spans
+            exerciseSpans: context.spans,
+            fixes: context.fixes
         )
     }
 
@@ -134,7 +147,8 @@ enum MarkdownParser {
             success: false,
             data: nil,
             errors: context.errors.map { "Line \($0.line): \($0.message)" },
-            warnings: context.warnings.map { "Line \($0.line): \($0.message)" }
+            warnings: context.warnings.map { "Line \($0.line): \($0.message)" },
+            fixes: context.fixes
         )
     }
 

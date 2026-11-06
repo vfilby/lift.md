@@ -30,6 +30,7 @@ Current flags:
 |------------------|---------|------------------------------------------------------------------------|
 | `workoutInbox`   | off     | Home inbox card, Plans Inbox section, `InboxPollerService` networking. |
 | `useBetaApi`     | off     | Routes the API base URL to the beta environment instead of prod. Off = prod. **Toggling forces a sign-out** because tokens issued by one env aren't valid in the other. **Child of `workoutInbox`** (see below). |
+| `aiPlanEditing`  | off     | "Edit with AI" on Workout Detail and the AI Edit sheet (`spec/services/ai-plan-editing.md`). **Child of `workoutInbox`** — the LiftMark cloud engine needs the account API. Turning it off resets the AI engine override to `auto`. |
 
 ## Flag hierarchy (parent/child)
 
@@ -40,7 +41,8 @@ A flag may declare a `parent` (`FeatureFlag.parent`). A child flag only makes se
 
 Current hierarchy:
 
-- `useBetaApi` is a child of `workoutInbox` — the beta environment only serves the account + sync API, which the inbox drives. There's no reason to switch environments unless the inbox is in use.
+- `useBetaApi` is a child of `workoutInbox` — the beta environment only serves the account + sync API, which the inbox drives.
+- `aiPlanEditing` is a child of `workoutInbox` — its cloud engine talks to the same account API. There's no reason to switch environments unless the inbox is in use.
 
 `FeatureFlag.topLevelCases` are the roots the Settings list iterates; each root's `children` render beneath it.
 
@@ -60,6 +62,10 @@ Unlike the other flags (which gate UI / poller behavior), `useBetaApi` changes t
 Side effect on toggle: every session token (`lmwf_access_jwt`, `lmwf_refresh_token`) and every device-local server-keyed table (`workout_inbox`, `outbox_pending_queue`) was issued/scoped to the *previous* environment. To avoid 401-loops and orphan rows, the Settings row for `useBetaApi` calls `authStore.logout()` immediately after `flags.set(.useBetaApi, ...)`. `logout()` already wipes tokens + inbox + outbox queue.
 
 This is the only flag that's special-cased in the Settings UI; future flags with similar side effects should follow the same pattern (per-flag effect inline at the toggle site, never inside `FeatureFlagsStore` itself).
+
+### Developer setting: AI engine override
+
+`aiPlanEditing` has one companion developer *setting* that is not a boolean flag: `AIEngineOverride` (`auto | applePrivateCloud | appleOnDevice | liftMarkCloud`). It is stored in `UserDefaults` under `feature_flag.aiEngineOverride` (default `auto`), exposed as `FeatureFlagsStore.engineOverride`, and rendered as a `Picker` row (`ai-engine-override-picker`, title "AI engine") nested beneath the `aiPlanEditing` row only while that flag is on. Disabling `aiPlanEditing` resets it to `auto` (side effect at the toggle site, like `useBetaApi`). Launch argument `--ai-engine-override=<rawValue>` sets it for UI tests; `--ai-engine-stub` selects the stub engine regardless of the override. This is the one sanctioned exception to "flags are toggles": it exists purely so each AI engine can be exercised on a real device, and it is removed with the flag.
 
 ## Gating pattern
 
@@ -81,4 +87,4 @@ When a flag has been on by default in shipped builds for one full release cycle 
 
 ## Testing
 
-UI tests pass `--enable-flag=workoutInbox` (etc.) as a launch argument to force a flag on without poking UserDefaults. `FeatureFlagsStore` reads launch arguments in its initializer, so the override applies before any view evaluates.
+UI tests pass `--enable-flag=workoutInbox` (etc.) as a launch argument to force a flag on without poking UserDefaults. The AI engine override is set the same way with `--ai-engine-override=<rawValue>`. `FeatureFlagsStore` reads launch arguments in its initializer, so the override applies before any view evaluates.

@@ -91,6 +91,7 @@ struct MaxLiftTile: View {
     let unit: WeightUnit
     let isRegularWidth: Bool
     let sparklineData: [Double]
+    let onTap: () -> Void
     let onLongPress: () -> Void
 
     var body: some View {
@@ -127,14 +128,17 @@ struct MaxLiftTile: View {
         .padding(LiftMarkTheme.spacingLG)
         .background(LiftMarkTheme.secondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: LiftMarkTheme.cornerRadiusMD))
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
         .onLongPressGesture(minimumDuration: 0.4) {
             onLongPress()
         }
+        .accessibilityAddTraits(.isButton)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(maxWeight != nil
             ? "\(exerciseName), \(formatWeight(maxWeight!)) \(unit.rawValue)"
             : "\(exerciseName), no data yet")
-        .accessibilityHint("Long press to change exercise")
+        .accessibilityHint("Tap for history. Long press to change exercise")
     }
 
     private func formatWeight(_ weight: Double) -> String {
