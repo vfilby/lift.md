@@ -123,6 +123,10 @@ jobs:
           cache-dependency-path: validator/package-lock.json
       - name: Install validator deps
         run: npm ci --no-audit --no-fund
+      # The full vitest run includes cdk/*.test.ts (aws-cdk-lib/assertions).
+      - name: Install CDK deps
+        working-directory: validator/cdk
+        run: npm ci --no-audit --no-fund
       - name: Bring up DDB Local + Mailpit
         run: |
           set -euo pipefail
