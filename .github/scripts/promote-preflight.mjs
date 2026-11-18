@@ -28,6 +28,7 @@
 import { writeFileSync } from 'node:fs';
 import {
   required,
+  fetchWithRetry,
   getAppId,
   getGroupId,
   listBuildsInGroup,
@@ -65,9 +66,9 @@ function rollupNotes(prevPreflightVersion, promotedVersion) {
 let _sentryProjectId;
 async function sentryProjectId(org, projectSlug, token) {
   if (_sentryProjectId) return _sentryProjectId;
-  const res = await fetch(`https://sentry.io/api/0/projects/${encodeURIComponent(org)}/${encodeURIComponent(projectSlug)}/`, {
+  const res = await fetchWithRetry(`https://sentry.io/api/0/projects/${encodeURIComponent(org)}/${encodeURIComponent(projectSlug)}/`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }, { label: 'Sentry project lookup' });
   if (!res.ok) throw new Error(`Sentry project lookup → ${res.status}: ${await res.text()}`);
   _sentryProjectId = (await res.json()).id;
   return _sentryProjectId;
@@ -87,9 +88,9 @@ async function sentryCrashFreeRate(release) {
   });
   params.append('field', 'crash_free_rate(session)');
 
-  const res = await fetch(`https://sentry.io/api/0/organizations/${encodeURIComponent(org)}/sessions/?${params}`, {
+  const res = await fetchWithRetry(`https://sentry.io/api/0/organizations/${encodeURIComponent(org)}/sessions/?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }, { label: 'Sentry sessions' });
   if (!res.ok) throw new Error(`Sentry sessions → ${res.status}: ${await res.text()}`);
   const data = await res.json();
 
@@ -115,9 +116,9 @@ async function sentryUnresolvedIssueCount(release) {
     statsPeriod: '14d',
     limit: '100',
   });
-  const res = await fetch(`https://sentry.io/api/0/organizations/${encodeURIComponent(org)}/issues/?${params}`, {
+  const res = await fetchWithRetry(`https://sentry.io/api/0/organizations/${encodeURIComponent(org)}/issues/?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }, { label: 'Sentry issues' });
   if (!res.ok) throw new Error(`Sentry issues → ${res.status}: ${await res.text()}`);
   // X-Hits exposes total without paginating; fall back to page length.
   const hits = res.headers.get('x-hits');

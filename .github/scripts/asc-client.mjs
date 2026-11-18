@@ -47,19 +47,83 @@ export function required(name) {
   return v;
 }
 
+// Transient-failure policy shared by every outbound call in the release scripts.
+// Apple's ASC API and Sentry both return sporadic 5xx / 429s; without a retry a single
+// blip fails the whole weekly promotion (2026-11-17: ASC GET /apps → 500 UNEXPECTED_ERROR
+// on the very first request). Only statuses that are safe to repeat are retried; 4xx
+// other than 408/429 are returned to the caller unchanged so error-message contracts
+// (e.g. the 409 check in submitForAppStoreReview) still hold.
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+function backoffMs(attempt, baseDelayMs, maxDelayMs) {
+  return Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
+}
+
+// Retry-After is either delta-seconds or an HTTP-date. Returns null when absent/unparseable.
+function retryAfterMs(headers, maxDelayMs, now = Date.now()) {
+  const raw = headers?.get?.('retry-after');
+  if (raw == null || raw === '') return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, maxDelayMs);
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return null;
+  return Math.min(Math.max(at - now, 0), maxDelayMs);
+}
+
+// fetch() with exponential backoff on retryable statuses and network errors.
+// Resolves with the final Response (ok or not) so callers keep their own status
+// handling; rejects only if the last attempt itself throws. `attempts` counts the
+// first try, so attempts=4 means up to 3 retries. Dependencies are injectable for tests.
+export async function fetchWithRetry(url, init = {}, opts = {}) {
+  const {
+    attempts = 4,
+    baseDelayMs = 1000,
+    maxDelayMs = 30_000,
+    fetchImpl = globalThis.fetch,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    log = (msg) => console.warn(msg),
+    label = `${init.method || 'GET'} ${url}`,
+  } = opts;
+  if (!(attempts >= 1)) throw new Error(`fetchWithRetry: attempts must be >= 1, got ${attempts}`);
+
+  for (let attempt = 1; ; attempt++) {
+    const isLast = attempt >= attempts;
+    let res;
+    try {
+      res = await fetchImpl(url, init);
+    } catch (err) {
+      if (isLast) throw err;
+      const delay = backoffMs(attempt, baseDelayMs, maxDelayMs);
+      log(`${label} → ${err?.message || err}; retrying in ${delay}ms (attempt ${attempt}/${attempts})`);
+      await sleep(delay);
+      continue;
+    }
+    if (res.ok || !RETRYABLE_STATUSES.has(res.status) || isLast) return res;
+    const delay = retryAfterMs(res.headers, maxDelayMs) ?? backoffMs(attempt, baseDelayMs, maxDelayMs);
+    log(`${label} → ${res.status}; retrying in ${delay}ms (attempt ${attempt}/${attempts})`);
+    await sleep(delay);
+  }
+}
+
 export async function ascFetch(path, init = {}) {
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${makeJwt()}`,
-      'Content-Type': 'application/json',
-      ...(init.headers || {}),
+  const method = init.method || 'GET';
+  // One JWT for all attempts: it is valid for 20 minutes, far longer than the backoff window.
+  const res = await fetchWithRetry(
+    url,
+    {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${makeJwt()}`,
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
     },
-  });
+    { label: `ASC ${method} ${path}` },
+  );
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`ASC ${init.method || 'GET'} ${path} → ${res.status}: ${body}`);
+    throw new Error(`ASC ${method} ${path} → ${res.status}: ${body}`);
   }
   return res.status === 204 ? null : res.json();
 }
