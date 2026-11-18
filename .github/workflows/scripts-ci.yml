@@ -1,0 +1,38 @@
+name: '[CI] Release scripts'
+
+# Unit tests for the Node scripts behind the TestFlight/App Store promotion workflows
+# (.github/scripts/*.mjs). Scoped by path so unrelated PRs don't pay for it; it is not a
+# required status check, so skipping is harmless.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/scripts-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/scripts-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: node --test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Syntax-check every script
+        run: for f in .github/scripts/*.mjs; do node --check "$f"; done
+
+      - name: Run unit tests
+        run: node --test .github/scripts/*.test.mjs
